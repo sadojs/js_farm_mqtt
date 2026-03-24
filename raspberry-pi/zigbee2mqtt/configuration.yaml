@@ -1,0 +1,65 @@
+# Smart Farm MQTT - Zigbee2MQTT 설정
+# 경로: /opt/zigbee2mqtt/data/configuration.yaml
+
+# Home Assistant 연동 비활성화
+homeassistant: false
+
+# MQTT Broker 연결
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://localhost:1883
+  # user: mqtt_user
+  # password: mqtt_password
+
+# Zigbee 코디네이터 (Tuya ZNDongle-E)
+serial:
+  port: /dev/ttyUSB0
+  # ZNDongle-E가 /dev/ttyZigbee로 symlink 되면 아래 사용
+  # port: /dev/ttyZigbee
+  adapter: zstack
+
+# 웹 프론트엔드 (장비 페어링/관리용)
+frontend:
+  port: 8080
+  host: 0.0.0.0
+
+# 고급 설정
+advanced:
+  # 로그 레벨
+  log_level: info
+  log_output:
+    - console
+
+  # 네트워크 키 (첫 실행 시 자동 생성)
+  network_key: GENERATE
+
+  # PAN ID (첫 실행 시 자동 생성)
+  pan_id: GENERATE
+
+  # 채널 (기본 11, 간섭이 있으면 15, 20, 25 중 선택)
+  channel: 11
+
+  # 마지막 상태 retain (재부팅 시 상태 복원)
+  last_seen: ISO_8601
+  elapsed: false
+
+  # Zigbee2MQTT 자동 업데이트 확인 비활성화
+  homeassistant_legacy_entity_attributes: false
+  legacy_api: false
+  legacy_availability_payload: false
+
+# 장비 가용성 모니터링 (오프라인 감지)
+availability:
+  active:
+    timeout: 10      # 10분 동안 메시지 없으면 오프라인
+  passive:
+    timeout: 1500    # 25시간 (배터리 장비용)
+
+# OTA 펌웨어 업데이트 (선택)
+ota:
+  update_check_interval: 1440  # 24시간마다 확인
+  disable_automatic_update_check: true
+
+# 장비 목록 (페어링하면 자동 추가됨)
+devices: {}
+groups: {}

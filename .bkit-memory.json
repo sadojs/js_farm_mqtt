@@ -1,22 +1,22 @@
 {
   "version": "1.5.3",
   "project": {
-    "name": "smart-farm-platform",
+    "name": "smart-farm-mqtt",
     "level": "dynamic",
-    "description": "Tuya IoT 기반 스마트 농업 자동화 플랫폼",
+    "description": "Zigbee/MQTT 기반 스마트 농업 자동화 플랫폼",
     "techStack": {
       "frontend": "Vue 3 + TypeScript + Vite",
       "backend": "NestJS + TypeScript",
       "database": "PostgreSQL + TimescaleDB",
       "cache": "Redis",
       "realtime": "Socket.io",
-      "iot": "Tuya Cloud API"
+      "iot": "Zigbee2MQTT + Mosquitto"
     }
   },
   "pdca": {
-    "currentFeature": "env-group-scope",
-    "phase": "check",
-    "matchRate": 97,
+    "currentFeature": "mqtt-integration",
+    "phase": "plan",
+    "matchRate": 0,
     "iterationCount": 0,
     "history": [
       {
