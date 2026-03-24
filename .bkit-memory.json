@@ -1,0 +1,433 @@
+{
+  "version": "1.5.3",
+  "project": {
+    "name": "smart-farm-platform",
+    "level": "dynamic",
+    "description": "Tuya IoT 기반 스마트 농업 자동화 플랫폼",
+    "techStack": {
+      "frontend": "Vue 3 + TypeScript + Vite",
+      "backend": "NestJS + TypeScript",
+      "database": "PostgreSQL + TimescaleDB",
+      "cache": "Redis",
+      "realtime": "Socket.io",
+      "iot": "Tuya Cloud API"
+    }
+  },
+  "pdca": {
+    "currentFeature": "env-group-scope",
+    "phase": "check",
+    "matchRate": 97,
+    "iterationCount": 0,
+    "history": [
+      {
+        "action": "plan_created",
+        "feature": "smart-farm-platform",
+        "timestamp": "2026-02-10T00:00:00Z",
+        "details": "프로젝트 설계 검토 Plan 문서 작성 완료"
+      },
+      {
+        "action": "design_created",
+        "feature": "smart-farm-platform",
+        "timestamp": "2026-02-10T00:00:00Z",
+        "details": "상세 설계 문서 작성 완료 - 프론트엔드/백엔드/DB/보안/구현순서"
+      },
+      {
+        "action": "plan_created",
+        "feature": "automation-rules",
+        "timestamp": "2026-02-11T00:00:00Z",
+        "details": "자동화 룰 관리 기능 Plan 문서 작성 - 개폐기/환풍기/관수 룰 생성 위저드"
+      },
+      {
+        "action": "design_created",
+        "feature": "automation-rules",
+        "timestamp": "2026-02-11T00:00:00Z",
+        "details": "상세 설계 완료 - 데이터 구조(ConditionGroup/RuleAction), 위저드 4단계 UI, 10단계 구현순서"
+      },
+      {
+        "action": "do_started",
+        "feature": "automation-rules",
+        "timestamp": "2026-02-11T00:00:00Z",
+        "details": "구현 시작 - 10단계 구현순서 따라 진행"
+      },
+      {
+        "action": "do_completed",
+        "feature": "automation-rules",
+        "timestamp": "2026-02-12T00:00:00Z",
+        "details": "10단계 구현 완료 - 타입/헬퍼/DTO/서비스/위저드6컴포넌트/Automation.vue 리팩토링, TypeScript+Vite 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "smart-farm-platform",
+        "timestamp": "2026-02-19T00:00:00Z",
+        "details": "전체 플랫폼 Gap 분석 완료 - Match Rate 82%, 10개 Gap 발견 (테스트 미구현, WebSocket 미연결, 알림모듈 미구현 등)"
+      },
+      {
+        "action": "plan_created",
+        "feature": "ui-improvement",
+        "timestamp": "2026-02-19T00:00:00Z",
+        "details": "모바일 UX 개선 Plan 작성 - 하단탭바/SafeArea/접근성/ConfirmDialog/StepByStep위저드/ProgressiveDisclosure, 9개 FR, 4Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "ui-improvement",
+        "timestamp": "2026-02-19T00:00:00Z",
+        "details": "상세 설계 완료 - BottomTabBar/MoreMenu/ConfirmDialog/useConfirm/SummaryCards 5개 신규 컴포넌트, 9개 기존파일 수정, 12단계 구현순서"
+      },
+      {
+        "action": "plan_created",
+        "feature": "platform-bugfix-v2",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "6개 요구사항 Plan 작성 - 폰트가독성/CSS변수교체/그룹센서로딩/Tuya동기화/전체센서표시/리포트연동"
+      },
+      {
+        "action": "plan_created",
+        "feature": "ui-enhancement-v2",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "시니어 사용자 접근성 개선 Plan 작성 - 다크모드/폰트확대/버튼통일/장비ID숨김/카드디자인통일, 5개 FR, 5Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "ui-enhancement-v2",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "상세 설계 완료 - CSS변수 50+개 정의(라이트/다크), 10개 파일 120+개 색상매핑, 버튼3단계규격, 카드통일규격, 10단계 구현순서"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "ui-enhancement-v2",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 94%, 9개 Gap (Small버튼5건, 카드2건, 하드코딩색상2건), FR-01/02/04 100% 달성"
+      },
+      {
+        "action": "iteration_completed",
+        "feature": "ui-enhancement-v2",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "Act-1 완료 - 8개 Gap 수정 (탭Small규격3건, Reports Medium/Small 2건, sensor-card배경, sub-card규격, warning변수추가), Match Rate 94%→98%, 빌드 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "platform-fix-v3",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "4개 FR Plan 작성 - 센서표시필터링(5개)/대시보드정리+날씨확대/다크모드배경수정/자동화카드녹색제거, 5Phase 구현순서"
+      },
+      {
+        "action": "do_completed",
+        "feature": "platform-fix-v3",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "5Phase 구현 완료 - 센서5개필터(Sensors/SummaryCards/automation-helpers), 대시보드격자+API제거+날씨확대, 다크모드14파일background교체, 자동화카드border-left제거, 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "platform-fix-v3",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 78%, FR-01(90%)/FR-02(100%)/FR-04(100%) PASS, FR-03(40%) FAIL - StepConditionBuilder/UserManagement/RuleWizardModal 하드코딩 색상 7건"
+      },
+      {
+        "action": "iteration_completed",
+        "feature": "platform-fix-v3",
+        "timestamp": "2026-02-20T00:00:00Z",
+        "details": "Act-1 완료 - FR-03 하드코딩 색상 8건 수정 (StepConditionBuilder #fafafa→var(--bg-secondary), UserManagement #f5f5f5/#f8f9fa/#f0f0f0→CSS변수 4건, RuleWizardModal #eee/#f5f5f5→CSS변수 3건), Match Rate 78%→95%, 빌드 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "automation-device-v2",
+        "timestamp": "2026-02-21T00:00:00Z",
+        "details": "7개 FR Plan 작성 - 자동화위저드(장비단일선택/히스테리시스조건/시간대스케줄러/릴레이동작대기) + 장비등록(타입변경/개폐기페어링/인터록제어), 7Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "automation-device-v2",
+        "timestamp": "2026-02-21T00:00:00Z",
+        "details": "상세 설계 완료 - 6개 데이터구조변경(EquipmentType/Device/Condition/WizardFormData/RuleAction/DB), 4개 컴포넌트(StepActuatorSelect/StepConditionBuilder/DeviceRegistration/Devices), 5개 백엔드(entity/service/runner 히스테리시스+시간대+릴레이), 7Phase 구현순서"
+      },
+      {
+        "action": "do_completed",
+        "feature": "automation-device-v2",
+        "timestamp": "2026-02-21T00:00:00Z",
+        "details": "7Phase 구현 완료 - EquipmentType(opener→opener_open/close)+DB마이그레이션, 개폐기페어링(DeviceRegistration+백엔드), 인터록제어(Devices.vue 1.5초딜레이), 장비단일선택(StepActuatorSelect라디오+개폐기숨김), 히스테리시스(기준값+편차UI+백엔드evaluateSingleCondition), 시간대스케줄러(timeSlots+요일+반복), 릴레이(50/10분사이클+checkRelayCycle), 프론트/백엔드 빌드 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "equipment-ui-toggle-status",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "5개 FR Plan 작성 - 개폐기/관수 ON/OFF→토글변환, 개폐기 장비뱃지 추가, 관수 상태모달(8개 스위치 읽기전용), 그룹관리 관수에도 상태모달 추가, 4Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "equipment-ui-toggle-status",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "상세 설계 완료 - Devices.vue(개폐기토글+뱃지, 관수토글, 상태모달), Groups.vue(상태버튼+모달), IRRIGATION_SWITCH_LABELS 8개 스위치 매핑, 4Phase 7Step 구현순서"
+      },
+      {
+        "action": "do_completed",
+        "feature": "equipment-ui-toggle-status",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "4Phase 구현 완료 - 개폐기(장비뱃지+토글변환), 관수(토글변환+상태버튼+8스위치상태모달), Groups.vue(상태버튼+모달), StepDeviceAction.vue TS에러수정, 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "equipment-ui-toggle-status",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 100%, FR-01~FR-05 전체 PASS, Gap 0건, 추가수정: RuleWizardModal noSensor 복원 버그 수정"
+      },
+      {
+        "action": "plan_created",
+        "feature": "ui-design-improvement",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "5개 FR Plan 작성 - 토글간격개선/시간피커교체(vue-datepicker)/상세설정폰트확대/날짜피커교체/센서가로레이아웃, 5Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "ui-design-improvement",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "상세 설계 완료 - VueDatePicker(time-picker+date-picker)+다크모드연동(useLocalStorage), 폰트5개확대(content-scale), 토글행간격+구분선, 센서grid→flex가로레이아웃, 5Phase 7Step 구현순서"
+      },
+      {
+        "action": "do_completed",
+        "feature": "ui-design-improvement",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "5Phase 구현 완료 - VueDatePicker설치+named import수정, StepIrrigationCondition(time-picker교체+timePickerValue computed+isDark+폰트5개확대), Reports(date-picker2개교체+isDark+CSS커스텀), Groups(토글padding+구분선+센서flex가로레이아웃), vue-tsc+vite빌드 통과"
+      },
+      {
+        "action": "do_completed",
+        "feature": "ui-design-improvement",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "사용자 피드백 5회 반영 완료 - StepIrrigationCondition(VueDatePicker제거→네이티브select2개 시/분, iOS스타일 스크롤휠), Reports(dp__input_icon CSS숨김+시간제거+yyyy-MM-dd포맷), Groups(센서flex-wrap변경), 빌드 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "report-weather-integration",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "4개 FR Plan 작성 - 리포트조회버그(updateDateRange미호출)/날씨DB저장(weather_data hypertable+크론잡)/날씨조회API/센서타입UI변경+날씨비교차트, 7Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "report-weather-integration",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "상세 설계 완료 - WeatherData엔티티(복합PK time+userId), WeatherCollectorService(Cron EVERY_HOUR+DashboardService재사용), DashboardModule exports추가, ReportsService getWeatherHourly, Reports.vue(onCustomQuery버그수정+weatherData ref+차트점선라인4색), 7Phase 12Step 구현순서"
+      },
+      {
+        "action": "plan_created",
+        "feature": "role-based-access",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "5개 FR Plan 작성 - 3-tier RBAC(admin/farm_admin/farm_user), 메뉴접근제어(farm_user:장비/자동화/사용자관리숨김), 사용자등록폼(역할3개+팜선택+Tuya연동생략), parent_user_id기반데이터공유, 계정마이그레이션(test/user→farm_admin), 5Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "role-based-access",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "상세 설계 완료 - DB(role CHECK+parent_user_id), Entity/DTO/JwtPayload 3-tier확장, UsersService(findFarmAdmins+getEffectiveUserId), 4개Controller effectiveUserId적용, Frontend(auth.store isFarmAdmin/isFarmUser+router denyFarmUser+App.vue메뉴조건부+UserFormModal 역할3개+팜선택UI+UserManagement 뱃지3종), 6Phase 18Step 구현순서"
+      },
+      {
+        "action": "do_completed",
+        "feature": "role-based-access",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "6Phase 구현 완료 - DB(schema/seed role CHECK+parent_user_id), Entity/DTO 3-tier확장, JWT(parentUserId payload), AuthService(login/refresh/getMe parentUserId), UsersService(findFarmAdmins+getEffectiveUserId+findAll parentUserName/tuyaProject+create/update parentUserId), UsersController(farm-admins), 4개Controller effectiveUserId, Frontend auth(types+store isFarmAdmin/isFarmUser), Router(denyFarmUser+guard), App.vue(데스크탑+모바일 v-if+userRole 3종), user.api.ts(getFarmAdmins+CreateUserRequest), UserFormModal(역할3개+팜선택+Tuya조건부), UserManagement(뱃지3종+parentBadge+saveUser parentUserId), 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "role-based-access",
+        "timestamp": "2026-02-22T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 100%, 23개 항목 6카테고리 전체 PASS (DB/Entity 4, Backend Auth 4, Backend Data Sharing 6, Frontend Auth 4, Frontend User Mgmt 3, Security 2)"
+      },
+      {
+        "action": "plan_created",
+        "feature": "monitoring-widgets",
+        "timestamp": "2026-02-23T00:00:00Z",
+        "details": "7개 환경 모니터링 위젯 Plan 작성 - VPD/환기스코어/온도변화율/습도변화율/ΔT·ΔRH게이지/UV위험도/환경점수, 센서분석(qxj=내부+KMA=외부, 추가센서불필요), 백엔드API+계산유틸+위젯컴포넌트+Dashboard통합"
+      },
+      {
+        "action": "design_created",
+        "feature": "monitoring-widgets",
+        "timestamp": "2026-02-23T00:00:00Z",
+        "details": "상세 설계 완료 - 데이터소스(qxj=내부센서, KMA API=외부, hjjcy=CO2전용), 백엔드(GET /dashboard/widgets+4개SQL쿼리병렬), 계산유틸(8개함수:VPD/환기/변화율/UV/환경점수), MonitoringWidgets.vue(7카드+게이지+sparkline+반응형3열), Dashboard통합(Promise.all), 6Phase 21검증항목"
+      },
+      {
+        "action": "do_started",
+        "feature": "monitoring-widgets",
+        "timestamp": "2026-02-23T00:00:00Z",
+        "details": "6Phase 구현 시작 - 백엔드API/계산유틸/API클라이언트/위젯컴포넌트/Dashboard통합/빌드검증"
+      },
+      {
+        "action": "do_completed",
+        "feature": "monitoring-widgets",
+        "timestamp": "2026-02-23T00:00:00Z",
+        "details": "6Phase 구현 완료 - dashboard.module(Device+SensorData import), dashboard.service(getWidgetData+4개쿼리병렬:latest/history/trend6h/uvStats14d), dashboard.controller(GET /widgets+effectiveUserId), widget-calculations.ts(VPD/환기/변화율/UV/환경점수+sparkline+gauge 11개함수), MonitoringWidgets.vue(7카드+게이지바+SVG sparkline+반응형3→2→1열), Dashboard.vue(Promise.all병렬호출+widgetData ref), 백엔드+프론트엔드 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "monitoring-widgets",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 100%, 21개 항목 전체 PASS(14)+ENHANCED(7), FAIL 0건. Enhancement: 방울토마토기준(VPD1.4/Temp22-26/Humidity60-70), 교차분석권고(envRecommendations), WebSocket실시간갱신(sensor:update 2s debounce), Sensors.vue그룹내부배치"
+      },
+      {
+        "action": "plan_created",
+        "feature": "harvest-sensor-alerts",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "2기능 Plan 작성 - 수확예측카운터(crop_batches CRUD+D-day/진행률+프리셋6종+둔내기준방울토마토) + 센서이상감지(sensor_alerts+크론5분+4룰:no_data/flatline/spike/out_of_range+인박스UI), Zero Impact설계(기존모듈수정없음, 삭제8단계), 신규파일15개, 6Phase 구현순서"
+      },
+      {
+        "action": "design_created",
+        "feature": "harvest-sensor-alerts",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "상세 설계 완료 - DB(crop_batches+sensor_alerts 2테이블), 수확백엔드(CropBatch entity+DTO+7API+clone), 알림백엔드(SensorAlert entity+SENSOR_ALERT_RULES 7센서+Cron5분+4check+중복방지+24h통계+snooze), 프론트(harvest-presets6종+Harvest.vue탭/카드/D-day/진행률/모달+Alerts.vue필터/카드/상세모달), 라우터/네비/AppModule수정, 신규15+수정4=19파일, 6Phase 25검증항목"
+      },
+      {
+        "action": "do_completed",
+        "feature": "harvest-sensor-alerts",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "6Phase 구현 완료 - DB(crop_batches+sensor_alerts DDL+인덱스+트리거), 수확백엔드(CropBatch entity+CreateBatchDto/UpdateBatchDto+HarvestService 7메서드+HarvestController 7엔드포인트+HarvestModule), 알림백엔드(SensorAlert entity+sensor-alert-rules 7센서파라미터+SensorAlertsService Cron5분+4check+중복방지+24h통계+SensorAlertsController 4엔드포인트+SensorAlertsModule), 프론트(harvest-presets.ts 6종+harvest.api.ts 7메서드+sensor-alerts.api.ts 4메서드+Harvest.vue탭/카드/D-day/진행률/모달+Alerts.vue필터칩/카드/상세모달/스누즈), 라우터2개라우트+App.vue네비4링크(데스크탑+모바일)+AppModule 2모듈import, 백엔드+프론트엔드 빌드 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "harvest-task-calendar",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "작업달력 Plan 작성 - 배치+TaskTemplate→달력자동일정+재스케줄3옵션(anchor/shift/one_time), 10FR(템플릿CRUD/프리셋6종/occurrence90일생성/달력뷰/완료연기스킵/재스케줄BottomSheet/RememberChoice/그룹필터/house_id FK/리스트뷰), 데이터모델3테이블(task_templates/batch_tasks/task_occurrences)+crop_batches ALTER, 하우스그룹달력UX(그룹탭+그룹별섹션+미분류폴백), API10개, 구현파일17개, 7Phase"
+      },
+      {
+        "action": "design_created",
+        "feature": "harvest-task-calendar",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "상세 설계 완료 - DB(DDL3개+ALTER1개+인덱스5개), Entity3개(TaskTemplate/BatchTask/TaskOccurrence)+CropBatch수정(houseId), DTO2개(task-template/occurrence-action), HarvestTaskService(템플릿CRUD+applyTemplate+generateOccurrences90일+reschedule3모드+rememberChoice+onModuleInit프리셋upsert), HarvestTaskController(10엔드포인트), 프론트(task-presets.ts+harvest-task.api.ts+TaskCalendar.vue달력+리스트+그룹탭필터+RescheduleSheet.vue BottomSheet3옵션), Harvest.vue하우스드롭다운추가, 기존수정8파일, 7Phase 25검증항목"
+      },
+      {
+        "action": "do_completed",
+        "feature": "harvest-task-calendar",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "7Phase 구현 완료 - DB(schema.sql DDL3개+ALTER1개+인덱스5개+트리거), 백엔드Entity3개(TaskTemplate+BatchTask+TaskOccurrence)+CropBatch houseId추가, DTO2개(task-template+occurrence-action)+CreateBatchDto houseId, HarvestTaskService(onModuleInit프리셋6종upsert+템플릿CRUD4+applyTemplate occurrence90일생성+findOccurrences JOIN5테이블+그룹필터+completeOccurrence reschedule3모드+postpone+skip+rememberChoice+generateOccurrences bulk insert), HarvestTaskController(10엔드포인트+effectiveUserId), HarvestModule 4엔티티+2서비스+2컨트롤러, 프론트(task-presets.ts 6종+RESCHEDULE_MODES+harvest-task.api.ts 10메서드+TaskCalendar.vue 달력월간그리드42셀+리스트3범위+그룹탭필터+그룹별섹션+완료/연기/스킵+RescheduleSheet.vue BottomSheet3옵션+remember), Harvest.vue(하우스드롭다운+groupApi로드+onHouseSelect), harvest.api.ts houseId추가, 라우터/task-calendar+App.vue달력아이콘네비(데스크탑+모바일), TS에러수정(DeepPartial defaultRescheduleMode cast+unused startDate), nest build+vue-tsc+vite build 통과"
+      },
+      {
+        "action": "plan_created",
+        "feature": "stage-based-task-management",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "생육단계기반작업관리 Plan 작성 - 4단계(seedling/vegetative/flowering_fruit/harvest)+유연간격(min/max)+생육피드백(growth_fast/normal/growth_slow)+그룹드롭다운+transplant_date+7종프리셋+Harvest.vue통합(TaskCalendar삭제), 15FR, 8Phase"
+      },
+      {
+        "action": "do_completed",
+        "feature": "stage-based-task-management",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "8Phase 구현 완료 - Entity4개(CropBatch groupId/transplantDate/currentStage/stageStartedAt, TaskTemplate stageName/intervalMin/Max/isPreset, BatchTask anchorDate/rescheduleMode/isActive, TaskOccurrence windowEndDate/growthFeedback), DTO3개, HarvestTaskService(onModuleInit프리셋7종rawSQL+determineStage+applyStageTemplates+changeStage+archiveStageOccurrences+generateFlexOccurrences interval기반+rescheduleWithFeedback+completeOccurrence+postpone+skip), HarvestController(auto-apply on create), Harvest.vue(3탭batches/tasks/completed+그룹드롭다운+단계변경4격자+프리셋선택+작업필터+overdue/today/upcoming+RescheduleSheet생육피드백), RescheduleSheet(3모드+피드백3종+remember), task-presets.ts(GROWTH_STAGES4+FEEDBACK3+RESCHEDULE_MODES3), DB(house_id추가+house_name nullable), 빌드 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "stage-based-task-management",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 94%, FR-01~FR-10 전체 PASS, Gap 5건(모두 Low: stage필드중복/legacy house필드/window표시형식/60일고정/모드명명), 추가구현7건(BatchTask entity/clone/complete/postpone/skip/crop presets/task summary)"
+      },
+      {
+        "action": "plan_created",
+        "feature": "harvest-schedule-fix",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "수확관리 스케줄 수정 Plan 작성 - 3개 버그수정(anchorDate정식일기준계산/배치생성시자동단계판정/seedling프리셋스킵) + 달력뷰추가(리스트+달력토글/42셀월간그리드/날짜클릭작업표시/dot색상), 5FR, 5Phase, 수정4파일"
+      },
+      {
+        "action": "design_created",
+        "feature": "harvest-schedule-fix",
+        "timestamp": "2026-02-24T00:00:00Z",
+        "details": "상세 설계 완료 - STAGE_OFFSETS상수(vegetative0/flowering30/harvest65), calcAnchorDate전면수정(transplantDate+stageOffset+startOffset), seedling프리셋제거(7→6종), determineStage복제(harvest.service), create()자동단계판정+seedling시applySkip, generateFlexOccurrences transplantDate파라미터추가(과거날짜포함), 프론트달력(42셀월간그리드+viewMode토글+calendarDays/tasksByDate/selectedDateTasks computed+월이동+dot3색), 4Phase 14검증항목"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "sensor-alerts",
+        "timestamp": "2026-02-25T00:00:00Z",
+        "details": "센서알림 Gap 분석 완료 - Match Rate 97%, PASS 8 / CHANGED 3 / ENHANCED 3 / MISSING 0, standby필터/24타입확장/3탭UI/삭제기능 의도적 변경"
+      },
+      {
+        "action": "plan_created",
+        "feature": "sensor-env-config",
+        "timestamp": "2026-02-27T00:00:00Z",
+        "details": "센서환경설정 Plan 작성 - 그룹별센서매핑(env_roles 7역할+env_mappings), 소스(sensor+weather), 매핑CRUD API 5개, Groups.vue환경설정모달, 홍길동기본매핑, 13검증항목"
+      },
+      {
+        "action": "design_created",
+        "feature": "sensor-env-config",
+        "timestamp": "2026-02-27T00:00:00Z",
+        "details": "상세 설계 완료 - DB(env_roles+env_mappings 2테이블+홍길동매핑6개시드), 백엔드(EnvRole+EnvMapping엔티티, EnvConfigService 5메서드:getRoles/getSources/getMappings/saveMappings/getResolved, EnvConfigController 5엔드포인트, EnvConfigModule 5엔티티import), 프론트(env-config.api.ts 6타입+5메서드, Groups.vue 환경설정버튼⚙+모달: internal/external섹션+역할별드롭다운+optgroup센서/날씨+표시형식{장비}-{한글}({영문})-{값}), 신규6+수정3=9파일, 5Phase 21검증항목"
+      },
+      {
+        "action": "do_completed",
+        "feature": "sensor-env-config",
+        "timestamp": "2026-02-27T00:00:00Z",
+        "details": "5Phase 구현 완료 - DB(env_roles 7역할시드+env_mappings 홍길동6기본매핑+schema.sql DDL), 백엔드(EnvRole+EnvMapping entity type:varchar수정, EnvConfigService getRoles/getSources DISTINCT ON sensor_data+weather_data/getMappings/saveMappings delete+insert/getResolved 센서+날씨값조회, EnvConfigController 5엔드포인트+JwtAuthGuard+effectiveUserId, EnvConfigModule 5엔티티+AppModule import), 프론트(env-config.api.ts 6타입+5메서드, Groups.vue ⚙버튼+환경설정모달 internal/external섹션+역할별select optgroup+onSourceSelect파서+getSelectedValue), API검증4엔드포인트(roles7개/sources센서25+날씨4/mappings6개/resolved7개실시간값) 전체PASS, nest build+vue-tsc+vite build 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "sensor-env-config",
+        "timestamp": "2026-02-27T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 97%, PASS 19 / CHANGED 1 / FAIL 0, CHANGED: EnvMapping entity type:varchar 추가(TypeORM Object타입추론오류방지), 추가개선6건(const/findBy/null명시/envLoading/ESLint/멱등DDL), API실테스트(매핑변경→resolved즉시반영 3건 검증)"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "sensor-env-config",
+        "timestamp": "2026-02-28T00:00:00Z",
+        "details": "2차 Gap 분석 완료 - Match Rate 100%, 25개 항목 전체 PASS (A.휀멀티선택 10/10, B.조건센서환경설정 13/13, C.연관컴포넌트정합성 2/2), AutomationEditModal groupId prop 누락 수정 후 재분석"
+      },
+      {
+        "action": "plan_created",
+        "feature": "design-improvement",
+        "timestamp": "2026-02-28T00:00:00Z",
+        "details": "디자인 리뷰 기반 UI/UX 개선 Plan 작성 - 70개 스크린샷 리뷰(72/100점), 8개 FR(모바일모달FullScreen7개/0개추가disabled/날짜포맷통일/빈상태CTA3페이지/리포트모바일레이아웃/터치타겟44px/자동화한국어화/그룹tooltip), Critical2+High1+Medium3+Low2, 8Phase 구현순서, 영향파일8개"
+      },
+      {
+        "action": "design_created",
+        "feature": "design-improvement",
+        "timestamp": "2026-02-28T00:00:00Z",
+        "details": "상세 설계 완료 - 프론트엔드Only(DB/백엔드변경없음), FR-01 모바일모달FullScreen(6개모달CSS+bodyLock+safeArea, DeviceRegistration참조패턴), FR-02 0개추가텍스트+disabled스타일, FR-03 Harvest.vue VueDatePicker교체, FR-04 빈상태CTA(Sensors가이드3단계+Alerts링크+Dashboard인라인링크), FR-05 Reports기간버튼nowrap+다운로드nowrap+테이블스크롤, FR-06 터치타겟44px, FR-07 ACTION_LABELS매핑+localizeAction, FR-08 title+aria-label, 수정10파일, 8Phase 18검증항목"
+      },
+      {
+        "action": "do_completed",
+        "feature": "design-improvement",
+        "timestamp": "2026-02-28T00:00:00Z",
+        "details": "8Phase 구현 완료 - FR-01 모바일모달FullScreen(Groups/Harvest/RuleWizardModal/AutomationEditModal bodyScrollLock+safeArea+borderRadius), FR-02 0개추가조건부텍스트, FR-03 Harvest.vue VueDatePicker교체(sowDate+transplantDate), FR-04 빈상태CTA(Sensors3단계가이드+Alerts링크+SummaryCards설정하기), FR-05 Reports기간버튼nowrap+다운로드nowrap, FR-06 btn-icon 44px모바일, FR-07 ACTION_LABELS+localizeAction, FR-08 title tooltip 4개버튼, vue-tsc+vite build 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "delete-safety-group-block",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 100%, 23개 항목 전체 PASS (Backend 10/10: canDelete groups체크, getDependencies, removeOpenerPair, remove개폐기차단, removeGroup자동화체크, Module AutomationRule import; Frontend 13/13: API함수3개, 타입2개, handleRemoveDevice/handleRemoveOpenerGroup/deleteGroup 의존성체크, DeleteBlockingModal 3케이스지원(자동화전용/그룹전용/복합)), 비파괴적차이4건(groups필드추가/common경로/canDelete확장/내부navigate)"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "env-group-scope",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 97%, 18개 항목 전체 PASS (ResolvedEnvPanel internal/external섹션+formatValue, Sensors.vue MonitoringWidgets제거+resolvedByGroup+toggleGroup+isEnvConfigured+placeholder+loading+캐시, Reports.vue envWarning배너+데이터숨김+빌드통과), 개선적차이9건(formatValue CO2 unit=ppm수정/미설정unit숨김/딥링크라우팅/WebSocket debounce갱신/envWarning데이터숨김/Set→Record/placeholder간소화/링크텍스트/배너문구)"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "design-improvement",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "details": "Gap 분석 완료 - Match Rate 89%, FR-01~FR-08 분석 (FR-01 78%: safe-area-inset-top 누락 4파일+border-radius 16px 2파일, FR-02 90%, FR-03 80%: locale=ko누락, FR-04 83%, FR-05 80%, FR-06 100%, FR-07 90%: toggle누락, FR-08 100%), 주요갭: modal header safe-area-inset-top 미적용"
+      },
+      {
+        "action": "iteration_completed",
+        "feature": "design-improvement",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "details": "Act-1 완료 - 5개 Gap 수정 (safe-area-inset-top 4파일: Groups/Harvest/RuleWizardModal/AutomationEditModal, border-radius 0 2파일: Groups/Harvest, VueDatePicker locale=ko+format Harvest, ACTION_LABELS toggle 추가), Match Rate 89%→95%, vue-tsc+vite build 통과"
+      },
+      {
+        "action": "design_created",
+        "feature": "device-control-feedback",
+        "timestamp": "2026-03-04T00:00:00Z",
+        "details": "상세 설계 완료 - ToastContainer.vue신규(notification.store재사용), controlDevice반환값.data변경+verifyDeviceStatus신규(1초딜레이+상태비교), tuya-errors.ts Tuya에러한국어번역, Devices.vue 3핸들러(handleControl/handleIrrigationControl/interlockControl)+Groups.vue 2핸들러(handleControl/handleIrrigationControl) 응답처리+피드백토스트, App.vue ToastContainer등록, 신규2+수정4=6파일, 7Step 9검증항목"
+      },
+      {
+        "action": "do_completed",
+        "feature": "device-control-feedback",
+        "timestamp": "2026-03-04T00:00:00Z",
+        "details": "7Step 구현 완료 - ToastContainer.vue(Teleport+TransitionGroup+4타입아이콘+safe-area-inset-bottom+반응형), App.vue ToastContainer등록, tuya-errors.ts(5개에러한국어매핑), device.store.ts(controlDevice .data반환+verifyDeviceStatus 1초딜레이+상태비교), Devices.vue 3핸들러(handleControl/handleIrrigationControl/interlockControl 응답처리+토스트+UI복구), Groups.vue 2핸들러(handleControl/handleIrrigationControl 동일패턴), vue-tsc+vite build 통과"
+      },
+      {
+        "action": "gap_analysis",
+        "feature": "env-group-scope",
+        "timestamp": "2026-03-08T00:00:00Z",
+        "details": "v2 Gap 분석 완료 - Match Rate 97%, 28/28 PASS (12원본+6확장+10신규), GroupEnvScore.vue 추가(VPD/결로/환기/환경점수/권고), role key 수정(internal_temp/external_temp), ResolvedEnvPanel ROLE_ICONS 키 불일치 수정, Number()변환 추가"
+      }
+    ]
+  },
+  "context": {
+    "lastModified": "2026-02-19",
+    "phase1Status": "completed",
+    "phase2Status": "in_progress",
+    "criticalIssues": ["no_tests", "no_websocket_client", "no_sensor_data_recording"],
+    "overallCompletion": "82%"
+  }
+}

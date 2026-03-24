@@ -1,0 +1,391 @@
+<template>
+  <div v-if="show" class="modal-overlay" @click.self="closeModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2>⚙️ 센서 표시 설정</h2>
+        <button class="close-btn" @click="closeModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="description">
+          대시보드에 표시할 센서 타입을 선택하세요. 선택한 센서만 화면에 표시됩니다.
+        </p>
+
+        <div class="sensor-types-list">
+          <div
+            v-for="sensorType in availableSensorTypes"
+            :key="sensorType.id"
+            class="sensor-type-item"
+            :class="{ selected: localSelectedSensors.includes(sensorType.id) }"
+            @click="toggleSensor(sensorType.id)"
+          >
+            <input
+              type="checkbox"
+              :checked="localSelectedSensors.includes(sensorType.id)"
+              @click.stop
+              @change="toggleSensor(sensorType.id)"
+            />
+            <div class="sensor-type-icon">{{ sensorType.icon }}</div>
+            <div class="sensor-type-info">
+              <h4>{{ sensorType.name }}</h4>
+              <p>{{ sensorType.description }}</p>
+            </div>
+            <span class="sensor-count">{{ sensorType.count }}개</span>
+          </div>
+        </div>
+
+        <div class="quick-actions">
+          <button class="quick-btn" @click="selectAll">전체 선택</button>
+          <button class="quick-btn" @click="deselectAll">전체 해제</button>
+          <button class="quick-btn" @click="selectDefault">기본값</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" @click="closeModal">취소</button>
+        <button class="btn-primary" @click="saveSettings">
+          적용 ({{ localSelectedSensors.length }}개 선택)
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+
+interface SensorType {
+  id: string
+  name: string
+  icon: string
+  description: string
+  count: number
+}
+
+const props = defineProps<{
+  show: boolean
+  selectedSensors: string[]
+}>()
+
+const emit = defineEmits<{
+  close: []
+  update: [sensorTypes: string[]]
+}>()
+
+const availableSensorTypes = ref<SensorType[]>([
+  {
+    id: 'temperature',
+    name: '온도 센서',
+    icon: '🌡️',
+    description: '하우스 내부 온도 측정',
+    count: 12
+  },
+  {
+    id: 'humidity',
+    name: '습도 센서',
+    icon: '💧',
+    description: '대기 중 습도 측정',
+    count: 12
+  },
+  {
+    id: 'co2',
+    name: 'CO2 센서',
+    icon: '🌫️',
+    description: '이산화탄소 농도 측정',
+    count: 8
+  },
+  {
+    id: 'light',
+    name: '조도 센서',
+    icon: '💡',
+    description: '빛의 세기 측정',
+    count: 10
+  },
+  {
+    id: 'soil_moisture',
+    name: '토양수분 센서',
+    icon: '🌱',
+    description: '토양 수분 함량 측정',
+    count: 15
+  },
+  {
+    id: 'ph',
+    name: 'PH 센서',
+    icon: '⚗️',
+    description: '토양 산도 측정',
+    count: 6
+  },
+  {
+    id: 'ec',
+    name: 'EC 센서',
+    icon: '⚡',
+    description: '전기전도도 측정',
+    count: 6
+  }
+])
+
+const localSelectedSensors = ref<string[]>([...props.selectedSensors])
+
+watch(
+  () => props.selectedSensors,
+  (newValue) => {
+    localSelectedSensors.value = [...newValue]
+  }
+)
+
+const toggleSensor = (sensorId: string) => {
+  const index = localSelectedSensors.value.indexOf(sensorId)
+  if (index === -1) {
+    localSelectedSensors.value.push(sensorId)
+  } else {
+    localSelectedSensors.value.splice(index, 1)
+  }
+}
+
+const selectAll = () => {
+  localSelectedSensors.value = availableSensorTypes.value.map(s => s.id)
+}
+
+const deselectAll = () => {
+  localSelectedSensors.value = []
+}
+
+const selectDefault = () => {
+  localSelectedSensors.value = ['temperature', 'humidity', 'co2', 'light']
+}
+
+const saveSettings = () => {
+  emit('update', localSelectedSensors.value)
+  closeModal()
+}
+
+const closeModal = () => {
+  emit('close')
+}
+</script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-container {
+  background: var(--bg-card);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid var(--border-input);
+}
+
+.modal-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.description {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.sensor-types-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sensor-type-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sensor-type-item:hover {
+  border-color: #4caf50;
+  background: #f8f9fa;
+}
+
+.sensor-type-item.selected {
+  border-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.sensor-type-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sensor-type-icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.sensor-type-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sensor-type-info h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.sensor-type-info p {
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+}
+
+.sensor-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4caf50;
+  flex-shrink: 0;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.quick-btn {
+  flex: 1;
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-btn:hover {
+  background: #e0e0e0;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+@media (max-width: 768px) {
+  .modal-container {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .sensor-type-item {
+    flex-wrap: wrap;
+  }
+
+  .quick-actions {
+    flex-direction: column;
+  }
+}
+</style>

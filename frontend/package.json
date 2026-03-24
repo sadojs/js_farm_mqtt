@@ -1,0 +1,33 @@
+{
+  "name": "smart-farm-mqtt-frontend",
+  "version": "0.1.0",
+  "description": "Zigbee/MQTT 기반 농업 자동화 플랫폼 프론트엔드",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+  },
+  "dependencies": {
+    "@vuepic/vue-datepicker": "^12.1.0",
+    "@vueuse/core": "^10.7.2",
+    "axios": "^1.6.5",
+    "chart.js": "^4.4.1",
+    "dayjs": "^1.11.10",
+    "pinia": "^2.1.7",
+    "socket.io-client": "^4.6.1",
+    "vue": "^3.4.15",
+    "vue-chartjs": "^5.3.0",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@vitejs/plugin-vue": "^6.0.4",
+    "@vue/tsconfig": "^0.5.1",
+    "playwright": "^1.58.2",
+    "typescript": "~5.3.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^1.8.27"
+  }
+}

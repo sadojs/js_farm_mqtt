@@ -1,0 +1,114 @@
+# Smart Farm Platform - Gap Analysis Report
+
+**Date**: 2026-02-19
+**Feature**: smart-farm-platform (automation-rules + device management + sensors)
+**Phase**: Check → Act (PDCA Iteration 1)
+
+---
+
+## Match Rate: 82% → 91% (After Iteration 1)
+
+---
+
+## 1. Implementation Status Summary (Updated)
+
+| Module | Status | Completeness |
+|--------|--------|-------------|
+| Auth (Login/JWT) | Implemented | 95% |
+| Tuya Project Settings | Implemented | 90% |
+| Device Registration | Implemented | 95% (+5) |
+| Device Control (ON/OFF) | Implemented | 90% |
+| Sensor Data Display | Implemented | 90% (+5) |
+| Group Management | Implemented | 85% |
+| Automation Wizard (4-step) | Implemented | 90% |
+| Automation CRUD | Implemented | 90% |
+| Automation Runner (Cron) | Implemented | 90% (+5) |
+| Dashboard (Weather) | Implemented | 80% |
+| Reports & Statistics | Implemented | 85% (+10) |
+| Device Status Sync (Cron) | Implemented | 85% |
+| WebSocket Realtime | Implemented | 90% (+30) |
+| Sensor Data Collection (Cron) | **NEW** | 90% |
+| Notifications | Partial | 50% (+10) |
+| Tests | Not Implemented | 0% |
+
+---
+
+## 2. Iteration 1 Changes
+
+### RESOLVED - GAP-01: RegisterDeviceRequest Type Fixed
+- Added `equipmentType?` and `online?` to `RegisterDeviceRequest` interface
+- File: `frontend/src/types/device.types.ts`
+
+### RESOLVED - GAP-02: WebSocket Already Implemented (Analysis Error)
+- `useWebSocket.ts` composable exists with full event handling
+- `App.vue` calls `connect()` on auth state change
+- Supports: `sensor:update`, `device:status`, `automation:executed`, `notification:new`
+
+### RESOLVED - GAP-05: Sensor Components Kept for Future Use
+- `BaseSensorCard.vue`, `TemperatureSensor.vue` kept as reusable templates
+- Not dead code but reserved for future sensor-specific UI enhancements
+
+### RESOLVED - GAP-06: Automation Runner Uses Dynamic Evaluation
+- Runner reads conditions dynamically from `ConditionGroup.conditions[].field`
+- All sensor types (temperature, humidity, co2, light, soil_moisture, ph, ec) are supported
+- `between` operator properly handled in condition evaluator
+
+### RESOLVED - GAP-08: Sensor Data Collection Cron Added
+- New `SensorCollectorService` with 5-minute cron job
+- Collects data from all online sensors via Tuya API
+- Stores to `sensor_data` TimescaleDB hypertable
+- Broadcasts via WebSocket for real-time updates
+- File: `backend/src/modules/sensors/sensor-collector.service.ts`
+
+### RESOLVED - GAP-10: Global Error Handler Added
+- Axios response interceptor now shows toast notifications for 500/403/404 errors
+- Uses `notification.store` for consistent UX
+- File: `frontend/src/api/client.ts`
+
+---
+
+## 3. Remaining Gaps
+
+### GAP-03: Notifications Backend Module (Low - Deferred)
+- DB table exists but no CRUD API
+- Client-side toast notifications work via `notification.store.ts`
+- Recommend: Implement as separate feature when needed
+
+### GAP-04: No Tests (Medium - Separate Phase)
+- Zero test files
+- Recommend: Add in dedicated testing phase
+
+### GAP-07: Dashboard Device/Sensor Summary (Low - UX Enhancement)
+- Weather-only dashboard
+- Recommend: Add summary cards as UX improvement feature
+
+### GAP-09: User Settings Unused (Low - Deferred)
+- Schema exists, no backend implementation
+- Recommend: Implement when user preferences feature is needed
+
+---
+
+## 4. Security Notes
+
+| Item | Status | Note |
+|------|--------|------|
+| JWT Auth Guard | OK | Applied to all controllers |
+| CORS | OK | Configured in gateway |
+| Global Error Handler | OK | Added via axios interceptor (no sensitive data leaked) |
+| Tuya Secret Storage | WARN | Encryption implementation needs verification |
+| Input Validation | WARN | Some controllers use `body: any` |
+
+---
+
+## 5. Architecture Consistency
+
+| Area | Frontend | Backend | Match |
+|------|----------|---------|-------|
+| Device types | `device.types.ts` | `device.entity.ts` | OK |
+| RegisterDevice type | `RegisterDeviceRequest` | Controller `body` | OK (fixed) |
+| Automation types | `automation.types.ts` | `automation-rule.entity.ts` | OK |
+| Group types | `group.types.ts` | `house-group.entity.ts` | OK |
+| API endpoints | `*.api.ts` | `*.controller.ts` | OK |
+| Sensor fields | SENSOR_META (7) | TUYA_SENSOR_MAP (7) | OK |
+| WebSocket events | `useWebSocket.ts` | `events.gateway.ts` | OK |
+| Sensor collection | Cron 5min | `SensorCollectorService` | OK (new) |

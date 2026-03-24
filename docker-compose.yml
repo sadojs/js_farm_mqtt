@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with TimescaleDB
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: sfm-db
+    environment:
+      POSTGRES_USER: smartfarm
+      POSTGRES_PASSWORD: smartfarm123
+      POSTGRES_DB: smartfarm_mqtt
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sfm-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: sfm-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sfm-network
+
+  # MQTT Broker (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sfm-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - sfm-network
+    restart: unless-stopped
+
+  # Zigbee2MQTT
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt
+    container_name: sfm-zigbee2mqtt
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./zigbee2mqtt/data:/app/data
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - TZ=Asia/Seoul
+    depends_on:
+      - mosquitto
+    networks:
+      - sfm-network
+    restart: unless-stopped
+
+  # Backend (NestJS)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sfm-backend
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+      - DATABASE_URL=postgresql://smartfarm:smartfarm123@postgres:5432/smartfarm_mqtt
+      - REDIS_URL=redis://redis:6379
+      - MQTT_URL=mqtt://mosquitto:1883
+      - ZIGBEE2MQTT_URL=http://zigbee2mqtt:8080
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - KMA_API_KEY=${KMA_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto
+    networks:
+      - sfm-network
+    restart: unless-stopped
+
+  # Frontend (Vue 3)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sfm-frontend
+    ports:
+      - "81:80"
+    depends_on:
+      - backend
+    networks:
+      - sfm-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:
+
+networks:
+  sfm-network:
+    driver: bridge

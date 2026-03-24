@@ -1,0 +1,258 @@
+# [Plan] automation-rules - 자동화 룰 관리 기능
+
+> PDCA Phase: Plan
+> Created: 2026-02-11
+> Status: Draft
+
+---
+
+## 1. 기능 개요
+
+스마트 농업 하우스의 장비(개폐기, 환풍기, 관수 시스템)를 조건 기반으로 자동 제어하는 룰 생성/관리 기능.
+사용자는 대상(하우스/그룹), 장비 유형, 조건(시간/센서/날씨)을 조합하여 복합 자동화 룰을 구성할 수 있다.
+
+## 2. 사용자 요구사항
+
+### 2.1 대상 선택
+- 하우스 단위 또는 그룹 단위 선택
+- 그룹 선택 시 해당 그룹 내 모든 하우스에 적용
+
+### 2.2 장비 유형별 제어
+
+#### A. 개폐기 (Roof Actuator)
+- **동작**: 열기(open), 닫기(close), 비율 조절(0~100%)
+- **조건 예시**:
+  - 시간: 몇시 ~ 몇시 사이 열림
+  - AND 온도: 특정 온도 이상일 때만
+  - 비 센서: 비가 오면 자동으로 닫힘 (최우선)
+
+#### B. 환풍기 (Ventilation Fan)
+- **동작**: ON/OFF, 속도 조절(low/mid/high)
+- **조건 예시**:
+  - 온도 기준: 28도 이상이면 ON
+  - 시간 + 온도: 낮시간(08~18시) AND 온도 25도 이상
+  - 습도 기준: 습도 80% 이상이면 ON
+
+#### C. 관수 (Irrigation)
+- **관수 종류**: 물(water), 비료(fertilizer)
+- **선택 모드**:
+  - 물만 관수
+  - 비료만 관수
+  - 물 + 비료 순차 관수 (순서, 시간/리터 지정)
+- **단위 설정**: 시간(분) 또는 용량(리터)
+- **조건**: 시간 기반 스케줄, 토양 수분 센서 연동
+
+### 2.3 조건 시스템
+
+| 조건 유형 | 필드 | 연산자 | 예시 |
+|-----------|------|--------|------|
+| 시간 | hour, minute | between, eq | 06:00~18:00 |
+| 온도 | temperature | gt, lt, gte, lte, between | 28도 이상 |
+| 습도 | humidity | gt, lt, gte, lte, between | 80% 이상 |
+| 비 센서 | rain | eq | rain = true |
+| 풍속 | windSpeed | gt, lt | 15m/s 이상 |
+| 토양 수분 | soil_moisture | lt, lte | 30% 이하 |
+
+### 2.4 복합 조건 (AND / OR)
+- **AND**: 모든 조건이 참일 때 실행
+  - 예: 08시~18시 AND 온도 >= 25도
+- **OR**: 하나라도 참이면 실행
+  - 예: 온도 >= 35도 OR 습도 >= 90%
+- **혼합**: 조건 그룹 간 AND/OR 조합
+  - 예: (08시~18시 AND 온도 >= 25도) AND (비 != true)
+
+### 2.5 관수 순차 실행 (Sequence)
+```
+예시: 물 10분 → 비료 5분 → 물 5분
+[
+  { type: "water", duration: 10, unit: "minutes" },
+  { type: "fertilizer", duration: 5, unit: "minutes" },
+  { type: "water", duration: 5, unit: "minutes" }
+]
+```
+- 각 단계별 시간(분) 또는 용량(리터) 지정
+- 순서대로 실행, 이전 단계 완료 후 다음 단계 시작
+
+## 3. 현재 구현 상태 분석
+
+### 3.1 이미 구현된 부분
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| DB 스키마 (automation_rules, automation_logs) | 완료 | JSONB 기반 유연 구조 |
+| Backend Entity (AutomationRule) | 완료 | weather/time/hybrid 타입 |
+| Backend CRUD API | 완료 | GET/POST/PUT/PATCH/DELETE |
+| Backend Engine 추상 클래스 | 완료 | BaseAutomationEngine |
+| Backend Weather Engine | 부분 | TODO: 실제 API 연동 |
+| Frontend Types | 완료 | AutomationRule, Condition, Action |
+| Frontend API Client | 완료 | automationApi |
+| Frontend Pinia Store | 완료 | useAutomationStore |
+| Frontend Automation.vue | 하드코딩 | 실제 데이터 미연결, 목업 UI |
+
+### 3.2 구현 필요 항목
+| 항목 | 우선순위 | 복잡도 |
+|------|----------|--------|
+| 룰 생성 모달/폼 UI (핵심) | P0 | 높음 |
+| 장비 유형별 액션 설정 UI | P0 | 높음 |
+| 복합 조건 빌더 UI (AND/OR) | P0 | 높음 |
+| 관수 순차 실행 설정 UI | P0 | 중간 |
+| Automation.vue를 실제 데이터 연결 | P1 | 중간 |
+| 룰 수정 모달 | P1 | 중간 |
+| Backend: 장비 유형별 DTO 검증 | P1 | 낮음 |
+| Backend: 관수 순차 실행 스키마 확장 | P1 | 중간 |
+| Backend: Time Engine 구현 | P2 | 중간 |
+| Backend: Hybrid Engine 구현 | P2 | 중간 |
+| 실행 로그 조회 UI | P2 | 낮음 |
+
+## 4. 기능 범위 (이번 PDCA 사이클)
+
+### In Scope (구현 범위)
+1. **룰 생성 위저드 UI** - 단계별 폼 (대상 → 장비 → 조건 → 확인)
+2. **조건 빌더** - AND/OR 복합 조건 UI
+3. **장비별 액션 설정** - 개폐기/환풍기/관수 각각의 설정 UI
+4. **관수 시퀀스 빌더** - 물/비료 순차 실행 설정
+5. **Automation.vue 리팩토링** - 실제 API 데이터 연결
+6. **룰 수정/삭제** - 기존 룰 편집 기능
+7. **Backend DTO/검증** - 장비 유형별 요청 검증
+
+### Out of Scope (다음 사이클)
+- 실제 장비 제어 실행 (Tuya API 연동)
+- Weather/Time/Hybrid Engine 실제 구동
+- 실행 로그 대시보드
+- 알림 연동
+
+## 5. 사용자 시나리오
+
+### 시나리오 1: 개폐기 시간+온도 룰 생성
+```
+1. "+ 새 룰 추가" 클릭
+2. 대상 선택: "화성 1농장" 그룹 선택
+3. 장비 유형: "개폐기" 선택
+4. 액션 설정: "열기 100%"
+5. 조건 추가:
+   - [시간] 08:00 ~ 18:00
+   - [AND]
+   - [온도] >= 20도
+6. 추가 조건:
+   - [AND] [비 센서] 비 = false (비가 안 올 때)
+7. 룰 이름: "낮 시간 개폐기 열림"
+8. 저장
+```
+
+### 시나리오 2: 관수 순차 실행 룰 생성
+```
+1. "+ 새 룰 추가" 클릭
+2. 대상 선택: "1동 하우스"
+3. 장비 유형: "관수" 선택
+4. 관수 모드: "물 + 비료 순차"
+5. 시퀀스 설정:
+   - Step 1: 물, 10분
+   - Step 2: 비료, 5분
+   - Step 3: 물, 5분 (세척)
+6. 조건: [시간] 매일 06:00
+7. 룰 이름: "아침 비료 관수"
+8. 저장
+```
+
+### 시나리오 3: 비 올 때 개폐기 긴급 닫힘
+```
+1. "+ 새 룰 추가" 클릭
+2. 대상 선택: "화성 1농장" 그룹 (전체 하우스)
+3. 장비 유형: "개폐기" 선택
+4. 액션 설정: "닫기 0%"
+5. 조건: [비 센서] rain = true
+6. 우선순위: 최고 (10)
+7. 룰 이름: "비 올 때 긴급 폐쇄"
+8. 저장
+```
+
+## 6. 기술 접근 방향
+
+### 6.1 프론트엔드
+- **위저드 패턴**: 멀티스텝 폼 (Step 1~4)
+- **조건 빌더 컴포넌트**: 동적 조건 추가/삭제, AND/OR 토글
+- **장비별 액션 폼**: 개폐기(슬라이더)/환풍기(속도 선택)/관수(시퀀스 빌더)
+- **컴포넌트 분리**:
+  - `RuleWizardModal.vue` - 위저드 컨테이너
+  - `StepTargetSelect.vue` - 대상 선택 (그룹/하우스)
+  - `StepDeviceAction.vue` - 장비 유형 및 액션 설정
+  - `StepConditionBuilder.vue` - 조건 빌더
+  - `StepReview.vue` - 최종 확인
+  - `IrrigationSequenceBuilder.vue` - 관수 시퀀스 설정
+
+### 6.2 백엔드
+- **DTO 강화**: 장비 유형별 검증 규칙
+- **conditions JSONB 구조 표준화**
+- **actions JSONB 구조 표준화** (irrigation sequence 포함)
+
+### 6.3 데이터 구조
+
+#### conditions JSONB 스키마
+```json
+{
+  "logic": "AND",
+  "groups": [
+    {
+      "logic": "AND",
+      "conditions": [
+        { "type": "time", "field": "hour", "operator": "between", "value": [8, 18] },
+        { "type": "sensor", "field": "temperature", "operator": "gte", "value": 20, "unit": "C" }
+      ]
+    },
+    {
+      "logic": "AND",
+      "conditions": [
+        { "type": "sensor", "field": "rain", "operator": "eq", "value": false }
+      ]
+    }
+  ]
+}
+```
+
+#### actions JSONB 스키마 (개폐기/환풍기)
+```json
+{
+  "deviceType": "roof_actuator",
+  "command": "open",
+  "parameters": {
+    "percentage": 100
+  }
+}
+```
+
+#### actions JSONB 스키마 (관수 - 순차 실행)
+```json
+{
+  "deviceType": "irrigation",
+  "command": "sequence",
+  "sequence": [
+    { "type": "water", "duration": 10, "unit": "minutes" },
+    { "type": "fertilizer", "duration": 5, "unit": "minutes" },
+    { "type": "water", "duration": 5, "unit": "minutes" }
+  ]
+}
+```
+
+## 7. 구현 순서
+
+| 단계 | 작업 | 예상 파일 |
+|------|------|-----------|
+| 1 | Backend DTO 및 타입 정의 강화 | `dto/create-rule.dto.ts`, types |
+| 2 | Frontend 타입 확장 (조건 그룹, 관수 시퀀스) | `types/automation.types.ts` |
+| 3 | RuleWizardModal 컴포넌트 생성 | `components/automation/RuleWizardModal.vue` |
+| 4 | Step 1: 대상 선택 컴포넌트 | `components/automation/StepTargetSelect.vue` |
+| 5 | Step 2: 장비/액션 설정 컴포넌트 | `components/automation/StepDeviceAction.vue` |
+| 6 | Step 3: 조건 빌더 컴포넌트 | `components/automation/StepConditionBuilder.vue` |
+| 7 | 관수 시퀀스 빌더 하위 컴포넌트 | `components/automation/IrrigationSequenceBuilder.vue` |
+| 8 | Step 4: 최종 확인 컴포넌트 | `components/automation/StepReview.vue` |
+| 9 | Automation.vue 리팩토링 (실제 데이터 연결) | `views/Automation.vue` |
+| 10 | 룰 수정 모드 지원 | 위저드에 edit mode 추가 |
+
+## 8. 성공 기준
+
+- [ ] 개폐기 룰: 시간+온도+비센서 AND/OR 조건으로 생성 가능
+- [ ] 환풍기 룰: 온도/습도 조건으로 생성 가능
+- [ ] 관수 룰: 물만/비료만/순차 실행 모드로 생성 가능
+- [ ] 관수 시퀀스: 시간(분) 또는 리터 단위 설정 가능
+- [ ] 생성된 룰이 DB에 저장되고 목록에 표시
+- [ ] 룰 수정/삭제/토글 동작
+- [ ] 복합 조건 (AND/OR 혼합) 정상 동작

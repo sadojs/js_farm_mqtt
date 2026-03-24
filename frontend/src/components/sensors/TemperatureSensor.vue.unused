@@ -1,0 +1,122 @@
+<template>
+  <BaseSensorCard
+    :title="title"
+    :subtitle="location"
+    :value="sensorData.value"
+    :unit="sensorData.unit"
+    :status="sensorData.status"
+    :enabled="enabled"
+    :thresholds="thresholds"
+    :trend="trend"
+    :trend-value="trendValue"
+    :show-chart="showChart"
+    @refresh="handleRefresh"
+    @settings="handleSettings"
+  >
+    <template #icon>
+      <div class="temp-icon" :style="{ background: iconGradient }">
+        🌡️
+      </div>
+    </template>
+
+    <template #chart v-if="showChart">
+      <!-- TODO: Chart.js 차트 컴포넌트 -->
+      <div class="chart-placeholder">Temperature Chart</div>
+    </template>
+  </BaseSensorCard>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, onMounted } from 'vue';
+import BaseSensorCard from './BaseSensorCard.vue';
+
+interface Props {
+  sensorId: string;
+  title?: string;
+  location?: string;
+  enabled?: boolean;
+  showChart?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '온도 센서',
+  location: '하우스 1동',
+  enabled: true,
+  showChart: false,
+});
+
+const emit = defineEmits<{
+  refresh: [];
+  settings: [];
+}>();
+
+// 센서 데이터 (실제로는 API 또는 WebSocket에서 가져옴)
+const sensorData = ref({
+  value: 25.5,
+  unit: '℃',
+  status: 'normal' as 'normal' | 'warning' | 'critical' | 'offline',
+});
+
+const thresholds = {
+  min: 15,
+  max: 30,
+};
+
+const trend = ref<'up' | 'down' | 'stable'>('stable');
+const trendValue = ref('+0.5℃');
+
+// 온도에 따른 아이콘 그라데이션
+const iconGradient = computed(() => {
+  const temp = sensorData.value.value;
+  if (temp < 18) {
+    return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+  } else if (temp < 24) {
+    return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+  } else {
+    return 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+  }
+});
+
+const handleRefresh = () => {
+  emit('refresh');
+  // TODO: 센서 데이터 갱신
+  console.log('Refreshing sensor:', props.sensorId);
+};
+
+const handleSettings = () => {
+  emit('settings');
+  console.log('Opening settings for:', props.sensorId);
+};
+
+// 실시간 데이터 업데이트 (WebSocket 연동)
+onMounted(() => {
+  // TODO: WebSocket 연결
+  // const socket = useWebSocket();
+  // socket.on(`sensor:${props.sensorId}`, (data) => {
+  //   sensorData.value = data;
+  // });
+});
+</script>
+
+<style scoped>
+.temp-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 8px;
+  transition: background 0.5s ease;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #f5f5f5;
+  border-radius: 8px;
+  color: #999;
+}
+</style>

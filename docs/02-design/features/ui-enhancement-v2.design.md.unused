@@ -1,0 +1,487 @@
+# Design: UI Enhancement v2 - 시니어 사용자 접근성 개선
+
+> Plan 문서: `docs/01-plan/features/ui-enhancement-v2.plan.md`
+
+## 1. 다크모드 CSS 변수 시스템 (FR-01)
+
+### 1.1 CSS 변수 정의 (App.vue)
+
+기존 `--content-scale` 시스템에 색상 변수를 추가한다.
+
+```css
+/* ========== 테마 색상 변수 시스템 ========== */
+#app {
+  /* 배경 */
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f5f5;
+  --bg-active: #e8f5e9;
+  --bg-input: #ffffff;
+  --bg-badge: #f0f0f0;
+  --bg-sensor: #f8f0ff;
+  --bg-actuator: #f0faf0;
+  --bg-condition: #f1f8e9;
+  --bg-action: #e8f5e9;
+  --bg-info-banner: #e3f2fd;
+  /* 텍스트 */
+  --text-primary: #333333;
+  --text-secondary: #555555;
+  --text-muted: #999999;
+  --text-link: #666666;
+  --text-info-banner: #1565c0;
+  /* 테두리 */
+  --border-color: #d0d0d0;
+  --border-light: #e8e8e8;
+  --border-card: #d0d0d0;
+  --border-input: #e0e0e0;
+  /* 그림자 */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.3);
+  /* 강조색 (accent) */
+  --accent: #2e7d32;
+  --accent-hover: #1b5e20;
+  --accent-bg: #e8f5e9;
+  --accent-text: #2e7d32;
+  /* 위험색 */
+  --danger: #e53935;
+  --danger-hover: #c62828;
+  --danger-bg: #ffebee;
+  /* 보라 (센서) */
+  --sensor-accent: #7b1fa2;
+  --sensor-bg: #ede7f6;
+  --sensor-value-bg: #f8f0ff;
+  /* 오렌지 (자동화) */
+  --automation-bg: #fff3e0;
+  --automation-text: #e65100;
+  /* 차트 */
+  --chart-primary: #4caf50;
+  --chart-bg: rgba(76, 175, 80, 0.2);
+  /* 토글 */
+  --toggle-off: #cccccc;
+  --toggle-on: #4caf50;
+  /* 오버레이 */
+  --overlay: rgba(0, 0, 0, 0.5);
+}
+
+#app.theme-dark {
+  /* 배경 */
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-card: #252525;
+  --bg-hover: #333333;
+  --bg-active: #1b3a2a;
+  --bg-input: #2a2a2a;
+  --bg-badge: #333333;
+  --bg-sensor: #2a1f3a;
+  --bg-actuator: #1a2e1a;
+  --bg-condition: #1a2a1a;
+  --bg-action: #1a2e1a;
+  --bg-info-banner: #1a2a3a;
+  /* 텍스트 */
+  --text-primary: #e8e8e8;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
+  --text-link: #b0b0b0;
+  --text-info-banner: #64b5f6;
+  /* 테두리 */
+  --border-color: #404040;
+  --border-light: #333333;
+  --border-card: #404040;
+  --border-input: #404040;
+  /* 그림자 */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6);
+  /* 강조색 */
+  --accent: #4caf50;
+  --accent-hover: #66bb6a;
+  --accent-bg: #1b3a2a;
+  --accent-text: #66bb6a;
+  /* 위험색 */
+  --danger: #ef5350;
+  --danger-hover: #f44336;
+  --danger-bg: #3a1a1a;
+  /* 보라 (센서) */
+  --sensor-accent: #ce93d8;
+  --sensor-bg: #2a1f3a;
+  --sensor-value-bg: #2a1f3a;
+  /* 오렌지 */
+  --automation-bg: #3a2a1a;
+  --automation-text: #ffb74d;
+  /* 차트 */
+  --chart-primary: #66bb6a;
+  --chart-bg: rgba(102, 187, 106, 0.2);
+  /* 토글 */
+  --toggle-off: #555555;
+  --toggle-on: #4caf50;
+  /* 오버레이 */
+  --overlay: rgba(0, 0, 0, 0.7);
+}
+```
+
+### 1.2 테마 토글 (App.vue script)
+
+```typescript
+type ThemeMode = 'light' | 'dark'
+const theme = ref<ThemeMode>(
+  (localStorage.getItem('sf-theme') as ThemeMode) ||
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+)
+
+function setTheme(mode: ThemeMode) {
+  theme.value = mode
+  localStorage.setItem('sf-theme', mode)
+}
+```
+
+- `#app`에 `:class` 바인딩: `theme === 'dark' ? 'theme-dark' : ''` 추가
+- 사이드바/드로어에 테마 토글 UI 추가 (폰트 크기 조절 아래):
+
+```html
+<div class="theme-control">
+  <span class="theme-label">화면 모드</span>
+  <div class="theme-buttons">
+    <button :class="{ active: theme === 'light' }" @click="setTheme('light')">☀️ 밝게</button>
+    <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">🌙 어둡게</button>
+  </div>
+</div>
+```
+
+### 1.3 App.vue 사이드바/글로벌 CSS 변수 적용 매핑
+
+| 현재 하드코딩 | CSS 변수 | 사용 위치 |
+|---|---|---|
+| `background: #f5f7fa` | `var(--bg-primary)` | body |
+| `color: #333` | `var(--text-primary)` | body |
+| `background: white` | `var(--bg-secondary)` | .sidebar, .mobile-header, .drawer, .bottom-tab-bar, .more-menu |
+| `border: 1px solid #e8e8e8` | `var(--border-light)` | .sidebar border-right, .mobile-header border-bottom |
+| `border: 1px solid #f0f0f0` | `var(--border-light)` | .sidebar-brand, .font-size-control, .sidebar-footer border-top |
+| `color: #555` | `var(--text-secondary)` | .sidebar-link |
+| `background: #f5f5f5` | `var(--bg-hover)` | .sidebar-link:hover, .btn-logout |
+| `background: #e8f5e9` | `var(--accent-bg)` | .sidebar-link.active, .font-size-buttons button.active |
+| `color: #2e7d32` | `var(--accent)` | .sidebar-link.active, .brand-text h1 |
+| `color: #999` | `var(--text-muted)` | .brand-sub, .font-size-label, .user-role |
+| `color: #666` | `var(--text-link)` | .font-size-buttons button, .btn-logout |
+| `background: #e8e8e8` (hamburger span) | `var(--text-primary)` | .hamburger span |
+
+## 2. 카드/그리드 통일 디자인 규격 (FR-05)
+
+### 2.1 통일 카드 스타일
+
+모든 카드 요소에 다음 CSS 변수 기반 규격을 적용한다:
+
+```css
+/* 통일 카드 규격 */
+.{card-class} {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+```
+
+### 2.2 파일별 카드 클래스 매핑
+
+| 파일 | 카드 클래스 | 현재 상태 | 변경 사항 |
+|------|-----------|----------|----------|
+| **Devices.vue** | `.device-card` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08)` | + `border: 1px solid var(--border-card)` + radius 14px + `var(--bg-card)` |
+| **Sensors.vue** | `.group-section` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08)` | 동일 |
+| **Sensors.vue** | `.sensor-card` | `background: #f8f9fa; border: 2px solid #e8f5e9; border-radius: 12px` | `background: var(--bg-card); border: 1px solid var(--border-card)` |
+| **Groups.vue** | `.group-card` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08)` | 동일 |
+| **Groups.vue** | `.sub-card` | `background: #f8f9fa; border: 1px solid #e8e8e8; border-radius: 10px; padding: 14px` | `var(--bg-hover); var(--border-light); radius 12px; padding: 16px` |
+| **Reports.vue** | `.filter-section` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px ...` | 동일 |
+| **Reports.vue** | `.stat-card` | 동일 | 동일 |
+| **Reports.vue** | `.chart-card` | 동일 | 동일 |
+| **Reports.vue** | `.data-table-section` | 동일 | 동일 |
+| **Automation.vue** | `.rule-card` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px ...; border-left: 4px solid #2e7d32` | + top/right/bottom border + `var(--accent)` for border-left |
+| **SummaryCards.vue** | `.detail-card` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px ...` | 동일 |
+| **SummaryCards.vue** | `.summary-item` | `background: white; border-radius: 12px; box-shadow: 0 1px 4px ...` | 동일 |
+
+### 2.3 서브 배경색 매핑
+
+| 현재 색상 | CSS 변수 | 용도 |
+|---|---|---|
+| `#f8f9fa` | `var(--bg-hover)` | 서브카드, 테이블헤더, 빈상태 배경 |
+| `#f8f0ff` | `var(--sensor-value-bg)` | 센서 값 표시 영역 |
+| `#f0faf0` | `var(--bg-actuator)` | 액추에이터 컨트롤 영역 |
+| `#e3f2fd` | `var(--bg-info-banner)` | 정보 배너 |
+| `#f1f8e9` | `var(--bg-condition)` | 자동화 조건 섹션 |
+| `#e8f5e9` | `var(--bg-action)` / `var(--accent-bg)` | 자동화 동작 섹션, 액티브 상태 |
+| `#ede7f6` | `var(--sensor-bg)` | 센서 타입 배지 |
+| `#fff3e0` | `var(--automation-bg)` | 자동화 라벨 |
+| `#f3e5f5` | `var(--sensor-bg)` | 센서 칩 |
+| `#f0f0f0` | `var(--bg-badge)` | 배지, 탭필터 배경 |
+| `#ffebee` | `var(--danger-bg)` | 위험 배경 |
+
+## 3. 최소 폰트 크기 확대 (FR-02)
+
+### 3.1 변경 대상 목록
+
+모든 `calc(Xpx * var(--content-scale, 1))` 에서 X < 13인 항목을 13으로 올린다.
+사이드바/레이아웃 컴포넌트의 하드코딩 폰트도 동일 처리.
+
+| 파일 | 셀렉터 | 현재 | 변경 |
+|------|--------|------|------|
+| **BottomTabBar.vue** | `.tab-item` | `10px` | `13px` |
+| **App.vue** | `.brand-sub` | `11px` | `13px` |
+| **App.vue** | `.font-size-label` | `12px` | `13px` |
+| **App.vue** | `.user-role` | `12px` | `13px` |
+| **Devices.vue** | `.tuya-label` | `calc(11px * ...)` | *(FR-04에서 제거)* |
+| **Devices.vue** | `.big-label` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Devices.vue** | `.last-seen` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Devices.vue** | `.btn-icon-delete` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Groups.vue** | `.type-tag` | `calc(11px * ...)` | `calc(13px * ...)` |
+| **Groups.vue** | `.device-count-badge` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Groups.vue** | `.section-label` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Groups.vue** | `.rule-summary` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Groups.vue** | `.status-indicator` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **Sensors.vue** | `.expand-icon` | `calc(12px * ...)` | `calc(13px * ...)` |
+| **ConfirmDialog.vue** | `.confirm-message` | `14px` | `15px` |
+| **ConfirmDialog.vue** | `.confirm-title` | `18px` | `18px` (유지) |
+
+## 4. 버튼 크기 3단계 규격 (FR-03)
+
+### 4.1 규격 정의
+
+| 등급 | 용도 | padding | font-size | border-radius | min-height |
+|------|------|---------|-----------|---------------|------------|
+| **Large** | 주요 CTA (+ 장비 추가, 첫번째 그룹 만들기) | `14px 28px` | `calc(16px * var(--content-scale, 1))` | `12px` | `50px` |
+| **Medium** | 일반 버튼 (Tuya 동기화, CSV 다운로드, 조회) | `12px 24px` | `calc(15px * var(--content-scale, 1))` | `10px` | `44px` |
+| **Small** | 보조 (탭 필터, 차트 타입, 페이지네이션, 초기화) | `8px 16px` | `calc(14px * var(--content-scale, 1))` | `8px` | `36px` |
+
+### 4.2 파일별 버튼 매핑
+
+| 파일 | 버튼 클래스 | 현재 | 등급 적용 |
+|------|-----------|------|----------|
+| **Devices.vue** | `.btn-primary` (+ 장비 추가) | `12px 24px / 15px` | **Large** `14px 28px / 16px` |
+| **Devices.vue** | `.btn-outline` (Tuya 동기화) | `12px 24px / 15px` | **Medium** (유지) |
+| **Devices.vue** | `.tab` (전체/장비/센서) | `10px 18px / 15px` | **Small** `8px 16px / 14px` |
+| **Groups.vue** | `.btn-primary` (+ 그룹 추가) | `10px 20px / 14px` | **Large** `14px 28px / 16px` |
+| **Groups.vue** | `.btn-outline` (Tuya 동기화) | `10px 20px / 14px` | **Medium** `12px 24px / 15px` |
+| **Groups.vue** | `.btn-sm` (+ 장비 추가 작은) | `6px 14px / 13px` | **Small** `8px 16px / 14px` |
+| **Groups.vue** | `.btn-icon` | `36x36 / 14px` | **Small** (min 36px 유지) |
+| **Sensors.vue** | `.btn-refresh` | `12px 24px / 15px` | **Medium** (유지) |
+| **Reports.vue** | `.btn-primary` (PDF, 조회) | `12px 24px / 15px` | **Medium** (유지) |
+| **Reports.vue** | `.btn-outline` (CSV) | `12px 24px / 15px` | **Medium** (유지) |
+| **Reports.vue** | `.btn-secondary` (초기화, CSV 내부) | `12px 24px / 15px` | **Small** `8px 16px / 14px` |
+| **Reports.vue** | `.chart-type-btn` | `6px 12px / 14px` | **Small** `8px 16px / 14px` |
+| **Reports.vue** | `.page-btn` | `8px 16px / 14px` | **Small** (유지) |
+| **Automation.vue** | `.btn-primary` (+ 룰 추가) | `12px 24px / 15px` | **Large** `14px 28px / 16px` |
+| **Automation.vue** | `.tab` | `10px 18px / 15px` | **Small** `8px 16px / 14px` |
+
+## 5. 장비 ID 숨김 (FR-04)
+
+### 5.1 Devices.vue 변경
+
+**Template**: `<div class="card-tuya-id">` 블록 전체 제거
+
+```html
+<!-- 삭제 대상 (line 72-76) -->
+<div class="card-tuya-id">
+  <span class="tuya-label">ID</span>
+  <span class="tuya-value">{{ device.tuyaDeviceId?.slice(0, 16) || '-' }}...</span>
+</div>
+```
+
+**CSS**: `.card-tuya-id`, `.tuya-label`, `.tuya-value` 클래스 전체 제거
+
+## 6. 파일별 색상 하드코딩 → CSS 변수 교체 매핑
+
+### 6.1 Devices.vue 색상 매핑 (25개)
+
+| 셀렉터 | 속성 | 현재 값 | CSS 변수 |
+|--------|------|--------|---------|
+| `.page-header h2` | color | `#333` | `var(--text-primary)` |
+| `.page-description` | color | `#666` | `var(--text-secondary)` |
+| `.btn-primary` | background | `#2e7d32` | `var(--accent)` |
+| `.btn-primary:hover` | background | `#1b5e20` | `var(--accent-hover)` |
+| `.btn-outline` | background | `white` | `var(--bg-card)` |
+| `.btn-outline` | color | `#333` | `var(--text-primary)` |
+| `.btn-outline` | border-color | `#ddd` | `var(--border-input)` |
+| `.btn-outline:hover` | border-color | `#2e7d32` | `var(--accent)` |
+| `.search-box` | background | `white` | `var(--bg-card)` |
+| `.search-box` | border-color | `#e0e0e0` | `var(--border-input)` |
+| `.search-icon` | color | `#999` | `var(--text-muted)` |
+| `.tab-filter` | background | `#f0f0f0` | `var(--bg-badge)` |
+| `.tab` | color | `#666` | `var(--text-link)` |
+| `.tab.active` | background | `white` | `var(--bg-card)` |
+| `.tab.active` | color | `#333` | `var(--text-primary)` |
+| `.device-card` | background | `white` | `var(--bg-card)` |
+| `.card-title h4` | color | `#333` | `var(--text-primary)` |
+| `.card-category` | color | `#999` | `var(--text-muted)` |
+| `.type-badge.actuator` | background/color | `#e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.type-badge.sensor` | background/color | `#ede7f6/#7b1fa2` | `var(--sensor-bg)/var(--sensor-accent)` |
+| `.card-sensor-value` | background | `#f8f0ff` | `var(--sensor-value-bg)` |
+| `.big-number` | color | `#7b1fa2` | `var(--sensor-accent)` |
+| `.card-control` | background | `#f0faf0` | `var(--bg-actuator)` |
+| `.toggle-label` | color | `#2e7d32` | `var(--accent)` |
+| `.card-footer` | border-color | `#f0f0f0` | `var(--border-light)` |
+| `.toggle-slider` | background | `#ccc` | `var(--toggle-off)` |
+| `input:checked + .toggle-slider` | background | `#4caf50` | `var(--toggle-on)` |
+| `.btn-icon-delete` | color/border | `#e53935` | `var(--danger)` |
+| `.btn-icon-delete:hover` | background | `#e53935` | `var(--danger)` |
+| `.status-dot.online` | background | `#4caf50` | `var(--toggle-on)` |
+| `.status-dot.offline` | background | `#e0e0e0` | `var(--border-input)` |
+| `.loading-state, .empty-state` | color | `#666` | `var(--text-secondary)` |
+| `.empty-state h3` | color | `#333` | `var(--text-primary)` |
+
+### 6.2 Sensors.vue 색상 매핑 (20개)
+
+동일 패턴. 추가 항목:
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.group-section` | `background: white` | `var(--bg-card)` |
+| `.group-header:hover` | `background: #fafafa` | `var(--bg-hover)` |
+| `.group-title h3` | `color: #333` | `var(--text-primary)` |
+| `.sensor-card` | `background: #f8f9fa; border: 2px solid #e8f5e9` | `var(--bg-card); 1px solid var(--border-card)` |
+| `.sensor-name` | `color: #333` | `var(--text-primary)` |
+| `.sensor-status.online` | `background/color: #e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.sensor-status.offline` | `background/color: #f5f5f5/#999` | `var(--bg-badge)/var(--text-muted)` |
+| `.value-number` | `color: #2e7d32` | `var(--accent)` |
+| `.summary-chip` | `background: #f5f5f5; color: #555` | `var(--bg-badge); var(--text-secondary)` |
+| `.sensor-count` | `background: #f0f0f0; color: #666` | `var(--bg-badge); var(--text-link)` |
+| `.info-banner` | `background: #e3f2fd; color: #1565c0` | `var(--bg-info-banner); var(--text-info-banner)` |
+| `.sensor-card-footer` | `border-color: #e8e8e8` | `var(--border-light)` |
+
+### 6.3 Groups.vue 색상 매핑 (20개)
+
+동일 패턴 + 모달 관련:
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.group-card` | `background: white` | `var(--bg-card)` |
+| `.btn-icon` | `background: #f5f5f5` | `var(--bg-hover)` |
+| `.btn-icon:hover` | `background: #e8e8e8` | `var(--bg-badge)` |
+| `.btn-icon.danger:hover` | `background: #ffebee; color: #e53935` | `var(--danger-bg); var(--danger)` |
+| `.sub-card` | `background: #f8f9fa; border: #e8e8e8` | `var(--bg-hover); var(--border-light)` |
+| `.section-label.sensor` | `background/color: #ede7f6/#7b1fa2` | `var(--sensor-bg)/var(--sensor-accent)` |
+| `.section-label.actuator` | `background/color: #e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.section-label.automation` | `background/color: #fff3e0/#e65100` | `var(--automation-bg)/var(--automation-text)` |
+| `.control-label` | `color: #2e7d32` | `var(--accent)` |
+| `.rules-list` | `background: #f8f9fa` | `var(--bg-hover)` |
+| `.modal-overlay` | `background: rgba(0,0,0,0.5)` | `var(--overlay)` |
+| `.add-device-modal` | `background: white` | `var(--bg-card)` |
+| `.add-modal-header` | `border-color: #e0e0e0` | `var(--border-input)` |
+| `.device-row.selected` | `background: #e8f5e9` | `var(--accent-bg)` |
+| `.status-indicator.online` | `background/color: #e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.status-indicator.offline` | `background/color: #ffebee/#c62828` | `var(--danger-bg)/var(--danger)` |
+
+### 6.4 Reports.vue 색상 매핑 (15개)
+
+동일 패턴 + 필터/차트:
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.filter-section` | `background: white` | `var(--bg-card)` |
+| `.filter-select, .filter-input` | `background: white; border: #e0e0e0` | `var(--bg-input); var(--border-input)` |
+| `.filter-select:focus` | `border-color: #2e7d32` | `var(--accent)` |
+| `.filter-group label` | `color: #666` | `var(--text-link)` |
+| `.stat-card` | `background: white` | `var(--bg-card)` |
+| `.stat-value` | `color: #333` | `var(--text-primary)` |
+| `.stat-content h3` | `color: #999` | `var(--text-muted)` |
+| `.chart-card` | `background: white` | `var(--bg-card)` |
+| `.chart-actions` | `background: #f0f0f0` | `var(--bg-badge)` |
+| `.chart-type-btn.active` | `background: white; color: #333` | `var(--bg-card); var(--text-primary)` |
+| `.data-table-section` | `background: white` | `var(--bg-card)` |
+| `.data-table thead` | `background: #f8f9fa` | `var(--bg-hover)` |
+| `.data-table th/td` | `border-color / color` | `var(--border-light) / var(--text-secondary)` |
+| `.data-table tbody tr:hover` | `background: #f8f9fa` | `var(--bg-hover)` |
+| `.status-badge.normal` | `#e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.status-badge.warning` | `#fff3e0/#e65100` | `var(--automation-bg)/var(--automation-text)` |
+| `.status-badge.critical` | `#ffebee/#c62828` | `var(--danger-bg)/var(--danger)` |
+| `.page-btn` | `background: #f5f5f5` | `var(--bg-hover)` |
+| `.page-btn:hover` | `background: #e0e0e0` | `var(--bg-badge)` |
+| `.btn-secondary` | `background: #f5f5f5; color: #333` | `var(--bg-hover); var(--text-primary)` |
+| `.btn-secondary:hover` | `background: #e0e0e0` | `var(--bg-badge)` |
+
+### 6.5 Automation.vue 색상 매핑 (12개)
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.rule-card` | `background: white; border-left: 4px solid #2e7d32` | `var(--bg-card); var(--accent)` |
+| `.rule-name` | `color: #333` | `var(--text-primary)` |
+| `.active-badge.enabled` | `#e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.active-badge.disabled` | `#f5f5f5/#999` | `var(--bg-badge)/var(--text-muted)` |
+| `.target-text` | `color: #2e7d32` | `var(--accent)` |
+| `.rule-type-badge` | `background: #f0f0f0; color: #666` | `var(--bg-badge); var(--text-link)` |
+| `.rule-section.condition` | `background: #f1f8e9` | `var(--bg-condition)` |
+| `.rule-section.action` | `background: #e8f5e9` | `var(--bg-action)` |
+| `.section-title` | `color: #666` | `var(--text-link)` |
+| `.section-content` | `color: #333` | `var(--text-primary)` |
+| `.rule-footer` | `border-color: #f0f0f0` | `var(--border-light)` |
+| `.automation-tabs` | `background: #f0f0f0` | `var(--bg-badge)` |
+
+### 6.6 SummaryCards.vue 색상 매핑 (10개)
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.detail-card` | `background: white` | `var(--bg-card)` |
+| `.detail-card-header` | `border-color: #f0f0f0` | `var(--border-light)` |
+| `.detail-card-header h3` | `color: #333` | `var(--text-primary)` |
+| `.detail-count` | `color/bg: #2e7d32/#e8f5e9` | `var(--accent)/var(--accent-bg)` |
+| `.detail-item` | `border-color: #f5f5f5` | `var(--border-light)` |
+| `.detail-item:hover` | `background: #fafafa` | `var(--bg-hover)` |
+| `.item-name` | `color: #333` | `var(--text-primary)` |
+| `.item-status.running` | `#e8f5e9/#2e7d32` | `var(--accent-bg)/var(--accent)` |
+| `.item-status.stopped` | `#f5f5f5/#999` | `var(--bg-badge)/var(--text-muted)` |
+| `.summary-item` | `background: white` | `var(--bg-card)` |
+| `.summary-number` | `color: #333` | `var(--text-primary)` |
+| `.sensor-chip` | `background/color: #f3e5f5/#7b1fa2` | `var(--sensor-bg)/var(--sensor-accent)` |
+
+### 6.7 BottomTabBar.vue 색상 매핑
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.bottom-tab-bar` | `background: white; border-color: #e0e0e0` | `var(--bg-secondary); var(--border-color)` |
+| `.tab-item` | `color: #999` | `var(--text-muted)` |
+| `.tab-item.active` | `color: #2e7d32` | `var(--accent)` |
+
+### 6.8 MoreMenu.vue 색상 매핑
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.more-menu` | `background: white` | `var(--bg-card)` |
+| `.more-item` | `color: #333` | `var(--text-primary)` |
+| `.more-item:hover` | `background: #f5f5f5` | `var(--bg-hover)` |
+| `.more-item.logout` | `border-color: #f0f0f0; color: #c62828` | `var(--border-light); var(--danger)` |
+
+### 6.9 ConfirmDialog.vue 색상 매핑
+
+| 셀렉터 | 현재 | CSS 변수 |
+|--------|------|---------|
+| `.confirm-overlay` | `background: rgba(0,0,0,0.5)` | `var(--overlay)` |
+| `.confirm-dialog` | `background: white` | `var(--bg-card)` |
+| `.confirm-title` | `color: #333` | `var(--text-primary)` |
+| `.confirm-message` | `color: #666` | `var(--text-secondary)` |
+| `.confirm-btn.cancel` | `background: #f5f5f5; color: #333` | `var(--bg-hover); var(--text-primary)` |
+| `.confirm-btn.cancel:hover` | `background: #e0e0e0` | `var(--bg-badge)` |
+| `.confirm-btn.ok.danger` | `background: #f44336` | `var(--danger)` |
+| `.confirm-btn.ok.info` | `background: #2e7d32` | `var(--accent)` |
+
+## 7. 구현 순서 (10단계)
+
+| 단계 | 작업 | 파일 | FR |
+|------|------|------|----|
+| 1 | App.vue CSS 변수 시스템 정의 (라이트+다크) | App.vue | FR-01 |
+| 2 | App.vue 테마 토글 script + UI 추가 | App.vue | FR-01 |
+| 3 | App.vue 사이드바/드로어/글로벌 CSS 변수 적용 | App.vue | FR-01 |
+| 4 | BottomTabBar.vue + MoreMenu.vue + ConfirmDialog.vue 색상/폰트 변수 적용 | 3개 파일 | FR-01, FR-02 |
+| 5 | Devices.vue: Tuya ID 제거 + 색상 변수 + 카드 border + 버튼 규격 + 폰트 확대 | Devices.vue | FR-01~05 |
+| 6 | Sensors.vue: 색상 변수 + 카드 border + 폰트 확대 | Sensors.vue | FR-01, FR-02, FR-05 |
+| 7 | Groups.vue: 색상 변수 + 카드 border + 버튼 규격 + 폰트 확대 | Groups.vue | FR-01~03, FR-05 |
+| 8 | Reports.vue: 색상 변수 + 카드 border + 버튼 규격 + 폰트 확대 | Reports.vue | FR-01~03, FR-05 |
+| 9 | Automation.vue: 색상 변수 + 카드 border + 버튼 규격 | Automation.vue | FR-01, FR-03, FR-05 |
+| 10 | SummaryCards.vue: 색상 변수 + 카드 border | SummaryCards.vue | FR-01, FR-05 |
+
+## 8. 검증 체크리스트
+
+- [ ] 라이트 모드: 모든 카드에 `#d0d0d0` border 표시
+- [ ] 다크 모드: 모든 텍스트 가독성 (대비 4.5:1 이상)
+- [ ] 다크 모드: 차트 색상 적용 (Chart.js는 JS에서 별도 처리 필요시 확인)
+- [ ] 최소 폰트 13px 미만 없음
+- [ ] 버튼 Large/Medium/Small 규격 일치
+- [ ] Devices.vue에서 Tuya ID 미표시
+- [ ] localStorage `sf-theme` 저장/복원
+- [ ] `npm run build` 통과

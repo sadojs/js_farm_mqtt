@@ -1,0 +1,875 @@
+# Design: Smart Farm Platform 상세 설계
+
+> Created: 2026-02-10
+> Feature: smart-farm-platform
+> Phase: Design (PDCA)
+> Plan Reference: [smart-farm-platform.plan.md](../../01-plan/features/smart-farm-platform.plan.md)
+
+---
+
+## 1. 설계 개요
+
+### 1.1 목적
+Plan 문서에서 식별된 이슈(보안, 상태관리, API 레이어 부재 등)를 해결하고,
+Phase 2(백엔드) 구현을 위한 상세 설계를 제공한다.
+
+### 1.2 설계 범위
+- 프론트엔드: 상태관리 정규화, API 서비스 레이어, 보안 개선
+- 백엔드: NestJS 모듈 구조, API 엔드포인트, 인증 시스템
+- 데이터베이스: 기존 스키마 기반 구현 전략
+- 인프라: Docker 환경 보안 강화
+
+### 1.3 설계 원칙
+1. **점진적 마이그레이션**: Mock → 실제 API 전환을 모듈별로 순차 진행
+2. **인터페이스 우선**: API 인터페이스를 먼저 정의하고 구현
+3. **보안 우선**: 인증/암호화를 첫 번째로 구현
+4. **기존 코드 보존**: 프론트엔드 UI/UX는 유지하면서 내부 로직만 개선
+
+---
+
+## 2. 프론트엔드 설계
+
+### 2.1 디렉토리 구조 (개선안)
+
+```
+frontend/src/
+├── api/                        # [신규] API 클라이언트
+│   ├── client.ts               # Axios 인스턴스 + 인터셉터
+│   ├── auth.api.ts             # 인증 API
+│   ├── sensor.api.ts           # 센서 데이터 API
+│   ├── device.api.ts           # 장비 API
+│   ├── group.api.ts            # 그룹 API
+│   ├── automation.api.ts       # 자동화 API
+│   ├── user.api.ts             # 사용자 관리 API
+│   └── report.api.ts           # 리포트 API
+│
+├── stores/                     # [신규] Pinia 상태관리
+│   ├── auth.store.ts           # 인증 상태 (JWT 토큰, 사용자 정보)
+│   ├── sensor.store.ts         # 센서 데이터 캐시
+│   ├── device.store.ts         # 장비 상태
+│   ├── group.store.ts          # 그룹 상태
+│   ├── automation.store.ts     # 자동화 규칙 상태
+│   └── notification.store.ts   # 알림 상태
+│
+├── composables/                # [신규] 재사용 로직
+│   ├── useAuth.ts              # 인증 관련 컴포저블
+│   ├── useWebSocket.ts         # WebSocket 연결 관리
+│   └── useNotification.ts      # 토스트 알림
+│
+├── types/                      # [신규] 타입 정의
+│   ├── auth.types.ts           # 인증 관련 타입
+│   ├── sensor.types.ts         # 센서 타입
+│   ├── device.types.ts         # 장비 타입
+│   ├── group.types.ts          # 그룹 타입
+│   ├── automation.types.ts     # 자동화 타입
+│   └── api.types.ts            # API 응답 공통 타입
+│
+├── views/                      # [기존] 수정
+├── components/                 # [기존] 유지
+├── router/                     # [기존] 수정 (가드 개선)
+└── main.ts                     # [기존] 수정 (Pinia 활성화)
+```
+
+### 2.2 API 클라이언트 설계
+
+#### client.ts - Axios 인스턴스
+```typescript
+// 핵심 설계
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  timeout: 10000,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+// 요청 인터셉터: JWT 토큰 자동 첨부
+apiClient.interceptors.request.use((config) => {
+  const authStore = useAuthStore()
+  if (authStore.accessToken) {
+    config.headers.Authorization = `Bearer ${authStore.accessToken}`
+  }
+  return config
+})
+
+// 응답 인터셉터: 401 시 토큰 갱신 or 로그아웃
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      const authStore = useAuthStore()
+      const refreshed = await authStore.refreshToken()
+      if (refreshed) {
+        return apiClient.request(error.config) // 재시도
+      }
+      authStore.logout()
+      router.push('/login')
+    }
+    return Promise.reject(error)
+  }
+)
+```
+
+#### API 모듈 패턴
+```typescript
+// auth.api.ts 예시
+export const authApi = {
+  login: (email: string, password: string) =>
+    apiClient.post<LoginResponse>('/auth/login', { email, password }),
+
+  refresh: (refreshToken: string) =>
+    apiClient.post<TokenResponse>('/auth/refresh', { refreshToken }),
+
+  me: () =>
+    apiClient.get<UserResponse>('/auth/me'),
+}
+```
+
+### 2.3 Pinia 상태관리 설계
+
+#### auth.store.ts
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  // State
+  const user = ref<User | null>(null)
+  const accessToken = ref<string | null>(null)
+  const refreshToken = ref<string | null>(null)
+
+  // Getters
+  const isAuthenticated = computed(() => !!accessToken.value)
+  const isAdmin = computed(() => user.value?.role === 'admin')
+
+  // Actions
+  async function login(email: string, password: string) {
+    const { data } = await authApi.login(email, password)
+    accessToken.value = data.accessToken
+    refreshToken.value = data.refreshToken
+    user.value = data.user
+    // 토큰만 localStorage에 저장 (사용자 정보는 메모리)
+    localStorage.setItem('refreshToken', data.refreshToken)
+  }
+
+  function logout() {
+    user.value = null
+    accessToken.value = null
+    refreshToken.value = null
+    localStorage.removeItem('refreshToken')
+  }
+
+  async function refreshTokenAction() {
+    const token = refreshToken.value || localStorage.getItem('refreshToken')
+    if (!token) return false
+    try {
+      const { data } = await authApi.refresh(token)
+      accessToken.value = data.accessToken
+      refreshToken.value = data.refreshToken
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  return {
+    user, accessToken, isAuthenticated, isAdmin,
+    login, logout, refreshToken: refreshTokenAction
+  }
+})
+```
+
+### 2.4 기존 코드 마이그레이션 계획
+
+#### Login.vue 변경점
+| 현재 | 변경 후 |
+|------|---------|
+| Mock 인증 (하드코딩) | `authApi.login()` 호출 |
+| `localStorage.setItem('user', ...)` | `authStore.login()` |
+| `localStorage.setItem('isAuthenticated', ...)` | Pinia `isAuthenticated` computed |
+| 데모 계정 UI 노출 | 개발 환경에서만 조건부 표시 (`import.meta.env.DEV`) |
+
+#### App.vue 변경점
+| 현재 | 변경 후 |
+|------|---------|
+| `localStorage.getItem('isAuthenticated')` | `authStore.isAuthenticated` |
+| `localStorage.getItem('user')` | `authStore.user` |
+| `watch(() => route.path, ...)` localStorage 재읽기 | 불필요 (Pinia 반응성) |
+
+#### router/index.ts 변경점
+| 현재 | 변경 후 |
+|------|---------|
+| `localStorage.getItem('isAuthenticated')` | `authStore.isAuthenticated` |
+| `alert('관리자 권한이 필요합니다.')` | `notificationStore.error('...')` 토스트 |
+| 프론트엔드 역할 체크만 | 서버에서 역할 검증 (JWT payload) |
+
+#### Reports.vue 변경점
+| 현재 | 변경 후 |
+|------|---------|
+| Mock 데이터 생성 | `reportApi.getSensorData(params)` |
+| `alert('백엔드 연동 후 구현')` | `reportApi.downloadPdf(params)` |
+| 하드코딩된 그룹/하우스 | `groupStore.groups`, `groupStore.houses` |
+
+#### DeviceRegistration.vue 변경점
+| 현재 | 변경 후 |
+|------|---------|
+| `localStorage.getItem('user')` Tuya 프로젝트 | `authStore.user.tuyaProject` |
+| Mock 장비 목록 | `deviceApi.getTuyaDevices(projectId)` |
+| `console.log('등록:', ...)` | `deviceApi.register(devices, houseId)` |
+| 하드코딩된 하우스 목록 | `groupStore.houses` |
+
+---
+
+## 3. 백엔드 설계
+
+### 3.1 NestJS 프로젝트 구조
+
+```
+backend/src/
+├── main.ts                         # 앱 엔트리포인트
+├── app.module.ts                   # 루트 모듈
+│
+├── common/                         # 공통 모듈
+│   ├── decorators/
+│   │   ├── current-user.decorator.ts  # @CurrentUser() 데코레이터
+│   │   └── roles.decorator.ts         # @Roles('admin') 데코레이터
+│   ├── guards/
+│   │   ├── jwt-auth.guard.ts          # JWT 인증 가드
+│   │   └── roles.guard.ts            # 역할 기반 접근 제어
+│   ├── filters/
+│   │   └── http-exception.filter.ts   # 전역 예외 필터
+│   ├── interceptors/
+│   │   └── transform.interceptor.ts   # 응답 포맷 통일
+│   └── pipes/
+│       └── validation.pipe.ts         # 입력 검증 파이프
+│
+├── modules/
+│   ├── auth/                       # 인증 모듈
+│   │   ├── auth.module.ts
+│   │   ├── auth.controller.ts      # POST /auth/login, /auth/refresh
+│   │   ├── auth.service.ts         # JWT 발급, 검증
+│   │   ├── strategies/
+│   │   │   ├── jwt.strategy.ts     # JWT 전략
+│   │   │   └── local.strategy.ts   # 로컬 인증 전략
+│   │   └── dto/
+│   │       ├── login.dto.ts
+│   │       └── token-response.dto.ts
+│   │
+│   ├── users/                      # 사용자 모듈
+│   │   ├── users.module.ts
+│   │   ├── users.controller.ts     # CRUD /users
+│   │   ├── users.service.ts
+│   │   ├── entities/
+│   │   │   └── user.entity.ts      # TypeORM 엔티티
+│   │   └── dto/
+│   │       ├── create-user.dto.ts
+│   │       └── update-user.dto.ts
+│   │
+│   ├── devices/                    # 장비 모듈
+│   │   ├── devices.module.ts
+│   │   ├── devices.controller.ts   # CRUD /devices
+│   │   ├── devices.service.ts
+│   │   ├── entities/
+│   │   │   └── device.entity.ts
+│   │   └── dto/
+│   │       ├── register-device.dto.ts
+│   │       └── control-device.dto.ts
+│   │
+│   ├── sensors/                    # 센서 데이터 모듈
+│   │   ├── sensors.module.ts
+│   │   ├── sensors.controller.ts   # GET /sensor-data
+│   │   ├── sensors.service.ts      # 시계열 데이터 쿼리
+│   │   ├── entities/
+│   │   │   └── sensor-data.entity.ts
+│   │   └── dto/
+│   │       └── query-sensor.dto.ts
+│   │
+│   ├── groups/                     # 그룹 모듈
+│   │   ├── groups.module.ts
+│   │   ├── groups.controller.ts    # CRUD /groups
+│   │   ├── groups.service.ts
+│   │   ├── entities/
+│   │   │   ├── house-group.entity.ts
+│   │   │   └── house.entity.ts
+│   │   └── dto/
+│   │       └── create-group.dto.ts
+│   │
+│   ├── automation/                 # 자동화 모듈
+│   │   ├── automation.module.ts
+│   │   ├── automation.controller.ts  # CRUD /automation/rules
+│   │   ├── automation.service.ts
+│   │   ├── engines/                  # [기존] 자동화 엔진
+│   │   │   ├── base-engine.abstract.ts
+│   │   │   ├── weather-engine.ts
+│   │   │   ├── time-engine.ts
+│   │   │   └── hybrid-engine.ts
+│   │   ├── entities/
+│   │   │   ├── automation-rule.entity.ts
+│   │   │   └── automation-log.entity.ts
+│   │   └── dto/
+│   │       └── create-rule.dto.ts
+│   │
+│   ├── integrations/               # 외부 서비스 연동
+│   │   ├── tuya/
+│   │   │   ├── tuya.module.ts
+│   │   │   ├── tuya.service.ts     # Tuya Cloud API 래퍼
+│   │   │   └── tuya.webhook.controller.ts  # POST /webhooks/tuya
+│   │   └── weather/
+│   │       ├── weather.module.ts
+│   │       └── weather.service.ts  # OpenWeather + 기상청 API
+│   │
+│   └── reports/                    # 리포트 모듈
+│       ├── reports.module.ts
+│       ├── reports.controller.ts   # GET /reports
+│       └── reports.service.ts      # PDF/CSV 생성
+│
+├── config/                         # 설정
+│   ├── database.config.ts          # TypeORM 설정
+│   ├── jwt.config.ts               # JWT 설정
+│   └── tuya.config.ts              # Tuya API 설정
+│
+└── database/
+    ├── schema.sql                  # [기존] DDL
+    └── migrations/                 # TypeORM 마이그레이션
+```
+
+### 3.2 API 엔드포인트 상세 설계
+
+#### 인증 API
+```
+POST /api/auth/login
+  Body: { email: string, password: string }
+  Response: {
+    accessToken: string,    // JWT (1시간)
+    refreshToken: string,   // JWT (7일)
+    user: { id, email, name, role, address, tuyaProject }
+  }
+
+POST /api/auth/refresh
+  Body: { refreshToken: string }
+  Response: { accessToken: string, refreshToken: string }
+
+GET /api/auth/me
+  Headers: Authorization: Bearer <token>
+  Response: { id, email, name, role, address, tuyaProject }
+```
+
+#### 사용자 API (관리자 전용)
+```
+GET    /api/users              → 사용자 목록 (페이지네이션)
+POST   /api/users              → 사용자 생성
+GET    /api/users/:id          → 사용자 상세
+PUT    /api/users/:id          → 사용자 수정
+DELETE /api/users/:id          → 사용자 삭제
+PUT    /api/users/:id/tuya     → Tuya 프로젝트 설정
+```
+
+#### 장비 API
+```
+GET    /api/devices                    → 내 장비 목록
+GET    /api/devices/tuya/list          → Tuya Cloud 장비 목록 조회
+POST   /api/devices/register           → 장비 등록 (배치)
+PUT    /api/devices/:id                → 장비 정보 수정
+DELETE /api/devices/:id                → 장비 삭제
+POST   /api/devices/:id/control        → 장비 제어 명령
+GET    /api/devices/:id/status         → 장비 실시간 상태
+```
+
+#### 센서 데이터 API
+```
+GET /api/sensor-data
+  Query: {
+    deviceId?: string,
+    sensorType?: string,     # temperature, humidity, co2, ...
+    startTime: string,       # ISO 8601
+    endTime: string,
+    aggregation?: string,    # raw, hourly, daily
+    groupId?: string,
+    houseId?: string,
+    page?: number,
+    limit?: number
+  }
+  Response: {
+    data: SensorDataPoint[],
+    statistics: { avg, min, max, count, stddev },
+    pagination: { page, limit, total, totalPages }
+  }
+
+GET /api/sensor-data/latest
+  Query: { deviceId?: string, groupId?: string }
+  Response: { [deviceId]: { sensorType, value, unit, status, time } }
+```
+
+#### 그룹 API
+```
+GET    /api/groups                     → 그룹 목록 (하우스 포함)
+POST   /api/groups                     → 그룹 생성
+PUT    /api/groups/:id                 → 그룹 수정
+DELETE /api/groups/:id                 → 그룹 삭제
+POST   /api/groups/:id/control         → 그룹 일괄 제어
+
+GET    /api/houses                     → 하우스 목록
+POST   /api/houses                     → 하우스 생성
+PUT    /api/houses/:id                 → 하우스 수정
+DELETE /api/houses/:id                 → 하우스 삭제
+```
+
+#### 자동화 API
+```
+GET    /api/automation/rules           → 규칙 목록
+POST   /api/automation/rules           → 규칙 생성
+PUT    /api/automation/rules/:id       → 규칙 수정
+DELETE /api/automation/rules/:id       → 규칙 삭제
+PATCH  /api/automation/rules/:id/toggle → 활성화/비활성화
+GET    /api/automation/logs            → 실행 로그 조회
+```
+
+#### 리포트 API
+```
+GET  /api/reports/statistics           → 통계 데이터
+GET  /api/reports/export/csv           → CSV 다운로드
+GET  /api/reports/export/pdf           → PDF 다운로드
+```
+
+#### Webhook
+```
+POST /api/webhooks/tuya                → Tuya 이벤트 수신
+  Headers: sign, t, nonce
+  Body: { bizCode, bizData, devId, ... }
+  Response: { success: true }
+```
+
+### 3.3 인증 시스템 설계
+
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Frontend   │────▶│  Auth API    │────▶│   Database   │
+│   (Vue 3)    │◀────│  (NestJS)    │◀────│ (PostgreSQL) │
+└─────────────┘     └──────────────┘     └──────────────┘
+
+로그인 플로우:
+1. 클라이언트 → POST /auth/login { email, password }
+2. 서버: bcrypt.compare(password, user.password_hash)
+3. 서버: JWT 발급 (accessToken: 1h, refreshToken: 7d)
+4. 클라이언트: accessToken → 메모리(Pinia), refreshToken → localStorage
+5. 요청마다: Authorization: Bearer <accessToken>
+6. 401 발생 시: POST /auth/refresh { refreshToken }
+```
+
+#### JWT Payload
+```typescript
+interface JwtPayload {
+  sub: string      // user.id (UUID)
+  email: string
+  role: 'admin' | 'user'
+  iat: number      // issued at
+  exp: number      // expiration
+}
+```
+
+#### 비밀번호 정책
+- bcrypt salt rounds: 10
+- 최소 8자, 영문+숫자 필수
+
+### 3.4 Tuya Cloud 연동 설계
+
+```
+┌──────────┐     ┌───────────┐     ┌───────────────┐
+│ Tuya 장비 │────▶│ Tuya Cloud │────▶│  Backend      │
+│ (센서/제어)│     │  Platform  │     │ (Webhook)     │
+└──────────┘     └───────────┘     └───────────────┘
+                      ▲                    │
+                      │                    ▼
+                 ┌────┴────┐      ┌───────────────┐
+                 │ OAuth   │      │  TimescaleDB  │
+                 │ Token   │      │ (sensor_data) │
+                 └─────────┘      └───────────────┘
+```
+
+#### Tuya API 인증 흐름
+```typescript
+// tuya.service.ts 핵심 로직
+class TuyaService {
+  private tokenCache: Map<string, { token: string, expiry: Date }>
+
+  async getAccessToken(userId: string): Promise<string> {
+    // 1. 캐시 확인
+    const cached = this.tokenCache.get(userId)
+    if (cached && cached.expiry > new Date()) return cached.token
+
+    // 2. DB에서 사용자의 Tuya 인증정보 조회
+    const tuyaProject = await this.tuyaProjectRepo.findOne({ userId })
+
+    // 3. Tuya OAuth 토큰 발급
+    const decryptedSecret = this.decrypt(tuyaProject.access_secret_encrypted)
+    const token = await this.requestTuyaToken(tuyaProject.access_id, decryptedSecret)
+
+    // 4. 캐시 저장 (2시간)
+    this.tokenCache.set(userId, { token, expiry: addHours(new Date(), 2) })
+    return token
+  }
+}
+```
+
+#### Webhook 처리
+```typescript
+// tuya.webhook.controller.ts
+@Post('/webhooks/tuya')
+async handleWebhook(
+  @Body() payload: TuyaWebhookPayload,
+  @Headers('sign') signature: string,
+  @Headers('t') timestamp: string,
+) {
+  // 1. 시그니처 검증
+  if (!this.tuyaService.verifySignature(payload, signature, timestamp)) {
+    throw new UnauthorizedException('Invalid signature')
+  }
+
+  // 2. 이벤트 타입별 처리
+  switch (payload.bizCode) {
+    case 'statusReport':
+      await this.sensorsService.storeSensorData(payload.bizData)
+      // WebSocket으로 프론트엔드에 브로드캐스트
+      this.gateway.broadcastSensorUpdate(payload.bizData)
+      break
+    case 'online':
+    case 'offline':
+      await this.devicesService.updateOnlineStatus(payload.devId, payload.bizCode)
+      break
+  }
+
+  return { success: true }
+}
+```
+
+### 3.5 WebSocket 실시간 통신 설계
+
+```typescript
+// 이벤트 정의
+interface WebSocketEvents {
+  // 서버 → 클라이언트
+  'sensor:update':     { deviceId, sensorType, value, unit, status, time }
+  'device:status':     { deviceId, online: boolean }
+  'automation:executed': { ruleId, success, actions }
+  'notification:new':  { id, type, title, message }
+
+  // 클라이언트 → 서버
+  'subscribe:house':   { houseId: string }
+  'subscribe:group':   { groupId: string }
+  'unsubscribe':       { channel: string }
+}
+```
+
+```
+┌──────────────┐  WebSocket   ┌──────────────┐
+│   Frontend   │◀────────────▶│   Backend    │
+│   (Socket.io)│              │  (Gateway)   │
+└──────────────┘              └──────────────┘
+                                     │
+                              ┌──────┴──────┐
+                              │    Redis     │
+                              │  (Pub/Sub)   │
+                              └─────────────┘
+```
+
+---
+
+## 4. 데이터베이스 설계
+
+### 4.1 기존 스키마 검증 결과
+
+기존 `schema.sql`은 적절히 설계되어 있으며, 추가 변경 사항은 최소화한다.
+
+#### 보완 사항
+| 항목 | 변경 내용 |
+|------|-----------|
+| `users.phone` | 전화번호 필드 추가 (선택) |
+| `tuya_projects.access_secret_encrypted` | AES-256-GCM으로 암호화 알고리즘 명시 |
+| `sensor_data` 압축 정책 | 7일 후 자동 압축 추가 |
+| `refresh_tokens` 테이블 | JWT Refresh Token 관리용 신규 테이블 |
+
+#### 추가 테이블: refresh_tokens
+```sql
+CREATE TABLE refresh_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(255) NOT NULL,  -- bcrypt hash
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  revoked BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+```
+
+### 4.2 TypeORM 엔티티 매핑
+
+```typescript
+// user.entity.ts
+@Entity('users')
+export class User {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column({ unique: true })
+  email: string
+
+  @Column({ name: 'password_hash' })
+  passwordHash: string
+
+  @Column()
+  name: string
+
+  @Column({ type: 'varchar', length: 20 })
+  role: 'admin' | 'user'
+
+  @Column({ nullable: true })
+  address: string
+
+  @Column({ default: 'active' })
+  status: 'active' | 'inactive'
+
+  @OneToOne(() => TuyaProject, tp => tp.user)
+  tuyaProject: TuyaProject
+
+  @OneToMany(() => Device, device => device.user)
+  devices: Device[]
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date
+}
+```
+
+### 4.3 센서 데이터 쿼리 전략
+
+```typescript
+// sensors.service.ts - 집계 데이터 쿼리
+async getSensorData(params: QuerySensorDto, userId: string) {
+  const { aggregation, startTime, endTime, sensorType, deviceId } = params
+
+  let query: string
+  let tableName: string
+
+  switch (aggregation) {
+    case 'hourly':
+      tableName = 'sensor_data_hourly'
+      query = `
+        SELECT bucket as time, avg_value as value, min_value, max_value, sample_count
+        FROM sensor_data_hourly
+        WHERE user_id = $1
+          AND bucket BETWEEN $2 AND $3
+          AND sensor_type = $4
+        ORDER BY bucket ASC
+      `
+      break
+    case 'daily':
+      tableName = 'sensor_data_daily'
+      query = `/* 유사 구조 */`
+      break
+    default: // raw
+      query = `
+        SELECT time, value, unit, status
+        FROM sensor_data
+        WHERE user_id = $1
+          AND time BETWEEN $2 AND $3
+          AND sensor_type = $4
+        ORDER BY time ASC
+        LIMIT $5 OFFSET $6
+      `
+  }
+
+  // 멀티테넌트: 항상 user_id 필터 적용
+  return this.dataSource.query(query, [userId, startTime, endTime, sensorType])
+}
+```
+
+---
+
+## 5. 보안 설계
+
+### 5.1 인증/인가 체크리스트
+
+| # | 항목 | 구현 방법 |
+|---|------|-----------|
+| S1 | 비밀번호 해싱 | bcrypt (salt rounds: 10) |
+| S2 | JWT 발급 | Access: 1h, Refresh: 7d |
+| S3 | Refresh Token 저장 | DB (해시), 클라이언트(localStorage) |
+| S4 | Tuya Secret 암호화 | AES-256-GCM (서버 측 키) |
+| S5 | API Rate Limiting | @nestjs/throttler (IP: 100req/min) |
+| S6 | CORS | 프론트엔드 도메인만 허용 |
+| S7 | Helmet | 보안 HTTP 헤더 |
+| S8 | 입력 검증 | class-validator + ValidationPipe |
+| S9 | SQL Injection 방지 | TypeORM 파라미터 바인딩 |
+| S10 | XSS 방지 | Vue 3 자동 이스케이프 + CSP |
+
+### 5.2 Docker 보안 강화
+
+```yaml
+# docker-compose.yml 개선
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}  # .env에서 읽기
+    # 외부 포트 노출 제거 (내부 네트워크만)
+    # ports: ["5432:5432"]  # 제거
+
+  backend:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      TUYA_ENCRYPTION_KEY: ${TUYA_ENCRYPTION_KEY}
+```
+
+---
+
+## 6. 구현 순서
+
+### Phase 2-A: 기반 구축 (1-2단계)
+```
+1. NestJS 프로젝트 초기화 + 기본 설정
+   └── @nestjs/cli, TypeORM, class-validator, passport-jwt, bcrypt
+   └── 파일: main.ts, app.module.ts, config/*.ts
+
+2. 인증 시스템 구현
+   └── auth.module (login, refresh, JWT 전략)
+   └── users.module (CRUD)
+   └── common/guards (JwtAuthGuard, RolesGuard)
+   └── 파일: auth/*, users/*, common/*
+```
+
+### Phase 2-B: 프론트엔드 정규화 (3단계)
+```
+3. 프론트엔드 상태관리 + API 연동
+   └── Pinia stores (auth, device, group, sensor, automation)
+   └── API client (axios 인스턴스, 인터셉터)
+   └── Login.vue, App.vue, router 마이그레이션
+   └── 파일: stores/*, api/*, types/*
+```
+
+### Phase 2-C: 핵심 기능 (4-7단계)
+```
+4. 장비 관리 + Tuya 연동
+   └── devices.module
+   └── tuya.service (OAuth, 장비 조회, 제어)
+   └── DeviceRegistration.vue API 연동
+
+5. 그룹 + 하우스 관리
+   └── groups.module
+   └── Groups.vue, GroupCreation.vue API 연동
+
+6. 센서 데이터 수집 + 실시간
+   └── sensors.module
+   └── tuya.webhook.controller (Webhook 수신)
+   └── WebSocket gateway (실시간 브로드캐스트)
+   └── Sensors.vue, Dashboard.vue 실시간 연동
+
+7. 자동화 엔진
+   └── automation.module
+   └── 기존 엔진 코드 통합 (weather, time, hybrid)
+   └── Bull Queue 스케줄러
+   └── Automation.vue CRUD 연동
+```
+
+### Phase 2-D: 리포트 + 품질 (8-9단계)
+```
+8. 리포트 + 통계
+   └── reports.module
+   └── PDF/CSV 생성 (pdfkit, csv-writer)
+   └── Reports.vue API 연동
+
+9. 사용자 관리 완성
+   └── UserManagement.vue API 연동
+   └── Tuya 프로젝트 설정 API
+```
+
+### Phase 2-E: 테스트 + 배포 (10단계)
+```
+10. 테스트 + 배포
+    └── 단위 테스트 (Jest)
+    └── API 통합 테스트 (supertest)
+    └── Docker Compose 보안 강화
+    └── CI/CD 파이프라인
+```
+
+---
+
+## 7. 기술 의존성
+
+### 백엔드 패키지
+```json
+{
+  "dependencies": {
+    "@nestjs/core": "^10.x",
+    "@nestjs/platform-express": "^10.x",
+    "@nestjs/typeorm": "^10.x",
+    "@nestjs/passport": "^10.x",
+    "@nestjs/jwt": "^10.x",
+    "@nestjs/websockets": "^10.x",
+    "@nestjs/platform-socket.io": "^10.x",
+    "@nestjs/throttler": "^5.x",
+    "@nestjs/bull": "^10.x",
+    "typeorm": "^0.3.x",
+    "pg": "^8.x",
+    "bcrypt": "^5.x",
+    "passport-jwt": "^4.x",
+    "class-validator": "^0.14.x",
+    "class-transformer": "^0.5.x",
+    "helmet": "^7.x",
+    "pdfkit": "^0.14.x"
+  }
+}
+```
+
+### 프론트엔드 추가 패키지 (없음)
+기존 `package.json`에 필요한 패키지가 이미 포함됨:
+- axios, socket.io-client, pinia, chart.js, dayjs
+
+---
+
+## 8. 마이그레이션 체크리스트
+
+### 프론트엔드
+- [ ] `stores/auth.store.ts` 생성
+- [ ] `stores/device.store.ts` 생성
+- [ ] `stores/group.store.ts` 생성
+- [ ] `stores/sensor.store.ts` 생성
+- [ ] `stores/automation.store.ts` 생성
+- [ ] `stores/notification.store.ts` 생성
+- [ ] `api/client.ts` 생성 (Axios 인스턴스)
+- [ ] `api/auth.api.ts` 생성
+- [ ] `api/device.api.ts` 생성
+- [ ] `api/sensor.api.ts` 생성
+- [ ] `api/group.api.ts` 생성
+- [ ] `api/automation.api.ts` 생성
+- [ ] `api/user.api.ts` 생성
+- [ ] `api/report.api.ts` 생성
+- [ ] `types/*.types.ts` 생성
+- [ ] `Login.vue` Mock → API 전환
+- [ ] `App.vue` localStorage → Pinia 전환
+- [ ] `router/index.ts` 가드 개선
+- [ ] `Dashboard.vue` 실시간 데이터 연동
+- [ ] `Sensors.vue` API 연동
+- [ ] `Automation.vue` CRUD API 연동
+- [ ] `Groups.vue` API 연동
+- [ ] `Devices.vue` API 연동
+- [ ] `Reports.vue` API 연동
+- [ ] `UserManagement.vue` API 연동
+- [ ] `DeviceRegistration.vue` Tuya API 연동
+
+### 백엔드
+- [ ] NestJS 프로젝트 초기화
+- [ ] TypeORM 설정 + PostgreSQL 연결
+- [ ] auth 모듈 (login, refresh, JWT)
+- [ ] users 모듈 (CRUD + Tuya 설정)
+- [ ] devices 모듈 (CRUD + Tuya 장비 조회)
+- [ ] sensors 모듈 (시계열 데이터 쿼리)
+- [ ] groups 모듈 (CRUD + 하우스 관리)
+- [ ] automation 모듈 (CRUD + 엔진 + 스케줄러)
+- [ ] integrations/tuya (OAuth, Webhook, 제어)
+- [ ] integrations/weather (날씨 API)
+- [ ] reports 모듈 (통계, PDF, CSV)
+- [ ] WebSocket gateway
+- [ ] 보안 설정 (Helmet, CORS, Throttle)
+
+---
+
+> **다음 단계**: `/pdca do smart-farm-platform` 으로 구현 시작

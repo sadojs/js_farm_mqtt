@@ -1,0 +1,787 @@
+# [Design] automation-rules - 자동화 룰 관리 기능
+
+> PDCA Phase: Design
+> Created: 2026-02-11
+> Plan Reference: `docs/01-plan/features/automation-rules.plan.md`
+> Status: Draft
+
+---
+
+## 1. 아키텍처 개요
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Frontend (Vue 3)                                        │
+│                                                         │
+│  Automation.vue                                         │
+│    ├── RuleCard (목록 표시, 토글, 삭제)                  │
+│    └── RuleWizardModal.vue (생성/수정)                   │
+│          ├── Step 1: StepTargetSelect (그룹/하우스)      │
+│          ├── Step 2: StepDeviceAction (장비/액션)        │
+│          │     └── IrrigationSequenceBuilder (관수 전용) │
+│          ├── Step 3: StepConditionBuilder (조건 빌더)    │
+│          └── Step 4: StepReview (최종 확인)              │
+│                                                         │
+│  stores/automation.store.ts (상태 관리)                  │
+│  api/automation.api.ts (HTTP 통신)                      │
+│  types/automation.types.ts (타입 정의)                   │
+├─────────────────────────────────────────────────────────┤
+│ Backend (NestJS)                                        │
+│                                                         │
+│  POST /api/automation/rules   → create (DTO 검증)       │
+│  GET  /api/automation/rules   → findAll                 │
+│  PUT  /api/automation/rules/:id → update                │
+│  PATCH /api/automation/rules/:id/toggle → toggle        │
+│  DELETE /api/automation/rules/:id → remove              │
+│                                                         │
+│  dto/create-rule.dto.ts (검증 강화)                     │
+├─────────────────────────────────────────────────────────┤
+│ Database (PostgreSQL)                                   │
+│                                                         │
+│  automation_rules (conditions JSONB, actions JSONB)     │
+│  automation_logs (실행 이력)                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+## 2. 데이터 구조 상세 설계
+
+### 2.1 장비 유형 (DeviceType)
+
+```typescript
+type DeviceType = 'roof_actuator' | 'ventilation_fan' | 'irrigation'
+```
+
+| DeviceType | 한글명 | 동작 | 파라미터 |
+|------------|--------|------|----------|
+| `roof_actuator` | 개폐기 | open, close | percentage: 0~100 |
+| `ventilation_fan` | 환풍기 | on, off | speed: low/mid/high |
+| `irrigation` | 관수 | single, sequence | irrigationType, duration/volume |
+
+### 2.2 conditions JSONB 구조
+
+기존 flat array 구조를 **중첩 그룹 구조**로 확장:
+
+```typescript
+// 최상위 조건 구조
+interface ConditionGroup {
+  logic: 'AND' | 'OR'         // 그룹 간 논리 연산
+  groups: ConditionSet[]      // 조건 세트 배열
+}
+
+// 개별 조건 세트
+interface ConditionSet {
+  logic: 'AND' | 'OR'         // 세트 내 조건 간 논리 연산
+  conditions: Condition[]
+}
+
+// 개별 조건
+interface Condition {
+  type: 'time' | 'sensor' | 'weather'
+  field: string               // hour, temperature, humidity, rain, windSpeed, soil_moisture
+  operator: 'eq' | 'gt' | 'lt' | 'gte' | 'lte' | 'between'
+  value: number | boolean | [number, number]  // between일 때 배열
+  unit?: string               // C, %, m/s 등
+}
+```
+
+**예시 1: 시간 + 온도 AND 비 안올 때**
+```json
+{
+  "logic": "AND",
+  "groups": [
+    {
+      "logic": "AND",
+      "conditions": [
+        { "type": "time", "field": "hour", "operator": "between", "value": [8, 18] },
+        { "type": "sensor", "field": "temperature", "operator": "gte", "value": 20, "unit": "C" }
+      ]
+    },
+    {
+      "logic": "AND",
+      "conditions": [
+        { "type": "sensor", "field": "rain", "operator": "eq", "value": false }
+      ]
+    }
+  ]
+}
+```
+
+**예시 2: 단순 온도 조건**
+```json
+{
+  "logic": "AND",
+  "groups": [
+    {
+      "logic": "AND",
+      "conditions": [
+        { "type": "sensor", "field": "temperature", "operator": "gte", "value": 28, "unit": "C" }
+      ]
+    }
+  ]
+}
+```
+
+### 2.3 actions JSONB 구조
+
+```typescript
+// 액션 공통 구조
+interface RuleAction {
+  deviceType: DeviceType
+  command: string
+  parameters: RoofActuatorParams | VentilationFanParams | IrrigationParams
+}
+
+// 개폐기 파라미터
+interface RoofActuatorParams {
+  percentage: number           // 0~100
+}
+
+// 환풍기 파라미터
+interface VentilationFanParams {
+  speed?: 'low' | 'mid' | 'high'
+}
+
+// 관수 파라미터
+interface IrrigationParams {
+  mode: 'water_only' | 'fertilizer_only' | 'sequence'
+  // single 모드
+  duration?: number            // 분
+  volume?: number              // 리터
+  durationUnit?: 'minutes' | 'liters'
+  // sequence 모드
+  sequence?: IrrigationStep[]
+}
+
+// 관수 시퀀스 단계
+interface IrrigationStep {
+  type: 'water' | 'fertilizer'
+  value: number                // 수량
+  unit: 'minutes' | 'liters'  // 단위
+}
+```
+
+**예시: 개폐기 열기 100%**
+```json
+{
+  "deviceType": "roof_actuator",
+  "command": "open",
+  "parameters": { "percentage": 100 }
+}
+```
+
+**예시: 환풍기 고속 ON**
+```json
+{
+  "deviceType": "ventilation_fan",
+  "command": "on",
+  "parameters": { "speed": "high" }
+}
+```
+
+**예시: 관수 순차 실행**
+```json
+{
+  "deviceType": "irrigation",
+  "command": "sequence",
+  "parameters": {
+    "mode": "sequence",
+    "sequence": [
+      { "type": "water", "value": 10, "unit": "minutes" },
+      { "type": "fertilizer", "value": 5, "unit": "minutes" },
+      { "type": "water", "value": 5, "unit": "minutes" }
+    ]
+  }
+}
+```
+
+**예시: 물만 관수 (리터)**
+```json
+{
+  "deviceType": "irrigation",
+  "command": "single",
+  "parameters": {
+    "mode": "water_only",
+    "volume": 50,
+    "durationUnit": "liters"
+  }
+}
+```
+
+### 2.4 ruleType 결정 로직
+
+```
+conditions에 time 조건만 있으면      → ruleType = 'time'
+conditions에 sensor/weather만 있으면  → ruleType = 'weather'
+conditions에 둘 다 있으면             → ruleType = 'hybrid'
+```
+
+## 3. 프론트엔드 컴포넌트 상세 설계
+
+### 3.1 파일 구조
+
+```
+frontend/src/
+├── components/automation/
+│   ├── RuleWizardModal.vue          # 위저드 컨테이너 (모달)
+│   ├── StepTargetSelect.vue         # Step 1: 대상 선택
+│   ├── StepDeviceAction.vue         # Step 2: 장비 + 액션
+│   ├── StepConditionBuilder.vue     # Step 3: 조건 빌더
+│   ├── StepReview.vue               # Step 4: 최종 확인
+│   ├── IrrigationSequenceBuilder.vue # 관수 시퀀스 설정
+│   └── ConditionRow.vue             # 조건 1줄 (재사용)
+├── types/automation.types.ts        # 타입 확장
+├── stores/automation.store.ts       # 스토어 (기존)
+└── views/Automation.vue             # 목록 뷰 리팩토링
+```
+
+### 3.2 RuleWizardModal.vue (위저드 컨테이너)
+
+```
+Props:
+  - visible: boolean
+  - editRule?: AutomationRule        // 수정 모드 시 기존 룰 데이터
+
+Emits:
+  - close
+  - saved(rule: AutomationRule)
+
+State:
+  - currentStep: 1 | 2 | 3 | 4
+  - formData: WizardFormData         // 전체 위저드 데이터
+
+WizardFormData:
+  {
+    // Step 1
+    targetType: 'group' | 'house'
+    groupId?: string
+    houseId?: string
+    // Step 2
+    deviceType: DeviceType
+    action: RuleAction
+    // Step 3
+    conditions: ConditionGroup
+    // Step 4 (자동 생성)
+    name: string
+    description?: string
+    priority: number
+  }
+```
+
+**위저드 흐름:**
+```
+Step 1 (대상)  →  Step 2 (장비/액션)  →  Step 3 (조건)  →  Step 4 (확인)
+[이전] [다음]    [이전] [다음]          [이전] [다음]      [이전] [저장]
+```
+
+### 3.3 StepTargetSelect.vue (Step 1)
+
+```
+Props:
+  - modelValue: { targetType, groupId, houseId }
+
+UI 구성:
+  ┌──────────────────────────────────┐
+  │ 대상 선택                        │
+  │                                  │
+  │  ○ 그룹 전체    ○ 하우스 개별    │
+  │                                  │
+  │  [그룹 선택 드롭다운     ▼]      │
+  │                                  │
+  │  (그룹 선택 시 하우스 목록 표시)  │
+  │  ┌──────────────────────────┐    │
+  │  │ ☑ 1동 하우스             │    │
+  │  │ ☑ 2동 하우스             │    │
+  │  └──────────────────────────┘    │
+  └──────────────────────────────────┘
+
+데이터 소스:
+  - groupStore.groups (그룹 목록)
+  - groupStore.allHouses (하우스 목록)
+```
+
+### 3.4 StepDeviceAction.vue (Step 2)
+
+```
+Props:
+  - modelValue: { deviceType, action }
+
+UI 구성 (장비 선택):
+  ┌──────────────────────────────────┐
+  │ 장비 유형 선택                   │
+  │                                  │
+  │  ┌──────┐ ┌──────┐ ┌──────┐    │
+  │  │ 🏠   │ │ 💨   │ │ 💧   │    │
+  │  │개폐기│ │환풍기│ │ 관수 │    │
+  │  └──────┘ └──────┘ └──────┘    │
+  └──────────────────────────────────┘
+
+UI 분기 (개폐기 선택 시):
+  ┌──────────────────────────────────┐
+  │ 개폐기 동작 설정                 │
+  │                                  │
+  │  동작: ○ 열기  ○ 닫기           │
+  │                                  │
+  │  개방 비율: [━━━━━━━●━━] 70%    │
+  └──────────────────────────────────┘
+
+UI 분기 (환풍기 선택 시):
+  ┌──────────────────────────────────┐
+  │ 환풍기 동작 설정                 │
+  │                                  │
+  │  동작: ○ ON  ○ OFF              │
+  │                                  │
+  │  속도: ○ 저속  ○ 중속  ○ 고속   │
+  └──────────────────────────────────┘
+
+UI 분기 (관수 선택 시):
+  ┌──────────────────────────────────┐
+  │ 관수 모드 선택                   │
+  │                                  │
+  │  ○ 물만      ○ 비료만           │
+  │  ○ 물+비료 순차 실행            │
+  │                                  │
+  │  [물만 선택 시]                  │
+  │  단위: ○ 시간(분)  ○ 용량(L)   │
+  │  수량: [____] 분/L              │
+  │                                  │
+  │  [순차 실행 선택 시]             │
+  │  → IrrigationSequenceBuilder    │
+  └──────────────────────────────────┘
+```
+
+### 3.5 IrrigationSequenceBuilder.vue (관수 시퀀스)
+
+```
+Props:
+  - modelValue: IrrigationStep[]
+
+UI 구성:
+  ┌──────────────────────────────────┐
+  │ 관수 순서 설정                   │
+  │                                  │
+  │  Step 1                          │
+  │  [물 ▼]  [10] [분 ▼]   [🗑]    │
+  │           ↓                      │
+  │  Step 2                          │
+  │  [비료 ▼] [5] [분 ▼]   [🗑]    │
+  │           ↓                      │
+  │  Step 3                          │
+  │  [물 ▼]  [5] [분 ▼]   [🗑]    │
+  │                                  │
+  │  [+ 단계 추가]                   │
+  │                                  │
+  │  총 소요: 20분                   │
+  └──────────────────────────────────┘
+
+기능:
+  - 드래그 앤 드롭으로 순서 변경 (선택)
+  - 단계 추가/삭제
+  - 각 단계별 종류(물/비료) + 수량 + 단위(분/리터)
+  - 하단에 총 소요 시간/용량 자동 계산
+```
+
+### 3.6 StepConditionBuilder.vue (Step 3)
+
+```
+Props:
+  - modelValue: ConditionGroup
+
+UI 구성:
+  ┌──────────────────────────────────────────┐
+  │ 실행 조건 설정                           │
+  │                                          │
+  │ 조건 그룹 1                              │
+  │ ┌──────────────────────────────────────┐ │
+  │ │ [시간 ▼] [사이 ▼] [08:00] ~ [18:00]│ │
+  │ │        ── AND ──                     │ │
+  │ │ [온도 ▼] [이상 ▼] [20] °C           │ │
+  │ │                    [+ 조건 추가]     │ │
+  │ └──────────────────────────────────────┘ │
+  │                                          │
+  │            ── [AND ▼] ──                 │
+  │                                          │
+  │ 조건 그룹 2                              │
+  │ ┌──────────────────────────────────────┐ │
+  │ │ [비센서 ▼] [같음 ▼] [아니오]        │ │
+  │ │                    [+ 조건 추가]     │ │
+  │ └──────────────────────────────────────┘ │
+  │                                          │
+  │ [+ 조건 그룹 추가]                       │
+  └──────────────────────────────────────────┘
+
+조건 유형 드롭다운 옵션:
+  - 시간        → 시작시각~종료시각 / 특정 시각
+  - 온도        → 숫자 입력 + °C
+  - 습도        → 숫자 입력 + %
+  - 비 센서     → 예/아니오 (boolean)
+  - 풍속        → 숫자 입력 + m/s
+  - 토양 수분   → 숫자 입력 + %
+
+연산자 드롭다운 (조건 유형에 따라 변경):
+  - 숫자형: 이상(gte), 이하(lte), 초과(gt), 미만(lt), 같음(eq), 사이(between)
+  - 시간형: 사이(between), 같음(eq)
+  - 불린형: 같음(eq) → 예/아니오
+```
+
+### 3.7 ConditionRow.vue (개별 조건 행)
+
+```
+Props:
+  - modelValue: Condition
+  - removable: boolean
+
+UI:
+  [조건유형 ▼] [연산자 ▼] [값 입력] [단위]  [🗑]
+
+동적 UI 변경:
+  - type='time' + operator='between' → 두 개의 시간 입력 (HH:MM ~ HH:MM)
+  - type='time' + operator='eq'      → 하나의 시간 입력 (HH:MM)
+  - type='sensor' + field='rain'     → 예/아니오 토글
+  - type='sensor' (숫자형)           → 숫자 입력 + 단위 표시
+```
+
+### 3.8 StepReview.vue (Step 4)
+
+```
+Props:
+  - formData: WizardFormData
+
+UI 구성:
+  ┌──────────────────────────────────────────┐
+  │ 최종 확인                                │
+  │                                          │
+  │  룰 이름: [________________________]     │
+  │  설명:   [________________________]     │
+  │  우선순위: [5 ▼] (1=낮음, 10=높음)      │
+  │                                          │
+  │  ─── 요약 ───                            │
+  │  대상: 화성 1농장 (그룹)                 │
+  │  장비: 개폐기 → 열기 100%               │
+  │  조건:                                   │
+  │    (시간 08:00~18:00 AND 온도 >= 20°C)  │
+  │    AND                                   │
+  │    (비 = 아니오)                         │
+  │                                          │
+  │  [이전]              [저장]              │
+  └──────────────────────────────────────────┘
+```
+
+### 3.9 Automation.vue 리팩토링
+
+**변경 사항:**
+1. 하드코딩된 목업 데이터 → `automationStore.fetchRules()` 호출
+2. `rules` 배열 → store에서 computed로 바인딩
+3. 탭 필터링 → store의 `weatherRules`, `timeRules`, `hybridRules` 사용
+4. "새 룰 추가" 버튼 → `RuleWizardModal` 열기
+5. 룰 카드 토글 → `automationStore.toggleRule(id)` 호출
+6. 룰 카드 삭제 → `automationStore.removeRule(id)` 호출
+7. 룰 카드 클릭 → `RuleWizardModal` 수정 모드로 열기
+
+**룰 카드에 표시할 정보 매핑:**
+```
+rule.name          → 카드 제목
+rule.ruleType      → 타입 배지 (날씨/시간/하이브리드)
+rule.enabled       → 토글 스위치
+rule.conditions    → 조건 배지 목록 (파싱하여 표시)
+rule.actions       → 액션 배지 (장비+동작 요약)
+rule.priority      → 우선순위 표시
+```
+
+## 4. 백엔드 상세 설계
+
+### 4.1 DTO 강화
+
+**파일**: `backend/src/modules/automation/dto/create-rule.dto.ts`
+
+```typescript
+import { IsString, IsOptional, IsEnum, IsObject, IsInt, Min, Max, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateRuleDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  groupId?: string;
+
+  @IsOptional()
+  @IsString()
+  houseId?: string;
+
+  @IsObject()
+  conditions: any;  // ConditionGroup (JSONB - 프론트에서 구조화)
+
+  @IsObject()
+  actions: any;     // RuleAction (JSONB)
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  priority?: number;
+}
+
+export class UpdateRuleDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsObject()
+  conditions?: any;
+
+  @IsOptional()
+  @IsObject()
+  actions?: any;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  priority?: number;
+}
+```
+
+### 4.2 Service 변경
+
+**ruleType 자동 결정 로직 추가:**
+
+```typescript
+// automation.service.ts 에 추가
+private determineRuleType(conditions: any): 'weather' | 'time' | 'hybrid' {
+  const types = new Set<string>();
+
+  for (const group of conditions.groups || []) {
+    for (const condition of group.conditions || []) {
+      types.add(condition.type);
+    }
+  }
+
+  const hasTime = types.has('time');
+  const hasSensorOrWeather = types.has('sensor') || types.has('weather');
+
+  if (hasTime && hasSensorOrWeather) return 'hybrid';
+  if (hasTime) return 'time';
+  return 'weather';
+}
+```
+
+**create 메서드 수정:**
+```typescript
+async create(userId: string, dto: CreateRuleDto) {
+  const ruleType = this.determineRuleType(dto.conditions);
+  const rule = this.rulesRepo.create({
+    userId,
+    groupId: dto.groupId,
+    name: dto.name,
+    description: dto.description,
+    ruleType,
+    conditions: dto.conditions,
+    actions: dto.actions,
+    priority: dto.priority ?? 0,
+  });
+  return this.rulesRepo.save(rule);
+}
+```
+
+### 4.3 Entity 변경 사항
+
+현재 entity는 이미 JSONB를 사용하므로 **변경 불필요**.
+`conditions`와 `actions` 컬럼이 이미 `type: 'jsonb'`로 설정됨.
+
+## 5. Frontend 타입 확장
+
+**파일**: `frontend/src/types/automation.types.ts`
+
+```typescript
+// === 장비 유형 ===
+export type DeviceType = 'roof_actuator' | 'ventilation_fan' | 'irrigation'
+
+// === 조건 구조 ===
+export interface Condition {
+  type: 'time' | 'sensor' | 'weather'
+  field: string
+  operator: 'eq' | 'gt' | 'lt' | 'gte' | 'lte' | 'between'
+  value: number | boolean | [number, number]
+  unit?: string
+}
+
+export interface ConditionSet {
+  logic: 'AND' | 'OR'
+  conditions: Condition[]
+}
+
+export interface ConditionGroup {
+  logic: 'AND' | 'OR'
+  groups: ConditionSet[]
+}
+
+// === 액션 구조 ===
+export interface RoofActuatorParams {
+  percentage: number
+}
+
+export interface VentilationFanParams {
+  speed?: 'low' | 'mid' | 'high'
+}
+
+export interface IrrigationStep {
+  type: 'water' | 'fertilizer'
+  value: number
+  unit: 'minutes' | 'liters'
+}
+
+export interface IrrigationParams {
+  mode: 'water_only' | 'fertilizer_only' | 'sequence'
+  duration?: number
+  volume?: number
+  durationUnit?: 'minutes' | 'liters'
+  sequence?: IrrigationStep[]
+}
+
+export type ActionParameters = RoofActuatorParams | VentilationFanParams | IrrigationParams
+
+export interface RuleAction {
+  deviceType: DeviceType
+  command: string
+  parameters: ActionParameters
+}
+
+// === 위저드 폼 데이터 ===
+export interface WizardFormData {
+  targetType: 'group' | 'house'
+  groupId?: string
+  houseId?: string
+  deviceType: DeviceType | null
+  action: RuleAction | null
+  conditions: ConditionGroup
+  name: string
+  description: string
+  priority: number
+}
+
+// === 기존 타입 유지 (conditions/actions를 새 구조로) ===
+export type RuleType = 'weather' | 'time' | 'hybrid'
+
+export interface AutomationRule {
+  id: string
+  userId: string
+  groupId?: string
+  name: string
+  description?: string
+  ruleType: RuleType
+  enabled: boolean
+  conditions: ConditionGroup
+  actions: RuleAction
+  priority: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateRuleRequest {
+  name: string
+  description?: string
+  groupId?: string
+  houseId?: string
+  conditions: ConditionGroup
+  actions: RuleAction
+  priority?: number
+}
+
+export interface AutomationLog {
+  id: string
+  ruleId: string
+  ruleName: string
+  executedAt: string
+  success: boolean
+  actions: RuleAction[]
+  error?: string
+}
+```
+
+## 6. 조건/액션 표시 헬퍼 함수
+
+**파일**: `frontend/src/utils/automation-helpers.ts` (신규)
+
+카드 UI에서 조건/액션을 읽기 좋은 한글로 변환하는 함수들:
+
+```typescript
+// 장비 유형 → 한글
+const DEVICE_LABELS: Record<DeviceType, string> = {
+  roof_actuator: '개폐기',
+  ventilation_fan: '환풍기',
+  irrigation: '관수',
+}
+
+// 장비 유형 → 아이콘
+const DEVICE_ICONS: Record<DeviceType, string> = {
+  roof_actuator: '🏠',
+  ventilation_fan: '💨',
+  irrigation: '💧',
+}
+
+// 조건 필드 → 한글
+const FIELD_LABELS: Record<string, string> = {
+  hour: '시간',
+  temperature: '온도',
+  humidity: '습도',
+  rain: '비 센서',
+  windSpeed: '풍속',
+  soil_moisture: '토양 수분',
+}
+
+// 연산자 → 한글
+const OPERATOR_LABELS: Record<string, string> = {
+  eq: '=',
+  gt: '>',
+  lt: '<',
+  gte: '>=',
+  lte: '<=',
+  between: '~',
+}
+
+// 조건 → 한글 문자열
+function formatCondition(c: Condition): string
+// 액션 → 한글 요약
+function formatAction(a: RuleAction): string
+// 조건 그룹 → 한글 요약 (전체)
+function formatConditionGroup(cg: ConditionGroup): string
+```
+
+## 7. 구현 순서 (10단계)
+
+| # | 작업 | 파일 | 의존성 |
+|---|------|------|--------|
+| 1 | Frontend 타입 확장 | `types/automation.types.ts` | 없음 |
+| 2 | 헬퍼 유틸 함수 | `utils/automation-helpers.ts` | #1 |
+| 3 | Backend DTO 생성 | `dto/create-rule.dto.ts` | 없음 |
+| 4 | Backend Service ruleType 자동결정 로직 | `automation.service.ts` | #3 |
+| 5 | StepTargetSelect 컴포넌트 | `components/automation/StepTargetSelect.vue` | #1 |
+| 6 | StepDeviceAction 컴포넌트 | `components/automation/StepDeviceAction.vue` | #1 |
+| 7 | IrrigationSequenceBuilder 컴포넌트 | `components/automation/IrrigationSequenceBuilder.vue` | #1 |
+| 8 | ConditionRow + StepConditionBuilder 컴포넌트 | `components/automation/StepConditionBuilder.vue`, `ConditionRow.vue` | #1 |
+| 9 | StepReview + RuleWizardModal 컴포넌트 | `components/automation/StepReview.vue`, `RuleWizardModal.vue` | #5~#8 |
+| 10 | Automation.vue 리팩토링 (실제 데이터 연결 + 위저드 통합) | `views/Automation.vue` | #9 |
+
+## 8. 성공 기준 (체크리스트)
+
+- [ ] 개폐기 룰 생성: 시간+온도+비센서 AND/OR 조건 지원
+- [ ] 환풍기 룰 생성: 온도/습도 조건 + 속도 선택
+- [ ] 관수 룰 생성: 물만/비료만/순차 실행 3가지 모드
+- [ ] 관수 시퀀스: 단계 추가/삭제, 시간(분)/리터 단위 선택
+- [ ] 조건 그룹: AND/OR 토글, 그룹 추가/삭제
+- [ ] 위저드 4단계 네비게이션 (이전/다음/저장)
+- [ ] 생성된 룰이 API를 통해 DB에 저장
+- [ ] 목록에서 실제 데이터 표시 (조건/액션 한글 요약)
+- [ ] 룰 수정: 기존 데이터로 위저드 프리필
+- [ ] 룰 삭제 및 활성화 토글
+- [ ] TypeScript 빌드 에러 0개

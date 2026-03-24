@@ -1,0 +1,20 @@
+homeassistant: false
+
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+
+serial:
+  port: /dev/ttyUSB0
+
+frontend:
+  port: 8080
+
+advanced:
+  log_level: info
+  network_key: GENERATE
+
+availability: true
+
+devices: {}
+groups: {}

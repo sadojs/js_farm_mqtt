@@ -1,0 +1,155 @@
+# Plan: UI Enhancement v2 - 시니어 사용자 접근성 개선
+
+> 45세~70세 사용자를 고려한 UI/UX 개선 계획
+
+## 1. 배경 및 목적
+
+스마트팜 플랫폼의 주요 사용자층(45~70세)의 시각적 편의성과 조작 편의성을 높이기 위해 다크모드, 폰트 크기 확대, 버튼/카드 디자인 통일, 불필요 정보 숨김을 적용한다.
+
+## 2. 요구사항 (FR)
+
+### FR-01: 다크모드 추가
+- **설명**: 라이트/다크 테마 전환 기능 추가
+- **현황 분석**:
+  - 현재 모든 색상이 하드코딩(white, #333, #f5f7fa, #e8e8e8 등)
+  - CSS 변수 시스템은 폰트 크기만 존재 (`--content-scale`, `--content-body-size`)
+  - 색상용 CSS 변수가 전혀 없음
+- **구현 방향**:
+  - App.vue에 다크모드 CSS 변수 시스템 도입: `--bg-primary`, `--bg-secondary`, `--bg-card`, `--text-primary`, `--text-secondary`, `--border-color`, `--accent-color` 등
+  - `#app.theme-dark` 클래스로 다크모드 색상 오버라이드
+  - localStorage `sf-theme` 키로 테마 저장 (light/dark)
+  - 사이드바에 테마 토글 버튼 추가 (폰트 크기 조절 옆)
+  - 시스템 prefers-color-scheme 감지 옵션 (초기값)
+- **영향 파일**: App.vue, 모든 뷰 컴포넌트(6개), BottomTabBar.vue, MoreMenu.vue, ConfirmDialog.vue, SummaryCards.vue
+- **우선순위**: High (가장 큰 작업량, 다른 FR의 기반)
+
+### FR-02: 최소 폰트 크기 확대
+- **설명**: 45~70세 사용자가 읽기 어려운 작은 글씨 제거
+- **현황 분석**:
+  - BottomTabBar.vue: `.tab-item { font-size: 10px }` (가장 작음)
+  - App.vue: `.brand-sub { font-size: 11px }`, `.font-size-label { font-size: 12px }`, `.user-role { font-size: 12px }`
+  - 각 뷰에 `calc(11px * var(--content-scale, 1))`, `calc(12px * var(--content-scale, 1))` 등 소형 폰트 다수
+- **구현 방향**:
+  - 최소 폰트 크기를 **13px**로 설정 (WCAG AA 권장 기준 고려)
+  - BottomTabBar.vue: 10px → 13px
+  - App.vue 사이드바: 11px → 13px, 12px → 13px
+  - 각 뷰의 `calc(11px * ...)`, `calc(12px * ...)` → `calc(13px * ...)`로 교체
+  - 레이블/보조텍스트 최소 13px, 본문 최소 15px, 제목 최소 18px 기준 적용
+- **영향 파일**: App.vue, BottomTabBar.vue, Sensors.vue, Devices.vue, Groups.vue, Reports.vue, Automation.vue, SummaryCards.vue
+- **우선순위**: High (가독성 직결)
+
+### FR-03: 버튼 크기 통일
+- **설명**: 페이지별로 다른 버튼 크기를 성격별로 통일
+- **현황 분석**:
+  - Devices.vue: `padding: 12px 24px; font-size: calc(15px * ...)`
+  - Groups.vue: `padding: 10px 20px; font-size: calc(14px * ...)`
+  - Sensors.vue/Reports.vue/Automation.vue: 각각 다른 크기
+  - 같은 성격의 버튼(Primary Action)이 페이지마다 다른 크기
+- **구현 방향**:
+  - **3가지 버튼 크기 규격** 정의:
+    - **Large (주요 액션)**: `padding: 14px 28px; font-size: calc(16px * var(--content-scale, 1)); border-radius: 12px; min-height: 50px`
+    - **Medium (일반 버튼)**: `padding: 12px 24px; font-size: calc(15px * var(--content-scale, 1)); border-radius: 10px; min-height: 44px`
+    - **Small (보조/필터)**: `padding: 8px 16px; font-size: calc(14px * var(--content-scale, 1)); border-radius: 8px; min-height: 36px`
+  - 각 뷰의 버튼을 성격에 따라 규격 적용
+  - 시니어 사용자 터치 최소 영역 44px 보장 (WCAG 2.5.5)
+- **영향 파일**: Sensors.vue, Devices.vue, Groups.vue, Reports.vue, Automation.vue
+- **우선순위**: Medium
+
+### FR-04: 장비 ID 숨김 처리
+- **설명**: Devices.vue에서 Tuya 장비 ID를 사용자에게 노출하지 않음
+- **현황 분석**:
+  - Devices.vue 템플릿에 `<div class="card-tuya-id">` 섹션이 있음
+  - `device.tuyaDeviceId?.slice(0, 16)` 표시 중
+  - 사용자가 알 필요 없는 내부 식별자
+- **구현 방향**:
+  - `<div class="card-tuya-id">` 블록을 `v-if="false"` 또는 템플릿에서 제거
+  - 관련 CSS 클래스(`.card-tuya-id`, `.tuya-label`, `.tuya-value`) 정리
+  - 카드 높이 자연스럽게 조정
+- **영향 파일**: Devices.vue
+- **우선순위**: Low (간단한 변경)
+
+### FR-05: 카드/그리드 디자인 통일 및 경계선 개선
+- **설명**: 모든 페이지의 카드 디자인을 통일하고, 라이트 모드에서 경계가 잘 보이도록 개선
+- **현황 분석**:
+  - 대부분의 카드: `box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08)` — 라이트 모드에서 경계 거의 안 보임
+  - 일부 카드에만 `border: 1px solid #f0f0f0` 적용
+  - 카드 radius: 12px~16px 혼재
+  - 카드 padding: 16px~24px 혼재
+  - 배경색: white 통일이나 경계 구분 부족
+- **구현 방향**:
+  - **통일 카드 스타일 규격**:
+    - `border: 1px solid var(--border-color)` (라이트: `#e0e0e0`, 다크: `#3a3a3a`)
+    - `border-radius: 14px`
+    - `padding: 20px`
+    - `box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06)`
+    - `background: var(--bg-card)`
+  - 라이트 모드에서 `border-color`를 `#d0d0d0` 수준으로 강화하여 경계 명확히
+  - 다크 모드에서는 `#3a3a3a` border + 약간 밝은 카드 배경
+  - 모든 뷰의 카드 요소에 통일 스타일 적용
+- **영향 파일**: Sensors.vue, Devices.vue, Groups.vue, Reports.vue, Automation.vue, SummaryCards.vue
+- **우선순위**: Medium (다크모드 CSS 변수와 연동)
+
+## 3. 구현 순서
+
+| Phase | FR | 작업 내용 | 의존성 |
+|-------|-----|----------|--------|
+| 1 | FR-01 | App.vue 다크모드 CSS 변수 시스템 + 토글 버튼 | 없음 |
+| 2 | FR-05 | 카드/그리드 통일 디자인 (CSS 변수 활용) | FR-01 |
+| 3 | FR-02 | 최소 폰트 크기 확대 (13px 미만 제거) | 없음 |
+| 4 | FR-03 | 버튼 크기 3단계 규격 통일 | 없음 |
+| 5 | FR-04 | Devices.vue 장비 ID 숨김 | 없음 |
+
+> Phase 1(다크모드 CSS 변수)을 먼저 구축하면 Phase 2(카드 디자인)에서 `var(--border-color)`, `var(--bg-card)` 등을 바로 활용 가능
+
+## 4. 비기능 요구사항
+
+- **접근성**: WCAG AA 기준 충족 (최소 터치 영역 44px, 색상 대비 4.5:1)
+- **호환성**: localStorage 기반 테마/폰트 설정 유지 (기존 `sf-font-size`와 동일 패턴)
+- **성능**: CSS 변수 전환으로 재렌더링 없이 테마 변경
+- **점진적 적용**: 기존 `--content-scale` 시스템과 충돌 없이 확장
+
+## 5. 다크모드 CSS 변수 설계 (참조)
+
+```css
+/* 라이트 모드 (기본) */
+#app {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f5f5;
+  --bg-active: #e8f5e9;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border-color: #d0d0d0;
+  --border-light: #e8e8e8;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --accent: #2e7d32;
+  --accent-bg: #e8f5e9;
+}
+
+/* 다크 모드 */
+#app.theme-dark {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #1e2a3a;
+  --bg-hover: #2a3a4a;
+  --bg-active: #1b3a2a;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
+  --border-color: #3a3a4a;
+  --border-light: #2a2a3a;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --accent: #4caf50;
+  --accent-bg: #1b3a2a;
+}
+```
+
+## 6. 위험 요소 및 대응
+
+| 위험 | 영향 | 대응 |
+|------|------|------|
+| 색상 하드코딩이 많아 누락 발생 | 다크모드에서 일부 요소 안 보임 | 파일별 체크리스트로 관리, 빌드 후 육안 검수 |
+| 폰트 크기 변경으로 레이아웃 깨짐 | 텍스트 잘림, 줄바꿈 | 각 뷰별 반응형 확인 |
+| 카드 border 추가로 디자인 밸런스 변경 | 시각적 혼란 | 통일 규격 사전 정의 후 일괄 적용 |

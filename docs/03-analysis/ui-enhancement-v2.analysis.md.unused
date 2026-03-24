@@ -1,0 +1,118 @@
+# Gap Analysis: UI Enhancement v2 - 시니어 사용자 접근성 개선
+
+> 분석일: 2026-02-20
+> Design: `docs/02-design/features/ui-enhancement-v2.design.md`
+> Implementation: `frontend/src/`
+
+## Overall Match Rate: 94%
+
+| Category | Score | Status |
+|----------|:-----:|:------:|
+| FR-01: 다크모드 CSS 변수 시스템 | 100% | PASS |
+| FR-02: 최소 폰트 13px | 100% | PASS |
+| FR-03: 버튼 크기 3단계 규격 | 82% | WARNING |
+| FR-04: 장비 ID 숨김 | 100% | PASS |
+| FR-05: 카드 디자인 통일 | 92% | WARNING |
+| 색상 변수 마이그레이션 | 96% | WARNING |
+
+```
+[Plan] -> [Design] -> [Do] -> [Check] 94% -> [Act] ⏳
+```
+
+## FR-01: 다크모드 CSS 변수 시스템 - PASS (100%)
+
+- 40+ 라이트 모드 CSS 변수: 모두 일치
+- 40+ 다크 모드 CSS 변수: 모두 일치
+- 테마 토글 script (localStorage + prefers-color-scheme): 일치
+- 테마 토글 UI (사이드바 + 모바일 드로어): 일치
+- 사이드바/드로어/글로벌 하드코딩 색상 → CSS 변수 교체: 모두 완료
+
+## FR-02: 최소 폰트 13px - PASS (100%)
+
+모든 13px 미만 폰트가 정상적으로 13px로 상향 완료:
+- App.vue: brand-sub(11→13), font-size-label(12→13), user-role(12→13)
+- BottomTabBar.vue: tab-item(10→13)
+- Devices.vue: big-label(12→13), last-seen(12→13), btn-icon-delete(12→13)
+- Groups.vue: type-tag(11→13), device-count-badge(12→13), section-label(12→13), rule-summary(12→13), status-indicator(12→13)
+- Sensors.vue: expand-icon(12→13)
+- ConfirmDialog.vue: confirm-message(14→15)
+
+## FR-03: 버튼 크기 3단계 규격 - WARNING (82%)
+
+### 일치 항목
+| 파일 | 버튼 | 등급 | 상태 |
+|------|------|------|------|
+| Devices.vue | `.btn-primary` | Large (14px 28px / 16px) | MATCH |
+| Devices.vue | `.btn-outline` | Medium (12px 24px / 15px) | MATCH |
+| Groups.vue | `.btn-primary` | Large (14px 28px / 16px) | MATCH |
+| Groups.vue | `.btn-outline` | Medium (12px 24px / 15px) | MATCH |
+| Sensors.vue | `.btn-refresh` | Medium (12px 24px / 15px) | MATCH |
+| Reports.vue | `.btn-outline` | Medium (12px 24px / 15px) | MATCH |
+| Reports.vue | `.btn-secondary` | Small (8px 16px / 14px) | MATCH |
+| Automation.vue | `.btn-primary` | Large (14px 28px / 16px) | MATCH |
+
+### Gap 항목
+| # | 파일 | 버튼 | 설계 | 구현 | 영향도 |
+|---|------|------|------|------|--------|
+| 1 | Devices.vue | `.tab` | Small: 8px 16px / 14px | 10px 18px / 15px | Medium |
+| 2 | Automation.vue | `.tab` | Small: 8px 16px / 14px | 10px 18px / 15px | Medium |
+| 3 | Groups.vue | `.btn-sm` | Small: 8px 16px / 14px | 6px 14px / 13px | Medium |
+| 4 | Reports.vue | `.btn-primary` | Medium: 12px 24px / 15px | Large: 14px 28px / 16px | Low |
+| 5 | Reports.vue | `.chart-type-btn` | Small: 8px 16px | 6px 12px | Low |
+
+## FR-04: 장비 ID 숨김 - PASS (100%)
+
+- Template: `card-tuya-id` 블록 완전 제거 확인
+- CSS: `.card-tuya-id`, `.tuya-label`, `.tuya-value` 클래스 완전 제거 확인
+
+## FR-05: 카드 디자인 통일 - WARNING (92%)
+
+### 일치 항목 (10/12)
+- Devices.vue `.device-card`: bg-card + border-card + radius 14px + shadow-card
+- Sensors.vue `.group-section`: bg-card + border-card + radius 14px + shadow-card
+- Groups.vue `.group-card`: bg-card + border-card + radius 14px + shadow-card
+- Reports.vue `.filter-section`, `.stat-card`, `.chart-card`, `.data-table-section`: 모두 일치
+- Automation.vue `.rule-card`: 일치 + border-left: 4px solid var(--accent)
+- SummaryCards.vue `.detail-card`: 일치
+
+### Gap 항목
+| # | 파일 | 카드 | 설계 | 구현 | 영향도 |
+|---|------|------|------|------|--------|
+| 1 | Sensors.vue | `.sensor-card` | background: var(--bg-card) | var(--bg-sensor) | Low |
+| 2 | Groups.vue | `.sub-card` | radius 12px / padding 16px | radius 10px / padding 14px | Low |
+
+## 색상 변수 마이그레이션 - WARNING (96%)
+
+### 하드코딩 잔여 항목
+| 파일 | 위치 | 색상 | 사유 |
+|------|------|------|------|
+| App.vue | `.user-avatar` gradient | #667eea, #764ba2 | 장식용 (설계 미정의) |
+| ConfirmDialog.vue | `.confirm-btn.ok.warning` | #ff9800, #f57c00 | --warning 변수 미정의 |
+| Reports.vue | Chart.js JS 코드 | '#4caf50' 등 | JS 영역 (CSS 변수 적용 불가) |
+| Sensors.vue | SENSOR_FIELD_META JS | '#f44336' 등 | JS 데이터 (CSS 변수 적용 불가) |
+
+## 권장 조치
+
+### 즉시 수정 (94% → 97%+)
+1. Devices.vue + Automation.vue `.tab`: padding 10px 18px → 8px 16px, font 15px → 14px
+2. Groups.vue `.btn-sm`: padding 6px 14px → 8px 16px, font 13px → 14px
+3. Reports.vue `.chart-type-btn`: padding 6px 12px → 8px 16px
+
+### 단기 수정
+4. Reports.vue `.btn-primary`: Medium(12px 24px/15px) vs Large(14px 28px/16px) 결정
+5. Sensors.vue `.sensor-card` background: var(--bg-card) vs var(--bg-sensor) 결정
+6. Groups.vue `.sub-card`: radius 10px → 12px, padding 14px → 16px
+
+### 설계 문서 업데이트
+7. --warning / --warning-hover CSS 변수 추가 정의 필요
+8. Chart.js 색상 처리 방안 명시
+
+## 검증 체크리스트 결과
+
+- [x] 라이트 모드: 모든 카드에 border 표시
+- [x] 다크 모드: 변수 시스템 정상 동작
+- [x] 최소 폰트 13px 미만 없음
+- [ ] 버튼 Small 규격 일부 불일치 (5건)
+- [x] Devices.vue에서 Tuya ID 미표시
+- [x] localStorage `sf-theme` 저장/복원
+- [x] `npm run build` 통과

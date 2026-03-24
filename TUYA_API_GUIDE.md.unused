@@ -1,0 +1,385 @@
+# Tuya Cloud API 연동 가이드
+
+## 📋 개요
+
+이 문서는 스마트 농업 플랫폼에서 Tuya Cloud IoT Platform과 연동하는 방법을 설명합니다.
+
+## 🔑 Tuya Cloud 프로젝트 생성
+
+### 1. Tuya IoT Platform 가입
+1. [Tuya IoT Platform](https://iot.tuya.com/) 접속
+2. 계정 생성 및 로그인
+3. Cloud → Development → Create Cloud Project
+
+### 2. 프로젝트 설정
+프로젝트 생성 시 다음 정보를 선택합니다:
+- **Industry**: Smart Agriculture / Smart Home
+- **Development Method**: Custom Development
+- **Data Center**: 사용자 위치에 가까운 지역 선택
+  - Americas (미국): `https://openapi.tuyaus.com`
+  - China (중국): `https://openapi.tuyacn.com`
+  - Europe (유럽): `https://openapi.tuyaeu.com`
+  - India (인도): `https://openapi.tuyain.com`
+
+### 3. 인증 정보 확보
+프로젝트 생성 후 다음 정보를 확인:
+- **Access ID** (Client ID): 예) `vr5hn8x9kqjxxxxxxx`
+- **Access Secret** (Client Secret): 예) `a1b2c3d4e5fxxxxxxxxxxxxxxxx`
+- **API Endpoint**: 예) `https://openapi.tuyaus.com`
+
+## 🔌 사용자 등록 시 Tuya 프로젝트 설정
+
+### 관리자 페이지에서 사용자 등록
+사용자 관리 페이지(/users)에서 새 사용자를 생성할 때:
+
+1. **기본 정보**
+   - 이름
+   - 이메일
+   - 비밀번호
+   - 역할 (관리자/사용자)
+   - 주소 (날씨 정보용)
+
+2. **Tuya Cloud 프로젝트 설정**
+   - 프로젝트 이름: 사용자가 식별할 수 있는 이름
+   - Access ID: Tuya 프로젝트의 Client ID
+   - Access Secret: Tuya 프로젝트의 Client Secret
+   - API Endpoint: 데이터 센터 지역
+   - 프로젝트 ID (선택): 특정 프로젝트 ID
+   - Tuya 프로젝트 활성화: 체크 시 사용 가능
+
+### 저장되는 데이터 구조
+```typescript
+interface User {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'user'
+  address?: string
+  tuyaProject?: {
+    name: string
+    accessId: string
+    accessSecret: string  // 암호화 저장 필요
+    endpoint: string
+    projectId?: string
+    enabled: boolean
+  }
+  createdAt: string
+  status: 'active' | 'inactive'
+}
+```
+
+## 🔧 백엔드 API 구현
+
+### 1. Tuya 인증 토큰 발급
+```typescript
+// backend/src/modules/integrations/tuya/tuya-auth.service.ts
+import crypto from 'crypto'
+import axios from 'axios'
+
+interface TuyaTokenResponse {
+  access_token: string
+  expire_time: number
+  refresh_token: string
+  uid: string
+}
+
+export class TuyaAuthService {
+  private endpoint: string
+  private accessId: string
+  private accessSecret: string
+
+  constructor(endpoint: string, accessId: string, accessSecret: string) {
+    this.endpoint = endpoint
+    this.accessId = accessId
+    this.accessSecret = accessSecret
+  }
+
+  async getAccessToken(): Promise<string> {
+    const timestamp = Date.now().toString()
+    const sign = this.generateSign('GET', '/v1.0/token?grant_type=1', timestamp)
+
+    const response = await axios.get<{ result: TuyaTokenResponse }>(
+      `${this.endpoint}/v1.0/token?grant_type=1`,
+      {
+        headers: {
+          client_id: this.accessId,
+          sign,
+          t: timestamp,
+          sign_method: 'HMAC-SHA256',
+        },
+      }
+    )
+
+    return response.data.result.access_token
+  }
+
+  private generateSign(method: string, path: string, timestamp: string, body = ''): string {
+    const contentHash = crypto.createHash('sha256').update(body).digest('hex')
+    const stringToSign = [method, contentHash, '', path].join('\n')
+    const signStr = this.accessId + timestamp + stringToSign
+
+    return crypto
+      .createHmac('sha256', this.accessSecret)
+      .update(signStr, 'utf8')
+      .digest('hex')
+      .toUpperCase()
+  }
+}
+```
+
+### 2. 장비 목록 조회
+```typescript
+// backend/src/modules/integrations/tuya/tuya.service.ts
+export class TuyaService {
+  constructor(
+    private authService: TuyaAuthService,
+    private endpoint: string,
+    private accessId: string
+  ) {}
+
+  async getDevices(userId: string): Promise<Device[]> {
+    const token = await this.authService.getAccessToken()
+    const timestamp = Date.now().toString()
+    const path = `/v1.0/users/${userId}/devices`
+
+    const response = await axios.get(`${this.endpoint}${path}`, {
+      headers: {
+        client_id: this.accessId,
+        access_token: token,
+        t: timestamp,
+        sign_method: 'HMAC-SHA256',
+      },
+    })
+
+    return response.data.result
+  }
+
+  async getDeviceStatus(deviceId: string): Promise<any> {
+    const token = await this.authService.getAccessToken()
+    const timestamp = Date.now().toString()
+    const path = `/v1.0/devices/${deviceId}/status`
+
+    const response = await axios.get(`${this.endpoint}${path}`, {
+      headers: {
+        client_id: this.accessId,
+        access_token: token,
+        t: timestamp,
+        sign_method: 'HMAC-SHA256',
+      },
+    })
+
+    return response.data.result
+  }
+
+  async controlDevice(deviceId: string, commands: any[]): Promise<void> {
+    const token = await this.authService.getAccessToken()
+    const timestamp = Date.now().toString()
+    const path = `/v1.0/devices/${deviceId}/commands`
+
+    await axios.post(
+      `${this.endpoint}${path}`,
+      { commands },
+      {
+        headers: {
+          client_id: this.accessId,
+          access_token: token,
+          t: timestamp,
+          sign_method: 'HMAC-SHA256',
+        },
+      }
+    )
+  }
+}
+```
+
+### 3. API 엔드포인트 구현
+```typescript
+// backend/src/modules/devices/device.controller.ts
+@Controller('devices')
+export class DeviceController {
+  constructor(
+    private deviceService: DeviceService,
+    private tuyaService: TuyaService
+  ) {}
+
+  @Get('tuya/list')
+  @UseGuards(JwtAuthGuard)
+  async getTuyaDevices(@CurrentUser() user: User) {
+    // 사용자의 Tuya 프로젝트 설정 확인
+    if (!user.tuyaProject?.enabled) {
+      throw new BadRequestException('Tuya 프로젝트가 설정되지 않았습니다')
+    }
+
+    // Tuya Service 인스턴스 생성
+    const tuyaAuth = new TuyaAuthService(
+      user.tuyaProject.endpoint,
+      user.tuyaProject.accessId,
+      user.tuyaProject.accessSecret
+    )
+    const tuyaService = new TuyaService(
+      tuyaAuth,
+      user.tuyaProject.endpoint,
+      user.tuyaProject.accessId
+    )
+
+    // 장비 목록 조회
+    const devices = await tuyaService.getDevices(user.id)
+    return devices
+  }
+
+  @Post('register')
+  @UseGuards(JwtAuthGuard)
+  async registerDevices(
+    @CurrentUser() user: User,
+    @Body() dto: RegisterDevicesDto
+  ) {
+    // 장비 등록 로직
+    return await this.deviceService.registerDevices(
+      user.id,
+      dto.devices,
+      dto.houseId
+    )
+  }
+}
+```
+
+## 📡 프론트엔드 API 호출
+
+### 장비 목록 불러오기
+```typescript
+// frontend/src/services/tuya.service.ts
+export class TuyaService {
+  private apiUrl = '/api/devices'
+
+  async getDevices(): Promise<TuyaDevice[]> {
+    const response = await fetch(`${this.apiUrl}/tuya/list`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('장비 목록 조회 실패')
+    }
+
+    return response.json()
+  }
+
+  async registerDevices(devices: TuyaDevice[], houseId: string) {
+    const response = await fetch(`${this.apiUrl}/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({ devices, houseId }),
+    })
+
+    if (!response.ok) {
+      throw new Error('장비 등록 실패')
+    }
+
+    return response.json()
+  }
+}
+```
+
+### DeviceRegistration 컴포넌트에서 사용
+```typescript
+// frontend/src/components/devices/DeviceRegistration.vue
+const loadDevices = async () => {
+  if (!selectedProject.value) {
+    alert('Tuya 프로젝트를 선택하세요')
+    return
+  }
+
+  loading.value = true
+
+  try {
+    const tuyaService = new TuyaService()
+    const devices = await tuyaService.getDevices()
+
+    tuyaDevices.value = devices.map(device => ({
+      id: device.id,
+      name: device.name,
+      icon: getDeviceIcon(device.category),
+      category: device.category,
+      online: device.online,
+    }))
+
+    loading.value = false
+    step.value = 2
+  } catch (error) {
+    console.error('장비 목록 불러오기 실패:', error)
+    alert('장비 목록을 불러오는데 실패했습니다.')
+    loading.value = false
+  }
+}
+```
+
+## 🔒 보안 고려사항
+
+### 1. Access Secret 암호화
+백엔드에서 사용자의 Access Secret을 저장할 때 반드시 암호화:
+
+```typescript
+import crypto from 'crypto'
+
+const algorithm = 'aes-256-cbc'
+const secretKey = process.env.ENCRYPTION_KEY // 32 bytes
+
+export function encrypt(text: string): string {
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv(algorithm, Buffer.from(secretKey), iv)
+  const encrypted = Buffer.concat([cipher.update(text), cipher.final()])
+
+  return iv.toString('hex') + ':' + encrypted.toString('hex')
+}
+
+export function decrypt(text: string): string {
+  const [ivHex, encryptedHex] = text.split(':')
+  const iv = Buffer.from(ivHex, 'hex')
+  const encrypted = Buffer.from(encryptedHex, 'hex')
+  const decipher = crypto.createDecipheriv(algorithm, Buffer.from(secretKey), iv)
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
+
+  return decrypted.toString()
+}
+```
+
+### 2. 토큰 캐싱
+Tuya Access Token은 유효기간이 있으므로 Redis에 캐싱:
+
+```typescript
+export class TuyaAuthService {
+  async getAccessToken(): Promise<string> {
+    // Redis에서 캐시된 토큰 확인
+    const cached = await this.redis.get(`tuya:token:${this.accessId}`)
+    if (cached) {
+      return cached
+    }
+
+    // 새 토큰 발급
+    const token = await this.fetchNewToken()
+
+    // Redis에 캐싱 (5시간)
+    await this.redis.setex(`tuya:token:${this.accessId}`, 18000, token)
+
+    return token
+  }
+}
+```
+
+## 📚 참고 자료
+
+- [Tuya IoT Platform 공식 문서](https://developer.tuya.com/en/docs/iot)
+- [Tuya API Reference](https://developer.tuya.com/en/docs/cloud/api-reference)
+- [Tuya Device Management](https://developer.tuya.com/en/docs/cloud/device-management)
+- [Tuya Authentication](https://developer.tuya.com/en/docs/iot/api-request)
+
+## ⚠️ 주의사항
+
+1. **API Rate Limit**: Tuya API는 요청 제한이 있습니다. 과도한 요청 방지를 위해 캐싱 사용
+2. **보안**: Access Secret을 절대 프론트엔드에 노출하지 마세요
+3. **에러 처리**: API 호출 실패 시 적절한 에러 메시지 표시
+4. **로깅**: 모든 API 호출을 로깅하여 문제 추적 가능하도록 구현

@@ -1,0 +1,860 @@
+# UI Improvement Design Document
+
+> **Summary**: 모바일 친화적 UX 개선 - 사이드바+드로어 네비게이션, BottomTabBar, SafeArea, 접근성, 글꼴 크기 조절, Progressive Disclosure
+>
+> **Project**: smart-farm-platform
+> **Version**: 2.0.0
+> **Author**: Claude Code
+> **Date**: 2026-02-20
+> **Status**: Implemented
+> **Planning Doc**: [ui-improvement.plan.md](../01-plan/features/ui-improvement.plan.md)
+
+---
+
+## 1. Overview
+
+### 1.1 Design Goals
+
+1. 데스크탑 사이드바(260px) + 모바일 드로어(280px) 이중 네비게이션
+2. 모바일 하단 탭 바(BottomTabBar) + 더보기 메뉴(MoreMenu)
+3. iPhone Safe Area 완벽 대응 (노치, 다이나믹 아일랜드, 홈 인디케이터)
+4. 45~70세 사용자 접근성 (글꼴 크기 3단계 조절, 고대비, 큰 터치 타겟)
+5. 복잡한 작업(장비 등록)의 3-Step 위저드 UX (Tuya Cloud 연동)
+6. 정보 과부하 방지를 위한 Progressive Disclosure 패턴 (센서 그룹 접기/펼치기)
+7. Promise 기반 전역 확인 다이얼로그 (useConfirm composable)
+
+### 1.2 Design Principles
+
+- **Mobile First**: 768px 브레이크포인트 기준, 모바일 우선 설계
+- **Progressive Disclosure**: 센서 그룹별 접기/펼치기, 핵심 정보 우선 표시
+- **Minimum Touch Target**: 모든 인터랙티브 요소 최소 44x44px
+- **Accessibility for Elderly**: 글꼴 크기 3단계 (sm/md/lg), 고대비 컬러
+- **CSS Variables**: 디자인 토큰 기반 일관된 스타일링
+
+---
+
+## 2. Architecture
+
+### 2.1 Component Diagram
+
+```
+App.vue
+├── Desktop Sidebar (769px+, 260px 고정)
+│   ├── Brand Section (아이콘 + "스마트팜 / Smart Farm IoT")
+│   ├── Navigation Menu (7개 SVG 아이콘 메뉴)
+│   ├── Font Size Control (sm/md/lg 3단계)
+│   └── User Profile + Logout
+├── Mobile Header (<769px, 60px 고정)
+│   ├── Hamburger Menu Button
+│   └── Brand Name ("스마트팜")
+├── Mobile Drawer (<769px, 280px 슬라이드)
+│   ├── Navigation Menu (사이드바와 동일)
+│   └── Close Button (✕)
+├── BottomTabBar.vue (mobile, 하단 고정)
+│   ├── 5개 주요 탭 (장비, 센서, 자동화, 그룹, 모니터링)
+│   └── 더보기 버튼 → MoreMenu.vue
+├── ConfirmDialog.vue (Teleport to body)
+├── <router-view />
+│   ├── Dashboard.vue
+│   │   └── SummaryCards.vue (상세 카드 + 요약 행)
+│   ├── Sensors.vue (그룹별 접기/펼치기 Progressive Disclosure)
+│   ├── Devices.vue (그리드 + 검색 + 탭 필터)
+│   ├── DeviceRegistration.vue (3-Step Tuya 위저드)
+│   ├── Groups.vue
+│   ├── Automation.vue (장비 유형별 탭)
+│   ├── Reports.vue
+│   └── UserManagement.vue (admin only)
+└── composables/
+    ├── useConfirm.ts (Promise 기반 확인 다이얼로그)
+    ├── useNotification.ts (토스트 알림)
+    ├── useAuth.ts (인증)
+    └── useWebSocket.ts (실시간 데이터)
+```
+
+### 2.2 반응형 전략
+
+| Breakpoint | 네비게이션 | 레이아웃 | 위저드 |
+|------------|-----------|---------|--------|
+| ~768px | 모바일 헤더(60px) + 드로어(280px) + BottomTabBar | 1컬럼 | 풀스크린 (100dvh) |
+| 769px+ | 사이드바(260px, 고정) | 2~3컬럼, margin-left: 260px | 모달 (max-width: 700px) |
+
+---
+
+## 3. 디자인 시스템
+
+### 3.1 CSS Variables (style.css)
+
+```css
+:root {
+  /* Colors */
+  --color-primary: #2e7d32;
+  --color-primary-light: #4caf50;
+  --color-primary-dark: #1b5e20;
+
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-error: #f44336;
+  --color-info: #2196f3;
+
+  --color-bg: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-border: #e0e0e0;
+
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-text-disabled: #999999;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+}
+```
+
+### 3.2 글꼴 크기 조절 시스템 (App.vue)
+
+LocalStorage 키: `sf-font-size` (sm | md | lg)
+
+```css
+#app.content-size-sm {
+  --content-scale: 1;
+  --content-body-size: 16px;
+  --content-small-size: 14px;
+  --content-title-scale: 1;
+}
+
+#app.content-size-md {
+  --content-scale: 1.1;
+  --content-body-size: 17px;
+  --content-small-size: 15px;
+  --content-title-scale: 1.08;
+}
+
+#app.content-size-lg {
+  --content-scale: 1.2;
+  --content-body-size: 18px;
+  --content-small-size: 16px;
+  --content-title-scale: 1.15;
+}
+```
+
+### 3.3 컬러 시멘틱
+
+| 용도 | 컬러 | Hex |
+|------|------|-----|
+| Primary / 온라인 상태 | Green | #2e7d32 |
+| 경고 | Orange | #ff9800 |
+| 위험 / 오프라인 | Red | #f44336 |
+| 정보 | Blue | #2196f3 |
+| 센서 | Purple | #7b1fa2 |
+| 비활성 / 보조 | Gray | #f5f5f5, #e0e0e0, #999 |
+
+### 3.4 아이콘 시스템
+
+- **사이드바 네비게이션**: 인라인 SVG 아이콘 (stroke-linecap: round, stroke-linejoin: round, 20-24px)
+- **콘텐츠 영역**: 이모지 아이콘 (🔌 📡 🌡️ 💧 🌫️ 💡 🌱 ⚗️ ⚡ 🚪 💨 🌧️ 등)
+
+---
+
+## 4. 컴포넌트 상세 설계
+
+### 4.1 App.vue - 데스크탑 사이드바
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ ┌──────────┐                                            │
+│ │ 🌿      │                                            │
+│ │ 스마트팜  │        Main Content Area                  │
+│ │Smart Farm│        (margin-left: 260px)               │
+│ │──────────│                                            │
+│ │📊 대시보드│                                            │
+│ │🔌 장비관리│                                            │
+│ │👥 그룹관리│                                            │
+│ │⚙️ 자동화  │                                            │
+│ │📡 모니터링│                                            │
+│ │📈 리포트  │                                            │
+│ │👤 사용자  │ ← admin only                              │
+│ │──────────│                                            │
+│ │ [가] [나] [다]│ ← 글꼴 크기 조절                      │
+│ │──────────│                                            │
+│ │ 👤 홍길동 │                                            │
+│ │   관리자  │                                            │
+│ │ [로그아웃]│                                            │
+│ └──────────┘                                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+**CSS 핵심**:
+```css
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  background: white;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.main-content {
+  margin-left: 260px;
+  padding: 24px;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: 60px; /* 모바일 헤더 높이 */
+  }
+}
+```
+
+### 4.2 App.vue - 모바일 헤더 + 드로어
+
+```
+모바일 헤더 (60px 고정):
+┌──────────────────────────────────┐
+│  ☰          스마트팜              │
+└──────────────────────────────────┘
+
+모바일 드로어 (280px 슬라이드):
+┌──────────────────┐
+│            ✕     │
+│ 📊 대시보드       │
+│ 🔌 장비 관리      │
+│ 👥 그룹 관리      │
+│ ⚙️ 자동화 룰      │
+│ 📡 실시간 모니터링  │
+│ 📈 리포트         │
+│ 👤 사용자 관리     │
+│                  │
+│ 👤 홍길동 (관리자) │
+│ [로그아웃]        │
+└──────────────────┘
+```
+
+**CSS 핵심**:
+```css
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+  z-index: 200;
+  align-items: center;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100vh;
+  background: white;
+  z-index: 300;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+  .mobile-header { display: flex; }
+}
+```
+
+### 4.3 BottomTabBar.vue
+
+```
+┌──────────────────────────────────────────┐
+│ 📦    🌡️    ⚙️    👥    🔍    ≡        │
+│ 장비  센서  자동화  그룹  모니터  더보기   │ ← 하단 고정, safe-area 대응
+└──────────────────────────────────────────┘
+```
+
+**Props**: 없음
+**Events**: `@logout`
+
+```typescript
+// 탭 정의 (실제 구현)
+const mainTabs = [
+  { path: '/devices', icon: '📦', label: '장비' },
+  { path: '/sensors', icon: '🌡️', label: '센서' },
+  { path: '/automation', icon: '⚙️', label: '자동화' },
+  { path: '/groups', icon: '👥', label: '그룹' },
+  { path: '/sensors', icon: '🔍', label: '모니터' },
+]
+```
+
+**CSS 핵심**:
+```css
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  z-index: 1000;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  gap: 2px;
+  text-decoration: none;
+  color: #999;
+  font-size: 10px;
+  transition: color 0.2s;
+}
+
+.tab-item.active {
+  color: #2e7d32;
+}
+
+@media (min-width: 769px) {
+  .bottom-tab-bar { display: none; }
+}
+```
+
+### 4.4 MoreMenu.vue
+
+```
+           ┌──────────────────┐
+           │ 📈  리포트        │
+           │ 👤  사용자 관리   │ ← admin only
+           │─────────────────│
+           │ 🚪  로그아웃      │ ← 빨간 텍스트 (#c62828)
+           └──────────────────┘
+                    ≡
+                  더보기
+```
+
+**Props**:
+```typescript
+interface Props {
+  visible: boolean
+  isAdmin: boolean
+}
+```
+
+**Events**: `@close`, `@logout`
+
+**동작**:
+- Teleport to body 사용
+- 바텀탭바 바로 위에 위치: `bottom: calc(56px + env(safe-area-inset-bottom))`
+- 바깥 클릭 시 닫힘
+- 메뉴 항목: role="menu" / role="menuitem" ARIA 적용
+- 로그아웃 항목: 상단 보더 분리선, 빨간 텍스트
+- 호버 효과: background #f5f5f5
+
+### 4.5 ConfirmDialog.vue
+
+```
+┌──────────────────────────────────┐
+│                                  │
+│         ⚠️ (40px)               │
+│                                  │
+│    장비를 삭제하시겠습니까?        │ ← 18px, font-weight 700
+│                                  │
+│    이 작업은 되돌릴 수 없습니다.   │ ← 14px, color #666
+│                                  │
+│   [취소]           [삭제]        │ ← min-height 44px
+│                                  │
+└──────────────────────────────────┘
+```
+
+**구현**: Teleport to body 사용
+
+**타입 정의**:
+```typescript
+interface ConfirmOptions {
+  title: string
+  message: string
+  confirmText?: string       // 기본값: '확인'
+  cancelText?: string        // 기본값: '취소'
+  variant?: 'danger' | 'warning' | 'info'  // 기본값: 'warning'
+}
+```
+
+**Variant 스타일**:
+| Variant | 아이콘 | 확인 버튼 색상 |
+|---------|--------|--------------|
+| danger | ⚠️ | #f44336 (빨강) |
+| warning | ⚠️ | #ff9800 (주황) |
+| info | ℹ️ | #2e7d32 (녹색) |
+
+**CSS 핵심**:
+```css
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  overscroll-behavior: contain;
+}
+
+.confirm-dialog {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* ARIA */
+role="alertdialog"
+aria-modal="true"
+```
+
+### 4.6 useConfirm.ts (Composable)
+
+```typescript
+import { ref, readonly } from 'vue'
+
+interface ConfirmOptions {
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  variant?: 'danger' | 'warning' | 'info'
+}
+
+const state = ref({
+  visible: false,
+  options: {} as ConfirmOptions,
+  resolve: null as ((value: boolean) => void) | null,
+})
+
+export function useConfirm() {
+  function confirm(options: ConfirmOptions): Promise<boolean> {
+    return new Promise((resolve) => {
+      state.value = { visible: true, options, resolve }
+    })
+  }
+
+  function handleConfirm() {
+    state.value.resolve?.(true)
+    state.value.visible = false
+  }
+
+  function handleCancel() {
+    state.value.resolve?.(false)
+    state.value.visible = false
+  }
+
+  return {
+    state: readonly(state),
+    confirm,
+    handleConfirm,
+    handleCancel,
+  }
+}
+```
+
+**사용 예시**:
+```typescript
+const { confirm } = useConfirm()
+
+const handleRemoveDevice = async (id: string) => {
+  const ok = await confirm({
+    title: '장비 삭제',
+    message: '이 장비를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+    confirmText: '삭제',
+    variant: 'danger',
+  })
+  if (!ok) return
+  await deviceStore.removeDevice(id)
+}
+```
+
+### 4.7 SummaryCards.vue
+
+기존 설계의 단순 4카드가 아닌, **상세 카드 2열 + 요약 행 4열** 구조로 구현.
+
+```
+상세 카드 (2열 그리드):
+┌─────────────────────────┐ ┌─────────────────────────┐
+│ 🔔 가동 중인 장비        │ │ 📊 센서 현황             │
+│ 8 / 12                  │ │ 10 / 15                 │
+│                         │ │                         │
+│ • 개폐기A  온실1>1동     │ │ • 센서A  온실1>1동       │
+│   [가동중]              │ │   🌡️23.5 💧65% 🌫️450  │
+│ • 환풍기B  온실1>2동     │ │ • 센서B  온실2>1동       │
+│   [대기]                │ │   🌡️22.1 💧70%         │
+│                         │ │                         │
+│ (max-height: 320px,     │ │ (max-height: 320px,     │
+│  overflow scroll)       │ │  overflow scroll)       │
+└─────────────────────────┘ └─────────────────────────┘
+
+요약 행 (4열 그리드):
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ 🔌 전체장비│ │ 👥 활성그룹│ │ ⚙️ 자동화  │ │ ✅ 온라인  │
+│    15     │ │     5    │ │   3/8    │ │    12    │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
+
+**Props**: 없음 (Pinia 스토어 직접 사용)
+
+**데이터 소스**:
+- `useDeviceStore()` → 장비 목록, 온라인/오프라인 상태
+- `useGroupStore()` → 그룹 목록
+- `useAutomationStore()` → 자동화 룰 목록, 활성 수
+
+**onMounted 동작**:
+- 장비/그룹/룰이 미로드 시 자동 fetch
+- 센서/액추에이터 상태도 함께 조회
+
+**상세 카드 스타일**:
+```css
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* 아이콘 배경 */
+.icon-device { background: #e8f5e9; color: #2e7d32; }  /* 장비: 녹색 */
+.icon-sensor { background: #ede7f6; color: #7b1fa2; }  /* 센서: 보라 */
+
+/* 상태 뱃지 */
+.badge-running { background: #e8f5e9; color: #2e7d32; }
+.badge-standby { background: #fff3e0; color: #e65100; }
+.badge-offline { background: #f5f5f5; color: #999; }
+
+@media (max-width: 768px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+```
+
+### 4.8 Sensors.vue - Progressive Disclosure
+
+그룹별 접기/펼치기 방식의 Progressive Disclosure 구현.
+
+```
+접힌 그룹:
+┌──────────────────────────────────────┐
+│ ▶ 온실1 - 1동                        │
+│   🌡️ 평균 23.5°C  💧 평균 65%        │ ← 요약 칩
+└──────────────────────────────────────┘
+
+펼친 그룹:
+┌──────────────────────────────────────┐
+│ ▼ 온실1 - 1동                        │
+│   🌡️ 평균 23.5°C  💧 평균 65%        │
+│                                      │
+│ ┌────────────────┐ ┌────────────────┐│
+│ │ 센서A           │ │ 센서B          ││
+│ │ 🌡️ 23.5°C      │ │ 🌡️ 22.1°C     ││
+│ │ 💧 65%         │ │ 💧 70%        ││
+│ │ 🌫️ 450ppm     │ │ 🌫️ 420ppm    ││
+│ │ 💡 1200lux     │ │               ││
+│ └────────────────┘ └────────────────┘│
+└──────────────────────────────────────┘
+```
+
+**구현 패턴**:
+```typescript
+// 그룹별 접기/펼치기 상태
+const expandedGroups = ref(new Set<string>())
+
+function toggleGroup(groupId: string) {
+  if (expandedGroups.value.has(groupId)) {
+    expandedGroups.value.delete(groupId)
+  } else {
+    expandedGroups.value.add(groupId)
+  }
+}
+```
+
+**ARIA**:
+- 그룹 헤더: `aria-expanded="true/false"`
+- 접기/펼치기 아이콘: ▼ (펼침) / ▶ (접힘)
+
+### 4.9 DeviceRegistration.vue - 3-Step Tuya 위저드
+
+기존 설계의 4단계가 아닌 **3단계 위저드**로 구현. Tuya Cloud API 연동.
+
+```
+Step 1: Tuya Cloud 기기 불러오기
+┌──────────────────────────────────────┐
+│  ① Tuya Cloud 기기 로드              │
+│                                      │
+│  ℹ️ Tuya 프로젝트: smart-farm        │
+│     Endpoint: https://openapi.tuya...│
+│                                      │
+│  [📡 기기 목록 불러오기]              │
+│                                      │
+│  ⚠️ Tuya 설정이 없으면 경고 박스 표시  │
+│  📭 기기가 없으면 빈 상태 표시         │
+└──────────────────────────────────────┘
+
+Step 2: 기기 선택 & 분류
+┌──────────────────────────────────────┐
+│  ② 기기 선택                         │
+│                                      │
+│  🔍 기기 이름, ID 검색...            │
+│                                      │
+│  ☑️ 🌡️ 온습도 센서A     wsdcg       │
+│     → [센서] [액추에이터] 장비유형▼   │
+│  ☐  🔌 개폐기B          cz          │
+│  ☑️ 💨 환풍기C          fs          │
+│     → [센서] [액추에이터] [환풍기▼]   │
+│                                      │
+│  선택: 2개                           │
+└──────────────────────────────────────┘
+
+Step 3: 이름 확인 & 등록
+┌──────────────────────────────────────┐
+│  ③ 등록 확인                         │
+│                                      │
+│  [온습도 센서A______] [센서] ● 온라인 ✕│
+│  [환풍기C____________] [액추] ● 온라인 ✕│
+│                                      │
+│  센서 1개 / 장비 1개 - 총 2개         │
+│                                      │
+│  [이전]              [등록 완료]       │
+└──────────────────────────────────────┘
+```
+
+**Props**:
+```typescript
+interface Props {
+  isOpen: boolean
+}
+
+// Events
+emit: {
+  close: []
+  registered: [devices: TuyaDevice[]]
+}
+```
+
+**기기 자동 분류**:
+- 센서 카테고리: wsdcg, co2bj, ldcg, mcs, ywbj, pm25, cz
+- 액추에이터: 그 외 카테고리
+- 장비 유형: 개폐기(opener), 환풍기(fan), 관수(irrigation), 기타(other)
+
+**모바일/데스크탑 스타일**:
+```css
+/* 데스크탑: 모달 */
+.registration-modal {
+  max-width: 700px;
+  max-height: 90vh;
+  border-radius: 16px;
+}
+
+/* 모바일: 풀스크린 */
+@media (max-width: 768px) {
+  .registration-modal {
+    width: 100%;
+    height: 100dvh;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+}
+```
+
+**정보 박스 컬러 시스템**:
+| 유형 | 배경색 | 보더색 |
+|------|--------|--------|
+| Info | #e8f5e9 (연녹) | - |
+| Warning | #fff3e0 (연주황) | #ff9800 |
+| Error | #ffebee (연빨강) | #ef9a9a |
+
+---
+
+## 5. 기존 파일 수정 설계
+
+### 5.1 index.html
+
+```html
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2e7d32" />
+  <meta name="color-scheme" content="light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>스마트 농장 - Smart Farm Platform</title>
+</head>
+```
+
+### 5.2 App.vue 주요 변경
+
+| 항목 | 기존 설계 | 실제 구현 |
+|------|----------|----------|
+| 데스크탑 네비 | 상단 메뉴 (TopNav) | **사이드바 260px 고정** |
+| 모바일 네비 | BottomTabBar만 | **모바일 헤더 60px + 드로어 280px + BottomTabBar** |
+| 글꼴 조절 | 없음 | **sm/md/lg 3단계 (localStorage)** |
+| 유저 프로필 | 없음 | **아바타 + 이름 + 역할 표시** |
+| 네비 아이콘 | 이모지 | **인라인 SVG** |
+
+### 5.3 Devices.vue / Groups.vue / Automation.vue
+
+기존 `window.confirm()` → `useConfirm().confirm()` 교체 완료.
+
+### 5.4 접근성 적용 현황
+
+| 항목 | 구현 상태 |
+|------|----------|
+| aria-label (버튼) | ✅ 적용됨 |
+| role="menu" / "menuitem" (MoreMenu) | ✅ 적용됨 |
+| role="alertdialog", aria-modal (ConfirmDialog) | ✅ 적용됨 |
+| aria-expanded (센서 그룹) | ✅ 적용됨 |
+| 최소 터치 타겟 44x44px | ✅ 적용됨 |
+| focus outline: 2px solid #2e7d32 | ✅ 적용됨 |
+| autocomplete 속성 (Login) | ✅ 적용됨 |
+
+### 5.5 애니메이션 & 트랜지션
+
+| 요소 | 트랜지션 |
+|------|---------|
+| 드로어 슬라이드 | transform 0.3s ease |
+| 버튼 호버 | background 0.2s, color 0.2s |
+| 모달 페이드인 | opacity 0.3s, transform translateY(10px) |
+| 토글 스위치 | background 0.3s, transform 0.3s |
+| 확인 버튼 클릭 | transform scale(0.98) |
+
+---
+
+## 6. 라우트 구조
+
+| Route | Component | Auth | Admin | 타이틀 |
+|-------|-----------|------|-------|--------|
+| `/login` | Login.vue | No | No | 로그인 |
+| `/` | → `/dashboard` | Yes | No | - |
+| `/dashboard` | Dashboard.vue | Yes | No | 대시보드 |
+| `/sensors` | Sensors.vue | Yes | No | 센서 관리 |
+| `/automation` | Automation.vue | Yes | No | 자동화 |
+| `/groups` | Groups.vue | Yes | No | 그룹 관리 |
+| `/devices` | Devices.vue | Yes | No | 장비 관리 |
+| `/users` | UserManagement.vue | Yes | Yes | 사용자 관리 |
+| `/reports` | Reports.vue | Yes | No | 리포트 및 통계 |
+
+---
+
+## 7. 센서/자동화 관련 컴포넌트
+
+### 7.1 센서 컴포넌트
+
+| 컴포넌트 | 역할 |
+|---------|------|
+| BaseSensorCard.vue | 센서 카드 기본 레이아웃 |
+| SensorDisplaySettings.vue | 센서 표시 설정 |
+| TemperatureSensor.vue | 온도 센서 특화 카드 |
+
+### 7.2 자동화 위저드 컴포넌트
+
+| 컴포넌트 | 역할 |
+|---------|------|
+| RuleWizardModal.vue | 자동화 룰 생성 위저드 (멀티스텝) |
+| StepSensorSelect.vue | 센서 선택 단계 |
+| StepConditionBuilder.vue | 조건 설정 단계 |
+| StepActuatorSelect.vue | 액추에이터 선택 단계 |
+| StepTargetSelect.vue | 대상 선택 단계 |
+| StepDeviceAction.vue | 장비 액션 설정 단계 |
+| StepReview.vue | 최종 확인 단계 |
+| ConditionRow.vue | 조건 행 컴포넌트 |
+| IrrigationSequenceBuilder.vue | 관수 시퀀스 빌더 |
+
+---
+
+## 8. 검증 체크리스트
+
+### 8.1 모바일 테스트 (375px, Chrome DevTools)
+
+- [x] 모바일 헤더 표시 (60px, 햄버거 메뉴)
+- [x] 드로어 슬라이드 동작 (280px, 오버레이)
+- [x] 하단 탭 바 표시 (5탭 + 더보기)
+- [x] 더보기 메뉴 드롭업 (리포트/사용자관리/로그아웃)
+- [x] Safe Area 적용 (하단 여백, 상단 노치)
+- [x] 장비 등록 풀스크린 위저드 (3단계)
+- [x] 센서 그룹 접기/펼치기 동작
+- [x] 대시보드 상세카드 1열 + 요약 2열
+- [x] 확인 다이얼로그 표시 (삭제 시)
+- [x] 터치 타겟 44px 이상
+
+### 8.2 데스크탑 테스트 (1440px)
+
+- [x] 사이드바 260px 고정 표시 (하단 탭 바 숨김)
+- [x] 글꼴 크기 조절 버튼 (sm/md/lg)
+- [x] 장비 등록 모달 (max-width: 700px)
+- [x] 센서 그룹 접기/펼치기 동작
+- [x] 대시보드 상세카드 2열 + 요약 4열
+
+### 8.3 접근성 테스트
+
+- [x] 아이콘 버튼 aria-label 존재
+- [x] form input autocomplete 속성 존재
+- [x] focus 시 outline 스타일 표시
+- [x] ARIA role 적용 (menu, menuitem, alertdialog)
+- [x] aria-expanded 적용 (센서 그룹)
+
+### 8.4 빌드 테스트
+
+- [x] `npm run build` (Vite + TypeScript) 에러 없음
+
+---
+
+## Version History
+
+| Version | Date | Changes | Author |
+|---------|------|---------|--------|
+| 0.1 | 2026-02-19 | Initial draft - 12단계 구현순서 | Claude Code |
+| 2.0 | 2026-02-20 | 실제 구현 기반 역설계 - 사이드바/드로어 네비, 3-Step Tuya 위저드, SummaryCards 상세구조, 글꼴크기 조절, CSS Variables 시스템 반영 | Claude Code |

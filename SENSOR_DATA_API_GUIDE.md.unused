@@ -1,0 +1,542 @@
+# 센서 데이터 수집 및 리포트 API 가이드
+
+## 📊 개요
+
+이 문서는 센서 데이터를 TimescaleDB에 저장하고, 과거 데이터를 조회하여 리포트/통계를 제공하는 API를 설명합니다.
+
+## 🗄️ 데이터베이스 구조
+
+### 센서 데이터 테이블 (TimescaleDB Hypertable)
+```sql
+CREATE TABLE sensor_data (
+  time TIMESTAMP WITH TIME ZONE NOT NULL,
+  device_id UUID NOT NULL,
+  user_id UUID NOT NULL,
+  sensor_type VARCHAR(50) NOT NULL,
+  value DECIMAL(10, 4) NOT NULL,
+  unit VARCHAR(20) NOT NULL,
+  status VARCHAR(20) DEFAULT 'normal',
+  metadata JSONB
+);
+
+SELECT create_hypertable('sensor_data', 'time');
+```
+
+### 집계 뷰 (성능 최적화)
+- **sensor_data_hourly**: 1시간 단위 집계
+- **sensor_data_daily**: 1일 단위 집계
+
+## 🔧 백엔드 API 구현
+
+### 1. 센서 데이터 수집 및 저장
+
+#### Tuya Webhook으로 실시간 데이터 수신
+```typescript
+// backend/src/modules/integrations/tuya/tuya-webhook.controller.ts
+import { Controller, Post, Body, Headers } from '@nestjs/common'
+import { SensorDataService } from '../sensors/sensor-data.service'
+
+@Controller('webhooks/tuya')
+export class TuyaWebhookController {
+  constructor(private sensorDataService: SensorDataService) {}
+
+  @Post()
+  async handleWebhook(
+    @Body() payload: any,
+    @Headers('sign') signature: string
+  ) {
+    // 1. Tuya 시그니처 검증
+    if (!this.verifySignature(payload, signature)) {
+      throw new UnauthorizedException('Invalid signature')
+    }
+
+    // 2. 이벤트 타입 확인
+    if (payload.bizCode === 'statusReport') {
+      // 센서 데이터 업데이트
+      await this.processSensorData(payload.bizData)
+    }
+
+    return { success: true }
+  }
+
+  private async processSensorData(bizData: any) {
+    const { devId, status } = bizData
+
+    // 장비 정보 조회
+    const device = await this.deviceRepository.findOne({
+      where: { tuyaDeviceId: devId },
+      relations: ['user']
+    })
+
+    if (!device) {
+      console.warn(`Unknown device: ${devId}`)
+      return
+    }
+
+    // status 배열에서 센서 데이터 추출
+    for (const item of status) {
+      const { code, value } = item
+
+      // 센서 타입 매핑
+      const sensorType = this.mapCodeToSensorType(code)
+      if (!sensorType) continue
+
+      // 센서 데이터 저장
+      await this.sensorDataService.save({
+        time: new Date(),
+        deviceId: device.id,
+        userId: device.userId,
+        sensorType,
+        value: parseFloat(value),
+        unit: this.getSensorUnit(sensorType),
+        status: this.calculateStatus(sensorType, parseFloat(value))
+      })
+    }
+  }
+
+  private mapCodeToSensorType(code: string): string | null {
+    const mapping: Record<string, string> = {
+      'temp_current': 'temperature',
+      'humidity_value': 'humidity',
+      'co2_value': 'co2',
+      'bright_value': 'light',
+      'soil_moisture': 'soil_moisture',
+      'ph_value': 'ph',
+      'ec_value': 'ec'
+    }
+    return mapping[code] || null
+  }
+
+  private getSensorUnit(sensorType: string): string {
+    const units: Record<string, string> = {
+      temperature: '°C',
+      humidity: '%',
+      co2: 'ppm',
+      light: 'lux',
+      soil_moisture: '%',
+      ph: 'pH',
+      ec: 'mS/cm'
+    }
+    return units[sensorType] || ''
+  }
+
+  private calculateStatus(sensorType: string, value: number): string {
+    // 센서 타입별 임계값 정의
+    const thresholds: Record<string, { warning: number, critical: number }> = {
+      temperature: { warning: 30, critical: 35 },
+      humidity: { warning: 70, critical: 80 },
+      co2: { warning: 1000, critical: 1500 }
+      // ... 다른 센서들
+    }
+
+    const threshold = thresholds[sensorType]
+    if (!threshold) return 'normal'
+
+    if (value >= threshold.critical) return 'critical'
+    if (value >= threshold.warning) return 'warning'
+    return 'normal'
+  }
+}
+```
+
+#### 센서 데이터 저장 서비스
+```typescript
+// backend/src/modules/sensors/sensor-data.service.ts
+import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { SensorData } from './entities/sensor-data.entity'
+
+@Injectable()
+export class SensorDataService {
+  constructor(
+    @InjectRepository(SensorData)
+    private sensorDataRepository: Repository<SensorData>
+  ) {}
+
+  async save(data: Partial<SensorData>): Promise<SensorData> {
+    const sensorData = this.sensorDataRepository.create(data)
+    return await this.sensorDataRepository.save(sensorData)
+  }
+
+  async saveBatch(dataArray: Partial<SensorData>[]): Promise<SensorData[]> {
+    const sensorDataArray = this.sensorDataRepository.create(dataArray)
+    return await this.sensorDataRepository.save(sensorDataArray)
+  }
+}
+```
+
+### 2. 센서 데이터 조회 API
+
+#### 시계열 데이터 조회
+```typescript
+// backend/src/modules/sensors/sensor-data.controller.ts
+import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
+
+@Controller('sensor-data')
+@UseGuards(JwtAuthGuard)
+export class SensorDataController {
+  constructor(private sensorDataService: SensorDataService) {}
+
+  @Get()
+  async getSensorData(
+    @CurrentUser() user: User,
+    @Query('sensorType') sensorType: string,
+    @Query('deviceId') deviceId?: string,
+    @Query('houseId') houseId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('aggregation') aggregation: 'raw' | 'hourly' | 'daily' = 'hourly'
+  ) {
+    return await this.sensorDataService.query({
+      userId: user.id,
+      sensorType,
+      deviceId,
+      houseId,
+      startDate: startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      endDate: endDate ? new Date(endDate) : new Date(),
+      aggregation
+    })
+  }
+
+  @Get('statistics')
+  async getStatistics(
+    @CurrentUser() user: User,
+    @Query('sensorType') sensorType: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string
+  ) {
+    return await this.sensorDataService.getStatistics({
+      userId: user.id,
+      sensorType,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate)
+    })
+  }
+
+  @Get('latest')
+  async getLatestData(
+    @CurrentUser() user: User,
+    @Query('sensorType') sensorType?: string
+  ) {
+    return await this.sensorDataService.getLatest({
+      userId: user.id,
+      sensorType
+    })
+  }
+}
+```
+
+#### 쿼리 서비스 구현
+```typescript
+// backend/src/modules/sensors/sensor-data.service.ts (추가)
+export class SensorDataService {
+  // ... 이전 코드
+
+  async query(params: {
+    userId: string
+    sensorType: string
+    deviceId?: string
+    houseId?: string
+    startDate: Date
+    endDate: Date
+    aggregation: 'raw' | 'hourly' | 'daily'
+  }) {
+    const { userId, sensorType, deviceId, houseId, startDate, endDate, aggregation } = params
+
+    // 집계 타입에 따라 다른 테이블 사용
+    const tableName = aggregation === 'raw'
+      ? 'sensor_data'
+      : aggregation === 'hourly'
+        ? 'sensor_data_hourly'
+        : 'sensor_data_daily'
+
+    let query = this.sensorDataRepository
+      .createQueryBuilder('sd')
+      .where('sd.user_id = :userId', { userId })
+      .andWhere('sd.sensor_type = :sensorType', { sensorType })
+      .andWhere('sd.time >= :startDate', { startDate })
+      .andWhere('sd.time <= :endDate', { endDate })
+
+    if (deviceId) {
+      query = query.andWhere('sd.device_id = :deviceId', { deviceId })
+    }
+
+    if (houseId) {
+      query = query
+        .leftJoin('sd.device', 'device')
+        .andWhere('device.house_id = :houseId', { houseId })
+    }
+
+    // 집계 데이터인 경우
+    if (aggregation !== 'raw') {
+      query = query
+        .select([
+          'sd.bucket as time',
+          'sd.device_id as deviceId',
+          'sd.avg_value as value',
+          'sd.min_value as minValue',
+          'sd.max_value as maxValue',
+          'sd.sample_count as count'
+        ])
+    } else {
+      query = query.select([
+        'sd.time',
+        'sd.device_id as deviceId',
+        'sd.value',
+        'sd.unit',
+        'sd.status'
+      ])
+    }
+
+    query = query.orderBy('sd.time', 'ASC')
+
+    return await query.getRawMany()
+  }
+
+  async getStatistics(params: {
+    userId: string
+    sensorType: string
+    startDate: Date
+    endDate: Date
+  }) {
+    const { userId, sensorType, startDate, endDate } = params
+
+    const result = await this.sensorDataRepository
+      .createQueryBuilder('sd')
+      .select([
+        'AVG(sd.value) as average',
+        'MIN(sd.value) as min',
+        'MAX(sd.value) as max',
+        'COUNT(*) as count',
+        'STDDEV(sd.value) as stddev'
+      ])
+      .where('sd.user_id = :userId', { userId })
+      .andWhere('sd.sensor_type = :sensorType', { sensorType })
+      .andWhere('sd.time >= :startDate', { startDate })
+      .andWhere('sd.time <= :endDate', { endDate })
+      .getRawOne()
+
+    return {
+      average: parseFloat(result.average) || 0,
+      min: parseFloat(result.min) || 0,
+      max: parseFloat(result.max) || 0,
+      count: parseInt(result.count) || 0,
+      stddev: parseFloat(result.stddev) || 0
+    }
+  }
+
+  async getLatest(params: {
+    userId: string
+    sensorType?: string
+  }) {
+    const { userId, sensorType } = params
+
+    let query = this.sensorDataRepository
+      .createQueryBuilder('sd')
+      .leftJoinAndSelect('sd.device', 'device')
+      .where('sd.user_id = :userId', { userId })
+
+    if (sensorType) {
+      query = query.andWhere('sd.sensor_type = :sensorType', { sensorType })
+    }
+
+    // 각 device_id의 최신 데이터만 가져오기
+    query = query
+      .distinctOn(['sd.device_id'])
+      .orderBy('sd.device_id')
+      .addOrderBy('sd.time', 'DESC')
+
+    return await query.getMany()
+  }
+}
+```
+
+### 3. 리포트 생성 API
+
+#### PDF 리포트 생성
+```typescript
+// backend/src/modules/reports/report.service.ts
+import { Injectable } from '@nestjs/common'
+import PDFDocument from 'pdfkit'
+import { SensorDataService } from '../sensors/sensor-data.service'
+
+@Injectable()
+export class ReportService {
+  constructor(private sensorDataService: SensorDataService) {}
+
+  async generatePDFReport(params: {
+    userId: string
+    sensorType: string
+    startDate: Date
+    endDate: Date
+  }): Promise<Buffer> {
+    // 데이터 조회
+    const data = await this.sensorDataService.query({
+      ...params,
+      aggregation: 'daily'
+    })
+
+    const stats = await this.sensorDataService.getStatistics(params)
+
+    // PDF 생성
+    const doc = new PDFDocument()
+    const chunks: Buffer[] = []
+
+    doc.on('data', chunk => chunks.push(chunk))
+    doc.on('end', () => {})
+
+    // PDF 내용
+    doc.fontSize(20).text('센서 데이터 리포트', { align: 'center' })
+    doc.moveDown()
+
+    doc.fontSize(12)
+    doc.text(`센서 타입: ${params.sensorType}`)
+    doc.text(`기간: ${params.startDate.toLocaleDateString()} ~ ${params.endDate.toLocaleDateString()}`)
+    doc.moveDown()
+
+    // 통계
+    doc.fontSize(16).text('통계')
+    doc.fontSize(12)
+    doc.text(`평균: ${stats.average}`)
+    doc.text(`최소: ${stats.min}`)
+    doc.text(`최대: ${stats.max}`)
+    doc.text(`데이터 개수: ${stats.count}`)
+    doc.moveDown()
+
+    // 데이터 테이블
+    doc.fontSize(16).text('상세 데이터')
+    // ... 테이블 렌더링
+
+    doc.end()
+
+    return Buffer.concat(chunks)
+  }
+}
+```
+
+## 📡 프론트엔드 API 호출
+
+### 센서 데이터 조회
+```typescript
+// frontend/src/services/sensor-data.service.ts
+export class SensorDataService {
+  private apiUrl = '/api/sensor-data'
+
+  async query(params: {
+    sensorType: string
+    deviceId?: string
+    houseId?: string
+    startDate: string
+    endDate: string
+    aggregation: 'raw' | 'hourly' | 'daily'
+  }) {
+    const queryString = new URLSearchParams(params as any).toString()
+    const response = await fetch(`${this.apiUrl}?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('데이터 조회 실패')
+    }
+
+    return response.json()
+  }
+
+  async getStatistics(params: {
+    sensorType: string
+    startDate: string
+    endDate: string
+  }) {
+    const queryString = new URLSearchParams(params).toString()
+    const response = await fetch(`${this.apiUrl}/statistics?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('통계 조회 실패')
+    }
+
+    return response.json()
+  }
+
+  async getLatest(sensorType?: string) {
+    const url = sensorType
+      ? `${this.apiUrl}/latest?sensorType=${sensorType}`
+      : `${this.apiUrl}/latest`
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('최신 데이터 조회 실패')
+    }
+
+    return response.json()
+  }
+}
+```
+
+## 🔄 데이터 수집 플로우
+
+```
+1. Tuya 센서 → Tuya Cloud
+   ↓
+2. Tuya Cloud → Webhook (POST /webhooks/tuya)
+   ↓
+3. Webhook Controller → 시그니처 검증
+   ↓
+4. 센서 데이터 파싱 및 변환
+   ↓
+5. TimescaleDB에 저장 (sensor_data 테이블)
+   ↓
+6. Continuous Aggregates 자동 업데이트 (hourly, daily)
+   ↓
+7. WebSocket으로 프론트엔드에 실시간 브로드캐스트
+```
+
+## ⚡ 성능 최적화
+
+### 1. 인덱스 활용
+```sql
+CREATE INDEX idx_sensor_data_device_id ON sensor_data(device_id, time DESC);
+CREATE INDEX idx_sensor_data_user_id ON sensor_data(user_id, time DESC);
+CREATE INDEX idx_sensor_data_sensor_type ON sensor_data(sensor_type, time DESC);
+```
+
+### 2. 연속 집계 (Continuous Aggregates)
+- 자동으로 1시간, 1일 단위로 집계
+- 조회 시 원시 데이터 대신 집계 데이터 사용으로 성능 향상
+
+### 3. 데이터 압축
+```sql
+-- TimescaleDB 자동 압축 설정
+ALTER TABLE sensor_data SET (
+  timescaledb.compress,
+  timescaledb.compress_segmentby = 'device_id, sensor_type'
+);
+
+-- 7일 이상 된 데이터 자동 압축
+SELECT add_compression_policy('sensor_data', INTERVAL '7 days');
+```
+
+### 4. 보존 정책
+```sql
+-- 3개월 이상 된 원시 데이터 삭제
+SELECT add_retention_policy('sensor_data', INTERVAL '3 months');
+```
+
+## 📚 참고 자료
+
+- [TimescaleDB Documentation](https://docs.timescale.com/)
+- [TimescaleDB Continuous Aggregates](https://docs.timescale.com/timescaledb/latest/how-to-guides/continuous-aggregates/)
+- [Chart.js Documentation](https://www.chartjs.org/docs/latest/)
