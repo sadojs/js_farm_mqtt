@@ -14,7 +14,7 @@ export function useWebSocket() {
   function connect() {
     if (socket?.connected) return
 
-    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000'
+    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3100'
     socket = io(wsUrl, {
       auth: { token: authStore.accessToken },
       transports: ['websocket'],

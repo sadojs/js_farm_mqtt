@@ -8,7 +8,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
     credentials: true,
   });
 
@@ -20,8 +20,8 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3100;
   await app.listen(port);
-  console.log(`Smart Farm API running on port ${port}`);
+  console.log(`Smart Farm MQTT API running on port ${port}`);
 }
 bootstrap();
