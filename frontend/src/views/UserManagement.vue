@@ -100,7 +100,6 @@
             <th>이름</th>
             <th>소유자</th>
             <th>위치</th>
-            <th>라즈베리파이 IP</th>
             <th>상태</th>
             <th>작업</th>
           </tr>
@@ -111,7 +110,6 @@
             <td>{{ gw.name }}</td>
             <td>{{ getUserName(gw.userId) }}</td>
             <td>{{ gw.location || '-' }}</td>
-            <td>{{ gw.rpiIp || '-' }}</td>
             <td>
               <span class="status-badge" :class="gw.status === 'online' ? 'active' : 'inactive'">
                 {{ gw.status === 'online' ? '🟢 온라인' : '🔴 오프라인' }}
@@ -160,10 +158,6 @@
           <div class="form-group">
             <label>위치</label>
             <input v-model="gwForm.location" type="text" placeholder="예: 경기도 화성시..." class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>라즈베리파이 IP</label>
-            <input v-model="gwForm.rpiIp" type="text" placeholder="예: 192.168.0.50" class="form-input" />
           </div>
         </div>
         <div class="modal-footer">
@@ -226,7 +220,7 @@ const selectedUser = ref<User | null>(null)
 const gatewayList = ref<any[]>([])
 const showGatewayModal = ref(false)
 const editingGateway = ref<any>(null)
-const gwForm = ref({ gatewayId: '', name: '', userId: '', location: '', rpiIp: '' })
+const gwForm = ref({ gatewayId: '', name: '', userId: '', location: '' })
 
 const farmAdminUsers = computed(() =>
   users.value.filter(u => u.role === 'admin' || u.role === 'farm_admin')
@@ -265,7 +259,6 @@ function editGateway(gw: any) {
     name: gw.name,
     userId: gw.userId,
     location: gw.location || '',
-    rpiIp: gw.rpiIp || '',
   }
   showGatewayModal.value = true
 }
@@ -276,14 +269,12 @@ async function saveGateway() {
       await gatewayApi.update(editingGateway.value.id, {
         name: gwForm.value.name,
         location: gwForm.value.location || undefined,
-        rpiIp: gwForm.value.rpiIp || undefined,
       })
     } else {
       await gatewayApi.create({
         gatewayId: gwForm.value.gatewayId,
         name: gwForm.value.name,
         location: gwForm.value.location || undefined,
-        rpiIp: gwForm.value.rpiIp || undefined,
       })
     }
     showGatewayModal.value = false
