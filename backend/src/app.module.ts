@@ -30,7 +30,7 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
         type: 'postgres',
         url: config.get('DATABASE_URL', 'postgresql://smartfarm:smartfarm123@localhost:5432/smartfarm_mqtt'),
         autoLoadEntities: true,
-        synchronize: false, // 스키마는 schema.sql로 관리
+        synchronize: true, // 개발 환경에서 자동 스키마 생성
       }),
     }),
     AuthModule,

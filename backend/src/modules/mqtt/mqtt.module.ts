@@ -8,6 +8,7 @@ import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { Device } from '../devices/entities/device.entity';
 import { SensorsModule } from '../sensors/sensors.module';
 import { GatewayManagerModule } from '../gateway-manager/gateway-manager.module';
+import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GatewayManagerModule } from '../gateway-manager/gateway-manager.module'
     TypeOrmModule.forFeature([Device]),
     SensorsModule,
     GatewayManagerModule,
+    GatewayModule,
   ],
   providers: [MqttService, MqttSensorHandler, MqttDeviceHandler, MqttBridgeHandler],
   exports: [MqttService],
