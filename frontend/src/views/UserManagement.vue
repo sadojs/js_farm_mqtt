@@ -83,6 +83,98 @@
       </div>
     </div>
 
+    <!-- 게이트웨이 관리 섹션 -->
+    <header class="page-header" style="margin-top: 40px;">
+      <h2>📡 게이트웨이 관리</h2>
+      <p class="page-description">라즈베리파이 Zigbee 게이트웨이를 등록하고 관리하세요</p>
+      <button class="btn-primary" @click="showGatewayModal = true">
+        + 게이트웨이 등록
+      </button>
+    </header>
+
+    <div class="users-table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>게이트웨이 ID</th>
+            <th>이름</th>
+            <th>소유자</th>
+            <th>위치</th>
+            <th>라즈베리파이 IP</th>
+            <th>상태</th>
+            <th>작업</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="gw in gatewayList" :key="gw.id">
+            <td><code class="gateway-id">{{ gw.gatewayId }}</code></td>
+            <td>{{ gw.name }}</td>
+            <td>{{ getUserName(gw.userId) }}</td>
+            <td>{{ gw.location || '-' }}</td>
+            <td>{{ gw.rpiIp || '-' }}</td>
+            <td>
+              <span class="status-badge" :class="gw.status === 'online' ? 'active' : 'inactive'">
+                {{ gw.status === 'online' ? '🟢 온라인' : '🔴 오프라인' }}
+              </span>
+            </td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn-icon" title="편집" @click="editGateway(gw)">✏️</button>
+                <button class="btn-icon danger" title="삭제" @click="deleteGateway(gw)">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="gatewayList.length === 0" class="empty-state">
+        <p>등록된 게이트웨이가 없습니다. 라즈베리파이 setup.sh 실행 전에 먼저 등록하세요.</p>
+      </div>
+    </div>
+
+    <!-- 게이트웨이 등록/수정 모달 -->
+    <div v-if="showGatewayModal" class="modal-overlay" @click.self="showGatewayModal = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ editingGateway ? '게이트웨이 수정' : '게이트웨이 등록' }}</h3>
+          <button class="modal-close" @click="showGatewayModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>게이트웨이 ID *</label>
+            <input v-model="gwForm.gatewayId" type="text" placeholder="예: farm01" class="form-input" :disabled="!!editingGateway" />
+            <p class="help-text">라즈베리파이 setup.sh에서 입력할 값과 동일하게 설정하세요</p>
+          </div>
+          <div class="form-group">
+            <label>이름 *</label>
+            <input v-model="gwForm.name" type="text" placeholder="예: 석문리 하우스" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>소유자 *</label>
+            <select v-model="gwForm.userId" class="form-input">
+              <option value="" disabled>소유자를 선택하세요</option>
+              <option v-for="user in farmAdminUsers" :key="user.id" :value="user.id">
+                {{ user.name }} ({{ user.email }})
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>위치</label>
+            <input v-model="gwForm.location" type="text" placeholder="예: 경기도 화성시..." class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>라즈베리파이 IP</label>
+            <input v-model="gwForm.rpiIp" type="text" placeholder="예: 192.168.0.50" class="form-input" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="showGatewayModal = false">취소</button>
+          <button class="btn-primary" @click="saveGateway" :disabled="!gwForm.gatewayId || !gwForm.name || !gwForm.userId">
+            {{ editingGateway ? '수정' : '등록' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 사용자 추가/수정 모달 -->
     <UserFormModal
       :show="showUserModal"
@@ -95,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import { userApi } from '../api/user.api'
 import { gatewayApi } from '../api/gateway.api'
@@ -128,8 +220,17 @@ const users = ref<User[]>([])
 const loading = ref(false)
 
 const showUserModal = ref(false)
-const showProjectModal = ref(false)
 const selectedUser = ref<User | null>(null)
+
+// 게이트웨이 관리
+const gatewayList = ref<any[]>([])
+const showGatewayModal = ref(false)
+const editingGateway = ref<any>(null)
+const gwForm = ref({ gatewayId: '', name: '', userId: '', location: '', rpiIp: '' })
+
+const farmAdminUsers = computed(() =>
+  users.value.filter(u => u.role === 'admin' || u.role === 'farm_admin')
+)
 
 async function fetchUsers() {
   loading.value = true
@@ -143,18 +244,75 @@ async function fetchUsers() {
   }
 }
 
+async function fetchGateways() {
+  try {
+    const { data } = await gatewayApi.getAll()
+    gatewayList.value = data as any[]
+  } catch {
+    gatewayList.value = []
+  }
+}
+
+function getUserName(userId: string): string {
+  const user = users.value.find(u => u.id === userId)
+  return user ? user.name : userId
+}
+
+function editGateway(gw: any) {
+  editingGateway.value = gw
+  gwForm.value = {
+    gatewayId: gw.gatewayId,
+    name: gw.name,
+    userId: gw.userId,
+    location: gw.location || '',
+    rpiIp: gw.rpiIp || '',
+  }
+  showGatewayModal.value = true
+}
+
+async function saveGateway() {
+  try {
+    if (editingGateway.value) {
+      await gatewayApi.update(editingGateway.value.id, {
+        name: gwForm.value.name,
+        location: gwForm.value.location || undefined,
+        rpiIp: gwForm.value.rpiIp || undefined,
+      })
+    } else {
+      await gatewayApi.create({
+        gatewayId: gwForm.value.gatewayId,
+        name: gwForm.value.name,
+        location: gwForm.value.location || undefined,
+        rpiIp: gwForm.value.rpiIp || undefined,
+      })
+    }
+    showGatewayModal.value = false
+    editingGateway.value = null
+    gwForm.value = { gatewayId: '', name: '', userId: '', location: '', rpiIp: '' }
+    await fetchGateways()
+  } catch (err: any) {
+    alert(err.response?.data?.message || '게이트웨이 저장에 실패했습니다.')
+  }
+}
+
+async function deleteGateway(gw: any) {
+  if (!confirm(`게이트웨이 "${gw.name}" (${gw.gatewayId})를 삭제하시겠습니까?`)) return
+  try {
+    await gatewayApi.remove(gw.id)
+    await fetchGateways()
+  } catch {
+    alert('게이트웨이 삭제에 실패했습니다.')
+  }
+}
+
 onMounted(() => {
   fetchUsers()
+  fetchGateways()
 })
 
 const editUser = (user: User) => {
   selectedUser.value = { ...user }
   showUserModal.value = true
-}
-
-const assignProject = (user: User) => {
-  selectedUser.value = user
-  showProjectModal.value = true
 }
 
 const deleteUser = async (user: User) => {
@@ -419,6 +577,111 @@ const saveUser = async (userData: any) => {
 .empty-state p {
   color: var(--text-muted);
   font-size: 16px;
+}
+
+.gateway-id {
+  background: var(--bg-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: var(--bg-card, #fff);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-light, #eee);
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-light, #eee);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-input, #ddd);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--bg-input, #fff);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+}
+
+.help-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input, #ddd);
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 @media (max-width: 1024px) {
