@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device } from '../devices/entities/device.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { SensorsService } from '../sensors/sensors.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { SensorPayload } from './mqtt.types';
@@ -23,6 +24,7 @@ export class MqttSensorHandler {
 
   constructor(
     @InjectRepository(Device) private devicesRepo: Repository<Device>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private sensorsService: SensorsService,
     private eventsGateway: EventsGateway,
   ) {}
@@ -35,8 +37,14 @@ export class MqttSensorHandler {
       return; // 파싱 실패 무시
     }
 
+    // gateway_id로 Gateway 조회 → device를 gateway + friendlyName으로 조회
+    const gateway = await this.gatewayRepo.findOne({ where: { gatewayId } });
     const device = await this.devicesRepo.findOne({
-      where: { friendlyName: deviceName, deviceType: 'sensor' },
+      where: {
+        friendlyName: deviceName,
+        deviceType: 'sensor',
+        ...(gateway && { gatewayId: gateway.id }),
+      },
     });
     if (!device) return;
 

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device } from '../devices/entities/device.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { EventsGateway } from '../gateway/events.gateway';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class MqttDeviceHandler {
 
   constructor(
     @InjectRepository(Device) private devicesRepo: Repository<Device>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private eventsGateway: EventsGateway,
   ) {}
 
@@ -22,8 +24,12 @@ export class MqttDeviceHandler {
     }
 
     const online = data.state === 'online';
+    const gateway = await this.gatewayRepo.findOne({ where: { gatewayId } });
     const device = await this.devicesRepo.findOne({
-      where: { friendlyName: deviceName },
+      where: {
+        friendlyName: deviceName,
+        ...(gateway && { gatewayId: gateway.id }),
+      },
     });
     if (!device) return;
 
