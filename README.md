@@ -180,17 +180,6 @@ docker compose logs -f backend
 docker compose down
 ```
 
-## 기존 프로젝트와의 관계
-
-| | smart-farm-platform | smart-farm-mqtt |
-|---|---|---|
-| 레포 | sadojs/js_farm | sadojs/js_farm_mqtt |
-| 통신 | Tuya Cloud API (HTTP) | Zigbee/MQTT (로컬) |
-| Backend 포트 | 3000 | 3100 |
-| Frontend 포트 | 5173 | 5174 |
-| DB | smartfarm | smartfarm_mqtt |
-| 상태 | 라이브 운영 중 | 개발 중 |
-
 ## 라이선스
 
 MIT License
