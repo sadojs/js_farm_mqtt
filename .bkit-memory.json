@@ -15,7 +15,7 @@
   },
   "pdca": {
     "currentFeature": "mqtt-integration",
-    "phase": "plan",
+    "phase": "design",
     "matchRate": 0,
     "iterationCount": 0,
     "history": [
