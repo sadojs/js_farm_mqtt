@@ -298,7 +298,7 @@ async function interlockControl(group: OpenerGroup, action: 'open' | 'close') {
       const offResult = await deviceStore.controlDevice(oppositeDevice.id, [{ code: 'switch_1', value: false }])
       if (!offResult.success) {
         notify.remove(loadingId)
-        notify.error('제어 실패', translateTuyaError(offResult.msg))
+        notify.error('제어 실패', offResult.msg || '장비 제어에 실패했습니다')
         return
       }
       oppositeDevice.switchState = false
@@ -579,18 +579,7 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
   }
 }
 
-const handleTuyaSync = async () => {
-  syncing.value = true
-  try {
-    await deviceStore.fetchDevices()
-    await Promise.all([
-      deviceStore.fetchAllActuatorStatuses(),
-      deviceStore.fetchAllSensorStatuses(),
-    ])
-  } finally {
-    syncing.value = false
-  }
-}
+
 </script>
 
 <style scoped>

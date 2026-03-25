@@ -6,9 +6,7 @@
         <p class="page-description">장비를 그룹으로 묶어 관리합니다</p>
       </div>
       <div class="header-actions">
-        <button class="btn-outline" @click="handleTuyaSync" :disabled="syncing">
-          {{ syncing ? '동기화 중...' : '센서 동기화' }}
-        </button>
+        <!-- MQTT에서는 실시간 동기화됨 -->
         <button v-if="!isFarmUser" class="btn-primary" @click="showGroupCreationModal = true">+ 그룹 추가</button>
       </div>
     </header>
@@ -763,17 +761,6 @@ const onRuleEdited = () => {
   automationStore.fetchRules()
 }
 
-const handleTuyaSync = async () => {
-  syncing.value = true
-  try {
-    await deviceStore.fetchDevices()
-    await Promise.all([
-      deviceStore.fetchAllActuatorStatuses(),
-      deviceStore.fetchAllSensorStatuses(),
-    ])
-  } finally {
-    syncing.value = false
-  }
 }
 
 const unassignedDevices = computed(() => {

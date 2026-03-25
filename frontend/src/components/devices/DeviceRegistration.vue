@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <!-- Step 2: Tuya 기기 선택 -->
+        <!-- Step 2: Zigbee 장비 선택 -->
         <div class="step-section" v-if="step === 2">
           <div class="step-header">
             <span class="step-number">2</span>
