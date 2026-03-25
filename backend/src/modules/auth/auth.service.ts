@@ -4,7 +4,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
-import { TuyaProject } from '../users/entities/tuya-project.entity';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -13,8 +12,6 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
-    @InjectRepository(TuyaProject)
-    private tuyaRepo: Repository<TuyaProject>,
     private jwtService: JwtService,
   ) {}
 
@@ -33,8 +30,6 @@ export class AuthService {
       throw new UnauthorizedException('비활성화된 계정입니다.');
     }
 
-    const tuyaProject = await this.tuyaRepo.findOne({ where: { userId: user.id } });
-
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -52,15 +47,6 @@ export class AuthService {
         role: user.role,
         parentUserId: user.parentUserId || null,
         address: user.address,
-        tuyaProject: tuyaProject
-          ? {
-              name: tuyaProject.name,
-              accessId: tuyaProject.accessId,
-              endpoint: tuyaProject.endpoint,
-              projectId: tuyaProject.projectId,
-              enabled: tuyaProject.enabled,
-            }
-          : null,
       },
     };
   }
@@ -87,8 +73,6 @@ export class AuthService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
 
-    const tuyaProject = await this.tuyaRepo.findOne({ where: { userId: user.id } });
-
     return {
       id: user.id,
       email: user.email,
@@ -96,15 +80,6 @@ export class AuthService {
       role: user.role,
       parentUserId: user.parentUserId || null,
       address: user.address,
-      tuyaProject: tuyaProject
-        ? {
-            name: tuyaProject.name,
-            accessId: tuyaProject.accessId,
-            endpoint: tuyaProject.endpoint,
-            projectId: tuyaProject.projectId,
-            enabled: tuyaProject.enabled,
-          }
-        : null,
     };
   }
 }

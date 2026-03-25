@@ -5,8 +5,8 @@ import { Repository } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { AutomationLog } from './entities/automation-log.entity';
 import { Device } from '../devices/entities/device.entity';
-import { TuyaProject } from '../users/entities/tuya-project.entity';
-import { TuyaService } from '../integrations/tuya/tuya.service';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { MqttService } from '../mqtt/mqtt.service';
 import { EventsGateway } from '../gateway/events.gateway';
 
 interface ScheduledAction {
@@ -20,7 +20,8 @@ interface ScheduledAction {
 interface ActiveIrrigation {
   ruleId: string;
   userId: string;
-  deviceTuyaId: string;
+  gatewayId: string;
+  friendlyName: string;
   startedAt: number;
   timers: ReturnType<typeof setTimeout>[];
 }
@@ -45,9 +46,9 @@ export class IrrigationSchedulerService {
     private readonly logsRepo: Repository<AutomationLog>,
     @InjectRepository(Device)
     private readonly devicesRepo: Repository<Device>,
-    @InjectRepository(TuyaProject)
-    private readonly tuyaRepo: Repository<TuyaProject>,
-    private readonly tuyaService: TuyaService,
+    @InjectRepository(Gateway)
+    private readonly gatewayRepo: Repository<Gateway>,
+    private readonly mqttService: MqttService,
     private readonly eventsGateway: EventsGateway,
   ) {}
 
@@ -97,19 +98,16 @@ export class IrrigationSchedulerService {
       return;
     }
 
-    const credentials = await this.tuyaRepo.findOne({
-      where: { userId: rule.userId, enabled: true },
-    });
-    if (!credentials) {
-      this.logger.warn(`관수 룰 ${rule.id}: Tuya 프로젝트 없음`);
+    if (!device.gatewayId || !device.friendlyName) {
+      this.logger.warn(`관수 룰 ${rule.id}: 장비에 게이트웨이 또는 friendlyName 없음`);
       return;
     }
 
-    const tuyaCreds = {
-      accessId: credentials.accessId,
-      accessSecret: credentials.accessSecretEncrypted,
-      endpoint: credentials.endpoint,
-    };
+    const gateway = await this.gatewayRepo.findOne({ where: { id: device.gatewayId } });
+    if (!gateway) {
+      this.logger.warn(`관수 룰 ${rule.id}: 게이트웨이를 찾을 수 없음`);
+      return;
+    }
 
     // 타임라인 생성
     const timeline = this.buildTimeline(conditions);
@@ -120,7 +118,8 @@ export class IrrigationSchedulerService {
     const active: ActiveIrrigation = {
       ruleId: rule.id,
       userId: rule.userId,
-      deviceTuyaId: device.tuyaDeviceId,
+      gatewayId: gateway.gatewayId,
+      friendlyName: device.friendlyName,
       startedAt: Date.now(),
       timers,
     };
@@ -130,9 +129,9 @@ export class IrrigationSchedulerService {
       const timer = setTimeout(async () => {
         try {
           this.logger.log(`관수 실행: ${action.label} (${action.switchCode}=${action.value})`);
-          await this.tuyaService.sendDeviceCommand(tuyaCreds, device.tuyaDeviceId, [
-            { code: action.switchCode, value: action.value },
-          ]);
+          await this.mqttService.controlDevice(active.gatewayId, active.friendlyName, {
+            [action.switchCode]: action.value,
+          });
         } catch (err: any) {
           this.logger.error(`관수 명령 실패: ${action.label} - ${err.message}`);
         }

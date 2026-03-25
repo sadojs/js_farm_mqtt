@@ -50,26 +50,3 @@ export class UpdateUserDto {
   @MinLength(6)
   password?: string;
 }
-
-export class UpdateTuyaProjectDto {
-  @IsString()
-  name: string;
-
-  @IsString()
-  accessId: string;
-
-  @IsOptional()
-  @IsString()
-  accessSecret?: string;
-
-  @IsString()
-  endpoint: string;
-
-  @IsOptional()
-  @IsString()
-  projectId?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  enabled?: boolean;
-}

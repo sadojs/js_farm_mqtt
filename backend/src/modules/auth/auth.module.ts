@@ -7,11 +7,10 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User } from '../users/entities/user.entity';
-import { TuyaProject } from '../users/entities/tuya-project.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, TuyaProject]),
+    TypeOrmModule.forFeature([User]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

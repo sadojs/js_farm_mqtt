@@ -10,7 +10,8 @@ import { SensorsModule } from './modules/sensors/sensors.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
-import { TuyaModule } from './modules/integrations/tuya/tuya.module';
+import { MqttModule } from './modules/mqtt/mqtt.module';
+import { GatewayManagerModule } from './modules/gateway-manager/gateway-manager.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { HarvestModule } from './modules/harvest/harvest.module';
@@ -27,7 +28,7 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        url: config.get('DATABASE_URL', 'postgresql://smartfarm:smartfarm123@localhost:5432/smartfarm'),
+        url: config.get('DATABASE_URL', 'postgresql://smartfarm:smartfarm123@localhost:5432/smartfarm_mqtt'),
         autoLoadEntities: true,
         synchronize: false, // 스키마는 schema.sql로 관리
       }),
@@ -40,7 +41,8 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
     AutomationModule,
     ReportsModule,
     GatewayModule,
-    TuyaModule,
+    MqttModule,
+    GatewayManagerModule,
     DashboardModule,
     WeatherModule,
     HarvestModule,

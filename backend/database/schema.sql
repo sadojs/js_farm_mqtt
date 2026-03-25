@@ -27,24 +27,24 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_parent ON users(parent_user_id);
 
 -- ==========================================
--- 2. Tuya 프로젝트 설정
+-- 2. Zigbee Gateway (라즈베리파이)
 -- ==========================================
 
-CREATE TABLE tuya_projects (
+CREATE TABLE gateways (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  access_id VARCHAR(255) NOT NULL,
-  access_secret_encrypted TEXT NOT NULL, -- AES-256 암호화
-  endpoint VARCHAR(255) NOT NULL,
-  project_id VARCHAR(255),
-  enabled BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id)
+  gateway_id VARCHAR(50) NOT NULL UNIQUE,       -- MQTT topic prefix: farm/{이값}/z2m
+  name VARCHAR(100) NOT NULL,                   -- "석문리 하우스", "화성 농장"
+  location VARCHAR(200),
+  rpi_ip VARCHAR(45),                           -- 라즈베리파이 IP (관리용)
+  status VARCHAR(20) DEFAULT 'offline',
+  last_seen TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tuya_projects_user_id ON tuya_projects(user_id);
+CREATE INDEX idx_gateways_user ON gateways(user_id);
+CREATE INDEX idx_gateways_gateway ON gateways(gateway_id);
 
 -- ==========================================
 -- 3. 하우스 그룹
@@ -92,22 +92,29 @@ CREATE TABLE devices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   house_id UUID REFERENCES houses(id) ON DELETE SET NULL,
-  tuya_device_id VARCHAR(255) NOT NULL, -- Tuya Cloud의 실제 장비 ID
+  gateway_id UUID REFERENCES gateways(id) ON DELETE SET NULL,
+  zigbee_ieee VARCHAR(255) NOT NULL,            -- Zigbee IEEE 802.15.4 주소
+  friendly_name VARCHAR(100),                   -- Zigbee2MQTT 표시명
+  zigbee_model VARCHAR(100),                    -- 장비 모델 (e.g. TS0201)
   name VARCHAR(255) NOT NULL,
-  category VARCHAR(100) NOT NULL, -- '온도 센서', '환풍기', '개폐기' 등
-  device_type VARCHAR(50) NOT NULL, -- 'sensor', 'actuator'
-  equipment_type VARCHAR(50), -- 'opener', 'fan', 'irrigation', 'other' (액추에이터용)
+  category VARCHAR(100) NOT NULL,
+  device_type VARCHAR(50) NOT NULL,             -- 'sensor', 'actuator'
+  equipment_type VARCHAR(50),                   -- 'fan', 'irrigation', 'opener_open', 'opener_close', 'other'
   icon VARCHAR(50),
+  paired_device_id UUID,
+  opener_group_name VARCHAR(200),
   online BOOLEAN DEFAULT false,
-  last_seen TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, tuya_device_id)
+  last_seen TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, zigbee_ieee)
 );
 
 CREATE INDEX idx_devices_user_id ON devices(user_id);
 CREATE INDEX idx_devices_house_id ON devices(house_id);
-CREATE INDEX idx_devices_tuya_device_id ON devices(tuya_device_id);
+CREATE INDEX idx_devices_gateway ON devices(gateway_id);
+CREATE INDEX idx_devices_zigbee_ieee ON devices(zigbee_ieee);
+CREATE INDEX idx_devices_friendly_name ON devices(friendly_name);
 CREATE INDEX idx_devices_category ON devices(category);
 
 -- ==========================================

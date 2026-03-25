@@ -15,9 +15,7 @@ export class TemperatureSensor extends BaseSensor {
    * Tuya 디바이스에서 온도 데이터 읽기
    */
   async readRawValue(): Promise<number> {
-    // TODO: Tuya API 연동하여 실제 디바이스에서 데이터 읽기
-    // const tuyaService = TuyaService.getInstance();
-    // return await tuyaService.getDeviceStatus(this.config.deviceId, 'temperature');
+    // MQTT subscribe를 통해 센서 데이터 수신 (MqttSensorHandler에서 처리)
 
     // 임시: 시뮬레이션 데이터
     return 20 + Math.random() * 10; // 20-30℃

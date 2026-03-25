@@ -56,7 +56,7 @@ export const ACTION_GUIDES: Record<string, string[]> = {
   no_data: [
     '배터리/전원 상태를 확인하세요',
     '게이트웨이 연결 상태를 확인하세요',
-    'Tuya 앱에서 장비 온라인 상태를 확인하세요',
+    'Zigbee2MQTT에서 장비 온라인 상태를 확인하세요',
   ],
   flatline: [
     '센서 프로브의 접촉 상태를 확인하세요',

@@ -14,8 +14,17 @@ export class Device {
   @Column({ name: 'house_id', nullable: true })
   houseId: string;
 
-  @Column({ name: 'tuya_device_id' })
-  tuyaDeviceId: string;
+  @Column({ name: 'gateway_id', nullable: true })
+  gatewayId: string;
+
+  @Column({ name: 'zigbee_ieee' })
+  zigbeeIeee: string;
+
+  @Column({ name: 'friendly_name', nullable: true })
+  friendlyName: string;
+
+  @Column({ name: 'zigbee_model', nullable: true })
+  zigbeeModel: string;
 
   @Column()
   name: string;
