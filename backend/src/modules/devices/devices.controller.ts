@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { DevicesService } from './devices.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -23,6 +23,20 @@ export class DevicesController {
     @Body() body: { devices: any[]; houseId?: string },
   ) {
     return this.devicesService.registerBatch(this.getEffectiveUserId(user), body.devices, body.houseId);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.devicesService.findOneByUser(id, this.getEffectiveUserId(user));
+  }
+
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: Partial<{ name: string; category: string; equipmentType: string; icon: string }>,
+  ) {
+    return this.devicesService.updateByUser(id, this.getEffectiveUserId(user), body);
   }
 
   @Get(':id/status')

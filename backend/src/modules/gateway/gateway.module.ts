@@ -9,7 +9,7 @@ import { EventsGateway } from './events.gateway';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET', 'smart-farm-secret-key'),
+        secret: config.get('JWT_SECRET', 'smart-farm-jwt-secret-change-me'),
         signOptions: { expiresIn: '1h' },
       }),
     }),

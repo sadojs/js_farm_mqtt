@@ -41,6 +41,22 @@ export class DevicesService {
     });
   }
 
+  async findOneByUser(id: string, userId: string) {
+    const device = await this.devicesRepo.findOne({ where: { id, userId } });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    return device;
+  }
+
+  async updateByUser(id: string, userId: string, data: Partial<{ name: string; category: string; equipmentType: string; icon: string }>) {
+    const device = await this.devicesRepo.findOne({ where: { id, userId } });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    if (data.name !== undefined) device.name = data.name;
+    if (data.category !== undefined) device.category = data.category;
+    if (data.equipmentType !== undefined) device.equipmentType = data.equipmentType as any;
+    if (data.icon !== undefined) device.icon = data.icon;
+    return this.devicesRepo.save(device);
+  }
+
   async registerBatch(userId: string, devices: {
     zigbeeIeee: string; friendlyName?: string; zigbeeModel?: string;
     name: string; category: string; deviceType: string;

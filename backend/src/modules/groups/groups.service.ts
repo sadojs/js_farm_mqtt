@@ -1,10 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { HouseGroup } from './entities/house-group.entity';
 import { House } from './entities/house.entity';
 import { Device } from '../devices/entities/device.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { MqttService } from '../mqtt/mqtt.service';
 
 @Injectable()
 export class GroupsService {
@@ -13,6 +15,8 @@ export class GroupsService {
     @InjectRepository(House) private housesRepo: Repository<House>,
     @InjectRepository(Device) private devicesRepo: Repository<Device>,
     @InjectRepository(AutomationRule) private rulesRepo: Repository<AutomationRule>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
+    @Optional() @Inject(MqttService) private mqttService?: MqttService,
   ) {}
 
   async findAllGroups(userId: string) {
@@ -123,6 +127,42 @@ export class GroupsService {
     if (!house) throw new NotFoundException();
     await this.housesRepo.remove(house);
     return { message: '삭제되었습니다.' };
+  }
+
+  /** 그룹 내 actuator 장비 일괄 제어 */
+  async controlGroup(groupId: string, userId: string, commands: { code: string; value: any }[]) {
+    const group = await this.groupsRepo.findOne({
+      where: { id: groupId, userId },
+      relations: ['devices'],
+    });
+    if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
+
+    const actuators = (group.devices || []).filter(d => d.deviceType === 'actuator');
+    const results: { deviceId: string; name: string; success: boolean; error?: string }[] = [];
+
+    for (const device of actuators) {
+      try {
+        if (!device.gatewayId || !device.friendlyName || !this.mqttService) {
+          results.push({ deviceId: device.id, name: device.name, success: false, error: 'MQTT 미연결 또는 장비 정보 없음' });
+          continue;
+        }
+        const gateway = await this.gatewayRepo.findOne({ where: { id: device.gatewayId } });
+        if (!gateway) {
+          results.push({ deviceId: device.id, name: device.name, success: false, error: '게이트웨이 없음' });
+          continue;
+        }
+        const command: Record<string, any> = {};
+        for (const cmd of commands) {
+          command[cmd.code] = cmd.value;
+        }
+        await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, command);
+        results.push({ deviceId: device.id, name: device.name, success: true });
+      } catch (err: any) {
+        results.push({ deviceId: device.id, name: device.name, success: false, error: err.message });
+      }
+    }
+
+    return { groupId, controlled: results.length, results };
   }
 
   async assignDevices(groupId: string, userId: string, deviceIds: string[]) {

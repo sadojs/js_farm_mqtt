@@ -57,6 +57,15 @@ export class GroupsController {
     return this.groupsService.removeHouse(id, this.getEffectiveUserId(user));
   }
 
+  @Post(':id/control')
+  controlGroup(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { commands: { code: string; value: any }[] },
+  ) {
+    return this.groupsService.controlGroup(id, this.getEffectiveUserId(user), body.commands);
+  }
+
   @Post(':id/devices')
   assignDevices(
     @Param('id') id: string,
