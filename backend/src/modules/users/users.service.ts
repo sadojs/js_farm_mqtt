@@ -4,15 +4,20 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { GatewayManagerService } from '../gateway-manager/gateway-manager.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private usersRepo: Repository<User>,
+    private gatewayService: GatewayManagerService,
   ) {}
 
   async findAll() {
     const users = await this.usersRepo.find({ order: { createdAt: 'DESC' } });
+    const userIds = users.map(u => u.id);
+    const allGateways = await this.gatewayService.findAllByUserIds(userIds);
+
     const result: any[] = [];
     for (const user of users) {
       let parentUserName: string | null = null;
@@ -20,9 +25,13 @@ export class UsersService {
         const parent = await this.usersRepo.findOne({ where: { id: user.parentUserId } });
         parentUserName = parent?.name || null;
       }
+      const gateways = allGateways
+        .filter(gw => gw.userId === user.id)
+        .map(gw => ({ id: gw.id, gatewayId: gw.gatewayId, name: gw.name, status: gw.status }));
       result.push({
         ...this.sanitize(user),
         parentUserName,
+        gateways,
       });
     }
     return result;

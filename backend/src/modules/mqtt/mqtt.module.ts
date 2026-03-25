@@ -10,6 +10,7 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { SensorsModule } from '../sensors/sensors.module';
 import { GatewayManagerModule } from '../gateway-manager/gateway-manager.module';
 import { GatewayModule } from '../gateway/gateway.module';
+import { ConfigDeployModule } from '../config-deploy/config-deploy.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { GatewayModule } from '../gateway/gateway.module';
     SensorsModule,
     forwardRef(() => GatewayManagerModule),
     GatewayModule,
+    forwardRef(() => ConfigDeployModule),
   ],
   providers: [MqttService, MqttSensorHandler, MqttDeviceHandler, MqttBridgeHandler],
   exports: [MqttService],

@@ -18,6 +18,7 @@ import { HarvestModule } from './modules/harvest/harvest.module';
 import { SensorAlertsModule } from './modules/sensor-alerts/sensor-alerts.module';
 import { HarvestRecModule } from './modules/harvest-rec/harvest-rec.module';
 import { EnvConfigModule } from './modules/env-config/env-config.module';
+import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
     SensorAlertsModule,
     HarvestRecModule,
     EnvConfigModule,
+    ConfigDeployModule,
   ],
 })
 export class AppModule {}

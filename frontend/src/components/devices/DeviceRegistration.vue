@@ -51,8 +51,16 @@
           <div v-if="noDevicesFound" class="empty-devices-box">
             <div class="empty-icon">📭</div>
             <h3>페어링된 장비가 없습니다</h3>
-            <p>Zigbee2MQTT에 페어링된 장비가 없습니다.</p>
-            <p class="help-text">Zigbee2MQTT 웹UI에서 장비를 먼저 페어링한 후 다시 시도해주세요.</p>
+            <p>선택한 게이트웨이에 페어링된 Zigbee 장비가 없습니다.</p>
+            <p class="help-text">아래 버튼으로 페어링 모드를 켠 후, Zigbee 장비의 페어링 버튼을 눌러주세요.</p>
+            <button
+              class="btn-primary btn-sm"
+              style="margin-top: 0.75rem;"
+              :disabled="permitJoining"
+              @click="startPermitJoin"
+            >
+              {{ permitJoining ? '📡 페어링 대기 중... (240초)' : '📡 페어링 모드 시작' }}
+            </button>
           </div>
         </div>
 
@@ -394,6 +402,22 @@ const loading = ref(false)
 const searchQuery = ref('')
 const errorMessage = ref('')
 const noDevicesFound = ref(false)
+const permitJoining = ref(false)
+
+/** 페어링 모드 원격 시작 (MQTT를 통해 라즈베리파이에 전달) */
+const startPermitJoin = async () => {
+  if (!selectedGatewayId.value) return
+  permitJoining.value = true
+  try {
+    await apiClient.post(`/gateways/${selectedGatewayId.value}/permit-join`, { enable: true })
+    // 240초 후 자동 해제
+    setTimeout(() => {
+      permitJoining.value = false
+    }, 240_000)
+  } catch {
+    permitJoining.value = false
+  }
+}
 
 /** 게이트웨이 관련 */
 const gateways = ref<any[]>([])

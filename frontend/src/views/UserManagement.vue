@@ -45,9 +45,11 @@
               <span class="address-text">{{ user.address || '-' }}</span>
             </td>
             <td>
-              <span v-if="user.gateways?.length" class="project-badge">
-                {{ user.gateways.length }}개 게이트웨이
-              </span>
+              <div v-if="user.gateways?.length" class="gateway-list">
+                <span v-for="gw in user.gateways" :key="gw.id" class="gateway-tag" :class="gw.status">
+                  {{ gw.gatewayId }}
+                </span>
+              </div>
               <span v-else class="text-muted">미등록</span>
             </td>
             <td>{{ user.createdAt }}</td>
@@ -87,7 +89,7 @@
     <header class="page-header" style="margin-top: 40px;">
       <h2>📡 게이트웨이 관리</h2>
       <p class="page-description">라즈베리파이 Zigbee 게이트웨이를 등록하고 관리하세요</p>
-      <button class="btn-primary" @click="showGatewayModal = true">
+      <button class="btn-primary" @click="openNewGatewayModal">
         + 게이트웨이 등록
       </button>
     </header>
@@ -130,7 +132,7 @@
     </div>
 
     <!-- 게이트웨이 등록/수정 모달 -->
-    <div v-if="showGatewayModal" class="modal-overlay" @click.self="showGatewayModal = false">
+    <div v-if="showGatewayModal" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
           <h3>{{ editingGateway ? '게이트웨이 수정' : '게이트웨이 등록' }}</h3>
@@ -247,9 +249,20 @@ async function fetchGateways() {
   }
 }
 
+/** 모든 데이터 새로고침 */
+async function refreshAll() {
+  await Promise.all([fetchUsers(), fetchGateways()])
+}
+
 function getUserName(userId: string): string {
   const user = users.value.find(u => u.id === userId)
   return user ? user.name : userId
+}
+
+function openNewGatewayModal() {
+  editingGateway.value = null
+  gwForm.value = { gatewayId: '', name: '', userId: '', location: '' }
+  showGatewayModal.value = true
 }
 
 function editGateway(gw: any) {
@@ -269,18 +282,20 @@ async function saveGateway() {
       await gatewayApi.update(editingGateway.value.id, {
         name: gwForm.value.name,
         location: gwForm.value.location || undefined,
+        userId: gwForm.value.userId,
       })
     } else {
       await gatewayApi.create({
         gatewayId: gwForm.value.gatewayId,
         name: gwForm.value.name,
         location: gwForm.value.location || undefined,
+        userId: gwForm.value.userId,
       })
     }
     showGatewayModal.value = false
     editingGateway.value = null
-    gwForm.value = { gatewayId: '', name: '', userId: '', location: '', rpiIp: '' }
-    await fetchGateways()
+    gwForm.value = { gatewayId: '', name: '', userId: '', location: '' }
+    await refreshAll()
   } catch (err: any) {
     alert(err.response?.data?.message || '게이트웨이 저장에 실패했습니다.')
   }
@@ -290,15 +305,14 @@ async function deleteGateway(gw: any) {
   if (!confirm(`게이트웨이 "${gw.name}" (${gw.gatewayId})를 삭제하시겠습니까?`)) return
   try {
     await gatewayApi.remove(gw.id)
-    await fetchGateways()
+    await refreshAll()
   } catch {
     alert('게이트웨이 삭제에 실패했습니다.')
   }
 }
 
 onMounted(() => {
-  fetchUsers()
-  fetchGateways()
+  refreshAll()
 })
 
 const editUser = (user: User) => {
@@ -339,7 +353,7 @@ const saveUser = async (userData: any) => {
         await userApi.update(selectedUser.value.id, payload)
       }
 
-      await fetchUsers()
+      await refreshAll()
     } else {
       // 신규 추가
       const { data: newUser } = await userApi.create({
@@ -351,7 +365,7 @@ const saveUser = async (userData: any) => {
         parentUserId: userData.parentUserId,
       })
 
-      await fetchUsers()
+      await refreshAll()
     }
     closeUserModal()
   } catch (err: any) {
@@ -510,6 +524,26 @@ const saveUser = async (userData: any) => {
   font-weight: 500;
   font-family: monospace;
   white-space: nowrap;
+}
+
+.gateway-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gateway-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.gateway-tag.offline {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .text-muted {

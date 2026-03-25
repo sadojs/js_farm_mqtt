@@ -14,9 +14,9 @@
     }
   },
   "pdca": {
-    "currentFeature": "mqtt-integration",
-    "phase": "check",
-    "matchRate": 90,
+    "currentFeature": "config-deploy",
+    "phase": "do",
+    "matchRate": 0,
     "iterationCount": 0,
     "history": [
       {

@@ -52,12 +52,12 @@ log_info "MQTT 토픽: farm/$GATEWAY_ID/z2m/#"
 echo ""
 
 # ---- Step 1: 시스템 업데이트 ----
-log_info "Step 1/4: 시스템 업데이트..."
+log_info "Step 1/5: 시스템 업데이트..."
 apt-get update -qq
 apt-get upgrade -y -qq
 
 # ---- Step 2: Node.js 설치 ----
-log_info "Step 2/4: Node.js 20.x 설치..."
+log_info "Step 2/5: Node.js 20.x 설치..."
 if ! command -v node &> /dev/null || [[ $(node -v | cut -d. -f1 | tr -d v) -lt 18 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   apt-get install -y -qq nodejs
@@ -67,7 +67,7 @@ else
 fi
 
 # ---- Step 3: Zigbee2MQTT 설치 ----
-log_info "Step 3/4: Zigbee2MQTT 설치..."
+log_info "Step 3/5: Zigbee2MQTT 설치..."
 
 apt-get install -y -qq git make g++ gcc libsystemd-dev
 
@@ -126,7 +126,7 @@ YAML
 log_info "  설정 적용: base_topic=farm/${GATEWAY_ID}/z2m, server=mqtt://${SERVER_IP}:1883"
 
 # ---- Step 4: USB 권한 + systemd 서비스 ----
-log_info "Step 4/4: USB 권한 및 서비스 등록..."
+log_info "Step 4/5: USB 권한 및 서비스 등록..."
 
 # udev 룰
 cat > /etc/udev/rules.d/99-zigbee.rules << 'UDEV'
@@ -162,6 +162,50 @@ systemctl daemon-reload
 systemctl enable zigbee2mqtt
 log_info "  zigbee2mqtt.service 등록 완료"
 
+# ---- Step 5: Config Agent 설치 ----
+log_info "Step 5/5: Config Agent 설치..."
+
+CONFIG_AGENT_DIR="/opt/smart-farm/config-agent"
+mkdir -p "$CONFIG_AGENT_DIR"
+
+# config-agent 파일 복사
+cp -r "$SCRIPT_DIR/config-agent/"* "$CONFIG_AGENT_DIR/"
+
+# 의존성 설치
+cd "$CONFIG_AGENT_DIR"
+npm install --production --quiet
+log_info "  Config Agent 설치 완료"
+
+# config-agent systemd 서비스
+cat > /etc/systemd/system/config-agent.service << SERVICE
+[Unit]
+Description=Smart Farm Config Agent (${GATEWAY_ID})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${CONFIG_AGENT_DIR}
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+Environment=GATEWAY_ID=${GATEWAY_ID}
+Environment=MQTT_SERVER=mqtt://${SERVER_IP}:1883
+Environment=Z2M_CONFIG_PATH=/opt/zigbee2mqtt/data/configuration.yaml
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable config-agent
+systemctl start config-agent
+log_info "  config-agent.service 등록 및 시작 완료"
+
 # ---- 완료 ----
 echo ""
 echo "============================================"
@@ -192,6 +236,10 @@ echo "  게이트웨이 ID:     ${GATEWAY_ID}"
 echo "  MQTT 토픽:         farm/${GATEWAY_ID}/z2m/#"
 echo "  Zigbee2MQTT 웹UI:  http://${IP_ADDR}:8080"
 echo "  연결 대상 Broker:   mqtt://${SERVER_IP}:1883"
+echo ""
+echo "  Config Agent:      MQTT 기반 원격 설정 관리"
+echo "    설정 배포 토픽:   farm/${GATEWAY_ID}/config/request"
+echo "    자동 롤백:       60초 내 MQTT 재연결 실패 시"
 echo ""
 echo "  웹서비스에서 게이트웨이를 등록하세요:"
 echo "    게이트웨이 ID: ${GATEWAY_ID}"

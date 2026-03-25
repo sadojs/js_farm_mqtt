@@ -1,10 +1,12 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Inject, Logger, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as mqtt from 'mqtt';
 import { MqttSensorHandler } from './mqtt-sensor.handler';
 import { MqttDeviceHandler } from './mqtt-device.handler';
 import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { ZigbeeDevice } from './mqtt.types';
+import { ConfigDeployService } from '../config-deploy/config-deploy.service';
+import { ConfigRequest } from '../config-deploy/config-deploy.types';
 
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
@@ -16,6 +18,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     private sensorHandler: MqttSensorHandler,
     private deviceHandler: MqttDeviceHandler,
     private bridgeHandler: MqttBridgeHandler,
+    @Optional() @Inject(ConfigDeployService) private configDeployService?: ConfigDeployService,
   ) {}
 
   async onModuleInit() {
@@ -33,6 +36,13 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     this.client.on('connect', () => {
       this.logger.log(`MQTT Broker 연결 성공: ${brokerUrl}`);
       this.subscribeAll();
+
+      // ConfigDeployService에 publish 함수 주입
+      if (this.configDeployService) {
+        this.configDeployService.setPublishFunction(
+          (gatewayId, request) => this.publishConfigRequest(gatewayId, request),
+        );
+      }
     });
 
     this.client.on('error', (err) => {
@@ -61,6 +71,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       'farm/+/z2m/+/availability',      // 장비 온라인 상태
       'farm/+/z2m/bridge/state',        // 게이트웨이 상태
       'farm/+/z2m/bridge/devices',      // 페어링된 장비 목록
+      'farm/+/config/response',         // Config Agent 응답
     ];
 
     for (const topic of topics) {
@@ -75,11 +86,21 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private routeMessage(topic: string, payload: Buffer) {
-    // topic: "farm/{gatewayId}/z2m/{rest...}"
+    // topic: "farm/{gatewayId}/..." (z2m 또는 config)
     const parts = topic.split('/');
-    if (parts.length < 4 || parts[0] !== 'farm' || parts[2] !== 'z2m') return;
+    if (parts.length < 4 || parts[0] !== 'farm') return;
 
     const gatewayId = parts[1];
+    const namespace = parts[2]; // 'z2m' or 'config'
+
+    // Config Agent 응답: farm/{gw}/config/response
+    if (namespace === 'config' && parts[3] === 'response') {
+      this.configDeployService?.handleConfigResponse(gatewayId, payload);
+      return;
+    }
+
+    if (namespace !== 'z2m') return;
+
     const rest = parts.slice(3).join('/');
 
     if (rest === 'bridge/state') {
@@ -121,6 +142,18 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   /** 특정 게이트웨이의 Zigbee 장비 목록 (캐시) */
   getZigbeeDevices(gatewayId: string): ZigbeeDevice[] {
     return this.bridgeHandler.getZigbeeDevices(gatewayId);
+  }
+
+  /** Config Agent에 설정 요청 publish */
+  publishConfigRequest(gatewayId: string, request: ConfigRequest): void {
+    const topic = `farm/${gatewayId}/config/request`;
+    this.client.publish(topic, JSON.stringify(request), { qos: 1 }, (err) => {
+      if (err) {
+        this.logger.error(`Config 요청 전송 실패: ${topic} - ${err.message}`);
+      } else {
+        this.logger.log(`Config 요청: ${topic} → ${request.action} (${request.requestId})`);
+      }
+    });
   }
 
   isConnected(): boolean {

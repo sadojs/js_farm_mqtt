@@ -75,6 +75,12 @@ const router = createRouter({
       component: () => import('../views/Alerts.vue'),
       meta: { title: '센서 알림', requiresAuth: true }
     },
+    {
+      path: '/config-deploy',
+      name: 'config-deploy',
+      component: () => import('../views/ConfigDeploy.vue'),
+      meta: { title: '설정 배포', requiresAuth: true, requiresAdmin: true }
+    },
   ]
 })
 

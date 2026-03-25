@@ -5,10 +5,10 @@ export const gatewayApi = {
   getAll: () =>
     apiClient.get<Gateway[]>('/gateways'),
 
-  create: (data: { gatewayId: string; name: string; location?: string; rpiIp?: string }) =>
+  create: (data: { gatewayId: string; name: string; location?: string; rpiIp?: string; userId?: string }) =>
     apiClient.post<Gateway>('/gateways', data),
 
-  update: (id: string, data: { name?: string; location?: string; rpiIp?: string }) =>
+  update: (id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string }) =>
     apiClient.put<Gateway>(`/gateways/${id}`, data),
 
   remove: (id: string) =>
