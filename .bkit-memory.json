@@ -15,7 +15,7 @@
   },
   "pdca": {
     "currentFeature": "config-deploy",
-    "phase": "check",
+    "phase": "completed",
     "matchRate": 95,
     "iterationCount": 0,
     "history": [
