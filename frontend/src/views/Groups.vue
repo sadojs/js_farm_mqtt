@@ -761,8 +761,6 @@ const onRuleEdited = () => {
   automationStore.fetchRules()
 }
 
-}
-
 const unassignedDevices = computed(() => {
   const assignedIds = new Set(
     groups.value.flatMap(g => (g.devices || []).map(d => d.id))
