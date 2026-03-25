@@ -7,18 +7,8 @@ export interface User {
   parentUserName?: string | null
   address?: string
   status: 'active' | 'inactive'
-  tuyaProject?: TuyaProject
   createdAt: string
   updatedAt: string
-}
-
-export interface TuyaProject {
-  id: string
-  name: string
-  accessId: string
-  endpoint: string
-  projectId?: string
-  enabled: boolean
 }
 
 export interface LoginRequest {

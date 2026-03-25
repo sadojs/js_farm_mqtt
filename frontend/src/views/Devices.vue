@@ -6,9 +6,7 @@
         <p class="page-description">농장 장비와 센서를 관리합니다</p>
       </div>
       <div class="header-actions">
-        <button class="btn-outline" @click="handleTuyaSync" :disabled="syncing">
-          {{ syncing ? '동기화 중...' : '센서 동기화' }}
-        </button>
+        <!-- MQTT에서는 실시간 동기화됨 -->
         <button v-if="!authStore.isFarmUser" class="btn-primary" @click="showRegistrationModal = true">+ 장비 추가</button>
       </div>
     </header>
@@ -223,7 +221,6 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotificationStore } from '@/stores/notification.store'
 import { deviceApi } from '@/api/device.api'
-import { translateTuyaError } from '@/utils/tuya-errors'
 import type { Device, DependencyRule } from '@/types/device.types'
 
 const deviceStore = useDeviceStore()
@@ -282,7 +279,7 @@ async function interlockControl(group: OpenerGroup, action: 'open' | 'close') {
       const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: false }])
       if (!result.success) {
         notify.remove(loadingId)
-        notify.error('제어 실패', translateTuyaError(result.msg))
+        notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
         return
       }
       targetDevice.switchState = false
@@ -311,7 +308,7 @@ async function interlockControl(group: OpenerGroup, action: 'open' | 'close') {
     const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: true }])
     if (!result.success) {
       notify.remove(loadingId)
-      notify.error('제어 실패', translateTuyaError(result.msg))
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
       return
     }
     targetDevice.switchState = true
@@ -370,7 +367,7 @@ async function handleIrrigationControl(device: Device, switchCode: string) {
     const result = await deviceStore.controlDevice(device.id, [{ code: switchCode, value: newVal }])
     if (!result.success) {
       notify.remove(loadingId)
-      notify.error('제어 실패', translateTuyaError(result.msg))
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
       return
     }
     if (!device.switchStates) device.switchStates = {}
@@ -493,7 +490,7 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
     const result = await deviceStore.controlDevice(deviceId, [{ code: 'switch_1', value: turnOn }])
     if (!result.success) {
       notify.remove(loadingId)
-      notify.error('제어 실패', translateTuyaError(result.msg))
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
       return
     }
     if (device) device.switchState = turnOn

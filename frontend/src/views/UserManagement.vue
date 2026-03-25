@@ -45,10 +45,10 @@
               <span class="address-text">{{ user.address || '-' }}</span>
             </td>
             <td>
-              <span v-if="user.tuyaProject?.enabled && user.tuyaProject?.name" class="project-badge">
-                {{ user.tuyaProject.name }}
+              <span v-if="user.gateways?.length" class="project-badge">
+                {{ user.gateways.length }}개 게이트웨이
               </span>
-              <span v-else class="text-muted">미설정</span>
+              <span v-else class="text-muted">미등록</span>
             </td>
             <td>{{ user.createdAt }}</td>
             <td>
@@ -98,22 +98,14 @@
       @save="saveUser"
     />
 
-    <!-- Tuya 프로젝트 할당 모달 -->
-    <ProjectAssignModal
-      :show="showProjectModal"
-      :user="selectedUser"
-      @close="showProjectModal = false"
-      @assign="handleProjectAssign"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
-import ProjectAssignModal from '@/components/admin/ProjectAssignModal.vue'
 import { userApi } from '../api/user.api'
-import type { UpdateTuyaRequest } from '../api/user.api'
+import { gatewayApi } from '../api/gateway.api'
 import { useAuthStore } from '../stores/auth.store'
 
 interface User {
@@ -124,7 +116,7 @@ interface User {
   parentUserId?: string
   parentUserName?: string
   address?: string
-  tuyaProject?: any
+  gateways?: any[]
   createdAt: string
   status: 'active' | 'inactive'
 }
@@ -205,23 +197,6 @@ const saveUser = async (userData: any) => {
         await userApi.update(selectedUser.value.id, payload)
       }
 
-      // Tuya 프로젝트 정보가 있으면 함께 업데이트 (farm_user는 parent 것을 사용하므로 제외)
-      if (userData.role !== 'farm_user' && userData.tuyaProject?.name && userData.tuyaProject?.accessId && userData.tuyaProject?.endpoint) {
-        const tuyaPayload: UpdateTuyaRequest = {
-          name: userData.tuyaProject.name,
-          accessId: userData.tuyaProject.accessId,
-          accessSecret: userData.tuyaProject.accessSecret || '',
-          endpoint: userData.tuyaProject.endpoint,
-          projectId: userData.tuyaProject.projectId,
-          enabled: userData.tuyaProject.enabled ?? true,
-        }
-        if (selectedUser.value.id === authStore.user?.id) {
-          await userApi.updateMyTuya(tuyaPayload)
-        } else {
-          await userApi.updateTuya(selectedUser.value.id, tuyaPayload)
-        }
-      }
-
       await fetchUsers()
     } else {
       // 신규 추가
@@ -234,19 +209,6 @@ const saveUser = async (userData: any) => {
         parentUserId: userData.parentUserId,
       })
 
-      // 신규 사용자의 Tuya 프로젝트 정보 저장
-      if (userData.role !== 'farm_user' && userData.tuyaProject?.name && userData.tuyaProject?.accessId && userData.tuyaProject?.endpoint) {
-        const tuyaPayload: UpdateTuyaRequest = {
-          name: userData.tuyaProject.name,
-          accessId: userData.tuyaProject.accessId,
-          accessSecret: userData.tuyaProject.accessSecret || '',
-          endpoint: userData.tuyaProject.endpoint,
-          projectId: userData.tuyaProject.projectId,
-          enabled: userData.tuyaProject.enabled ?? true,
-        }
-        await userApi.updateTuya((newUser as any).id, tuyaPayload)
-      }
-
       await fetchUsers()
     }
     closeUserModal()
@@ -256,28 +218,6 @@ const saveUser = async (userData: any) => {
   }
 }
 
-const handleProjectAssign = async (project: any) => {
-  if (!selectedUser.value) return
-  try {
-    const tuyaPayload: UpdateTuyaRequest = {
-      name: project.name || '',
-      accessId: project.accessId || '',
-      accessSecret: project.accessSecret || '',
-      endpoint: project.endpoint || '',
-      projectId: project.projectId,
-    }
-    if (selectedUser.value.id === authStore.user?.id) {
-      await userApi.updateMyTuya(tuyaPayload)
-    } else {
-      await userApi.updateTuya(selectedUser.value.id, tuyaPayload)
-    }
-    await fetchUsers()
-  } catch (err) {
-    console.error('프로젝트 할당 실패:', err)
-    alert('프로젝트 할당에 실패했습니다.')
-  }
-  showProjectModal.value = false
-}
 </script>
 
 <style scoped>

@@ -7,39 +7,39 @@
       </div>
 
       <div class="modal-body">
-        <!-- Tuya 프로젝트 미설정 경고 -->
-        <div v-if="!hasTuyaProject" class="warning-box">
+        <!-- 게이트웨이 미등록 경고 -->
+        <div v-if="!hasGateway" class="warning-box">
           <div class="warning-icon">⚠️</div>
           <div class="warning-content">
-            <h3>센서 프로젝트가 설정되지 않았습니다</h3>
-            <p>사용자 관리에서 센서 클라우드 프로젝트 설정을 먼저 완료하세요.</p>
-            <ul>
-              <li>Access ID (Client ID)</li>
-              <li>Access Secret (Client Secret)</li>
-              <li>API Endpoint</li>
-            </ul>
+            <h3>등록된 게이트웨이가 없습니다</h3>
+            <p>사용자 관리에서 Zigbee 게이트웨이(라즈베리파이)를 먼저 등록하세요.</p>
           </div>
         </div>
 
-        <!-- Step 1: Tuya 기기 불러오기 -->
-        <div class="step-section" v-if="step === 1 && hasTuyaProject">
+        <!-- Step 1: Zigbee 장비 불러오기 -->
+        <div class="step-section" v-if="step === 1 && hasGateway">
           <div class="step-header">
             <span class="step-number">1</span>
-            <h3>센서 클라우드 기기 불러오기</h3>
+            <h3>Zigbee 장비 불러오기</h3>
           </div>
 
           <div class="project-info-box">
-            <p><strong>프로젝트:</strong> {{ authStore.user?.tuyaProject?.name }}</p>
-            <p><strong>엔드포인트:</strong> {{ authStore.user?.tuyaProject?.endpoint }}</p>
+            <label class="form-label">게이트웨이 선택</label>
+            <select v-model="selectedGatewayId" class="form-select">
+              <option value="" disabled>게이트웨이를 선택하세요</option>
+              <option v-for="gw in gateways" :key="gw.id" :value="gw.id">
+                {{ gw.name }} ({{ gw.gatewayId }}) {{ gw.status === 'online' ? '🟢' : '🔴' }}
+              </option>
+            </select>
           </div>
 
           <button
             class="btn-primary btn-block"
             @click="loadDevices"
-            :disabled="loading"
+            :disabled="loading || !selectedGatewayId"
           >
-            <span v-if="loading">⏳ 센서 클라우드에서 불러오는 중...</span>
-            <span v-else>📡 기기 목록 불러오기</span>
+            <span v-if="loading">⏳ Zigbee 장비를 불러오는 중...</span>
+            <span v-else>📡 장비 목록 불러오기</span>
           </button>
 
           <!-- 에러 메시지 -->
@@ -50,9 +50,9 @@
           <!-- 기기 없음 메시지 -->
           <div v-if="noDevicesFound" class="empty-devices-box">
             <div class="empty-icon">📭</div>
-            <h3>등록된 장치가 없습니다</h3>
-            <p>센서 클라우드에 연결된 장치가 없습니다.</p>
-            <p class="help-text">센서 앱에서 장치를 먼저 추가한 후 다시 시도해주세요.</p>
+            <h3>페어링된 장비가 없습니다</h3>
+            <p>Zigbee2MQTT에 페어링된 장비가 없습니다.</p>
+            <p class="help-text">Zigbee2MQTT 웹UI에서 장비를 먼저 페어링한 후 다시 시도해주세요.</p>
           </div>
         </div>
 
@@ -74,7 +74,7 @@
 
           <div class="device-list">
             <div
-              v-for="device in filteredTuyaDevices"
+              v-for="device in filteredZigbeeDevices"
               :key="device.id"
               class="device-item"
               :class="{ selected: isDeviceSelected(device.id) }"
@@ -335,14 +335,17 @@ import apiClient from '../../api/client'
 
 import type { EquipmentType } from '../../types/device.types'
 
-interface TuyaDevice {
-  id: string
-  name: string
-  category: string
+interface ZigbeeDevice {
+  id: string            // ieee_address
+  name: string          // friendly_name
+  category: string      // model_id 또는 자동 분류
   online: boolean
-  product_name?: string
+  product_name?: string // vendor + model
   deviceType?: 'sensor' | 'actuator'
   equipmentType?: EquipmentType
+  friendlyName?: string
+  zigbeeModel?: string
+  gatewayId?: string
 }
 
 const SENSOR_CATEGORIES = ['wsdcg', 'co2bj', 'ldcg', 'mcs', 'ywbj', 'pm25', 'cz', 'qxj', 'hjjcy']
@@ -368,7 +371,7 @@ const EQUIPMENT_TYPE_OPTIONS: { value: EquipmentType; label: string }[] = [
 const props = defineProps<{ isOpen: boolean }>()
 const emit = defineEmits<{
   close: []
-  registered: [devices: TuyaDevice[]]
+  registered: [devices: ZigbeeDevice[]]
 }>()
 
 const authStore = useAuthStore()
@@ -392,21 +395,23 @@ const searchQuery = ref('')
 const errorMessage = ref('')
 const noDevicesFound = ref(false)
 
-const hasTuyaProject = computed(() => {
-  const tp = authStore.user?.tuyaProject
-  return tp && tp.enabled && tp.accessId && tp.endpoint
-})
+/** 게이트웨이 관련 */
+const gateways = ref<any[]>([])
+const selectedGatewayId = ref('')
 
-// 모달 열릴 때 상태 초기화
+const hasGateway = computed(() => gateways.value.length > 0)
+
+// 모달 열릴 때 상태 초기화 + 게이트웨이 로드
 watch(() => props.isOpen, (open) => {
   if (open) {
     errorMessage.value = ''
     noDevicesFound.value = false
+    loadGateways()
   }
 })
 
-const tuyaDevices = ref<TuyaDevice[]>([])
-const selectedDevices = ref<TuyaDevice[]>([])
+const zigbeeDevices = ref<ZigbeeDevice[]>([])
+const selectedDevices = ref<ZigbeeDevice[]>([])
 
 const getCategoryIcon = (category: string) => {
   const icons: Record<string, string> = {
@@ -421,54 +426,80 @@ const getCategoryIcon = (category: string) => {
   return icons[category] || '📦'
 }
 
-const filteredTuyaDevices = computed(() => {
-  if (!searchQuery.value) return tuyaDevices.value
+const filteredZigbeeDevices = computed(() => {
+  if (!searchQuery.value) return zigbeeDevices.value
   const query = searchQuery.value.toLowerCase()
-  return tuyaDevices.value.filter(device =>
+  return zigbeeDevices.value.filter(device =>
     device.name.toLowerCase().includes(query) ||
     device.id.toLowerCase().includes(query) ||
     device.category.toLowerCase().includes(query)
   )
 })
 
+const loadGateways = async () => {
+  try {
+    const { data } = await apiClient.get('/gateways')
+    gateways.value = data as any[]
+    if (gateways.value.length === 1) {
+      selectedGatewayId.value = gateways.value[0].id
+    }
+  } catch {
+    gateways.value = []
+  }
+}
+
 const loadDevices = async () => {
+  if (!selectedGatewayId.value) {
+    errorMessage.value = '게이트웨이를 선택해주세요.'
+    return
+  }
+
   loading.value = true
   errorMessage.value = ''
   noDevicesFound.value = false
 
   try {
-    const { data } = await apiClient.get('/tuya/devices')
-    const result = data as any
+    const { data } = await apiClient.get(`/gateways/${selectedGatewayId.value}/zigbee-devices`)
+    const z2mDevices = data as any[]
 
-    if (!result.success) {
-      errorMessage.value = result.message || '기기 목록을 불러오지 못했습니다.'
-      loading.value = false
-      return
-    }
-
-    const devices = result.devices || []
-    if (devices.length === 0) {
+    if (!z2mDevices || z2mDevices.length === 0) {
       noDevicesFound.value = true
       loading.value = false
       return
     }
 
-    // 이미 등록된 장비(tuyaDeviceId 기준) 필터링
-    const registeredTuyaIds = new Set(deviceStore.devices.map(d => d.tuyaDeviceId))
-    const available = devices.filter((d: TuyaDevice) => !registeredTuyaIds.has(d.id))
+    // 이미 등록된 장비(zigbeeIeee 기준) 필터링
+    const registeredIeee = new Set(deviceStore.devices.map(d => d.zigbeeIeee))
+    const gateway = gateways.value.find(g => g.id === selectedGatewayId.value)
 
-    if (available.length === 0 && devices.length > 0) {
-      noDevicesFound.value = false
-      errorMessage.value = `모든 기기(${devices.length}개)가 이미 등록되어 있습니다.`
+    const available: ZigbeeDevice[] = z2mDevices
+      .filter((d: any) => !registeredIeee.has(d.ieee_address))
+      .map((d: any) => ({
+        id: d.ieee_address,
+        name: d.friendly_name || d.ieee_address,
+        category: d.definition?.model || d.model_id || 'unknown',
+        online: true,
+        product_name: d.definition ? `${d.definition.vendor} ${d.definition.model}` : d.model_id,
+        friendlyName: d.friendly_name,
+        zigbeeModel: d.definition?.model || d.model_id,
+        gatewayId: gateway?.id,
+        // exposes에 switch/light가 있으면 actuator, 아니면 sensor
+        deviceType: d.definition?.exposes?.some((e: any) => e.type === 'switch' || e.type === 'light')
+          ? 'actuator' as const
+          : 'sensor' as const,
+      }))
+
+    if (available.length === 0 && z2mDevices.length > 0) {
+      errorMessage.value = `모든 기기(${z2mDevices.length}개)가 이미 등록되어 있습니다.`
       loading.value = false
       return
     }
 
-    tuyaDevices.value = available
+    zigbeeDevices.value = available
     loading.value = false
     step.value = 2
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || '기기 목록을 불러오는데 실패했습니다. 센서 프로젝트 설정을 확인하세요.'
+    errorMessage.value = err.response?.data?.message || 'Zigbee 장비 목록을 불러오지 못했습니다. 게이트웨이 연결을 확인하세요.'
     loading.value = false
   }
 }
@@ -477,7 +508,7 @@ const isDeviceSelected = (deviceId: string) => {
   return selectedDevices.value.some(d => d.id === deviceId)
 }
 
-const toggleDeviceSelection = (device: TuyaDevice) => {
+const toggleDeviceSelection = (device: ZigbeeDevice) => {
   const index = selectedDevices.value.findIndex(d => d.id === device.id)
   if (index > -1) {
     selectedDevices.value.splice(index, 1)
@@ -560,7 +591,10 @@ const registerDevices = async () => {
     }
 
     const deviceList = selectedDevices.value.map(d => ({
-      tuyaDeviceId: d.id,
+      zigbeeIeee: d.id,
+      friendlyName: d.friendlyName || d.name,
+      zigbeeModel: d.zigbeeModel,
+      gatewayId: d.gatewayId,
       name: d.name,
       category: d.category,
       deviceType: d.deviceType || guessDeviceType(d.category),
@@ -620,7 +654,7 @@ const closeModal = () => {
   emit('close')
   step.value = 1
   selectedDevices.value = []
-  tuyaDevices.value = []
+  zigbeeDevices.value = []
   searchQuery.value = ''
   errorMessage.value = ''
   noDevicesFound.value = false

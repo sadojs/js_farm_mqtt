@@ -467,7 +467,6 @@ import AutomationEditModal from '@/components/automation/AutomationEditModal.vue
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
-import { translateTuyaError } from '../utils/tuya-errors'
 import { groupApi } from '../api/group.api'
 import { envConfigApi } from '../api/env-config.api'
 import type { EnvRole, SourcesResponse, SaveMappingItem } from '../api/env-config.api'
@@ -638,7 +637,7 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
     const result = await deviceStore.controlDevice(device.id, [{ code: switchCode, value: newVal }])
     if (!result.success) {
       notify.remove(loadingId)
-      notify.error('제어 실패', translateTuyaError(result.msg))
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
       return
     }
     const storeDevice = deviceStore.devices.find(d => d.id === device.id)
@@ -706,7 +705,7 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
     const result = await deviceStore.controlDevice(deviceId, [{ code: 'switch_1', value: turnOn }])
     if (!result.success) {
       notify.remove(loadingId)
-      notify.error('제어 실패', translateTuyaError(result.msg))
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
       return
     }
     if (device) device.switchState = turnOn

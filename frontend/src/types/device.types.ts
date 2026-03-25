@@ -8,7 +8,10 @@ export interface Device {
   id: string
   userId: string
   houseId?: string
-  tuyaDeviceId: string
+  gatewayId?: string
+  zigbeeIeee: string
+  friendlyName?: string
+  zigbeeModel?: string
   name: string
   category: string
   deviceType: 'sensor' | 'actuator'
@@ -27,12 +30,15 @@ export interface Device {
 
 export interface RegisterDeviceRequest {
   devices: {
-    tuyaDeviceId: string
+    zigbeeIeee: string
+    friendlyName?: string
+    zigbeeModel?: string
     name: string
     category: string
     deviceType: 'sensor' | 'actuator'
     equipmentType?: EquipmentType
     online?: boolean
+    gatewayId?: string
   }[]
   houseId?: string
 }
@@ -44,12 +50,34 @@ export interface DeviceControlRequest {
   }[]
 }
 
-export interface TuyaDeviceInfo {
+/** Zigbee2MQTT bridge/devices에서 가져온 장비 정보 */
+export interface ZigbeeDeviceInfo {
+  ieee_address: string
+  friendly_name: string
+  type: string
+  model_id?: string
+  manufacturer?: string
+  supported: boolean
+  definition?: {
+    model: string
+    vendor: string
+    description: string
+    exposes: { type: string; name?: string; property?: string }[]
+  }
+}
+
+/** 게이트웨이 (라즈베리파이) */
+export interface Gateway {
   id: string
+  userId: string
+  gatewayId: string
   name: string
-  category: string
-  online: boolean
-  productName: string
+  location?: string
+  rpiIp?: string
+  status: string
+  lastSeen?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface DependencyRule {

@@ -98,103 +98,7 @@
             </p>
           </div>
 
-          <div v-if="formData.role !== 'farm_user'" class="form-section">
-            <h3 class="section-title">🔗 센서 클라우드 프로젝트 설정</h3>
-            <p class="section-description">
-              사용자가 사용할 센서 클라우드 프로젝트의 인증 정보를 입력하세요
-            </p>
-
-            <div class="form-group">
-              <label>프로젝트 이름 *</label>
-              <input
-                v-model="formData.tuyaProject.name"
-                type="text"
-                placeholder="예: 1농장 스마트팜"
-                class="form-input"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Access ID (Client ID) *</label>
-              <input
-                v-model="formData.tuyaProject.accessId"
-                type="text"
-                placeholder="IoT Platform의 Access ID"
-                class="form-input"
-              />
-              <p class="help-text">
-                IoT Platform → Cloud → Development에서 확인
-              </p>
-            </div>
-
-            <div class="form-group">
-              <label>Access Secret (Client Secret) {{ user ? '(변경 시에만 입력)' : '*' }}</label>
-              <input
-                v-model="formData.tuyaProject.accessSecret"
-                type="password"
-                :placeholder="hasExistingTuya ? '저장됨 - 변경 시에만 입력' : 'IoT Platform의 Access Secret'"
-                class="form-input"
-              />
-              <p class="help-text">
-                {{ hasExistingTuya ? '보안을 위해 기존 값은 표시되지 않습니다. 변경하려면 새로 입력하세요.' : '보안을 위해 암호화되어 저장됩니다' }}
-              </p>
-            </div>
-
-            <div class="form-group">
-              <label>API Endpoint *</label>
-              <select v-model="formData.tuyaProject.endpoint" class="form-select">
-                <option value="">선택하세요</option>
-                <option value="https://openapi.tuyacn.com">중국 (China)</option>
-                <option value="https://openapi.tuyaus.com">미국 (Americas)</option>
-                <option value="https://openapi.tuyaeu.com">유럽 (Europe)</option>
-                <option value="https://openapi.tuyain.com">인도 (India)</option>
-              </select>
-              <p class="help-text">
-                프로젝트가 생성된 데이터 센터 지역을 선택하세요
-              </p>
-            </div>
-
-            <div class="form-group">
-              <label>프로젝트 ID (선택)</label>
-              <input
-                v-model="formData.tuyaProject.projectId"
-                type="text"
-                placeholder="예: p1234567890abcdef"
-                class="form-input"
-              />
-              <p class="help-text">
-                특정 프로젝트 ID가 있는 경우 입력하세요
-              </p>
-            </div>
-
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input
-                  v-model="formData.tuyaProject.enabled"
-                  type="checkbox"
-                />
-                <span>센서 프로젝트 활성화</span>
-              </label>
-              <p class="help-text">
-                체크 해제 시 사용자는 센서 장비를 사용할 수 없습니다
-              </p>
-            </div>
-
-            <div v-if="user" class="form-group">
-              <button
-                type="button"
-                class="btn-test"
-                :disabled="testLoading"
-                @click="testTuyaConnection"
-              >
-                {{ testLoading ? '테스트 중...' : '🔌 연결 테스트' }}
-              </button>
-              <div v-if="testResult" class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
-                <p>{{ testResult.message }}</p>
-                <p v-if="testResult.deviceCount !== undefined">디바이스 수: {{ testResult.deviceCount }}개</p>
-              </div>
-            </div>
-          </div>
+          <!-- 게이트웨이는 사용자 관리 페이지에서 별도로 등록합니다 -->
         </form>
       </div>
 
@@ -220,7 +124,6 @@ interface UserFormData {
   role: 'admin' | 'farm_admin' | 'farm_user'
   parentUserId?: string
   address?: string
-  tuyaProject?: any
   password?: string
   [key: string]: any
 }
@@ -247,14 +150,6 @@ const formData = ref<UserFormData>({
   email: '',
   role: 'farm_admin',
   address: '',
-  tuyaProject: {
-    name: '',
-    accessId: '',
-    accessSecret: '',
-    endpoint: '',
-    projectId: '',
-    enabled: true
-  },
   password: ''
 })
 
@@ -318,15 +213,7 @@ watch(
     if (newUser) {
       formData.value = {
         ...newUser,
-        password: '', // 비밀번호는 비워둠
-        tuyaProject: newUser.tuyaProject || {
-          name: '',
-          accessId: '',
-          accessSecret: '',
-          endpoint: '',
-          projectId: '',
-          enabled: true
-        }
+        password: '',
       }
     } else {
       formData.value = {
@@ -334,14 +221,6 @@ watch(
         email: '',
         role: 'farm_admin',
         address: '',
-        tuyaProject: {
-          name: '',
-          accessId: '',
-          accessSecret: '',
-          endpoint: '',
-          projectId: '',
-          enabled: true
-        },
         password: ''
       }
     }
@@ -393,43 +272,6 @@ function syncAddress() {
   formData.value.address = addressDetail.value
     ? `${base} ${addressDetail.value.trim()}`
     : base
-}
-
-// 기존 Tuya 프로젝트가 저장되어 있는지 (accessId가 있으면 저장된 것)
-const hasExistingTuya = computed(() => {
-  return !!props.user?.tuyaProject?.accessId
-})
-
-const testLoading = ref(false)
-const testResult = ref<{ success: boolean; message: string; deviceCount?: number } | null>(null)
-
-const testTuyaConnection = async () => {
-  const tuya = formData.value.tuyaProject
-  if (!tuya?.accessId || !tuya?.accessSecret || !tuya?.endpoint) {
-    testResult.value = {
-      success: false,
-      message: 'Access ID, Access Secret, API Endpoint를 모두 입력해주세요.',
-    }
-    return
-  }
-
-  testLoading.value = true
-  testResult.value = null
-  try {
-    const { data } = await userApi.testTuyaConnection({
-      accessId: tuya.accessId,
-      accessSecret: tuya.accessSecret,
-      endpoint: tuya.endpoint,
-    })
-    testResult.value = data as any
-  } catch (err: any) {
-    testResult.value = {
-      success: false,
-      message: err.response?.data?.message || '연결 테스트에 실패했습니다.',
-    }
-  } finally {
-    testLoading.value = false
-  }
 }
 
 const handleSubmit = () => {

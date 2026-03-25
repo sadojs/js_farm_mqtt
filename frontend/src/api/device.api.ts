@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { Device, DeviceDependenciesResponse, RegisterDeviceRequest, TuyaDeviceInfo } from '../types/device.types'
+import type { Device, DeviceDependenciesResponse, RegisterDeviceRequest } from '../types/device.types'
 
 export const deviceApi = {
   getAll: () =>
@@ -7,9 +7,6 @@ export const deviceApi = {
 
   getById: (id: string) =>
     apiClient.get<Device>(`/devices/${id}`),
-
-  getTuyaDevices: () =>
-    apiClient.get<TuyaDeviceInfo[]>('/devices/tuya/list'),
 
   register: (devices: RegisterDeviceRequest['devices'], houseId?: string) =>
     apiClient.post<Device[]>('/devices/register', { devices, ...(houseId && { houseId }) }),
