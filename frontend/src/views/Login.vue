@@ -9,14 +9,14 @@
 
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
-          <label for="email">이메일</label>
+          <label for="username">사용자명</label>
           <input
-            id="email"
-            v-model="loginData.email"
-            type="email"
-            name="email"
-            autocomplete="email"
-            placeholder="your@email.com"
+            id="username"
+            v-model="loginData.username"
+            type="text"
+            name="username"
+            autocomplete="username"
+            placeholder="사용자명을 입력하세요"
             class="form-input"
             required
           />
@@ -72,13 +72,13 @@ const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
 
 interface LoginData {
-  email: string
+  username: string
   password: string
   remember: boolean
 }
 
 const loginData = ref<LoginData>({
-  email: '',
+  username: '',
   password: '',
   remember: false
 })
@@ -91,11 +91,11 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    await authStore.login(loginData.value.email, loginData.value.password)
+    await authStore.login(loginData.value.username, loginData.value.password)
     notificationStore.success('로그인 성공', `${authStore.user?.name}님 환영합니다.`)
     router.push('/dashboard')
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.'
+    errorMessage.value = err.response?.data?.message || '사용자명 또는 비밀번호가 올바르지 않습니다.'
   } finally {
     isLoading.value = false
   }

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { AutomationRule, CreateRuleRequest, AutomationLog } from '../types/automation.types'
+import type { AutomationRule, CreateRuleRequest, AutomationLog, AutomationLogStats } from '../types/automation.types'
 
 export const automationApi = {
   getRules: () =>
@@ -19,4 +19,7 @@ export const automationApi = {
 
   getLogs: (params?: { ruleId?: string; page?: number; limit?: number }) =>
     apiClient.get<AutomationLog[]>('/automation/logs', { params }),
+
+  getLogStats: () =>
+    apiClient.get<AutomationLogStats>('/automation/logs/stats'),
 }

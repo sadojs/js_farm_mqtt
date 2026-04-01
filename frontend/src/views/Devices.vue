@@ -41,12 +41,16 @@
     </div>
 
     <!-- 장비 없음 -->
-    <div v-else-if="filteredDevices.length === 0" class="empty-state">
-      <div class="empty-icon">📭</div>
-      <h3>{{ searchQuery ? '검색 결과가 없습니다' : '등록된 장비가 없습니다' }}</h3>
-      <p>{{ searchQuery ? '다른 검색어를 입력해보세요.' : '센서 동기화를 통해 장비를 가져와 등록하세요.' }}</p>
-      <button v-if="!searchQuery && !authStore.isFarmUser" class="btn-primary" @click="showRegistrationModal = true">+ 장비 추가</button>
-    </div>
+    <EmptyState
+      v-else-if="filteredDevices.length === 0"
+      :icon="searchQuery
+        ? '<circle cx=\'11\' cy=\'11\' r=\'8\'/><line x1=\'21\' y1=\'21\' x2=\'16.65\' y2=\'16.65\'/>'
+        : '<path d=\'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9\'/><path d=\'M13.73 21a2 2 0 0 1-3.46 0\'/>'"
+      :title="searchQuery ? '검색 결과가 없습니다' : '아직 등록된 장비가 없습니다'"
+      :description="searchQuery ? '다른 검색어를 입력해보세요.' : '센서 동기화를 통해 장비를 가져와 등록하세요.'"
+      :action-label="!searchQuery && !authStore.isFarmUser ? '+ 장비 등록하기' : undefined"
+      :action-fn="!searchQuery && !authStore.isFarmUser ? () => { showRegistrationModal = true } : undefined"
+    />
 
     <!-- 개폐기 그룹 -->
     <div v-if="openerGroups.length > 0 && (activeTab === 'all' || activeTab === 'actuator')" class="opener-groups">
@@ -54,7 +58,7 @@
         <div class="opener-header">
           <div class="opener-title">{{ group.groupName }}</div>
           <span class="type-badge actuator">장비</span>
-          <button class="btn-icon-delete" @click="handleRemoveOpenerGroup(group)" aria-label="삭제">삭제</button>
+          <button class="btn-icon-delete" @click="handleRemoveOpenerGroup(group)" title="장비 삭제" aria-label="삭제">삭제</button>
         </div>
         <div class="opener-controls">
           <div class="opener-row">
@@ -88,30 +92,32 @@
           <div class="irrigation-title">{{ device.name }}</div>
           <button class="btn-status" @click="openIrrigationStatusModal(device)">상태</button>
           <span class="type-badge actuator">장비</span>
-          <button class="btn-icon-delete" @click="handleRemoveDevice(device.id)" aria-label="삭제">삭제</button>
+          <button class="btn-icon-delete" @click="handleRemoveDevice(device.id)" title="장비 삭제" aria-label="삭제">삭제</button>
         </div>
         <div class="irrigation-controls">
           <div class="irrigation-row">
-            <span class="irrigation-label">타이머 전원/B접점</span>
+            <span class="irrigation-label">원격제어 ON/OFF</span>
             <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
             <div class="irrigation-toggle-area" :class="{ disabled: !device.online }">
-              <label class="toggle-switch" @click.prevent="device.online && irrigationControlling === null && handleIrrigationControl(device, 'switch_1')">
-                <input type="checkbox" :checked="device.switchStates?.switch_1 === true" :disabled="!device.online || irrigationControlling !== null" />
+              <label class="toggle-switch" @click.prevent="device.online && irrigationControlling === null && handleIrrigationControl(device, getMapping(device)['remote_control'])">
+                <input type="checkbox" :checked="device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling !== null" />
                 <span class="toggle-slider"></span>
               </label>
             </div>
           </div>
           <div class="irrigation-row">
-            <span class="irrigation-label">교반기/B접점</span>
+            <span class="irrigation-label">액비/교반기 B접점</span>
             <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-            <div class="irrigation-toggle-area" :class="{ disabled: !device.online }">
-              <label class="toggle-switch" @click.prevent="device.online && irrigationControlling === null && handleIrrigationControl(device, 'switch_usb1')">
-                <input type="checkbox" :checked="device.switchStates?.switch_usb1 === true" :disabled="!device.online || irrigationControlling !== null" />
+            <div class="irrigation-toggle-area disabled">
+              <label class="toggle-switch">
+                <input type="checkbox" :checked="device.switchStates?.[getMapping(device)['fertilizer_b_contact']] === true" disabled />
                 <span class="toggle-slider"></span>
               </label>
             </div>
           </div>
         </div>
+        <!-- 채널 매핑 설정 패널 (admin/farm_admin 전용) -->
+        <IrrigationChannelMappingPanel :device="device" />
       </div>
     </div>
 
@@ -164,36 +170,18 @@
         <div class="card-footer">
           <span class="last-seen">{{ formatLastSeen(device.lastSeen) }}</span>
           <div class="card-actions">
-            <button class="btn-icon-delete" @click="handleRemoveDevice(device.id)" aria-label="삭제">삭제</button>
+            <button class="btn-icon-delete" @click="handleRemoveDevice(device.id)" title="장비 삭제" aria-label="삭제">삭제</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 관수 상태 모달 -->
-    <div v-if="showIrrigationStatusModal && irrigationStatusDevice" class="modal-overlay" @click.self="showIrrigationStatusModal = false">
-      <div class="status-modal">
-        <div class="status-modal-header">
-          <h3>{{ irrigationStatusDevice.name }} - 스위치 상태</h3>
-          <button class="close-btn" @click="showIrrigationStatusModal = false">✕</button>
-        </div>
-        <div class="status-modal-body">
-          <div
-            v-for="(label, code) in IRRIGATION_SWITCH_LABELS"
-            :key="code"
-            class="status-row"
-          >
-            <span class="status-row-label">{{ label }}</span>
-            <span
-              class="status-row-value"
-              :class="irrigationStatusDevice.switchStates?.[code] ? 'on' : 'off'"
-            >
-              {{ irrigationStatusDevice.switchStates?.[code] ? 'ON' : 'OFF' }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <IrrigationStatusModal
+      :visible="showIrrigationStatusModal"
+      :device="irrigationStatusDevice"
+      @close="showIrrigationStatusModal = false"
+    />
 
     <DeviceRegistration
       :is-open="showRegistrationModal"
@@ -215,20 +203,23 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import DeviceRegistration from '@/components/devices/DeviceRegistration.vue'
+import IrrigationChannelMappingPanel from '@/components/devices/IrrigationChannelMappingPanel.vue'
+import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useDeviceStore } from '@/stores/device.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotificationStore } from '@/stores/notification.store'
 import { deviceApi } from '@/api/device.api'
-import type { Device, DependencyRule } from '@/types/device.types'
+import type { Device, DependencyRule, ChannelMapping } from '@/types/device.types'
+import { FUNCTION_LABELS } from '@/types/device.types'
 
 const deviceStore = useDeviceStore()
 const authStore = useAuthStore()
 const notify = useNotificationStore()
 const { confirm } = useConfirm()
 const showRegistrationModal = ref(false)
-const syncing = ref(false)
 const searchQuery = ref('')
 const activeTab = ref<'all' | 'actuator' | 'sensor'>('all')
 
@@ -340,15 +331,14 @@ const irrigationControlling = ref<string | null>(null)
 const showIrrigationStatusModal = ref(false)
 const irrigationStatusDevice = ref<Device | null>(null)
 
-const IRRIGATION_SWITCH_LABELS: Record<string, string> = {
-  switch_1: '타이머 전원/B접점',
-  switch_2: '1구역 관수',
-  switch_3: '2구역 관수',
-  switch_4: '3구역 관수',
-  switch_5: '4구역 관수',
-  switch_6: '5구역 관수',
-  switch_usb1: '교반기 모터/B접점',
-  switch_usb2: '액비모터',
+function getMapping(device: Device): ChannelMapping {
+  return deviceStore.getEffectiveMapping(device)
+}
+
+function getMappingLabel(device: Device, switchCode: string): string {
+  const mapping = getMapping(device)
+  const found = (Object.entries(mapping) as [keyof ChannelMapping, string][]).find(([, sw]) => sw === switchCode)
+  return found ? FUNCTION_LABELS[found[0]] : switchCode
 }
 
 const openIrrigationStatusModal = (device: Device) => {
@@ -361,7 +351,7 @@ async function handleIrrigationControl(device: Device, switchCode: string) {
   irrigationControlling.value = device.id
   const currentVal = device.switchStates?.[switchCode] ?? false
   const newVal = !currentVal
-  const label = IRRIGATION_SWITCH_LABELS[switchCode] || switchCode
+  const label = getMappingLabel(device, switchCode)
   const loadingId = notify.add('info', '적용 중...', `${label} ${newVal ? 'ON' : 'OFF'} 명령 전송 중`, 0)
   try {
     const result = await deviceStore.controlDevice(device.id, [{ code: switchCode, value: newVal }])
@@ -471,8 +461,6 @@ const formatLastSeen = (lastSeen?: string) => {
 
 onMounted(async () => {
   await deviceStore.fetchDevices()
-  deviceStore.fetchAllActuatorStatuses()
-  deviceStore.fetchAllSensorStatuses()
 })
 
 const handleDeviceRegistered = () => {
@@ -902,6 +890,8 @@ input:checked + .toggle-slider:before {
 
 .btn-icon-delete {
   padding: 6px 14px;
+  min-height: 44px;
+  min-width: 44px;
   background: var(--bg-card);
   color: var(--danger);
   border: 1px solid var(--danger);
@@ -1066,88 +1056,6 @@ input:checked + .toggle-slider:before {
   background: var(--accent-bg);
 }
 
-/* 관수 상태 모달 */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.status-modal {
-  background: var(--bg-card);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 420px;
-  box-shadow: var(--shadow-modal);
-}
-
-.status-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.status-modal-header h3 {
-  font-size: calc(18px * var(--content-scale, 1));
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: var(--text-muted);
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.status-modal-body {
-  padding: 16px 24px 24px;
-}
-
-.status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-light);
-}
-.status-row:last-child {
-  border-bottom: none;
-}
-
-.status-row-label {
-  font-size: calc(15px * var(--content-scale, 1));
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.status-row-value {
-  font-size: calc(14px * var(--content-scale, 1));
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 6px;
-}
-.status-row-value.on {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-.status-row-value.off {
-  background: var(--bg-badge);
-  color: var(--text-muted);
-}
 
 @media (max-width: 768px) {
   .page-container { padding: 16px; }

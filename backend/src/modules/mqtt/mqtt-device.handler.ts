@@ -35,7 +35,7 @@ export class MqttDeviceHandler {
 
     if (device.online !== online) {
       await this.devicesRepo.update(device.id, { online, lastSeen: new Date() });
-      this.eventsGateway.broadcastDeviceStatus(device.id, online);
+      this.eventsGateway.broadcastDeviceStatus(device.userId, device.id, online);
       this.logger.log(`장비 상태 변경: ${device.name} → ${online ? '온라인' : '오프라인'}`);
     }
   }

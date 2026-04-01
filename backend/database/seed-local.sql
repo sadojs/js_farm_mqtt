@@ -19,7 +19,7 @@ DROP TABLE IF EXISTS users CASCADE;
 -- ==========================================
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
+  username VARCHAR(50) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(100) NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'farm_admin', 'farm_user')),
@@ -30,7 +30,7 @@ CREATE TABLE users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_parent ON users(parent_user_id);
 
 -- ==========================================
@@ -206,48 +206,48 @@ CREATE TRIGGER update_automation_rules_updated_at BEFORE UPDATE ON automation_ru
 -- ==========================================
 
 -- 관리자 계정 (비밀번호: admin123)
-INSERT INTO users (email, password_hash, name, role, address)
-VALUES ('admin@farm.com', '$2b$10$/3rGbaPbLwtp3WP26/rlre8O6VrocpfV8o8H.werJ0RICbknDHaV2', '관리자', 'admin', '서울시 강남구');
+INSERT INTO users (username, password_hash, name, role, address)
+VALUES ('admin', '$2b$10$/3rGbaPbLwtp3WP26/rlre8O6VrocpfV8o8H.werJ0RICbknDHaV2', '관리자', 'admin', '서울시 강남구');
 
 -- 테스트 농장 관리자 (비밀번호: user123)
-INSERT INTO users (email, password_hash, name, role, address)
-VALUES ('user@farm.com', '$2b$10$nzFSy4nFDGm2oP5afBzpO.r37PyM7/.7td2RrXdHfep7IzTJU3XLu', '김농부', 'farm_admin', '경기도 화성시 농업로 123');
+INSERT INTO users (username, password_hash, name, role, address)
+VALUES ('farmuser', '$2b$10$nzFSy4nFDGm2oP5afBzpO.r37PyM7/.7td2RrXdHfep7IzTJU3XLu', '김농부', 'farm_admin', '경기도 화성시 농업로 123');
 
 -- 사용자에게 Tuya 프로젝트 할당
 INSERT INTO tuya_projects (user_id, name, access_id, access_secret_encrypted, endpoint, project_id, enabled)
 SELECT id, '1농장 프로젝트', 'demo_access_id', 'demo_encrypted_secret', 'https://openapi.tuyaus.com', 'p1234567890', true
-FROM users WHERE email = 'user@farm.com';
+FROM users WHERE username = 'farmuser';
 
 -- 샘플 그룹
 INSERT INTO house_groups (user_id, name, description, manager, enable_group_control, enable_automation)
 SELECT id, '화성 1농장', '경기도 화성시 딸기 재배 농장', '김농부', true, true
-FROM users WHERE email = 'user@farm.com';
+FROM users WHERE username = 'farmuser';
 
 -- 샘플 하우스
 INSERT INTO houses (user_id, group_id, name, location, description, area, status)
 SELECT u.id, g.id, '1동 하우스', '화성시 농업로 123-1', '딸기 재배 하우스 1동', 330.00, 'active'
-FROM users u, house_groups g WHERE u.email = 'user@farm.com' AND g.name = '화성 1농장';
+FROM users u, house_groups g WHERE u.username = 'farmuser' AND g.name = '화성 1농장';
 
 INSERT INTO houses (user_id, group_id, name, location, description, area, status)
 SELECT u.id, g.id, '2동 하우스', '화성시 농업로 123-2', '딸기 재배 하우스 2동', 280.00, 'active'
-FROM users u, house_groups g WHERE u.email = 'user@farm.com' AND g.name = '화성 1농장';
+FROM users u, house_groups g WHERE u.username = 'farmuser' AND g.name = '화성 1농장';
 
 -- 샘플 장비
 INSERT INTO devices (user_id, house_id, tuya_device_id, name, category, device_type, online)
 SELECT u.id, h.id, 'tuya_temp_001', '온도 센서 1', '온도 센서', 'sensor', true
-FROM users u, houses h WHERE u.email = 'user@farm.com' AND h.name = '1동 하우스';
+FROM users u, houses h WHERE u.username = 'farmuser' AND h.name = '1동 하우스';
 
 INSERT INTO devices (user_id, house_id, tuya_device_id, name, category, device_type, online)
 SELECT u.id, h.id, 'tuya_humid_001', '습도 센서 1', '습도 센서', 'sensor', true
-FROM users u, houses h WHERE u.email = 'user@farm.com' AND h.name = '1동 하우스';
+FROM users u, houses h WHERE u.username = 'farmuser' AND h.name = '1동 하우스';
 
 INSERT INTO devices (user_id, house_id, tuya_device_id, name, category, device_type, online)
 SELECT u.id, h.id, 'tuya_fan_001', '환풍기 1', '환풍기', 'actuator', true
-FROM users u, houses h WHERE u.email = 'user@farm.com' AND h.name = '1동 하우스';
+FROM users u, houses h WHERE u.username = 'farmuser' AND h.name = '1동 하우스';
 
 INSERT INTO devices (user_id, house_id, tuya_device_id, name, category, device_type, online)
 SELECT u.id, h.id, 'tuya_temp_002', '온도 센서 2', '온도 센서', 'sensor', false
-FROM users u, houses h WHERE u.email = 'user@farm.com' AND h.name = '2동 하우스';
+FROM users u, houses h WHERE u.username = 'farmuser' AND h.name = '2동 하우스';
 
 -- 샘플 센서 데이터 (최근 데이터)
 INSERT INTO sensor_data (time, device_id, user_id, sensor_type, value, unit, status)
@@ -255,14 +255,14 @@ SELECT NOW() - interval '1 hour' * n, d.id, u.id, 'temperature',
   20 + (random() * 15)::numeric(10,4), '°C',
   CASE WHEN random() > 0.9 THEN 'warning' ELSE 'normal' END
 FROM users u, devices d, generate_series(0, 23) n
-WHERE u.email = 'user@farm.com' AND d.tuya_device_id = 'tuya_temp_001';
+WHERE u.username = 'farmuser' AND d.tuya_device_id = 'tuya_temp_001';
 
 INSERT INTO sensor_data (time, device_id, user_id, sensor_type, value, unit, status)
 SELECT NOW() - interval '1 hour' * n, d.id, u.id, 'humidity',
   50 + (random() * 40)::numeric(10,4), '%',
   CASE WHEN random() > 0.85 THEN 'warning' ELSE 'normal' END
 FROM users u, devices d, generate_series(0, 23) n
-WHERE u.email = 'user@farm.com' AND d.tuya_device_id = 'tuya_humid_001';
+WHERE u.username = 'farmuser' AND d.tuya_device_id = 'tuya_humid_001';
 
 -- 샘플 자동화 규칙
 INSERT INTO automation_rules (user_id, group_id, name, description, rule_type, enabled, conditions, actions, priority)
@@ -270,15 +270,15 @@ SELECT u.id, g.id, '고온 경보 환풍기 자동 작동', '온도 30도 이상
   '[{"type": "sensor", "field": "temperature", "operator": "gte", "value": 30, "unit": "°C"}]'::jsonb,
   '[{"command": "turn_on", "value": true, "groupId": null}]'::jsonb,
   1
-FROM users u, house_groups g WHERE u.email = 'user@farm.com' AND g.name = '화성 1농장';
+FROM users u, house_groups g WHERE u.username = 'farmuser' AND g.name = '화성 1농장';
 
 INSERT INTO automation_rules (user_id, group_id, name, description, rule_type, enabled, conditions, actions, priority)
 SELECT u.id, g.id, '일출 시 개폐기 오픈', '매일 오전 6시에 하우스 개폐기 열기', 'time', true,
   '[{"type": "time", "field": "hour", "operator": "eq", "value": 6}]'::jsonb,
   '[{"command": "open", "value": 100}]'::jsonb,
   2
-FROM users u, house_groups g WHERE u.email = 'user@farm.com' AND g.name = '화성 1농장';
+FROM users u, house_groups g WHERE u.username = 'farmuser' AND g.name = '화성 1농장';
 
 SELECT '시드 데이터 생성 완료!' as result;
-SELECT 'admin@farm.com / admin123 (관리자)' as admin_account;
-SELECT 'user@farm.com / user123 (농장 관리자)' as farm_admin_account;
+SELECT 'admin / admin123 (관리자)' as admin_account;
+SELECT 'farmuser / user123 (농장 관리자)' as farm_admin_account;

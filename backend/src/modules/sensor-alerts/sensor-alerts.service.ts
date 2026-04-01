@@ -75,7 +75,10 @@ export class SensorAlertsService {
 
   // ── 알림 CRUD ──
 
-  async findAll(userId: string, filters: { severity?: string; resolved?: boolean; deviceId?: string }) {
+  async findAll(userId: string, filters: { severity?: string; resolved?: boolean; deviceId?: string; limit?: number; offset?: number }) {
+    const limit = filters.limit ?? 100;
+    const offset = filters.offset ?? 0;
+
     const qb = this.alertRepo.createQueryBuilder('a')
       .where('a.user_id = :userId', { userId })
       .andWhere('(a.snoozed_until IS NULL OR a.snoozed_until < NOW())')
@@ -86,13 +89,16 @@ export class SensorAlertsService {
           AND ss.device_id = a.device_id
           AND ss.sensor_type = a.sensor_type
       )`)
-      .orderBy('a.created_at', 'DESC');
+      .orderBy('a.created_at', 'DESC')
+      .take(limit)
+      .skip(offset);
 
     if (filters.severity) qb.andWhere('a.severity = :severity', { severity: filters.severity });
     if (filters.resolved !== undefined) qb.andWhere('a.resolved = :resolved', { resolved: filters.resolved });
     if (filters.deviceId) qb.andWhere('a.device_id = :deviceId', { deviceId: filters.deviceId });
 
-    return qb.getMany();
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, limit, offset };
   }
 
   async findOneWithStats(userId: string, id: string) {
@@ -154,11 +160,88 @@ export class SensorAlertsService {
       await this.checkDevice(device, standbySet);
     }
 
+    // 액추에이터 오프라인 감지
+    await this.checkActuatorOffline();
+
     // 조건이 정상으로 복귀한 알림 자동 해제
     await this.autoResolveAlerts(standbySet);
 
     // 알림/해제 반복(flapping) 감지
     await this.checkFlapping(standbySet);
+  }
+
+  private async checkActuatorOffline() {
+    const actuators = await this.deviceRepo.find({
+      where: { deviceType: 'actuator' },
+      select: ['id', 'userId', 'name', 'online', 'lastSeen'],
+    });
+
+    for (const actuator of actuators) {
+      if (actuator.online) {
+        // 온라인이면 기존 미해결 오프라인 알림 자동 해제
+        const existingAlerts = await this.alertRepo.find({
+          where: {
+            deviceId: actuator.id,
+            alertType: 'no_data' as any,
+            sensorType: 'actuator_offline',
+            resolved: false,
+          },
+        });
+        for (const alert of existingAlerts) {
+          await this.alertRepo.update(
+            { id: alert.id },
+            { resolved: true, resolvedAt: new Date() },
+          );
+          this.logger.log(
+            `[Auto-Resolve] Actuator ${actuator.name} back online — offline alert resolved`,
+          );
+        }
+        continue;
+      }
+
+      // 오프라인인 경우 lastSeen 확인
+      if (!actuator.lastSeen) continue;
+      const minutesAgo = (Date.now() - new Date(actuator.lastSeen).getTime()) / 60000;
+
+      if (minutesAgo < 60) continue;
+
+      // 중복 방지: 기존 미해결 no_data 알림이 있는지 확인
+      const existing = await this.alertRepo.findOne({
+        where: {
+          deviceId: actuator.id,
+          alertType: 'no_data' as any,
+          sensorType: 'actuator_offline',
+          resolved: false,
+        },
+      });
+
+      if (existing) {
+        // 기존 알림이 있으면 심각도 업그레이드만 확인
+        if (minutesAgo >= 360 && existing.severity === 'warning') {
+          await this.alertRepo.update(
+            { id: existing.id },
+            { severity: 'critical', message: `장비 ${actuator.name} ${Math.round(minutesAgo / 60)}시간 동안 오프라인` },
+          );
+          this.logger.warn(`[Actuator Offline] ${actuator.name}: severity upgraded to critical`);
+        }
+        continue;
+      }
+
+      // 새 알림 생성
+      const severity: 'warning' | 'critical' = minutesAgo >= 360 ? 'critical' : 'warning';
+      const alert = this.alertRepo.create({
+        userId: actuator.userId,
+        deviceId: actuator.id,
+        deviceName: actuator.name,
+        sensorType: 'actuator_offline',
+        alertType: 'no_data' as any,
+        severity,
+        message: `장비 ${actuator.name} ${minutesAgo >= 360 ? Math.round(minutesAgo / 60) + '시간' : Math.round(minutesAgo) + '분'} 동안 오프라인`,
+        threshold: minutesAgo >= 360 ? '>360분' : '>60분',
+      });
+      await this.alertRepo.save(alert);
+      this.logger.warn(`[Actuator Offline] ${actuator.name}: offline for ${Math.round(minutesAgo)} minutes (${severity})`);
+    }
   }
 
   private async checkDevice(

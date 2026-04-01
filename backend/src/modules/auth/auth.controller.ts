@@ -1,25 +1,58 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Res, Req } from '@nestjs/common';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshTokenDto } from './dto/login.dto';
+import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+const REFRESH_COOKIE = 'rft';
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
+  path: '/',
+};
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+    res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
+    return { accessToken: result.accessToken, user: result.user };
   }
 
   @Post('refresh')
-  async refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  @SkipThrottle()
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token = req.cookies?.[REFRESH_COOKIE];
+    const result = await this.authService.refresh(token);
+    res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
+    return { accessToken: result.accessToken };
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle()
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser('id') userId: string,
+  ) {
+    const token = req.cookies?.[REFRESH_COOKIE];
+    await this.authService.logout(userId, token);
+    res.clearCookie(REFRESH_COOKIE, { path: '/' });
+    return { ok: true };
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @SkipThrottle()
   async me(@CurrentUser('id') userId: string) {
     return this.authService.getMe(userId);
   }

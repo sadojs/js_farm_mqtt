@@ -7,7 +7,6 @@ import * as path from 'path';
 import { User } from '../users/entities/user.entity';
 import { Device } from '../devices/entities/device.entity';
 import { SensorData } from '../sensors/entities/sensor-data.entity';
-import { CropBatch } from '../harvest/entities/crop-batch.entity';
 
 interface PositionEntry {
   code: string;
@@ -36,8 +35,6 @@ export class DashboardService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Device)
     private readonly devicesRepo: Repository<Device>,
-    @InjectRepository(CropBatch)
-    private readonly batchRepo: Repository<CropBatch>,
     private readonly dataSource: DataSource,
   ) {
     const filePath = path.join(process.cwd(), 'src/modules/dashboard/position.json');
@@ -59,7 +56,12 @@ export class DashboardService {
       throw new NotFoundException(`주소에 대응하는 좌표를 찾지 못했습니다: ${user.address}`);
     }
 
-    const serviceKey = this.getServiceKey();
+    let serviceKey: string;
+    try {
+      serviceKey = this.getServiceKey();
+    } catch {
+      throw new NotFoundException('기상청 API 키가 설정되지 않아 날씨 정보를 불러올 수 없습니다. KMA_SERVICE_KEY 환경변수를 설정해 주세요.');
+    }
     const { baseDate, baseTime } = this.getUltraSrtNcstBaseDateTime(new Date());
 
     const { data } = await axios.get('https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst', {
@@ -124,21 +126,16 @@ export class DashboardService {
     }
 
     // 2~6) 병렬 실행 (활성 배치 currentStage 포함)
-    const [inside, history, trend6h, uvStats14d, activeBatch] = await Promise.all([
+    const [inside, history, trend6h, uvStats14d] = await Promise.all([
       this.getLatestSensorValues(qxjIds),
       this.getHistoryValues(qxjIds),
       this.getTrend6h(qxjIds),
       this.getUvStats14d(qxjIds),
-      this.batchRepo.findOne({
-        where: { userId, status: 'active' },
-        order: { createdAt: 'DESC' },
-        select: ['currentStage'],
-      }),
     ]);
 
     return {
       inside, history, trend6h, uvStats14d,
-      currentStage: activeBatch?.currentStage || null,
+      currentStage: null,
     };
   }
 
@@ -221,11 +218,11 @@ export class DashboardService {
   }
 
   private getServiceKey(): string {
-    const encodedFallback =
-      'Ovj%2FY%2Bkq2KuEXQDUmEBRg4ekq4bR2xjBSmwLU0Atp4r2ZJeOKhMBjap2M5J34fLoj5VM9w6VA%2FySVbjAtgX9SQ%3D%3D';
-    const configured = process.env.KMA_SERVICE_KEY || process.env.KMA_API_KEY || encodedFallback;
-
-    // API 키가 URL 인코딩된 형태로 주어지므로 디코드 후 axios가 다시 1회 인코딩하도록 처리
+    const configured = process.env.KMA_SERVICE_KEY || process.env.KMA_API_KEY;
+    if (!configured) {
+      throw new Error('KMA_SERVICE_KEY 환경변수가 설정되지 않았습니다.');
+    }
+    // API 키가 URL 인코딩된 형태로 주어지는 경우 디코드
     try {
       return configured.includes('%') ? decodeURIComponent(configured) : configured;
     } catch {

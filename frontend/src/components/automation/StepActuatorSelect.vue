@@ -73,6 +73,7 @@ import { useGroupStore } from '../../stores/group.store'
 const props = defineProps<{
   selectedIds: string[]
   groupId?: string
+  hideIrrigation?: boolean
 }>()
 const emit = defineEmits<{
   'update:selectedIds': [value: string[]]
@@ -87,7 +88,8 @@ const actuators = computed(() => {
   return (group.devices || []).filter((d: any) =>
     d.deviceType === 'actuator' &&
     d.equipmentType !== 'opener_open' &&
-    d.equipmentType !== 'opener_close'
+    d.equipmentType !== 'opener_close' &&
+    !(props.hideIrrigation && d.equipmentType === 'irrigation')
   )
 })
 

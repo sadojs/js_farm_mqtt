@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Device } from './entities/device.entity';
@@ -6,6 +6,7 @@ import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttService } from '../mqtt/mqtt.service';
 import { EventsGateway } from '../gateway/events.gateway';
+import { DEFAULT_CHANNEL_MAPPING, AVAILABLE_SWITCH_CODES } from './channel-mapping.constants';
 
 const DEVICE_DEPENDENCY_SQL = `
   SELECT id, name, enabled FROM automation_rules
@@ -119,6 +120,32 @@ export class DevicesService {
     return results;
   }
 
+  getEffectiveMapping(device: Device): Record<string, string> {
+    return device.channelMapping ?? { ...DEFAULT_CHANNEL_MAPPING };
+  }
+
+  async updateChannelMapping(
+    id: string,
+    userId: string,
+    role: string,
+    mapping: Record<string, string>,
+  ): Promise<Device> {
+    if (role !== 'admin' && role !== 'farm_admin') {
+      throw new ForbiddenException('채널 매핑 수정 권한이 없습니다.');
+    }
+    const device = await this.devicesRepo.findOne({ where: { id, userId } });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    if (device.equipmentType !== 'irrigation') {
+      throw new BadRequestException('관수 장비만 채널 매핑을 설정할 수 있습니다.');
+    }
+    const invalid = Object.values(mapping).filter(v => v !== '' && !AVAILABLE_SWITCH_CODES.includes(v));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`유효하지 않은 switch 코드: ${invalid.join(', ')}`);
+    }
+    device.channelMapping = mapping;
+    return this.devicesRepo.save(device);
+  }
+
   async controlDevice(id: string, userId: string, commands: { code: string; value: any }[]) {
     const device = await this.devicesRepo.findOne({ where: { id, userId } });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
@@ -129,6 +156,31 @@ export class DevicesService {
       ? await this.gatewayRepo.findOne({ where: { id: device.gatewayId } })
       : null;
     if (!gateway) throw new NotFoundException('장비에 연결된 게이트웨이를 찾을 수 없습니다.');
+
+    // 관수 장비 원격제어 연동
+    if (device.equipmentType === 'irrigation') {
+      const mapping = this.getEffectiveMapping(device);
+      const remoteSwitch = mapping['remote_control'];
+      const remoteCmd = commands.find(c => c.code === remoteSwitch);
+
+      if (remoteCmd) {
+        if (remoteCmd.value === true) {
+          // 원격제어 ON → fertilizer_b_contact 자동 ON
+          const bContactSwitch = mapping['fertilizer_b_contact'];
+          await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
+            [bContactSwitch]: true,
+          });
+        } else if (remoteCmd.value === false) {
+          // 원격제어 OFF → 모든 관수 스위치 강제 OFF
+          const allSwitches = Object.values(mapping).filter(Boolean);
+          const offPayload: Record<string, any> = {};
+          for (const sw of allSwitches) offPayload[sw] = false;
+          await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
+          this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
+          return { success: true, deviceId: device.id, command: offPayload };
+        }
+      }
+    }
 
     // MQTT 커맨드 변환 (Tuya 형식 → Zigbee2MQTT 형식)
     const mqttCommand = this.buildMqttCommand(commands);

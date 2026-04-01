@@ -1,9 +1,16 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import * as helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+
+  app.use((helmet as any).default ? (helmet as any).default() : (helmet as any)());
+  app.use((cookieParser as any).default ? (cookieParser as any).default() : (cookieParser as any)());
 
   app.setGlobalPrefix('api');
 
@@ -20,8 +27,10 @@ async function bootstrap() {
     }),
   );
 
+  app.useGlobalFilters(new GlobalExceptionFilter());
+
   const port = process.env.PORT || 3100;
   await app.listen(port);
-  console.log(`Smart Farm MQTT API running on port ${port}`);
+  logger.log(`Smart Farm MQTT API running on port ${port}`);
 }
 bootstrap();

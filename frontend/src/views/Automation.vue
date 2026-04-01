@@ -5,9 +5,17 @@
         <h2>자동화 룰</h2>
         <p class="page-description">센서 값에 따라 장비를 자동으로 제어합니다</p>
       </div>
-      <button class="btn-primary" @click="openWizard()">+ 룰 추가</button>
+      <button v-if="mainTab === 'rules'" class="btn-primary" @click="openWizard()">+ 룰 추가</button>
     </header>
 
+    <!-- 메인 탭: 규칙 목록 | 실행 로그 -->
+    <div class="main-tabs">
+      <button class="main-tab" :class="{ active: mainTab === 'rules' }" @click="mainTab = 'rules'">규칙 목록</button>
+      <button class="main-tab" :class="{ active: mainTab === 'logs' }" @click="mainTab = 'logs'">실행 로그</button>
+    </div>
+
+    <!-- 규칙 목록 탭 -->
+    <template v-if="mainTab === 'rules'">
     <div class="automation-tabs">
       <button class="tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">전체 ({{ rules.length }})</button>
       <button v-if="SHOW_OPENER_TAB" class="tab" :class="{ active: activeTab === 'opener' }" @click="activeTab = 'opener'">개폐기 ({{ openerRules.length }})</button>
@@ -20,10 +28,14 @@
     <div v-if="loading" class="loading-state">룰 목록을 불러오는 중...</div>
 
     <!-- 빈 상태 -->
-    <div v-else-if="filteredRules.length === 0" class="empty-state">
-      <p>등록된 자동화 룰이 없습니다.</p>
-      <button class="btn-primary" @click="openWizard()">첫 번째 룰 만들기</button>
-    </div>
+    <EmptyState
+      v-else-if="filteredRules.length === 0"
+      icon="<circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'/>"
+      title="자동화 규칙이 없습니다"
+      description="센서 값에 따라 장비를 자동으로 제어하는 규칙을 만들어보세요."
+      action-label="+ 규칙 만들기"
+      :action-fn="() => openWizard()"
+    />
 
     <!-- 룰 목록 -->
     <div v-else class="rules-grid">
@@ -102,6 +114,14 @@
       @close="wizardOpen = false"
       @saved="onRuleSaved"
     />
+    </template>
+    <!-- //규칙 목록 탭 -->
+
+    <!-- 실행 로그 탭 -->
+    <template v-if="mainTab === 'logs'">
+      <AutomationLogTimeline />
+    </template>
+    <!-- //실행 로그 탭 -->
   </div>
 </template>
 
@@ -115,6 +135,8 @@ import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
 import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
+import EmptyState from '../components/common/EmptyState.vue'
+import AutomationLogTimeline from '../components/automation/AutomationLogTimeline.vue'
 
 const automationStore = useAutomationStore()
 const groupStore = useGroupStore()
@@ -127,6 +149,10 @@ type TabType = 'all' | RuleKind
 // 개폐기 탭 표시 여부 (당분간 미사용, 필요 시 true로 변경)
 const SHOW_OPENER_TAB = false
 const activeTab = ref<TabType>('all')
+
+// 메인 탭: 규칙 목록 / 실행 로그
+const mainTab = ref<'rules' | 'logs'>('rules')
+
 const wizardOpen = ref(false)
 const editingRule = ref<AutomationRule | null>(null)
 
@@ -275,6 +301,44 @@ onMounted(async () => {
   transition: background 0.2s;
 }
 .btn-primary:hover { background: var(--accent-hover); }
+
+/* 메인 탭 (규칙 목록 / 실행 로그) */
+.main-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border-light);
+}
+
+.main-tab {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.main-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.main-tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: calc(15px * var(--content-scale, 1));
+}
 
 .automation-tabs {
   display: flex;

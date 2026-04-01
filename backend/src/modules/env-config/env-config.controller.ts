@@ -1,10 +1,13 @@
 import { Controller, Get, Put, Param, Body, UseGuards } from '@nestjs/common';
 import { EnvConfigService } from './env-config.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('env-config')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'farm_admin')
 export class EnvConfigController {
   constructor(private envConfigService: EnvConfigService) {}
 

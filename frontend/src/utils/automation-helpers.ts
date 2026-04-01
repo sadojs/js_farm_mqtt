@@ -197,13 +197,11 @@ export function createDefaultIrrigationConditions(): import('../types/automation
   return {
     type: 'irrigation',
     startTime: '10:00',
-    timerSwitch: false,
     zones: [
       { zone: 1, name: '1구역', duration: 30, waitTime: 5, enabled: true },
       { zone: 2, name: '2구역', duration: 30, waitTime: 5, enabled: true },
       { zone: 3, name: '3구역', duration: 30, waitTime: 5, enabled: true },
       { zone: 4, name: '4구역', duration: 30, waitTime: 5, enabled: true },
-      { zone: 5, name: '5구역', duration: 30, waitTime: 5, enabled: false },
     ],
     mixer: { enabled: false },
     fertilizer: { duration: 10, preStopWait: 5 },

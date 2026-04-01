@@ -28,6 +28,7 @@
     "playwright": "^1.58.2",
     "typescript": "~5.3.3",
     "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
     "vue-tsc": "^1.8.27"
   }
 }

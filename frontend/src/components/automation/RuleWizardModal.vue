@@ -32,10 +32,14 @@
             v-if="currentStep === 3"
             v-model:selectedIds="formData.actuatorDeviceIds"
             :groupId="formData.groupId"
+            :hideIrrigation="!noSensor"
           />
           <StepIrrigationCondition
             v-if="currentStep === 4 && isIrrigation"
             v-model="irrigationForm"
+            :channelMapping="localChannelMapping"
+            :editableMapping="canEditMapping"
+            @update:channelMapping="handleMappingUpdate"
           />
           <StepConditionBuilder
             v-if="currentStep === 4 && !isIrrigation"
@@ -67,11 +71,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, shallowRef } from 'vue'
 import type { AutomationRule, WizardFormData, CreateRuleRequest, IrrigationConditions } from '../../types/automation.types'
 import { createEmptyWizardForm, createDefaultIrrigationConditions } from '../../utils/automation-helpers'
 import { useAutomationStore } from '../../stores/automation.store'
 import { useGroupStore } from '../../stores/group.store'
+import { useDeviceStore } from '../../stores/device.store'
+import { useAuthStore } from '../../stores/auth.store'
+import type { ChannelMapping } from '../../types/device.types'
 import StepTargetSelect from './StepTargetSelect.vue'
 import StepSensorSelect from './StepSensorSelect.vue'
 import StepActuatorSelect from './StepActuatorSelect.vue'
@@ -84,6 +91,8 @@ const emit = defineEmits<{ close: []; saved: [rule: any] }>()
 
 const automationStore = useAutomationStore()
 const groupStore = useGroupStore()
+const deviceStore = useDeviceStore()
+const { isAdmin, isFarmAdmin } = useAuthStore()
 const currentStep = ref(1)
 const saving = ref(false)
 const noSensor = ref(false)
@@ -144,6 +153,36 @@ const selectedEquipmentType = computed(() => {
 })
 
 const isIrrigation = computed(() => selectedEquipmentType.value === 'irrigation')
+
+// 로컬 채널 매핑 — UI 즉시 반영용 (API 응답 대기 없이 동작)
+const localChannelMapping = shallowRef<ChannelMapping | undefined>(undefined)
+
+// 장비 선택이 바뀌면 로컬 매핑 초기화
+watch(
+  () => formData.value.actuatorDeviceIds[0],
+  (deviceId) => {
+    if (!deviceId || !isIrrigation.value) { localChannelMapping.value = undefined; return }
+    const group = groupStore.groups.find(g => g.id === formData.value.groupId)
+    const device = group?.devices?.find((d: any) => d.id === deviceId)
+    localChannelMapping.value = device ? { ...deviceStore.getEffectiveMapping(device as any) } : undefined
+  },
+  { immediate: true },
+)
+
+// admin/farm_admin만 채널 매핑 편집 가능
+const canEditMapping = computed(() => isAdmin || isFarmAdmin)
+
+// 채널 매핑 변경 → 로컬 즉시 반영 + API 저장
+async function handleMappingUpdate(mapping: ChannelMapping) {
+  localChannelMapping.value = { ...mapping }   // UI 즉시 반영
+  const deviceId = formData.value.actuatorDeviceIds[0]
+  if (!deviceId) return
+  try {
+    await deviceStore.updateChannelMapping(deviceId, mapping)
+  } catch {
+    // 저장 실패 시 무시
+  }
+}
 
 const canNext = computed(() => {
   if (currentStep.value === 1) return !!formData.value.groupId

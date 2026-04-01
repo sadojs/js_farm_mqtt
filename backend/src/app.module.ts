@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { DevicesModule } from './modules/devices/devices.module';
@@ -14,24 +16,25 @@ import { MqttModule } from './modules/mqtt/mqtt.module';
 import { GatewayManagerModule } from './modules/gateway-manager/gateway-manager.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { WeatherModule } from './modules/weather/weather.module';
-import { HarvestModule } from './modules/harvest/harvest.module';
 import { SensorAlertsModule } from './modules/sensor-alerts/sensor-alerts.module';
-import { HarvestRecModule } from './modules/harvest-rec/harvest-rec.module';
 import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        url: config.get('DATABASE_URL', 'postgresql://smartfarm:smartfarm123@localhost:5432/smartfarm_mqtt'),
+        url: config.getOrThrow<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        synchronize: true, // 개발 환경에서 자동 스키마 생성
+        synchronize: config.get('NODE_ENV') !== 'production',
+        logging: config.get('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error'],
       }),
     }),
     AuthModule,
@@ -46,11 +49,11 @@ import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module
     GatewayManagerModule,
     DashboardModule,
     WeatherModule,
-    HarvestModule,
     SensorAlertsModule,
-    HarvestRecModule,
     EnvConfigModule,
     ConfigDeployModule,
+    HealthModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

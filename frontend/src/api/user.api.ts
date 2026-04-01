@@ -2,7 +2,7 @@ import apiClient from './client'
 import type { User } from '../types/auth.types'
 
 export interface CreateUserRequest {
-  email: string
+  username: string
   password: string
   name: string
   role: 'admin' | 'farm_admin' | 'farm_user'

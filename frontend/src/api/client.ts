@@ -5,12 +5,14 @@ import { useAuthStore } from '../stores/auth.store'
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 10000,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// 요청 인터셉터: JWT 토큰 자동 첨부
+// 요청 인터셉터: JWT 토큰 자동 첨부 (메모리 기반 - sessionStorage 미사용)
 apiClient.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem('accessToken')
+  const authStore = useAuthStore()
+  const token = authStore.accessToken
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -24,8 +26,9 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config
     const status = error.response?.status
 
-    // 401: 토큰 갱신 or 로그아웃
-    if (status === 401 && !originalRequest._retry) {
+    // 401: 토큰 갱신 or 로그아웃 (refresh 요청 자체는 재시도 안 함)
+    const isRefreshRequest = originalRequest.url?.includes('/auth/refresh')
+    if (status === 401 && !originalRequest._retry && !isRefreshRequest) {
       originalRequest._retry = true
       try {
         const authStore = useAuthStore()

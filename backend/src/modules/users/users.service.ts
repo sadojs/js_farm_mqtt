@@ -59,11 +59,12 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto) {
-    const exists = await this.usersRepo.findOne({ where: { email: dto.email } });
-    if (exists) throw new ConflictException('이미 등록된 이메일입니다.');
+    const username = dto.username.toLowerCase();
+    const exists = await this.usersRepo.findOne({ where: { username } });
+    if (exists) throw new ConflictException('이미 등록된 사용자명입니다.');
 
     const user = this.usersRepo.create({
-      email: dto.email,
+      username,
       passwordHash: await bcrypt.hash(dto.password, 10),
       name: dto.name,
       role: dto.role || 'farm_admin',

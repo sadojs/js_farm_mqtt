@@ -2,10 +2,13 @@ import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nes
 import { GatewayManagerService } from './gateway-manager.service';
 import { MqttService } from '../mqtt/mqtt.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('gateways')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'farm_admin')
 export class GatewayManagerController {
   constructor(
     private gatewayService: GatewayManagerService,

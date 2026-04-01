@@ -200,7 +200,7 @@ const loading = ref(true)
 const sensorsLoading = ref(true)
 const alerts = ref<SensorAlert[]>([])
 const sensors = ref<SensorEntry[]>([])
-const filter = ref('all')
+const filter = ref('unresolved')
 const selectedAlert = ref<SensorAlert | null>(null)
 const detail = ref<AlertDetail | null>(null)
 const detailLoading = ref(false)
@@ -274,11 +274,9 @@ const SENSOR_ICONS: Record<string, string> = {
 }
 
 const filterOptions = [
-  { label: '전체', value: 'all' },
-  { label: '미해결', value: 'unresolved' },
+  { label: '전체 (미해결)', value: 'unresolved' },
   { label: '심각', value: 'critical' },
   { label: '경고', value: 'warning' },
-  { label: '해결됨', value: 'resolved' },
 ]
 
 const activeSensors = computed(() => sensors.value.filter(s => !s.standby))
@@ -296,10 +294,8 @@ const unresolvedCount = computed(() => visibleAlerts.value.filter(a => !a.resolv
 
 const filteredAlerts = computed(() => {
   switch (filter.value) {
-    case 'unresolved': return visibleAlerts.value.filter(a => !a.resolved)
-    case 'critical': return visibleAlerts.value.filter(a => a.severity === 'critical' && !a.resolved)
-    case 'warning': return visibleAlerts.value.filter(a => a.severity === 'warning' && !a.resolved)
-    case 'resolved': return visibleAlerts.value.filter(a => a.resolved)
+    case 'critical': return visibleAlerts.value.filter(a => a.severity === 'critical')
+    case 'warning': return visibleAlerts.value.filter(a => a.severity === 'warning')
     default: return visibleAlerts.value
   }
 })
@@ -338,8 +334,8 @@ function formatDate(dateStr: string): string {
 async function loadAlerts() {
   loading.value = true
   try {
-    const res = await sensorAlertsApi.getAlerts()
-    alerts.value = res.data
+    const res = await sensorAlertsApi.getAlerts({ resolved: 'false' })
+    alerts.value = res.data.data
   } catch {
     notificationStore.error('오류', '알림 목록을 불러오지 못했습니다.')
   } finally {

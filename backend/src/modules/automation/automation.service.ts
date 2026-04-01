@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { CreateRuleDto, UpdateRuleDto } from './dto/create-rule.dto';
 import { AutomationLog } from './entities/automation-log.entity';
@@ -92,8 +92,50 @@ export class AutomationService {
       qb.andWhere('l.rule_id = :ruleId', { ruleId: params.ruleId });
     }
 
-    const [items] = await qb.getManyAndCount();
-    return items;
+    const items = await qb.getMany();
+
+    // ruleName 조인
+    const ruleIds = [...new Set(items.map((l) => l.ruleId))];
+    const rules = ruleIds.length > 0
+      ? await this.rulesRepo.findByIds(ruleIds)
+      : [];
+    const ruleMap = new Map(rules.map((r) => [r.id, r.name]));
+
+    return items.map((log) => ({
+      ...log,
+      ruleName: ruleMap.get(log.ruleId) || null,
+    }));
+  }
+
+  async getLogStats(userId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [todayCount, successCount, totalCount] = await Promise.all([
+      this.logsRepo.count({ where: { userId, executedAt: MoreThanOrEqual(today) } }),
+      this.logsRepo.count({ where: { userId, success: true } }),
+      this.logsRepo.count({ where: { userId } }),
+    ]);
+
+    const successRate = totalCount > 0 ? Math.round((successCount / totalCount) * 100) : 0;
+
+    const mostActiveRow = await this.logsRepo
+      .createQueryBuilder('l')
+      .select('l.rule_id', 'ruleId')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('l.user_id = :userId', { userId })
+      .groupBy('l.rule_id')
+      .orderBy('cnt', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    let mostActiveRule: string | null = null;
+    if (mostActiveRow?.ruleId) {
+      const rule = await this.rulesRepo.findOne({ where: { id: mostActiveRow.ruleId, userId } });
+      mostActiveRule = rule?.name || null;
+    }
+
+    return { todayCount, successRate, mostActiveRule };
   }
 
   async runRuleNow(id: string, userId: string) {

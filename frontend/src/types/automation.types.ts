@@ -55,7 +55,6 @@ export interface IrrigationZoneConfig {
 export interface IrrigationConditions {
   type: 'irrigation'
   startTime: string
-  timerSwitch: boolean
   zones: IrrigationZoneConfig[]
   mixer: { enabled: boolean }
   fertilizer: { duration: number; preStopWait: number }
@@ -104,12 +103,20 @@ export interface CreateRuleRequest {
 export interface AutomationLog {
   id: string
   ruleId: string
-  ruleName: string
+  userId?: string
+  ruleName?: string | null
   executedAt: string
   success: boolean
   conditionsMet?: any
   actionsExecuted?: any
   error?: string
+  errorMessage?: string | null
+}
+
+export interface AutomationLogStats {
+  todayCount: number
+  successRate: number
+  mostActiveRule: string | null
 }
 
 // === 레거시 타입 (기존 코드 호환) ===

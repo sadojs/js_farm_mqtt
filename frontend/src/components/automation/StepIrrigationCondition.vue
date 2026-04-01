@@ -44,29 +44,27 @@
 
     <!-- 2. 상세 설정 -->
     <div class="section">
-      <label class="section-label">상세 설정</label>
+      <label class="section-label">관수 채널 설정</label>
 
-      <!-- 타이머 전원/B접점 -->
-      <div class="setting-row compact">
-        <span class="setting-name fixed">타이머 전원/B접점</span>
-        <div class="setting-fields">
-          <button
-            class="toggle-btn"
-            :class="{ active: form.timerSwitch }"
-            @click="form.timerSwitch = !form.timerSwitch"
-          >{{ form.timerSwitch ? 'ON' : 'OFF' }}</button>
-        </div>
-      </div>
-
-      <!-- 구역 1~5 -->
-      <div v-for="zone in form.zones" :key="zone.zone" class="setting-row zone-row">
-        <div class="zone-name-wrap">
+      <!-- 구역 1~4 (zone > 4는 미지원으로 표시 제외) -->
+      <div v-for="zone in form.zones.filter(z => z.zone <= 4)" :key="zone.zone" class="setting-row zone-row">
+        <div class="zone-header-row">
           <input
             type="text"
             v-model="zone.name"
             class="zone-name-input"
-            :placeholder="`${zone.zone}구역`"
+            :placeholder="getZoneLabel(zone.zone)"
           />
+          <select
+            v-if="editableMapping"
+            class="switch-select"
+            :value="getZoneSwitch(zone.zone)"
+            @change="updateZoneSwitch(zone.zone, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="" disabled>-- 선택 --</option>
+            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+          </select>
+          <span v-else class="switch-hint">{{ getZoneSwitch(zone.zone) }}</span>
         </div>
         <div class="setting-fields">
           <div class="field-group">
@@ -91,9 +89,18 @@
         </div>
       </div>
 
-      <!-- 교반기/접점 -->
+      <!-- 교반기 -->
       <div class="setting-row compact">
-        <span class="setting-name fixed">교반기/접점</span>
+        <div class="zone-header-row">
+          <span class="setting-name fixed">교반기</span>
+          <select v-if="editableMapping" class="switch-select"
+            :value="effectiveMapping['mixer']"
+            @change="updateFnSwitch('mixer', ($event.target as HTMLSelectElement).value)">
+            <option value="" disabled>-- 선택 --</option>
+            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+          </select>
+          <span v-else class="switch-hint">{{ effectiveMapping['mixer'] }}</span>
+        </div>
         <div class="setting-fields">
           <button
             class="toggle-btn"
@@ -105,8 +112,15 @@
 
       <!-- 액비모터 -->
       <div class="setting-row zone-row">
-        <div class="zone-name-wrap">
+        <div class="zone-header-row">
           <span class="setting-name fixed">액비모터</span>
+          <select v-if="editableMapping" class="switch-select"
+            :value="effectiveMapping['fertilizer_motor']"
+            @change="updateFnSwitch('fertilizer_motor', ($event.target as HTMLSelectElement).value)">
+            <option value="" disabled>-- 선택 --</option>
+            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+          </select>
+          <span v-else class="switch-hint">{{ effectiveMapping['fertilizer_motor'] }}</span>
         </div>
         <div class="setting-fields">
           <div class="field-group">
@@ -127,7 +141,33 @@
       </div>
     </div>
 
-    <!-- 3. 반복 설정 -->
+    <!-- 3. 채널 매핑 (admin/farm_admin + editableMapping 시에만 표시) -->
+    <div v-if="editableMapping" class="section">
+      <label class="section-label">원격제어 채널 설정</label>
+      <p class="mapping-desc">각 기능에 연결된 물리 스위치 채널을 설정합니다.</p>
+
+      <div class="mapping-row">
+        <span class="mapping-label">원격제어 ON/OFF</span>
+        <select class="switch-select-full"
+          :value="effectiveMapping['remote_control']"
+          @change="updateFnSwitch('remote_control', ($event.target as HTMLSelectElement).value)">
+          <option value="" disabled>-- 선택 --</option>
+          <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+        </select>
+      </div>
+
+      <div class="mapping-row">
+        <span class="mapping-label">액비/교반기 B접점</span>
+        <select class="switch-select-full"
+          :value="effectiveMapping['fertilizer_b_contact']"
+          @change="updateFnSwitch('fertilizer_b_contact', ($event.target as HTMLSelectElement).value)">
+          <option value="" disabled>-- 선택 --</option>
+          <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 4. 반복 설정 -->
     <div class="section">
       <label class="section-label">반복 설정</label>
       <div class="day-selector">
@@ -148,7 +188,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, ref, nextTick } from 'vue'
+import { reactive, watch, ref, nextTick, computed } from 'vue'
+import type { ChannelMapping } from '../../types/device.types'
+import { DEFAULT_CHANNEL_MAPPING, FUNCTION_LABELS, AVAILABLE_SWITCH_CODES } from '../../types/device.types'
 
 export interface IrrigationZone {
   zone: number
@@ -161,7 +203,6 @@ export interface IrrigationZone {
 export interface IrrigationFormData {
   type: 'irrigation'
   startTime: string
-  timerSwitch: boolean
   zones: IrrigationZone[]
   mixer: { enabled: boolean }
   fertilizer: { duration: number; preStopWait: number }
@@ -170,10 +211,47 @@ export interface IrrigationFormData {
 
 const props = defineProps<{
   modelValue: IrrigationFormData
+  channelMapping?: ChannelMapping
+  editableMapping?: boolean
 }>()
+
 const emit = defineEmits<{
   'update:modelValue': [value: IrrigationFormData]
+  'update:channelMapping': [mapping: ChannelMapping]
 }>()
+
+const effectiveMapping = computed(() => props.channelMapping ?? DEFAULT_CHANNEL_MAPPING)
+
+const mappingRecord = computed(() => effectiveMapping.value as unknown as Record<string, string>)
+const labelsRecord = FUNCTION_LABELS as unknown as Record<string, string>
+
+function getZoneLabel(zoneNum: number): string {
+  return labelsRecord[`zone_${zoneNum}`] || `${zoneNum}구역`
+}
+function getZoneSwitch(zoneNum: number): string {
+  return mappingRecord.value[`zone_${zoneNum}`] || ''
+}
+
+// switch 코드 변경 시 기존 보유자를 빈 값으로 밀어냄
+function applySwitch(targetKey: string, switchCode: string) {
+  const next = { ...mappingRecord.value }
+  // 동일한 switch 코드를 갖고 있던 다른 키를 초기화
+  for (const k of Object.keys(next)) {
+    if (k !== targetKey && next[k] === switchCode) {
+      next[k] = ''
+    }
+  }
+  next[targetKey] = switchCode
+  emit('update:channelMapping', next as unknown as ChannelMapping)
+}
+
+function updateZoneSwitch(zoneNum: number, switchCode: string) {
+  applySwitch(`zone_${zoneNum}`, switchCode)
+}
+
+function updateFnSwitch(fnKey: keyof ChannelMapping, switchCode: string) {
+  applySwitch(fnKey, switchCode)
+}
 
 const DAYS = [
   { value: 1, label: '월' }, { value: 2, label: '화' },
@@ -294,7 +372,7 @@ function toggleDay(day: number) {
 }
 
 .setting-name.fixed {
-  font-size: calc(16px * var(--content-scale, 1));
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -302,6 +380,83 @@ function toggleDay(day: number) {
 
 .zone-name-wrap {
   min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name-hint-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 구역명 + 채널 선택을 한 행에 배치 */
+.zone-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.switch-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-family: monospace;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.switch-select {
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+/* 채널 매핑 섹션 */
+.mapping-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+
+.mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.mapping-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.switch-select-full {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 120px;
 }
 
 .zone-name-input {

@@ -61,7 +61,7 @@ export class MqttSensorHandler {
         unit: mapping.unit,
       });
 
-      this.eventsGateway.broadcastSensorUpdate({
+      this.eventsGateway.broadcastSensorUpdate(device.userId, {
         deviceId: device.id,
         houseId: device.houseId,
         sensorType: mapping.field,

@@ -15,7 +15,7 @@
         <thead>
           <tr>
             <th>이름</th>
-            <th>이메일</th>
+            <th>사용자명</th>
             <th>역할</th>
             <th>주소</th>
             <th>게이트웨이</th>
@@ -32,7 +32,7 @@
                 <span>{{ user.name }}</span>
               </div>
             </td>
-            <td>{{ user.email }}</td>
+            <td>{{ user.username }}</td>
             <td>
               <span class="role-badge" :class="user.role">
                 {{ roleLabel(user.role) }}
@@ -153,7 +153,7 @@
             <select v-model="gwForm.userId" class="form-input">
               <option value="" disabled>소유자를 선택하세요</option>
               <option v-for="user in farmAdminUsers" :key="user.id" :value="user.id">
-                {{ user.name }} ({{ user.email }})
+                {{ user.name }} ({{ user.username }})
               </option>
             </select>
           </div>
@@ -192,7 +192,7 @@ import { useAuthStore } from '../stores/auth.store'
 interface User {
   id: string
   name: string
-  email: string
+  username: string
   role: 'admin' | 'farm_admin' | 'farm_user'
   parentUserId?: string
   parentUserName?: string
@@ -356,8 +356,8 @@ const saveUser = async (userData: any) => {
       await refreshAll()
     } else {
       // 신규 추가
-      const { data: newUser } = await userApi.create({
-        email: userData.email,
+      await userApi.create({
+        username: userData.username,
         password: userData.password,
         name: userData.name,
         role: userData.role || 'farm_admin',

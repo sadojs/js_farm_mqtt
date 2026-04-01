@@ -10,12 +10,14 @@ import { Device } from '../devices/entities/device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
+import { DevicesModule } from '../devices/devices.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AutomationRule, AutomationLog, Device, Gateway]),
     MqttModule,
     GatewayModule,
+    DevicesModule,
   ],
   controllers: [AutomationController],
   providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService],

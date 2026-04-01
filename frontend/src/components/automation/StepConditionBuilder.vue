@@ -298,8 +298,11 @@ const TIME_ONLY_FIELDS = SENSOR_CONDITION_FIELDS.filter(f => f.type === 'time')
 // env role 기반 필드 목록 생성
 const envRoleFields = computed(() => {
   if (envRoles.value.length === 0) {
-    // fallback: 기존 SENSOR_CONDITION_FIELDS
-    return SENSOR_CONDITION_FIELDS.map(f => ({
+    // fallback: 기존 SENSOR_CONDITION_FIELDS (센서 선택 시 시간 제외)
+    const fallback = props.timeOnly
+      ? SENSOR_CONDITION_FIELDS
+      : SENSOR_CONDITION_FIELDS.filter(f => f.type !== 'time')
+    return fallback.map(f => ({
       ...f,
       displayLabel: f.label,
     }))
@@ -327,17 +330,19 @@ const envRoleFields = computed(() => {
     }
   })
 
-  // 시간 필드 추가
-  fields.push({
-    value: 'hour',
-    label: '시간',
-    displayLabel: '시간',
-    type: 'time',
-    operators: ['eq', 'between'],
-    unit: '',
-    defaultValue: 9,
-    icon: '🕐',
-  })
+  // 시간 필드: timeOnly(센서 없음)일 때만 추가 (센서 선택 시 2단계에서 시간 설정)
+  if (props.timeOnly) {
+    fields.push({
+      value: 'hour',
+      label: '시간',
+      displayLabel: '시간',
+      type: 'time',
+      operators: ['between'],
+      unit: '',
+      defaultValue: 9,
+      icon: '🕐',
+    })
+  }
 
   return fields
 })

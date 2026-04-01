@@ -1,7 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { deviceApi } from '../api/device.api'
-import type { Device } from '../types/device.types'
+import type { Device, ChannelMapping } from '../types/device.types'
+import { DEFAULT_CHANNEL_MAPPING } from '../types/device.types'
 
 export const useDeviceStore = defineStore('device', () => {
   const devices = ref<Device[]>([])
@@ -70,6 +71,31 @@ export const useDeviceStore = defineStore('device', () => {
     }
   }
 
+  function getEffectiveMapping(device: Device): ChannelMapping {
+    return device.channelMapping
+      ? { ...DEFAULT_CHANNEL_MAPPING, ...device.channelMapping }
+      : { ...DEFAULT_CHANNEL_MAPPING }
+  }
+
+  async function updateChannelMapping(deviceId: string, mapping: ChannelMapping) {
+    await deviceApi.updateChannelMapping(deviceId, mapping)
+    const device = devices.value.find(d => d.id === deviceId)
+    if (device) device.channelMapping = mapping
+  }
+
+  /** 제어 후 장비 상태 검증 (1초 대기 후 상태 확인) */
+  async function verifyDeviceStatus(deviceId: string, switchCode: string, expectedValue: boolean) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      const status = await fetchDeviceStatus(deviceId)
+      if (!status) return { verified: false }
+      const actualValue = status[switchCode] ?? status.state === 'ON'
+      return { verified: actualValue === expectedValue, actualValue }
+    } catch {
+      return { verified: false }
+    }
+  }
+
   return {
     devices,
     loading,
@@ -85,5 +111,8 @@ export const useDeviceStore = defineStore('device', () => {
     updateDeviceStatus,
     updateSensorData,
     fetchDeviceStatus,
+    verifyDeviceStatus,
+    getEffectiveMapping,
+    updateChannelMapping,
   }
 })

@@ -2,10 +2,13 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuard
 import { AutomationService } from './automation.service';
 import { CreateRuleDto, UpdateRuleDto } from './dto/create-rule.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('automation')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'farm_admin')
 export class AutomationController {
   constructor(private automationService: AutomationService) {}
 
@@ -41,6 +44,11 @@ export class AutomationController {
   @Delete('rules/:id')
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.automationService.remove(id, this.getEffectiveUserId(user));
+  }
+
+  @Get('logs/stats')
+  getLogStats(@CurrentUser() user: any) {
+    return this.automationService.getLogStats(this.getEffectiveUserId(user));
   }
 
   @Get('logs')

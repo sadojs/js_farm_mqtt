@@ -1,0 +1,2 @@
+- [User Profile](user_profile.md) -- Smart Farm MQTT project owner, prefers 30-day session, web-only, convenience-focused
+- [Security Audit 2026-03-27](project_security_audit_2026_03_27.md) -- 7 critical vulnerabilities identified, remediation plan created

@@ -37,11 +37,7 @@
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
           <span>리포트</span>
         </router-link>
-        <router-link to="/harvest-rec" class="sidebar-link">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c4-4 8-7.5 8-12a8 8 0 1 0-16 0c0 4.5 4 8 8 12z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <span>수확 관리</span>
-        </router-link>
-        <router-link to="/alerts" class="sidebar-link">
+<router-link to="/alerts" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
           <span>센서 알림</span>
         </router-link>
@@ -74,6 +70,18 @@
         </div>
       </div>
 
+      <!-- 알림 + 시계/버전 -->
+      <div class="sidebar-bottom-info">
+        <div class="sidebar-notification-row">
+          <NotificationCenter placement="right" />
+          <span class="sidebar-notification-label">알림</span>
+        </div>
+        <div class="sidebar-info-row">
+          <span class="sidebar-clock">{{ currentTime }}</span>
+          <span class="sidebar-version">Smart Farm IoT v0.1.0</span>
+        </div>
+      </div>
+
       <div class="sidebar-footer">
         <div class="sidebar-user">
           <div class="user-avatar">{{ userInitial }}</div>
@@ -96,7 +104,7 @@
         <span></span>
       </button>
       <div class="mobile-brand">스마트팜</div>
-      <div class="mobile-header-spacer"></div>
+      <NotificationCenter />
     </header>
 
     <!-- 모바일 드로어 오버레이 -->
@@ -147,10 +155,6 @@
         <router-link to="/reports" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
           <span>리포트</span>
-        </router-link>
-        <router-link to="/harvest-rec" class="sidebar-link" @click="isDrawerOpen = false">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c4-4 8-7.5 8-12a8 8 0 1 0-16 0c0 4.5 4 8 8 12z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <span>수확 관리</span>
         </router-link>
         <router-link to="/alerts" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
@@ -210,13 +214,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth.store'
 import { useNotificationStore } from './stores/notification.store'
 import { useWebSocket } from './composables/useWebSocket'
 import ConfirmDialog from './components/common/ConfirmDialog.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
+import NotificationCenter from './components/common/NotificationCenter.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -235,6 +240,17 @@ const userRole = computed(() => {
 const userInitial = computed(() => userName.value.charAt(0))
 
 const isDrawerOpen = ref(false)
+
+// 실시간 시계
+const currentTime = ref('')
+let clockTimer: ReturnType<typeof setInterval> | null = null
+
+function updateClock() {
+  currentTime.value = new Date().toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 // 폰트 크기 조절 (localStorage에 저장)
 type FontSize = 'sm' | 'md' | 'lg'
@@ -257,11 +273,16 @@ function setTheme(mode: ThemeMode) {
   localStorage.setItem('sf-theme', mode)
 }
 
-onMounted(async () => {
-  await authStore.initAuth()
+onMounted(() => {
   if (authStore.isAuthenticated) {
     connect()
   }
+  updateClock()
+  clockTimer = setInterval(updateClock, 10000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
 })
 
 const handleLogout = () => {
@@ -339,6 +360,15 @@ body {
   /* 경고색 */
   --warning: #ff9800;
   --warning-hover: #f57c00;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --warning-border: #fde68a;
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --danger-badge-bg: #fee2e2;
+  --danger-badge-text: #991b1b;
+  --diff-old: #dc2626;
+  --diff-new: #16a34a;
   /* 센서 (보라) */
   --sensor-accent: #7b1fa2;
   --sensor-bg: #ede7f6;
@@ -390,6 +420,15 @@ body {
   --danger-bg: #3a1a1a;
   --warning: #ffa726;
   --warning-hover: #ffb74d;
+  --warning-bg: #3a2a0a;
+  --warning-text: #fbbf24;
+  --warning-border: #78510a;
+  --success-bg: #0a2a1a;
+  --success-text: #4ade80;
+  --danger-badge-bg: #3a1a1a;
+  --danger-badge-text: #f87171;
+  --diff-old: #f87171;
+  --diff-new: #4ade80;
   --sensor-accent: #ce93d8;
   --sensor-bg: #2a1f3a;
   --sensor-value-bg: #2a1f3a;
@@ -510,6 +549,8 @@ body {
   font-size: 1em;
   font-weight: 500;
   transition: background 0.2s, color 0.2s;
+  /* 접근성: 터치 타겟 최소 44px 확보 */
+  min-height: 44px;
 }
 
 .sidebar-link:focus-visible {
@@ -629,6 +670,43 @@ body {
 
 .theme-buttons button:hover:not(.active) {
   background: var(--bg-hover);
+}
+
+/* ========== 사이드바 하단 정보 (알림 + 시계/버전) ========== */
+.sidebar-bottom-info {
+  border-top: 1px solid var(--border-light);
+}
+
+.sidebar-notification-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.sidebar-notification-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.sidebar-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 10px;
+}
+
+.sidebar-clock {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-version {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* ========== 사이드바 하단 ========== */

@@ -7,6 +7,22 @@
       </div>
     </header>
 
+    <!-- 메인 탭 -->
+    <div class="main-tabs">
+      <button class="main-tab" :class="{ active: reportTab === 'data' }" @click="reportTab = 'data'">
+        센서 데이터
+      </button>
+      <button class="main-tab" :class="{ active: reportTab === 'compare' }" @click="reportTab = 'compare'">
+        비교 분석
+      </button>
+    </div>
+
+    <!-- 비교 분석 탭 -->
+    <SensorCompareChart v-if="reportTab === 'compare'" />
+
+    <!-- 센서 데이터 탭 -->
+    <template v-if="reportTab === 'data'">
+
     <!-- 필터 영역 -->
     <div class="filter-section">
       <div class="filter-row">
@@ -165,9 +181,14 @@
       </div>
     </template>
 
-    <div v-else class="empty-state">
-      <p>{{ envWarning ? '환경 설정 후 리포트를 확인할 수 있습니다.' : '조회된 데이터가 없습니다. 기간을 선택하여 조회해주세요.' }}</p>
-    </div>
+    <EmptyState
+      v-else
+      icon="<line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/>"
+      title="데이터가 없습니다"
+      :description="envWarning ? '환경 설정 후 리포트를 확인할 수 있습니다.' : '기간을 선택하여 조회해주세요.'"
+    />
+
+    </template><!-- /센서 데이터 탭 -->
   </div>
 </template>
 
@@ -181,6 +202,8 @@ import {
 import { reportApi } from '../api/report.api'
 import { envConfigApi } from '../api/env-config.api'
 import { useGroupStore } from '../stores/group.store'
+import EmptyState from '../components/common/EmptyState.vue'
+import SensorCompareChart from '../components/reports/SensorCompareChart.vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { useLocalStorage } from '@vueuse/core'
@@ -191,6 +214,9 @@ const groupStore = useGroupStore()
 
 const sfTheme = useLocalStorage('sf-theme', 'light')
 const isDark = computed(() => sfTheme.value === 'dark')
+
+// 탭 상태
+const reportTab = ref('data')
 
 // 필터 상태
 const selectedGroup = ref('')
@@ -564,9 +590,9 @@ async function loadAllData() {
     }
 
     const [statsRes, hourlyRes, actRes, weatherRes] = await Promise.all([
-      reportApi.getStatistics({ ...baseParams, sensorType: undefined }),
-      reportApi.getHourlyData({ ...baseParams, sensorType: undefined }),
-      reportApi.getActuatorStats(baseParams),
+      reportApi.getStatistics({ ...baseParams, sensorType: undefined }).catch(() => ({ data: [] })),
+      reportApi.getHourlyData({ ...baseParams, sensorType: undefined }).catch(() => ({ data: [] })),
+      reportApi.getActuatorStats(baseParams).catch(() => ({ data: [] })),
       reportApi.getWeatherHourly({ startDate: baseParams.startDate, endDate: baseParams.endDate }).catch(() => ({ data: [] })),
     ])
 
@@ -644,6 +670,34 @@ onMounted(async () => {
 
 <style scoped>
 .page-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+/* 메인 탭 */
+.main-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-input);
+}
+.main-tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+.main-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.main-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
 
 .page-header {
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -817,12 +871,45 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .page-container { padding: 16px; }
   .stats-grid { grid-template-columns: 1fr; }
-  .chart-container { height: 250px; }
+  /* 모바일에서 차트 높이 증가 */
+  .chart-container { height: 280px; }
   .filter-row { flex-direction: column; }
-  .period-buttons { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .period-buttons {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
   .period-btn { white-space: nowrap; flex-shrink: 0; }
-  .download-row { flex-wrap: wrap; }
-  .btn-download { white-space: nowrap; }
+  /* 다운로드 버튼 flex-wrap + 전체 너비 */
+  .download-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .btn-download {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 120px;
+    text-align: center;
+  }
+  /* custom-dates 세로 정렬 */
+  .custom-dates {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .custom-date-picker {
+    max-width: 100%;
+    width: 100%;
+  }
+  .date-separator { text-align: center; }
+  /* 테이블 overflow */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+  .data-table {
+    min-width: 480px;
+  }
 }
 
 @media print {

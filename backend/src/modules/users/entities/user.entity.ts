@@ -8,8 +8,8 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
-  email: string;
+  @Column({ unique: true, length: 50 })
+  username: string;
 
   @Column({ name: 'password_hash' })
   passwordHash: string;

@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, readonly } from 'vue'
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '../stores/auth.store'
 import { useSensorStore } from '../stores/sensor.store'
@@ -7,8 +7,18 @@ import { useNotificationStore } from '../stores/notification.store'
 
 let socket: Socket | null = null
 
+/** 전역 연결 상태 (reactive) */
+const _connected = ref(false)
+const _reconnecting = ref(false)
+const _reconnectAttempts = ref(0)
+
+export const socketStatus = readonly({
+  connected: _connected,
+  reconnecting: _reconnecting,
+  reconnectAttempts: _reconnectAttempts,
+})
+
 export function useWebSocket() {
-  const connected = ref(false)
   const authStore = useAuthStore()
 
   function connect() {
@@ -18,14 +28,55 @@ export function useWebSocket() {
     socket = io(wsUrl, {
       auth: { token: authStore.accessToken },
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000,
+      timeout: 10000,
     })
 
     socket.on('connect', () => {
-      connected.value = true
+      _connected.value = true
+      _reconnecting.value = false
+      _reconnectAttempts.value = 0
     })
 
-    socket.on('disconnect', () => {
-      connected.value = false
+    socket.on('disconnect', (reason) => {
+      _connected.value = false
+      // 서버 측 종료가 아니면 자동 재연결
+      if (reason === 'io server disconnect') {
+        // 서버가 강제 종료한 경우 → 토큰 갱신 후 재연결 시도
+        setTimeout(() => {
+          if (authStore.accessToken) {
+            socket!.auth = { token: authStore.accessToken }
+            socket!.connect()
+          }
+        }, 2000)
+      }
+    })
+
+    socket.io.on('reconnect_attempt', (attempt) => {
+      _reconnecting.value = true
+      _reconnectAttempts.value = attempt
+    })
+
+    socket.io.on('reconnect', () => {
+      _connected.value = true
+      _reconnecting.value = false
+      _reconnectAttempts.value = 0
+      const notificationStore = useNotificationStore()
+      notificationStore.success('연결 복구', '서버와 다시 연결되었습니다.')
+    })
+
+    socket.io.on('reconnect_failed', () => {
+      _reconnecting.value = false
+      const notificationStore = useNotificationStore()
+      notificationStore.error('연결 실패', '서버와 연결할 수 없습니다. 페이지를 새로고침 해주세요.')
+    })
+
+    socket.on('connect_error', (err) => {
+      _connected.value = false
+      console.warn('WebSocket 연결 오류:', err.message)
     })
 
     // 센서 데이터 실시간 업데이트
@@ -60,7 +111,9 @@ export function useWebSocket() {
   function disconnect() {
     socket?.disconnect()
     socket = null
-    connected.value = false
+    _connected.value = false
+    _reconnecting.value = false
+    _reconnectAttempts.value = 0
   }
 
   function subscribe(channel: string, id: string) {
@@ -84,7 +137,9 @@ export function useWebSocket() {
   })
 
   return {
-    connected,
+    connected: socketStatus.connected,
+    reconnecting: socketStatus.reconnecting,
+    reconnectAttempts: socketStatus.reconnectAttempts,
     connect,
     disconnect,
     subscribe,

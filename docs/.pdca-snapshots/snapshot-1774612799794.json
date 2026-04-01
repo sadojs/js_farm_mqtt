@@ -1,0 +1,749 @@
+{
+  "timestamp": "2026-03-27T11:59:59.793Z",
+  "reason": "compaction",
+  "status": {
+    "version": "2.0",
+    "lastUpdated": "2026-03-27T11:33:13.667Z",
+    "activeFeatures": [
+      "frontend",
+      "backend",
+      "auth",
+      "dashboard",
+      "gateway",
+      "mqtt",
+      "automation",
+      "devices",
+      "gateway-manager",
+      "stores",
+      "api",
+      "groups",
+      "sensors",
+      "reports",
+      "harvest",
+      "env-config",
+      "sensor-alerts"
+    ],
+    "primaryFeature": "frontend",
+    "features": {
+      "frontend": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T09:55:26.629Z",
+          "lastUpdated": "2026-03-27T11:33:13.667Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/vite.config.ts"
+      },
+      "backend": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:39:01.502Z",
+          "lastUpdated": "2026-03-27T10:39:26.930Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/app.module.ts"
+      },
+      "auth": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:39:34.700Z",
+          "lastUpdated": "2026-03-27T11:01:23.643Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/auth/auth.service.ts"
+      },
+      "dashboard": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:40:18.857Z",
+          "lastUpdated": "2026-03-27T10:58:59.851Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/dashboard/dashboard.controller.ts"
+      },
+      "gateway": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:41:13.607Z",
+          "lastUpdated": "2026-03-27T11:06:46.459Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway/gateway.module.ts"
+      },
+      "mqtt": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:41:35.707Z",
+          "lastUpdated": "2026-03-27T10:41:41.522Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/mqtt/mqtt-device.handler.ts"
+      },
+      "automation": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:41:53.314Z",
+          "lastUpdated": "2026-03-27T10:43:05.356Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/automation/automation.controller.ts"
+      },
+      "devices": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:42:58.196Z",
+          "lastUpdated": "2026-03-27T10:42:58.196Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/devices/devices.controller.ts"
+      },
+      "gateway-manager": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:43:12.519Z",
+          "lastUpdated": "2026-03-27T10:43:12.519Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway-manager/gateway-manager.controller.ts"
+      },
+      "stores": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:44:46.645Z",
+          "lastUpdated": "2026-03-27T11:21:35.109Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/stores/notification.store.ts"
+      },
+      "api": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:44:53.616Z",
+          "lastUpdated": "2026-03-27T10:59:30.944Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/api/client.ts"
+      },
+      "groups": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:06.225Z",
+          "lastUpdated": "2026-03-27T10:58:06.225Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/groups/groups.controller.ts"
+      },
+      "sensors": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:14.867Z",
+          "lastUpdated": "2026-03-27T10:58:14.867Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/sensors/sensors.controller.ts"
+      },
+      "reports": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:23.358Z",
+          "lastUpdated": "2026-03-27T10:58:23.358Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/reports/reports.controller.ts"
+      },
+      "harvest": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:31.541Z",
+          "lastUpdated": "2026-03-27T10:58:39.238Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/harvest/harvest-task.controller.ts"
+      },
+      "env-config": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:46.798Z",
+          "lastUpdated": "2026-03-27T10:58:46.798Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/env-config/env-config.controller.ts"
+      },
+      "sensor-alerts": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-27T10:58:53.897Z",
+          "lastUpdated": "2026-03-27T10:58:53.897Z"
+        },
+        "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/sensor-alerts/sensor-alerts.controller.ts"
+      }
+    },
+    "pipeline": {
+      "currentPhase": 1,
+      "level": "Dynamic",
+      "phaseHistory": []
+    },
+    "session": {
+      "startedAt": "2026-03-27T09:32:17.896Z",
+      "onboardingCompleted": false,
+      "lastActivity": "2026-03-27T11:33:13.667Z"
+    },
+    "history": [
+      {
+        "timestamp": "2026-03-27T09:55:26.629Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T09:55:31.924Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:01.502Z",
+        "feature": "backend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:08.369Z",
+        "feature": "backend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:14.954Z",
+        "feature": "backend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:21.170Z",
+        "feature": "backend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:26.930Z",
+        "feature": "backend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:34.700Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:39:46.478Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:40:18.857Z",
+        "feature": "dashboard",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:40:37.756Z",
+        "feature": "dashboard",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:41:13.607Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:41:35.707Z",
+        "feature": "mqtt",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:41:41.522Z",
+        "feature": "mqtt",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:41:53.314Z",
+        "feature": "automation",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:42:02.879Z",
+        "feature": "automation",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:42:58.196Z",
+        "feature": "devices",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:43:05.356Z",
+        "feature": "automation",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:43:12.519Z",
+        "feature": "gateway-manager",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:43:41.619Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:44:06.162Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:44:13.559Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:44:46.645Z",
+        "feature": "stores",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:44:53.616Z",
+        "feature": "api",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:46:43.611Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:46:49.823Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:46:56.489Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:06.225Z",
+        "feature": "groups",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:14.867Z",
+        "feature": "sensors",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:23.358Z",
+        "feature": "reports",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:31.541Z",
+        "feature": "harvest",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:39.238Z",
+        "feature": "harvest",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:46.798Z",
+        "feature": "env-config",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:53.897Z",
+        "feature": "sensor-alerts",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:58:59.851Z",
+        "feature": "dashboard",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:59:24.283Z",
+        "feature": "stores",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:59:30.944Z",
+        "feature": "api",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T10:59:58.711Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:00:16.234Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:00:24.988Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:00:47.890Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:01:09.454Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:01:16.511Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:01:23.643Z",
+        "feature": "auth",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:06:05.089Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:06:10.917Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:06:24.552Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:06:46.459Z",
+        "feature": "gateway",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:14:34.153Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:14:46.557Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:14:55.323Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:15:04.362Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:15:33.772Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:15:44.350Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:15:51.826Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:16:05.909Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:16:13.463Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:16:20.504Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:16:27.884Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:17:10.256Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:17:18.085Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:17:42.310Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:17:47.468Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:18:01.612Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:18:32.410Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:18:47.469Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:19:39.187Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:19:57.826Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:20:07.613Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:20:21.244Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:20:42.807Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:21:16.341Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:21:35.109Z",
+        "feature": "stores",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:22:12.349Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:22:19.920Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:22:57.937Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:23:04.579Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:23:10.306Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:23:17.409Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:23:25.850Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-27T11:33:13.667Z",
+        "feature": "frontend",
+        "phase": "do",
+        "action": "updated"
+      }
+    ]
+  }
+}

@@ -50,6 +50,9 @@ export class Device {
   @Column({ default: false })
   online: boolean;
 
+  @Column({ name: 'channel_mapping', type: 'jsonb', nullable: true })
+  channelMapping: Record<string, string> | null;
+
   @Column({ name: 'last_seen', nullable: true })
   lastSeen: Date;
 

@@ -44,8 +44,8 @@ export const sensorAlertsApi = {
     apiClient.put('/sensor-alerts/sensors/standby', { deviceId, sensorType }),
   removeStandby: (deviceId: string, sensorType: string) =>
     apiClient.delete('/sensor-alerts/sensors/standby', { data: { deviceId, sensorType } }),
-  getAlerts: (params?: { severity?: string; resolved?: string; deviceId?: string }) =>
-    apiClient.get<SensorAlert[]>('/sensor-alerts', { params }),
+  getAlerts: (params?: { severity?: string; resolved?: string; deviceId?: string; limit?: number; offset?: number }) =>
+    apiClient.get<{ data: SensorAlert[]; total: number; limit: number; offset: number }>('/sensor-alerts', { params }),
   getAlert: (id: string) =>
     apiClient.get<AlertDetail>(`/sensor-alerts/${id}`),
   resolveAlert: (id: string) =>

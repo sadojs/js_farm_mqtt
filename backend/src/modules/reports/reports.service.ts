@@ -121,7 +121,11 @@ export class ReportsService {
       ORDER BY time ASC
     `;
 
-    return this.dataSource.query(query, values);
+    try {
+      return await this.dataSource.query(query, values);
+    } catch {
+      return [];
+    }
   }
 
   async exportCsv(userId: string, params: ReportParams): Promise<string> {

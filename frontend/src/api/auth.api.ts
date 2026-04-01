@@ -2,11 +2,15 @@ import apiClient from './client'
 import type { LoginResponse, TokenResponse, User } from '../types/auth.types'
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiClient.post<LoginResponse>('/auth/login', { email, password }),
+  login: (username: string, password: string) =>
+    apiClient.post<LoginResponse>('/auth/login', { username, password }),
 
-  refresh: (refreshToken: string) =>
-    apiClient.post<TokenResponse>('/auth/refresh', { refreshToken }),
+  // 쿠키는 브라우저가 자동 전송 → body 없음
+  refresh: () =>
+    apiClient.post<TokenResponse>('/auth/refresh'),
+
+  logout: () =>
+    apiClient.post('/auth/logout'),
 
   me: () =>
     apiClient.get<User>('/auth/me'),

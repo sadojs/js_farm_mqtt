@@ -10,10 +10,14 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { House } from '../groups/entities/house.entity';
+import { HouseGroup } from '../groups/entities/house-group.entity';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
     credentials: true,
   },
 })
@@ -23,7 +27,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private logger = new Logger('EventsGateway');
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    @InjectRepository(House)
+    private houseRepository: Repository<House>,
+    @InjectRepository(HouseGroup)
+    private groupRepository: Repository<HouseGroup>,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
@@ -34,6 +44,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       const payload = this.jwtService.verify(token);
       (client as any).userId = payload.sub;
+      // 사용자별 전용 room 자동 입장
+      client.join(`user:${payload.sub}`);
       this.logger.log(`Client connected: ${payload.sub}`);
     } catch {
       client.disconnect();
@@ -45,18 +57,51 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('subscribe:house')
-  handleSubscribeHouse(
+  async handleSubscribeHouse(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { houseId: string },
   ) {
+    const userId = (client as any).userId;
+    if (!userId || !data?.houseId) {
+      client.emit('error', { message: 'Invalid request' });
+      return;
+    }
+
+    // houseId 소유권 검증: DB에서 해당 house가 userId 소유인지 확인
+    const house = await this.houseRepository.findOne({
+      where: { id: data.houseId, userId },
+    });
+
+    if (!house) {
+      this.logger.warn(`Unauthorized subscribe:house attempt — userId=${userId}, houseId=${data.houseId}`);
+      client.emit('error', { message: 'Unauthorized: house not found or access denied' });
+      return;
+    }
+
     client.join(`house:${data.houseId}`);
   }
 
   @SubscribeMessage('subscribe:group')
-  handleSubscribeGroup(
+  async handleSubscribeGroup(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { groupId: string },
   ) {
+    const userId = (client as any).userId;
+    if (!userId || !data?.groupId) {
+      client.emit('error', { message: 'Invalid request' });
+      return;
+    }
+
+    const group = await this.groupRepository.findOne({
+      where: { id: data.groupId, userId },
+    });
+
+    if (!group) {
+      this.logger.warn(`Unauthorized subscribe:group attempt — userId=${userId}, groupId=${data.groupId}`);
+      client.emit('error', { message: 'Unauthorized: group not found or access denied' });
+      return;
+    }
+
     client.join(`group:${data.groupId}`);
   }
 
@@ -68,49 +113,49 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.leave(data.channel);
   }
 
-  // 센서 데이터 실시간 브로드캐스트
-  broadcastSensorUpdate(data: {
-    deviceId: string;
-    houseId?: string;
-    sensorType: string;
-    value: number;
-    unit: string;
-    status: string;
-    time: string;
-  }) {
-    this.server.emit('sensor:update', data);
+  // 센서 데이터 — 해당 사용자 room + house room으로만 전송
+  broadcastSensorUpdate(
+    userId: string,
+    data: {
+      deviceId: string;
+      houseId?: string;
+      sensorType: string;
+      value: number;
+      unit: string;
+      status: string;
+      time: string;
+    },
+  ) {
+    this.server.to(`user:${userId}`).emit('sensor:update', data);
     if (data.houseId) {
       this.server.to(`house:${data.houseId}`).emit('sensor:update', data);
     }
   }
 
-  // 장비 상태 변경 알림
-  broadcastDeviceStatus(deviceId: string, online: boolean) {
-    this.server.emit('device:status', { deviceId, online });
+  // 장비 상태 — 해당 사용자 room으로만 전송
+  broadcastDeviceStatus(userId: string, deviceId: string, online: boolean) {
+    this.server.to(`user:${userId}`).emit('device:status', { deviceId, online });
   }
 
-  // 자동화 실행 알림
-  broadcastAutomationExecuted(data: {
-    ruleId: string;
-    ruleName: string;
-    success: boolean;
-    actions: any[];
-  }) {
-    this.server.emit('automation:executed', data);
+  // 자동화 실행 알림 — 해당 사용자 room으로만 전송
+  broadcastAutomationExecuted(
+    userId: string,
+    data: {
+      ruleId: string;
+      ruleName: string;
+      success: boolean;
+      actions: any[];
+    },
+  ) {
+    this.server.to(`user:${userId}`).emit('automation:executed', data);
   }
 
-  // 일반 알림
+  // 일반 알림 — 사용자 room 기반으로 전송 (소켓 순회 제거)
   sendNotification(userId: string, notification: {
     type: string;
     title: string;
     message: string;
   }) {
-    // 특정 사용자에게 전송
-    const sockets = this.server.sockets.sockets;
-    sockets.forEach((socket) => {
-      if ((socket as any).userId === userId) {
-        socket.emit('notification:new', notification);
-      }
-    });
+    this.server.to(`user:${userId}`).emit('notification:new', notification);
   }
 }

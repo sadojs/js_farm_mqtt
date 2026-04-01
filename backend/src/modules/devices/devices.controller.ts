@@ -1,10 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { DevicesService } from './devices.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('devices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'farm_admin')
 export class DevicesController {
   constructor(private devicesService: DevicesService) {}
 
@@ -54,6 +57,20 @@ export class DevicesController {
     @Body() body: { commands: { code: string; value: any }[] },
   ) {
     return this.devicesService.controlDevice(id, this.getEffectiveUserId(user), body.commands);
+  }
+
+  @Patch(':id/channel-mapping')
+  updateChannelMapping(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { mapping: Record<string, string> },
+  ) {
+    return this.devicesService.updateChannelMapping(
+      id,
+      this.getEffectiveUserId(user),
+      user.role,
+      body.mapping,
+    );
   }
 
   @Get(':id/dependencies')
