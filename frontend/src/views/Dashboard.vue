@@ -78,6 +78,9 @@
 
       <!-- 장비 상태 정보 위젯 -->
       <DeviceStatusCards v-else-if="widget.type === 'device-status'" />
+
+      <!-- 관수 실행 이력 위젯 -->
+      <IrrigationHistoryWidget v-else-if="widget.type === 'irrigation-history'" />
     </template>
   </div>
 </template>
@@ -87,6 +90,7 @@ import { computed, onMounted, ref } from 'vue'
 import { dashboardApi } from '../api/dashboard.api'
 import SummaryCards from '../components/dashboard/SummaryCards.vue'
 import DeviceStatusCards from '../components/dashboard/DeviceStatusCards.vue'
+import IrrigationHistoryWidget from '../components/dashboard/IrrigationHistoryWidget.vue'
 import { useDashboardLayout } from '../composables/useDashboardLayout'
 
 const { isEditMode, layout, visibleWidgets, toggleWidget, moveWidget, enterEditMode, exitEditMode, resetLayout } = useDashboardLayout()
