@@ -84,15 +84,15 @@
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
                   <span class="control-label">열림</span>
-                  <label class="toggle-switch" @click.prevent="og.openDevice.online && handleControl(og.openDevice.id, !og.openDevice.switchState)">
-                    <input type="checkbox" :checked="og.openDevice.switchState === true" :disabled="!og.openDevice.online || controllingId === og.openDevice.id" />
+                  <label class="toggle-switch" @click.prevent="og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
+                    <input type="checkbox" :checked="og.openDevice.switchState === true" :disabled="!og.openDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.closeDevice.online }">
                   <span class="control-label">닫힘</span>
-                  <label class="toggle-switch" @click.prevent="og.closeDevice.online && handleControl(og.closeDevice.id, !og.closeDevice.switchState)">
-                    <input type="checkbox" :checked="og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || controllingId === og.closeDevice.id" />
+                  <label class="toggle-switch" @click.prevent="og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
+                    <input type="checkbox" :checked="og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -441,6 +441,73 @@ const getSensorUnit = (field: string): string => {
 
 // 장비 제어
 const controllingId = ref<string | null>(null)
+const openerInterlocking = ref(false)
+
+async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'close') {
+  if (openerInterlocking.value) return
+  const targetDevice = action === 'open' ? group.openDevice : group.closeDevice
+  const oppositeDevice = action === 'open' ? group.closeDevice : group.openDevice
+
+  openerInterlocking.value = true
+  const loadingId = notify.add('info', '적용 중...', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'} 명령 전송 중`, 0)
+  try {
+    // 이미 ON이면 OFF만
+    if (targetDevice.switchState) {
+      const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: false }])
+      if (!result.success) {
+        notify.remove(loadingId)
+        notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
+        return
+      }
+      const storeTarget = deviceStore.devices.find(d => d.id === targetDevice.id)
+      if (storeTarget) storeTarget.switchState = false
+      const v = await deviceStore.verifyDeviceStatus(targetDevice.id, 'switch_1', false)
+      notify.remove(loadingId)
+      if (v.verified) {
+        notify.success('적용 완료', `${targetDevice.name} OFF`)
+      } else if (v.actualValue !== undefined) {
+        notify.warning('상태 미변경', '명령은 전달되었으나 장비 상태가 변경되지 않았습니다')
+        if (storeTarget) storeTarget.switchState = v.actualValue
+      }
+      return
+    }
+    // 반대쪽이 ON이면: 먼저 OFF → 1초 대기 (릴레이 접점 아크 소멸)
+    if (oppositeDevice.switchState) {
+      const offResult = await deviceStore.controlDevice(oppositeDevice.id, [{ code: 'switch_1', value: false }])
+      if (!offResult.success) {
+        notify.remove(loadingId)
+        notify.error('제어 실패', offResult.msg || '장비 제어에 실패했습니다')
+        return
+      }
+      const storeOpposite = deviceStore.devices.find(d => d.id === oppositeDevice.id)
+      if (storeOpposite) storeOpposite.switchState = false
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+    // 타겟 ON
+    const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: true }])
+    if (!result.success) {
+      notify.remove(loadingId)
+      notify.error('제어 실패', result.msg || '장비 제어에 실패했습니다')
+      return
+    }
+    const storeTarget = deviceStore.devices.find(d => d.id === targetDevice.id)
+    if (storeTarget) storeTarget.switchState = true
+    const v = await deviceStore.verifyDeviceStatus(targetDevice.id, 'switch_1', true)
+    notify.remove(loadingId)
+    if (v.verified) {
+      notify.success('적용 완료', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'}`)
+    } else if (v.actualValue !== undefined) {
+      notify.warning('상태 미변경', '명령은 전달되었으나 장비 상태가 변경되지 않았습니다')
+      if (storeTarget) storeTarget.switchState = v.actualValue
+    }
+  } catch (err) {
+    console.error('인터록 제어 실패:', err)
+    notify.remove(loadingId)
+    notify.error('제어 실패', '네트워크 오류가 발생했습니다')
+  } finally {
+    openerInterlocking.value = false
+  }
+}
 
 const handleControl = async (deviceId: string, turnOn: boolean) => {
   if (controllingId.value) return

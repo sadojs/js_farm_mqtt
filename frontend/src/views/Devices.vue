@@ -293,7 +293,7 @@ async function interlockControl(group: OpenerGroup, action: 'open' | 'close') {
         return
       }
       oppositeDevice.switchState = false
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
     // 타겟 ON
     const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: true }])
