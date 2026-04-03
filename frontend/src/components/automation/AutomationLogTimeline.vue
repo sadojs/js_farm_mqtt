@@ -28,6 +28,13 @@
             <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관수 {{ log.conditionsMet.irrigationMin }}분</span>
             <span v-if="log.conditionsMet?.fertilizerMin" class="summary-chip">액비 {{ log.conditionsMet.fertilizerMin }}분</span>
           </template>
+          <!-- 릴레이 자동화 로그 -->
+          <template v-else-if="log.conditionsMet?.type === 'relay'">
+            <span v-for="name in (log.actionsExecuted?.deviceNames || [])" :key="name" class="summary-chip device">{{ name }}</span>
+            <span v-if="log.conditionsMet?.equipmentType" class="summary-chip">{{ formatEquipmentType(log.conditionsMet.equipmentType) }}</span>
+            <span v-if="log.conditionsMet?.field" class="summary-chip">{{ log.conditionsMet.field }}</span>
+            <span class="summary-chip">{{ log.conditionsMet?.relayOnMinutes }}분 ON / {{ log.conditionsMet?.relayOffMinutes }}분 OFF</span>
+          </template>
           <!-- 일반 자동화 로그 -->
           <template v-else>
             <span v-for="name in (log.actionsExecuted?.deviceNames || [])" :key="name" class="summary-chip device">{{ name }}</span>
@@ -96,6 +103,7 @@ function getLogTypeLabel(log: AutomationLogEntry): string {
   if (t === 'irrigation_started') return '시작'
   if (t === 'irrigation_cancelled') return '취소'
   if (t === 'irrigation') return log.success ? '완료' : '실패'
+  if (t === 'relay') return log.conditionsMet?.isOnPhase ? 'ON' : 'OFF'
   return log.success ? '실행' : '실패'
 }
 

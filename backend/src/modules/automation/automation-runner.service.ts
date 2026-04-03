@@ -640,14 +640,46 @@ export class AutomationRunnerService {
     const action = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
     const actionOverride = { ...action, command: relay.isOnPhase ? 'on' : 'off' };
 
+    let success = true;
+    let errorMessage: string | undefined;
+    let actionResult: any;
+
     try {
-      const result = await this.executeAction(rule, actionOverride);
+      actionResult = await this.executeAction(rule, actionOverride);
       this.logger.log(`릴레이 ${relay.isOnPhase ? 'ON' : 'OFF'} 실행: rule=${rule.name}`);
-      return { executed: true, relay: true, isOnPhase: relay.isOnPhase, actions: [result] };
     } catch (err: any) {
+      success = false;
+      errorMessage = err.message;
       this.logger.error(`릴레이 실행 실패: ${err.message}`);
-      return { executed: false, relay: true, error: err.message };
     }
+
+    // 릴레이 실행 로그 기록
+    const deviceNames = actionResult?.devices
+      ? actionResult.devices.map((d: any) => d.deviceName || d.deviceId).filter(Boolean)
+      : [];
+    await this.logsRepo.save(
+      this.logsRepo.create({
+        ruleId: rule.id,
+        userId: rule.userId,
+        success,
+        conditionsMet: {
+          type: 'relay',
+          ruleName: rule.name,
+          isOnPhase: relay.isOnPhase,
+          relayOnMinutes: relay.condition.relayOnMinutes,
+          relayOffMinutes: relay.condition.relayOffMinutes,
+          field: relay.condition.field,
+          equipmentType: action?.equipmentType || null,
+        },
+        actionsExecuted: {
+          deviceNames,
+          command: relay.isOnPhase ? 'on' : 'off',
+        },
+        errorMessage,
+      }),
+    );
+
+    return { executed: success, relay: true, isOnPhase: relay.isOnPhase, actions: actionResult ? [actionResult] : [] };
   }
 
   private toBoolean(value: any): boolean {
