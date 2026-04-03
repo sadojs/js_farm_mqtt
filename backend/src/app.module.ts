@@ -21,6 +21,7 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
 import { HealthModule } from './modules/health/health.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { RetentionService } from './common/retention.service';
 
 @Module({
   imports: [
@@ -56,6 +57,9 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
     HealthModule,
     ActivityLogModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    RetentionService,
+  ],
 })
 export class AppModule {}

@@ -100,7 +100,7 @@ export class AutomationService {
 
   async getLogs(
     userId: string,
-    params: { ruleId?: string; page?: number; limit?: number },
+    params: { ruleId?: string; page?: number; limit?: number; type?: string },
   ) {
     const page = Math.max(1, Number(params.page || 1));
     const limit = Math.min(100, Math.max(1, Number(params.limit || 20)));
@@ -114,6 +114,12 @@ export class AutomationService {
 
     if (params.ruleId) {
       qb.andWhere('l.rule_id = :ruleId', { ruleId: params.ruleId });
+    }
+
+    if (params.type === 'irrigation') {
+      qb.andWhere("l.conditions_met->>'type' IN (:...types)", {
+        types: ['irrigation', 'irrigation_started', 'irrigation_cancelled'],
+      });
     }
 
     const items = await qb.getMany();
@@ -138,8 +144,17 @@ export class AutomationService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [todayCount, successCount, totalCount] = await Promise.all([
-      this.logsRepo.count({ where: { userId, executedAt: MoreThanOrEqual(today) } }),
+    // todayCount: 관수 관련 타입만 카운트 (irrigation, irrigation_started, irrigation_cancelled)
+    const todayCount = await this.logsRepo
+      .createQueryBuilder('l')
+      .where('l.user_id = :userId', { userId })
+      .andWhere('l.executed_at >= :today', { today })
+      .andWhere("l.conditions_met->>'type' IN (:...types)", {
+        types: ['irrigation', 'irrigation_started', 'irrigation_cancelled'],
+      })
+      .getCount();
+
+    const [successCount, totalCount] = await Promise.all([
       this.logsRepo.count({ where: { userId, success: true } }),
       this.logsRepo.count({ where: { userId } }),
     ]);

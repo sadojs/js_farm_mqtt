@@ -103,11 +103,13 @@ export class AutomationController {
     @Query('ruleId') ruleId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('type') type?: string,
   ) {
     return this.automationService.getLogs(this.getEffectiveUserId(user), {
       ruleId,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      type,
     });
   }
 }

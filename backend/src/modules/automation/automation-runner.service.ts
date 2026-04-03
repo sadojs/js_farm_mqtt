@@ -15,6 +15,9 @@ type LogicOp = 'AND' | 'OR';
 export class AutomationRunnerService {
   private readonly logger = new Logger(AutomationRunnerService.name);
 
+  // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase }
+  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean }>();
+
   constructor(
     @InjectRepository(AutomationRule)
     private readonly rulesRepo: Repository<AutomationRule>,
@@ -46,14 +49,28 @@ export class AutomationRunnerService {
     const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
 
     if (!conditionResult.matched) {
+      this.lastState.delete(rule.id);
       return { executed: false, reason: 'conditions_not_met', details: conditionResult.details };
     }
 
     // 조건 만족 + 릴레이 모드: ON/OFF 사이클로 실행
     const relayResult = this.checkRelayCycle(rule, evaluatedAt);
     if (relayResult) {
+      // 릴레이 상태 변경 시에만 실행 (ON→OFF 또는 OFF→ON)
+      const prev = this.lastState.get(rule.id);
+      if (prev?.matched && prev.relayOnPhase === relayResult.isOnPhase) {
+        return { executed: false, reason: 'relay_state_unchanged' };
+      }
+      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase });
       return this.executeRelayAction(rule, relayResult, evaluatedAt);
     }
+
+    // 일반 자동화: 이미 조건 충족 중이면 중복 실행 방지
+    const prev = this.lastState.get(rule.id);
+    if (prev?.matched) {
+      return { executed: false, reason: 'already_active' };
+    }
+    this.lastState.set(rule.id, { matched: true });
 
     const actionResults: any[] = [];
     let success = true;

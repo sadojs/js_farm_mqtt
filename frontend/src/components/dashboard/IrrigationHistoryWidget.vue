@@ -29,20 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { automationLogApi } from '../../api/automation-log.api'
 import type { AutomationLogEntry, AutomationLogStats } from '../../api/automation-log.api'
 
 const stats = ref<AutomationLogStats>({ todayCount: 0, successRate: 0, mostActiveRule: null })
-const recentLogs = ref<AutomationLogEntry[]>([])
-
-const irrigationLogs = computed(() =>
-  recentLogs.value.filter(l =>
-    l.conditionsMet?.type === 'irrigation' ||
-    l.conditionsMet?.type === 'irrigation_started' ||
-    l.conditionsMet?.type === 'irrigation_cancelled'
-  ).slice(0, 10)
-)
+const irrigationLogs = ref<AutomationLogEntry[]>([])
 
 function getLogTypeLabel(log: AutomationLogEntry): string {
   const t = log.conditionsMet?.type
@@ -73,10 +65,10 @@ function formatTime(dateStr: string): string {
 onMounted(async () => {
   const [s, l] = await Promise.all([
     automationLogApi.getStats(),
-    automationLogApi.getLogs({ limit: 30 }),
+    automationLogApi.getLogs({ limit: 10, type: 'irrigation' }),
   ])
   stats.value = s
-  recentLogs.value = Array.isArray(l) ? l : (l.data ?? [])
+  irrigationLogs.value = Array.isArray(l) ? l : (l.data ?? [])
 })
 </script>
 

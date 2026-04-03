@@ -205,8 +205,8 @@ SELECT add_continuous_aggregate_policy('sensor_data_daily',
 -- 8. 데이터 보존 정책 (Retention Policy)
 -- ==========================================
 
--- 원시 데이터는 3개월 보관
-SELECT add_retention_policy('sensor_data', INTERVAL '3 months');
+-- 원시 데이터는 6개월 보관
+SELECT add_retention_policy('sensor_data', INTERVAL '6 months');
 
 -- ==========================================
 -- 8-1. 날씨 데이터 (시계열 데이터) - TimescaleDB Hypertable

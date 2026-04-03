@@ -18,7 +18,7 @@ export interface AutomationLogStats {
 }
 
 export const automationLogApi = {
-  async getLogs(params: { page?: number; limit?: number; ruleId?: string } = {}): Promise<{ data: AutomationLogEntry[]; total: number }> {
+  async getLogs(params: { page?: number; limit?: number; ruleId?: string; type?: string } = {}): Promise<{ data: AutomationLogEntry[]; total: number }> {
     const { data } = await apiClient.get('/automation/logs', { params })
     return data
   },
