@@ -276,6 +276,7 @@ onMounted(async () => {
     deviceStore.fetchDevices(),
     automationStore.fetchRules(),
   ])
+  automationStore.fetchIrrigationStatus()
   const envConfigGroupId = route.query.envConfig as string | undefined
   if (envConfigGroupId) {
     const target = groupStore.groups.find(g => g.id === envConfigGroupId)
@@ -347,7 +348,7 @@ const getGroupIrrigationDevices = (group: HouseGroup): Device[] => {
     .filter(d => d.equipmentType === 'irrigation')
     .map(d => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
-      return storeDevice ? { ...d, switchStates: storeDevice.switchStates, online: storeDevice.online } : d
+      return storeDevice ? { ...d, ...storeDevice } : d
     })
 }
 
@@ -374,9 +375,28 @@ const openIrrigationStatusModal = (device: Device) => {
 
 const handleIrrigationControl = async (device: Device, switchCode: string) => {
   if (irrigationControlling.value) return
-  irrigationControlling.value = device.id
+
+  const mapping = deviceStore.getEffectiveMapping(device)
+  const isRemoteControl = mapping['remote_control'] === switchCode
   const currentVal = device.switchStates?.[switchCode] ?? false
   const newVal = !currentVal
+
+  // FR-04: 원격제어 OFF 시 확인 다이얼로그
+  if (isRemoteControl && !newVal) {
+    const deviceStatus = automationStore.getDeviceIrrigationStatus(device.id)
+    const enabledCount = deviceStatus?.enabledRuleCount || 0
+    if (enabledCount > 0) {
+      const ok = await confirm({
+        title: '원격제어 끄기',
+        message: `원격제어를 끄면 이 장비의 자동화 룰 ${enabledCount}개도 비활성화됩니다.${deviceStatus?.isRunning ? '\n현재 가동 중인 관수도 중단됩니다.' : ''}`,
+        confirmText: '끄기',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
+  }
+
+  irrigationControlling.value = device.id
   const label = getMappingLabel(device, switchCode)
   const loadingId = notify.add('info', '적용 중...', `${label} ${newVal ? 'ON' : 'OFF'} 명령 전송 중`, 0)
   try {
@@ -401,6 +421,18 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
       storeDevice.switchStates[switchCode] = verification.actualValue
     } else {
       notify.warning('상태 확인 실패', '장비 상태를 확인할 수 없습니다')
+    }
+
+    // FR-04: 원격제어 OFF 후 룰 일괄 비활성화
+    if (isRemoteControl && !newVal) {
+      const bulkResult = await automationStore.bulkDisableByDevice(device.id)
+      if (bulkResult.disabledCount > 0) {
+        notify.info('자동화 비활성화', `자동화 룰 ${bulkResult.disabledCount}개가 비활성화되었습니다`)
+      }
+    }
+    // 관수 상태 갱신
+    if (isRemoteControl) {
+      await automationStore.fetchIrrigationStatus()
     }
   } catch (err: any) {
     console.error('관수 장비 제어 실패:', err)
@@ -557,7 +589,18 @@ const getRuleSummary = (rule: AutomationRule): string => {
 
 const toggleRule = async (ruleId: string) => {
   try {
-    await automationStore.toggleRule(ruleId)
+    const rule = automationStore.rules.find(r => r.id === ruleId)
+    const newState = rule ? !rule.enabled : true
+    // FR-03: 관수 룰 활성화 시 원격제어 자동 ON
+    const isIrrigationEnable = newState && (rule?.conditions as any)?.type === 'irrigation'
+    await automationStore.toggleRule(ruleId, isIrrigationEnable ? { autoEnableRemote: true } : undefined)
+    // 룰 토글 후 장비 상태 + 관수 상태 갱신
+    if ((rule?.conditions as any)?.type === 'irrigation') {
+      await Promise.all([
+        automationStore.fetchIrrigationStatus(),
+        deviceStore.fetchAllActuatorStatuses(),
+      ])
+    }
   } catch (err) {
     console.error('룰 토글 실패:', err)
   }
@@ -665,7 +708,33 @@ const anyModalOpen = computed(() => showAddDeviceModal.value || showEnvConfigMod
 watch(anyModalOpen, (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
 })
-onBeforeUnmount(() => { document.body.style.overflow = '' })
+// 관수 가동 중 상태 폴링 (15초 간격)
+let statusPollTimer: ReturnType<typeof setInterval> | null = null
+function startStatusPolling() {
+  if (statusPollTimer) return
+  statusPollTimer = setInterval(async () => {
+    await Promise.all([
+      automationStore.fetchIrrigationStatus(),
+      deviceStore.fetchAllActuatorStatuses(),
+    ])
+  }, 15000)
+}
+function stopStatusPolling() {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer)
+    statusPollTimer = null
+  }
+}
+watch(() => automationStore.irrigationStatus, (statuses) => {
+  const hasRunning = statuses.some(s => s.isRunning || s.enabledRuleCount > 0)
+  if (hasRunning) startStatusPolling()
+  else stopStatusPolling()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = ''
+  stopStatusPolling()
+})
 </script>
 
 <style scoped>
@@ -971,6 +1040,26 @@ input:checked + .toggle-slider:before { transform: translateX(22px); }
 }
 input:checked + .toggle-slider-sm { background: var(--toggle-on); }
 input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
+
+/* 관수 원격제어 (자동화 섹션 내) */
+.irrigation-remote-section {
+  background: var(--bg-hover);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.irrigation-remote-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+.irrigation-remote-row:last-child { border-bottom: none; }
+.irrigation-remote-label {
+  font-size: calc(13px * var(--content-scale, 1));
+  font-weight: 600;
+  color: var(--text-secondary);
+}
 
 /* 자동화 룰 */
 .rules-list {

@@ -1,17 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { CreateRuleDto, UpdateRuleDto } from './dto/create-rule.dto';
 import { AutomationLog } from './entities/automation-log.entity';
 import { AutomationRunnerService } from './automation-runner.service';
+import { IrrigationSchedulerService } from './irrigation-scheduler.service';
+import { DevicesService } from '../devices/devices.service';
+import { Device } from '../devices/entities/device.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { MqttService } from '../mqtt/mqtt.service';
 
 @Injectable()
 export class AutomationService {
+  private readonly logger = new Logger(AutomationService.name);
+
   constructor(
     @InjectRepository(AutomationRule) private rulesRepo: Repository<AutomationRule>,
     @InjectRepository(AutomationLog) private logsRepo: Repository<AutomationLog>,
+    @InjectRepository(Device) private devicesRepo: Repository<Device>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private readonly runnerService: AutomationRunnerService,
+    private readonly irrigationScheduler: IrrigationSchedulerService,
+    private readonly devicesService: DevicesService,
+    private readonly mqttService: MqttService,
   ) {}
 
   async findAll(userId: string) {
@@ -60,11 +72,23 @@ export class AutomationService {
     return this.withTarget(saved);
   }
 
-  async toggle(id: string, userId: string) {
+  async toggle(id: string, userId: string, options?: { autoEnableRemote?: boolean }) {
     const rule = await this.rulesRepo.findOne({ where: { id, userId } });
     if (!rule) throw new NotFoundException();
     rule.enabled = !rule.enabled;
-    return this.rulesRepo.save(rule);
+    const saved = await this.rulesRepo.save(rule);
+
+    // FR-03: 관수 룰 활성화 시 원격제어 자동 ON
+    let remoteControlEnabled = false;
+    if (saved.enabled && options?.autoEnableRemote && (saved.conditions as any)?.type === 'irrigation') {
+      const deviceIds = this.extractDeviceIds(saved.actions);
+      for (const did of deviceIds) {
+        const ok = await this.ensureRemoteControlOn(did);
+        if (ok) remoteControlEnabled = true;
+      }
+    }
+
+    return { ...saved, remoteControlEnabled };
   }
 
   async remove(id: string, userId: string) {
@@ -142,6 +166,116 @@ export class AutomationService {
     const rule = await this.rulesRepo.findOne({ where: { id, userId } });
     if (!rule) throw new NotFoundException();
     return this.runnerService.executeRule(rule);
+  }
+
+  /** 관수 장비별 자동화 상태 조회 */
+  async getIrrigationStatus(userId: string) {
+    const rules = await this.rulesRepo.find({ where: { userId } });
+    const irrigationRules = rules.filter(r => (r.conditions as any)?.type === 'irrigation');
+
+    // 장비별 그룹핑
+    const deviceRuleMap = new Map<string, AutomationRule[]>();
+    for (const rule of irrigationRules) {
+      const deviceIds = this.extractDeviceIds(rule.actions);
+      for (const deviceId of deviceIds) {
+        const arr = deviceRuleMap.get(deviceId) || [];
+        arr.push(rule);
+        deviceRuleMap.set(deviceId, arr);
+      }
+    }
+
+    const result: any[] = [];
+    for (const [deviceId, devRules] of deviceRuleMap) {
+      try {
+        const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
+        if (!device) continue;
+        const activeInfo = this.irrigationScheduler.getActiveByDevice(device.friendlyName);
+        result.push({
+          deviceId,
+          deviceName: device.name,
+          friendlyName: device.friendlyName,
+          enabledRuleCount: devRules.filter(r => r.enabled).length,
+          totalRuleCount: devRules.length,
+          isRunning: !!activeInfo,
+          runningRule: activeInfo ? {
+            ruleId: activeInfo.ruleId,
+            ruleName: activeInfo.ruleName,
+            startedAt: activeInfo.startedAt,
+            estimatedEndAt: activeInfo.estimatedEndAt,
+          } : undefined,
+        });
+      } catch {
+        // 장비가 삭제된 경우 무시
+      }
+    }
+    return result;
+  }
+
+  /** 특정 장비의 관수 룰 일괄 비활성화 (FR-04) */
+  async bulkDisableByDevice(userId: string, deviceId: string) {
+    const rules = await this.rulesRepo.find({ where: { userId } });
+    const targetRules = rules.filter(r => {
+      if ((r.conditions as any)?.type !== 'irrigation') return false;
+      return this.extractDeviceIds(r.actions).includes(deviceId);
+    });
+
+    let disabledCount = 0;
+    for (const rule of targetRules) {
+      if (rule.enabled) {
+        rule.enabled = false;
+        await this.rulesRepo.save(rule);
+        disabledCount++;
+      }
+    }
+
+    // 진행 중인 관수 중단
+    let stoppedIrrigation = false;
+    try {
+      const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
+      if (device) stoppedIrrigation = await this.irrigationScheduler.stopByDevice(device.friendlyName);
+    } catch {
+      // 장비 못 찾으면 무시
+    }
+
+    return { disabledCount, stoppedIrrigation };
+  }
+
+  /** 룰 actions에서 대상 장비 ID 배열 추출 */
+  private extractDeviceIds(actions: any): string[] {
+    const ids: string[] = [];
+    if (actions?.targetDeviceId) ids.push(actions.targetDeviceId);
+    if (Array.isArray(actions?.targetDeviceIds)) {
+      for (const id of actions.targetDeviceIds) {
+        if (id && !ids.includes(id)) ids.push(id);
+      }
+    }
+    return ids;
+  }
+
+  /** 원격제어 자동 ON (FR-03) — MQTT 방식 */
+  private async ensureRemoteControlOn(deviceId: string): Promise<boolean> {
+    try {
+      const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
+      if (!device || !device.friendlyName) return false;
+
+      const mapping = this.devicesService.getEffectiveMapping(device);
+      const remoteCode = mapping['remote_control'];
+      if (!remoteCode) return false;
+
+      const gateway = device.gatewayId
+        ? await this.gatewayRepo.findOne({ where: { id: device.gatewayId } })
+        : null;
+      if (!gateway) return false;
+
+      await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
+        [remoteCode]: true,
+      });
+      this.logger.log(`원격제어 자동 ON: ${device.name}`);
+      return true;
+    } catch (err: any) {
+      this.logger.warn(`원격제어 자동 ON 실패: ${err.message}`);
+      return false;
+    }
   }
 
   private determineRuleType(conditions: any): 'weather' | 'time' | 'hybrid' {

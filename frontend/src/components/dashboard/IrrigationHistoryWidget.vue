@@ -4,6 +4,24 @@
       <h3>관수 실행 이력</h3>
       <span class="badge">오늘 {{ stats.todayCount }}회</span>
     </div>
+    <!-- 실시간 상태 섹션 -->
+    <div v-if="irrigationDevices.length > 0" class="realtime-section">
+      <div v-for="device in irrigationDevices" :key="device.deviceId" class="device-status-row">
+        <span class="device-name">{{ device.deviceName }}</span>
+        <div class="status-badges">
+          <span v-if="device.enabledRuleCount > 0" class="status-badge active">
+            자동화 활성 ({{ device.enabledRuleCount }})
+          </span>
+          <span v-else class="status-badge inactive">비활성</span>
+          <span v-if="device.isRunning" class="status-badge running">
+            가동중 — {{ device.runningRule?.ruleName }}
+            <template v-if="getRemainingMin(device) > 0"> ({{ getRemainingMin(device) }}분)</template>
+          </span>
+          <span v-else class="status-badge idle">대기</span>
+        </div>
+      </div>
+    </div>
+
     <div class="stats-row">
       <div class="stat-item">
         <span class="stat-value">{{ stats.successRate }}%</span>
@@ -31,10 +49,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { automationApi } from '../../api/automation.api'
 import type { AutomationLog, AutomationLogStats } from '../../types/automation.types'
+import { useAutomationStore } from '../../stores/automation.store'
+import type { IrrigationDeviceStatus } from '../../api/automation.api'
 
+const automationStore = useAutomationStore()
 const stats = ref<AutomationLogStats>({
   todayCount: 0,
   successRate: 0,
@@ -42,6 +63,25 @@ const stats = ref<AutomationLogStats>({
 })
 
 const recentLogs = ref<AutomationLog[]>([])
+const irrigationDevices = computed(() => automationStore.irrigationStatus)
+
+function getRemainingMin(device: IrrigationDeviceStatus): number {
+  if (!device.runningRule?.estimatedEndAt) return 0
+  return Math.max(0, Math.ceil((device.runningRule.estimatedEndAt - Date.now()) / 60000))
+}
+
+// 가동중 장비 있으면 15초 폴링
+let pollTimer: ReturnType<typeof setInterval> | null = null
+watch(irrigationDevices, (devs) => {
+  const hasRunning = devs.some(d => d.isRunning)
+  if (hasRunning && !pollTimer) {
+    pollTimer = setInterval(() => automationStore.fetchIrrigationStatus(), 15000)
+  } else if (!hasRunning && pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}, { immediate: true })
+onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 
 function truncate(text: string | null, maxLen: number): string {
   if (!text) return '-'
@@ -70,6 +110,8 @@ async function loadData() {
 
 onMounted(() => {
   loadData()
+  // 별도 호출 (404 시에도 기존 기능에 영향 없음)
+  automationStore.fetchIrrigationStatus()
 })
 </script>
 
@@ -104,6 +146,40 @@ onMounted(() => {
   padding: 4px 10px;
   border-radius: 12px;
 }
+
+.realtime-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.device-status-row {
+  padding: 8px 0;
+}
+.device-status-row + .device-status-row {
+  border-top: 1px solid var(--border-light);
+}
+.device-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 6px;
+}
+.status-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.status-badge.active { background: #e8f5e9; color: #2e7d32; }
+.status-badge.inactive { background: var(--bg-badge, #f0f0f0); color: var(--text-muted); }
+.status-badge.running { background: #e3f2fd; color: #1565c0; }
+.status-badge.idle { background: var(--bg-badge, #f0f0f0); color: var(--text-muted); }
 
 .stats-row {
   display: grid;

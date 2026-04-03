@@ -32,8 +32,14 @@ export class AutomationController {
   }
 
   @Patch('rules/:id/toggle')
-  toggle(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.automationService.toggle(id, this.getEffectiveUserId(user));
+  toggle(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('autoEnableRemote') autoEnableRemote?: string,
+  ) {
+    return this.automationService.toggle(id, this.getEffectiveUserId(user), {
+      autoEnableRemote: autoEnableRemote === 'true',
+    });
   }
 
   @Post('rules/:id/run')
@@ -44,6 +50,16 @@ export class AutomationController {
   @Delete('rules/:id')
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.automationService.remove(id, this.getEffectiveUserId(user));
+  }
+
+  @Get('irrigation/status')
+  getIrrigationStatus(@CurrentUser() user: any) {
+    return this.automationService.getIrrigationStatus(this.getEffectiveUserId(user));
+  }
+
+  @Post('rules/bulk-disable')
+  bulkDisableByDevice(@CurrentUser() user: any, @Body() dto: { deviceId: string }) {
+    return this.automationService.bulkDisableByDevice(this.getEffectiveUserId(user), dto.deviceId);
   }
 
   @Get('logs/stats')

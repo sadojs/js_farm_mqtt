@@ -27,7 +27,15 @@
                 <span class="item-location">{{ getDeviceLocation(device) }}</span>
               </div>
             </div>
-            <span :class="['item-status', device.switchState ? 'running' : 'stopped']">
+            <div v-if="device.equipmentType === 'irrigation'" class="item-status-group">
+              <span :class="['item-status', getIrrigationScheduleStatus(device).scheduled ? 'scheduled' : 'stopped']">
+                {{ getIrrigationScheduleStatus(device).scheduled ? `스케줄 ON (${getIrrigationScheduleStatus(device).count})` : '스케줄 OFF' }}
+              </span>
+              <span :class="['item-status', getIrrigationScheduleStatus(device).running ? 'running' : 'stopped']">
+                {{ getIrrigationScheduleStatus(device).running ? '가동중' : '대기' }}
+              </span>
+            </div>
+            <span v-else :class="['item-status', device.switchState ? 'running' : 'stopped']">
               {{ device.online ? (device.switchState ? '가동중' : '대기') : '오프라인' }}
             </span>
           </div>
@@ -84,10 +92,21 @@
 import { computed, onMounted } from 'vue'
 import { useDeviceStore } from '../../stores/device.store'
 import { useGroupStore } from '../../stores/group.store'
+import { useAutomationStore } from '../../stores/automation.store'
 import type { Device } from '../../types/device.types'
 
 const deviceStore = useDeviceStore()
 const groupStore = useGroupStore()
+const automationStore = useAutomationStore()
+
+function getIrrigationScheduleStatus(device: Device) {
+  const status = automationStore.getDeviceIrrigationStatus(device.id)
+  return {
+    scheduled: (status?.enabledRuleCount ?? 0) > 0,
+    count: status?.enabledRuleCount ?? 0,
+    running: status?.isRunning ?? false,
+  }
+}
 
 const DISPLAY_FIELDS = ['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point']
 
@@ -282,6 +301,8 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .item-status.running { background: var(--accent-bg); color: var(--accent); }
+.item-status.scheduled { background: #e3f2fd; color: #1565c0; }
+.item-status-group { display: flex; gap: 4px; flex-shrink: 0; }
 .item-status.stopped { background: var(--bg-hover); color: var(--text-muted); }
 
 .sensor-detail-item {

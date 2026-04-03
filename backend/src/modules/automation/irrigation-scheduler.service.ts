@@ -21,10 +21,13 @@ interface ScheduledAction {
 
 interface ActiveIrrigation {
   ruleId: string;
+  ruleName: string;
   userId: string;
+  deviceId: string;
   gatewayId: string;
   friendlyName: string;
   startedAt: number;
+  estimatedEndAt: number;
   timers: ReturnType<typeof setTimeout>[];
 }
 
@@ -88,6 +91,14 @@ export class IrrigationSchedulerService {
   }
 
   private async startIrrigation(rule: AutomationRule, conditions: any) {
+    try {
+      await this._startIrrigationInternal(rule, conditions);
+    } catch (err: any) {
+      this.logger.error(`관수 시작 실패: ${rule.name} - ${err.message}`, err.stack);
+    }
+  }
+
+  private async _startIrrigationInternal(rule: AutomationRule, conditions: any) {
     const actions = rule.actions as any;
     const deviceIds = actions?.targetDeviceIds || (actions?.targetDeviceId ? [actions.targetDeviceId] : []);
     if (deviceIds.length === 0) {
@@ -132,15 +143,29 @@ export class IrrigationSchedulerService {
 
     // 타이머 등록
     const timers: ReturnType<typeof setTimeout>[] = [];
+    const totalDurationMs = timeline.length > 0 ? timeline[timeline.length - 1].time + 5000 : 0;
     const active: ActiveIrrigation = {
       ruleId: rule.id,
+      ruleName: rule.name,
       userId: rule.userId,
+      deviceId: deviceIds[0],
       gatewayId: gateway.gatewayId,
       friendlyName: device.friendlyName,
       startedAt: Date.now(),
+      estimatedEndAt: Date.now() + totalDurationMs,
       timers,
     };
     this.activeIrrigations.set(rule.id, active);
+
+    // 관수 시작 이벤트
+    this.eventsGateway.emitIrrigationStarted({
+      ruleId: rule.id,
+      ruleName: rule.name,
+      deviceId: deviceIds[0],
+      tuyaDeviceId: device.friendlyName,
+      startedAt: active.startedAt,
+      estimatedEndAt: active.estimatedEndAt,
+    });
 
     for (const action of timeline) {
       const timer = setTimeout(async () => {
@@ -157,57 +182,92 @@ export class IrrigationSchedulerService {
     }
 
     // 마지막 액션 이후 정리
-    const totalDuration = timeline.length > 0 ? timeline[timeline.length - 1].time + 5000 : 0;
     const cleanupTimer = setTimeout(async () => {
-      this.activeIrrigations.delete(rule.id);
-      this.logger.log(`관수 완료: ${rule.name}`);
-
-      // 비반복이면 룰 비활성화
-      if (!conditions.schedule?.repeat) {
-        rule.enabled = false;
-        await this.rulesRepo.save(rule);
-        this.logger.log(`관수 비반복 룰 비활성화: ${rule.name}`);
-      }
-
-      // 로그 기록
-      await this.logsRepo.save(
-        this.logsRepo.create({
+      try {
+        // 관수 종료 이벤트
+        this.eventsGateway.emitIrrigationStopped({
           ruleId: rule.id,
-          userId: rule.userId,
-          success: true,
-          conditionsMet: { type: 'irrigation', startTime: conditions.startTime },
-          actionsExecuted: { timeline: timeline.map(a => a.label) },
-        }),
-      );
+          tuyaDeviceId: device.friendlyName,
+        });
+        this.activeIrrigations.delete(rule.id);
+        this.logger.log(`관수 완료: ${rule.name}`);
 
-      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
-        ruleId: rule.id,
-        ruleName: rule.name,
-        success: true,
-        actions: [{ type: 'irrigation_complete' }],
-      });
-    }, totalDuration);
+        // 비반복: 이번 주 남은 요일이 없으면 비활성화
+        // 주간 순서: 월(1)→화(2)→수(3)→목(4)→금(5)→토(6)→일(0)
+        if (conditions.schedule?.repeat === false) {
+          const today = new Date().getDay();
+          const days: number[] = conditions.schedule?.days || [];
+          const todayOrder = today === 0 ? 7 : today;
+          const hasRemaining = days.some(d => {
+            const dOrder = d === 0 ? 7 : d;
+            return dOrder > todayOrder;
+          });
+          if (!hasRemaining) {
+            rule.enabled = false;
+            await this.rulesRepo.save(rule);
+            this.logger.log(`관수 비반복 룰 비활성화 (이번 주 완료): ${rule.name}`);
+          } else {
+            this.logger.log(`관수 비반복 룰 유지: 이번 주 남은 요일 있음 - ${rule.name}`);
+          }
+        }
+
+        // 로그 기록
+        await this.logsRepo.save(
+          this.logsRepo.create({
+            ruleId: rule.id,
+            userId: rule.userId,
+            success: true,
+            conditionsMet: { type: 'irrigation', startTime: conditions.startTime },
+            actionsExecuted: { timeline: timeline.map(a => a.label) },
+          }),
+        );
+
+        this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          success: true,
+          actions: [{ type: 'irrigation_complete' }],
+        });
+      } catch (err: any) {
+        this.logger.error(`관수 정리 실패: ${rule.name} - ${err.message}`);
+      }
+    }, totalDurationMs);
     timers.push(cleanupTimer);
   }
 
+  /**
+   * 관수 타임라인 생성
+   *
+   * 예: 10:00 시작, 관수 30분, 대기 5분, 액비투여 10분, 종료전대기 5분
+   *
+   * 10:00  1구역 ON + 교반기 ON
+   * 10:15  액비모터 ON  (30 - 10 - 5 = 15분 후)
+   * 10:25  액비모터 OFF (30 - 5 = 25분 후)
+   * 10:30  1구역 OFF + 교반기 OFF
+   * 10:30~10:35  대기 (모두 OFF)
+   * 10:35  2구역 ON + 교반기 ON → 이하 반복
+   */
   private buildTimeline(conditions: any, mapping: Record<string, string>): ScheduledAction[] {
     const actions: ScheduledAction[] = [];
-    const zones = (conditions.zones || []).filter((z: any) => z.enabled);
-    const fertilizer = conditions.fertilizer || { duration: 0, preStopWait: 0 };
+    const zones = (conditions.zones || [])
+      .filter((z: any) => z.enabled)
+      .sort((a: any, b: any) => a.zone - b.zone);
+    const fertilizer = conditions.fertilizer || { enabled: false, duration: 0, preStopWait: 0 };
+    const fertEnabled = fertilizer.enabled !== false && fertilizer.duration > 0;
+    const fertDurationMs = fertilizer.duration * 60000;
+    const fertPreStopMs = fertilizer.preStopWait * 60000;
 
     let offsetMs = 0;
 
     for (const zone of zones) {
-      const zoneDuration = zone.duration * 60000; // ms
-      const waitTime = zone.waitTime * 60000;
-      const fertDuration = fertilizer.duration * 60000;
-      const fertPreStop = fertilizer.preStopWait * 60000;
+      const zoneDurationMs = zone.duration * 60000;
+      const waitTimeMs = (zone.waitTime || 0) * 60000;
       const fnKey = ZONE_FUNCTION_KEY[zone.zone];
       if (!fnKey) continue;
       const switchCode = mapping[fnKey];
       if (!switchCode) continue;
 
-      // 구역 ON
+      // 1) 구역 ON
       actions.push({
         time: offsetMs,
         type: 'zone_on',
@@ -216,7 +276,7 @@ export class IrrigationSchedulerService {
         label: `${zone.name} ON`,
       });
 
-      // 교반기 ON (mixer.enabled 시에만)
+      // 2) 교반기 ON (관수 시작과 동시, 관수 종료와 동시에 OFF)
       if (conditions.mixer?.enabled && mapping['mixer']) {
         actions.push({
           time: offsetMs,
@@ -227,41 +287,44 @@ export class IrrigationSchedulerService {
         });
       }
 
-      // 액비모터 ON/OFF (페어링 보장: fertStartOffset > 0 이어야 ON 발송)
-      if (fertDuration > 0 && mapping['fertilizer_motor']) {
-        const fertStartOffset = zoneDuration - fertDuration - fertPreStop;
-        const fertEndOffset = zoneDuration - fertPreStop;
-        if (fertStartOffset > 0 && fertEndOffset > 0) {
+      // 3) 액비모터 ON/OFF
+      //    시작: 관수시간 - (투여시간 + 종료전대기)
+      //    종료: 관수시간 - 종료전대기
+      if (fertEnabled && mapping['fertilizer_motor']) {
+        const fertStartMs = zoneDurationMs - fertDurationMs - fertPreStopMs;
+        const fertEndMs = zoneDurationMs - fertPreStopMs;
+
+        if (fertStartMs >= 0 && fertEndMs > fertStartMs) {
           actions.push({
-            time: offsetMs + fertStartOffset,
+            time: offsetMs + fertStartMs,
             type: 'fertilizer_on',
             switchCode: mapping['fertilizer_motor'],
             value: true,
-            label: `액비모터 ON (${zone.name}, ${Math.round(fertStartOffset / 60000)}분 후)`,
+            label: `액비모터 ON (${zone.name}, ${Math.round(fertStartMs / 60000)}분 후)`,
           });
           actions.push({
-            time: offsetMs + fertEndOffset,
+            time: offsetMs + fertEndMs,
             type: 'fertilizer_off',
             switchCode: mapping['fertilizer_motor'],
             value: false,
-            label: `액비모터 OFF (${zone.name}, ${Math.round(fertEndOffset / 60000)}분 후)`,
+            label: `액비모터 OFF (${zone.name}, ${Math.round(fertEndMs / 60000)}분 후)`,
           });
         }
       }
 
-      // 구역 OFF (관수시간 후)
+      // 4) 구역 OFF
       actions.push({
-        time: offsetMs + zoneDuration,
+        time: offsetMs + zoneDurationMs,
         type: 'zone_off',
         switchCode,
         value: false,
         label: `${zone.name} OFF`,
       });
 
-      // 교반기 OFF (mixer.enabled 시에만)
+      // 5) 교반기 OFF (관수 종료와 동시)
       if (conditions.mixer?.enabled && mapping['mixer']) {
         actions.push({
-          time: offsetMs + zoneDuration,
+          time: offsetMs + zoneDurationMs,
           type: 'mixer_off',
           switchCode: mapping['mixer'],
           value: false,
@@ -269,12 +332,62 @@ export class IrrigationSchedulerService {
         });
       }
 
-      // 다음 구역까지 대기
-      offsetMs += zoneDuration + waitTime;
+      // 6) 대기시간 후 다음 구역
+      offsetMs += zoneDurationMs + waitTimeMs;
     }
 
-    // 시간순 정렬
     actions.sort((a, b) => a.time - b.time);
     return actions;
+  }
+
+  /** 특정 장비의 가동 정보 조회 */
+  getActiveByDevice(friendlyName: string): ActiveIrrigation | undefined {
+    for (const [, active] of this.activeIrrigations) {
+      if (active.friendlyName === friendlyName) return active;
+    }
+    return undefined;
+  }
+
+  /** 특정 장비의 가동 중단 — 모든 관수 스위치 OFF */
+  async stopByDevice(friendlyName: string): Promise<boolean> {
+    for (const [ruleId, active] of this.activeIrrigations) {
+      if (active.friendlyName === friendlyName) {
+        // 1) 예약 타이머 모두 취소
+        active.timers.forEach(t => clearTimeout(t));
+        this.activeIrrigations.delete(ruleId);
+
+        // 2) 현재 ON 상태인 스위치들 OFF 명령 전송
+        try {
+          const device = await this.devicesRepo.findOne({ where: { id: active.deviceId } });
+          if (device) {
+            const mapping = this.devicesService.getEffectiveMapping(device);
+
+            // 구역, 교반기, 액비모터 모두 OFF
+            const offCodes = [
+              ...Object.entries(mapping)
+                .filter(([key]) => key.startsWith('zone_') || key === 'mixer' || key === 'fertilizer_motor')
+                .map(([, code]) => code),
+            ];
+            for (const code of offCodes) {
+              try {
+                await this.mqttService.controlDevice(active.gatewayId, active.friendlyName, {
+                  [code]: false,
+                });
+              } catch {
+                // 개별 스위치 OFF 실패 시 계속 진행
+              }
+            }
+            this.logger.log(`관수 강제 중단 + 스위치 OFF: ${offCodes.join(', ')}`);
+          }
+        } catch (err: any) {
+          this.logger.warn(`관수 중단 시 스위치 OFF 실패: ${err.message}`);
+        }
+
+        this.eventsGateway.emitIrrigationStopped({ ruleId, tuyaDeviceId: friendlyName });
+        this.logger.log(`관수 강제 중단: ruleId=${ruleId}`);
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -121,8 +121,13 @@
             <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
           </select>
           <span v-else class="switch-hint">{{ effectiveMapping['fertilizer_motor'] }}</span>
+          <button
+            class="toggle-btn"
+            :class="{ active: form.fertilizer.enabled }"
+            @click="form.fertilizer.enabled = !form.fertilizer.enabled"
+          >{{ form.fertilizer.enabled ? 'ON' : 'OFF' }}</button>
         </div>
-        <div class="setting-fields">
+        <div v-if="form.fertilizer.enabled" class="setting-fields">
           <div class="field-group">
             <label class="field-label">투여시간</label>
             <div class="input-with-unit">
@@ -205,7 +210,7 @@ export interface IrrigationFormData {
   startTime: string
   zones: IrrigationZone[]
   mixer: { enabled: boolean }
-  fertilizer: { duration: number; preStopWait: number }
+  fertilizer: { enabled: boolean; duration: number; preStopWait: number }
   schedule: { days: number[]; repeat: boolean }
 }
 
@@ -260,7 +265,12 @@ const DAYS = [
   { value: 0, label: '일' },
 ]
 
-const form = reactive<IrrigationFormData>(JSON.parse(JSON.stringify(props.modelValue)))
+const raw = JSON.parse(JSON.stringify(props.modelValue))
+// 기존 룰 호환: fertilizer.enabled 기본값 (duration > 0이면 enabled)
+if (raw.fertilizer && raw.fertilizer.enabled === undefined) {
+  raw.fertilizer.enabled = raw.fertilizer.duration > 0
+}
+const form = reactive<IrrigationFormData>(raw)
 
 /* ── Time Picker ── */
 const showTimePicker = ref(false)
@@ -292,11 +302,17 @@ function confirmTime() {
 }
 
 /* ── Watchers ── */
+let ignoreFormWatch = false
 watch(() => props.modelValue, (val) => {
-  Object.assign(form, JSON.parse(JSON.stringify(val)))
+  const next = JSON.parse(JSON.stringify(val))
+  if (JSON.stringify(next) === JSON.stringify(form)) return
+  ignoreFormWatch = true
+  Object.assign(form, next)
+  nextTick(() => { ignoreFormWatch = false })
 }, { deep: true })
 
 watch(form, () => {
+  if (ignoreFormWatch) return
   emit('update:modelValue', JSON.parse(JSON.stringify(form)))
 }, { deep: true })
 

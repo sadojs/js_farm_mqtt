@@ -211,6 +211,7 @@ import { useDeviceStore } from '@/stores/device.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotificationStore } from '@/stores/notification.store'
+import { useAutomationStore } from '@/stores/automation.store'
 import { deviceApi } from '@/api/device.api'
 import type { Device, DependencyRule, ChannelMapping } from '@/types/device.types'
 import { FUNCTION_LABELS } from '@/types/device.types'
@@ -218,6 +219,7 @@ import { FUNCTION_LABELS } from '@/types/device.types'
 const deviceStore = useDeviceStore()
 const authStore = useAuthStore()
 const notify = useNotificationStore()
+const automationStore = useAutomationStore()
 const { confirm } = useConfirm()
 const showRegistrationModal = ref(false)
 const searchQuery = ref('')
@@ -348,9 +350,28 @@ const openIrrigationStatusModal = (device: Device) => {
 
 async function handleIrrigationControl(device: Device, switchCode: string) {
   if (irrigationControlling.value) return
-  irrigationControlling.value = device.id
+
+  const mapping = deviceStore.getEffectiveMapping(device)
+  const isRemoteControl = mapping['remote_control'] === switchCode
   const currentVal = device.switchStates?.[switchCode] ?? false
   const newVal = !currentVal
+
+  // FR-04: 원격제어 OFF 시 확인 다이얼로그
+  if (isRemoteControl && !newVal) {
+    const deviceStatus = automationStore.getDeviceIrrigationStatus(device.id)
+    const enabledCount = deviceStatus?.enabledRuleCount || 0
+    if (enabledCount > 0) {
+      const ok = await confirm({
+        title: '원격제어 끄기',
+        message: `원격제어를 끄면 이 장비의 자동화 룰 ${enabledCount}개도 비활성화됩니다.${deviceStatus?.isRunning ? '\n현재 가동 중인 관수도 중단됩니다.' : ''}`,
+        confirmText: '끄기',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
+  }
+
+  irrigationControlling.value = device.id
   const label = getMappingLabel(device, switchCode)
   const loadingId = notify.add('info', '적용 중...', `${label} ${newVal ? 'ON' : 'OFF'} 명령 전송 중`, 0)
   try {
@@ -371,6 +392,14 @@ async function handleIrrigationControl(device: Device, switchCode: string) {
       device.switchStates[switchCode] = verification.actualValue
     } else {
       notify.warning('상태 확인 실패', '장비 상태를 확인할 수 없습니다')
+    }
+
+    // FR-04: 원격제어 OFF 후 룰 일괄 비활성화
+    if (isRemoteControl && !newVal) {
+      const bulkResult = await automationStore.bulkDisableByDevice(device.id)
+      if (bulkResult.disabledCount > 0) {
+        notify.info('자동화 비활성화', `자동화 룰 ${bulkResult.disabledCount}개가 비활성화되었습니다`)
+      }
     }
   } catch (err) {
     console.error('관수 장비 제어 실패:', err)
@@ -461,6 +490,7 @@ const formatLastSeen = (lastSeen?: string) => {
 
 onMounted(async () => {
   await deviceStore.fetchDevices()
+  automationStore.fetchIrrigationStatus()
 })
 
 const handleDeviceRegistered = () => {
