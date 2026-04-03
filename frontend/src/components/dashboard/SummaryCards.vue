@@ -7,7 +7,7 @@
         </div>
         <div class="summary-text">
           <span class="summary-number">{{ actuatorCount + sensorCount }}</span>
-          <span class="summary-label">전체 장비</span>
+          <span class="summary-label">전체 장치</span>
         </div>
       </div>
 

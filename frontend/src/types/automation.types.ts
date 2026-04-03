@@ -1,4 +1,4 @@
-// === 장비 유형 (레거시 호환) ===
+// === 장치 유형 (레거시 호환) ===
 export type DeviceType = 'roof_actuator' | 'ventilation_fan' | 'irrigation'
 export type RuleType = 'weather' | 'time' | 'hybrid'
 
@@ -31,7 +31,7 @@ export interface ConditionGroup {
   groups: ConditionSet[]
 }
 
-// === 액션 (새로운 형식: 실제 장비 ID 기반) ===
+// === 액션 (새로운 형식: 실제 장치 ID 기반) ===
 export interface RuleAction {
   targetDeviceId?: string
   targetDeviceIds?: string[]

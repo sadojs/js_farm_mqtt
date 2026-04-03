@@ -42,7 +42,7 @@
       </div>
 
       <div class="summary-row">
-        <span class="summary-label">장비</span>
+        <span class="summary-label">장치</span>
         <span class="summary-value">{{ actuatorName }}</span>
       </div>
 

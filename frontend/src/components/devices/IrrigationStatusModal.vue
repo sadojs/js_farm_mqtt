@@ -93,13 +93,13 @@ const remainingMinutes = computed(() => {
   return Math.max(0, Math.ceil(remaining / 60000))
 })
 
-// 해당 장비의 활성 자동화 룰에서 구역별 ON/OFF 설정 추출
+// 해당 장치의 활성 자동화 룰에서 구역별 ON/OFF 설정 추출
 const zoneAutoMap = computed<Record<string, 'on' | 'off'>>(() => {
   if (!props.device) return {}
   const deviceId = props.device.id
   const result: Record<string, 'on' | 'off'> = {}
 
-  // 해당 장비의 모든 활성 irrigation 룰에서 구역 설정 수집
+  // 해당 장치의 모든 활성 irrigation 룰에서 구역 설정 수집
   for (const rule of automationStore.rules) {
     if (!rule.enabled) continue
     const cond = rule.conditions as any

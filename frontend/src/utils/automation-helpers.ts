@@ -150,10 +150,10 @@ export function localizeAction(command: string): string {
 
 export function formatAction(a: RuleAction): string {
   if (a.targetDeviceId) {
-    return `장비 제어 (조건에 따라 ON/OFF)`
+    return `장치 제어 (조건에 따라 ON/OFF)`
   }
   if (a.targetDeviceIds?.length) {
-    return `${a.targetDeviceIds.length}개 장비 제어`
+    return `${a.targetDeviceIds.length}개 장치 제어`
   }
   return localizeAction(a.command || '제어')
 }

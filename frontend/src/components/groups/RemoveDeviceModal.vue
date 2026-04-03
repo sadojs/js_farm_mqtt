@@ -2,11 +2,11 @@
   <div v-if="show && targetGroup" class="modal-overlay" @click.self="$emit('close')">
     <div class="remove-device-modal">
       <div class="add-modal-header">
-        <h3>장비 제거 — {{ targetGroup.name }}</h3>
+        <h3>장치 제거 — {{ targetGroup.name }}</h3>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="remove-modal-desc">
-        제거할 장비를 선택하세요. 장비 자체는 삭제되지 않으며 그룹에서만 해제됩니다.
+        제거할 장치를 선택하세요. 장치 자체는 삭제되지 않으며 그룹에서만 해제됩니다.
       </div>
       <div class="add-modal-body">
         <!-- 센서 -->
@@ -75,9 +75,9 @@
           </div>
         </template>
 
-        <!-- 일반 장비 -->
+        <!-- 일반 장치 -->
         <template v-if="actuators.length > 0">
-          <div class="remove-section-label actuator">장비</div>
+          <div class="remove-section-label actuator">장치</div>
           <div
             v-for="device in actuators"
             :key="device.id"
@@ -99,12 +99,12 @@
         </template>
 
         <div v-if="sensors.length === 0 && openers.length === 0 && irrigations.length === 0 && actuators.length === 0" class="empty-state-sm">
-          <p>제거할 장비가 없습니다.</p>
+          <p>제거할 장치가 없습니다.</p>
         </div>
       </div>
 
       <div v-if="hasWarning" class="remove-warning-banner">
-        ⚠ 선택한 장비 중 자동화 룰에서 사용 중인 항목이 있습니다. 자동화 룰을 먼저 수정해 주세요.
+        ⚠ 선택한 장치 중 자동화 룰에서 사용 중인 항목이 있습니다. 자동화 룰을 먼저 수정해 주세요.
       </div>
 
       <div class="add-modal-footer">
@@ -115,7 +115,7 @@
           @click="confirmRemove"
         >
           <span v-if="removing">제거 중...</span>
-          <span v-else-if="checked.size === 0">장비를 선택하세요</span>
+          <span v-else-if="checked.size === 0">장치를 선택하세요</span>
           <span v-else-if="hasWarning">자동화 룰 먼저 처리 필요</span>
           <span v-else>{{ checked.size }}개 제거</span>
         </button>
@@ -213,8 +213,8 @@ const confirmRemove = async () => {
     emit('removed')
     emit('close')
   } catch (err) {
-    console.error('그룹 장비 제거 실패:', err)
-    alert('장비 제거에 실패했습니다.')
+    console.error('그룹 장치 제거 실패:', err)
+    alert('장치 제거에 실패했습니다.')
   } finally {
     removing.value = false
   }

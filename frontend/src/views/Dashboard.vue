@@ -76,7 +76,7 @@
       <!-- 요약 카드 위젯 -->
       <SummaryCards v-else-if="widget.type === 'summary'" />
 
-      <!-- 장비 상태 정보 위젯 -->
+      <!-- 장치 상태 정보 위젯 -->
       <DeviceStatusCards v-else-if="widget.type === 'device-status'" />
 
       <!-- 관수 실행 이력 위젯 -->

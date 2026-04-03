@@ -14,7 +14,7 @@ export const gatewayApi = {
   remove: (id: string) =>
     apiClient.delete(`/gateways/${id}`),
 
-  /** 특정 게이트웨이에 페어링된 Zigbee 장비 목록 */
+  /** 특정 게이트웨이에 페어링된 Zigbee 장치 목록 */
   getZigbeeDevices: (id: string) =>
     apiClient.get<ZigbeeDeviceInfo[]>(`/gateways/${id}/zigbee-devices`),
 

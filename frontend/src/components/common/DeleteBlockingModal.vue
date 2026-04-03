@@ -77,7 +77,7 @@ const emit = defineEmits<{
 const router = useRouter()
 
 const subjectLabel = computed(() => {
-  if (props.type === 'opener-pair') return '의 열림/닫힘 장비 중 하나 이상이'
+  if (props.type === 'opener-pair') return '의 열림/닫힘 장치 중 하나 이상이'
   if (props.type === 'group') return '은(는) 대상 그룹으로 지정되어'
   return '은(는)'
 })
@@ -88,7 +88,7 @@ const groupsOnly = computed(() =>
 
 const blockingGuide = computed(() => {
   if (groupsOnly.value) {
-    return '먼저 그룹에서 장비를 제거한 후 다시 시도해 주세요.'
+    return '먼저 그룹에서 장치를 제거한 후 다시 시도해 주세요.'
   }
   return '위 자동화 룰에서 먼저 제거하거나 룰을 삭제한 후 다시 시도해 주세요.'
 })

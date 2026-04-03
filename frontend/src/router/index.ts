@@ -43,7 +43,7 @@ const router = createRouter({
       path: '/devices',
       name: 'devices',
       component: () => import('../views/Devices.vue'),
-      meta: { title: '장비 관리', requiresAuth: true, denyFarmUser: true }
+      meta: { title: '장치 관리', requiresAuth: true, denyFarmUser: true }
     },
     {
       path: '/users',

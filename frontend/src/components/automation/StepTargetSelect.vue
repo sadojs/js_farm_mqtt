@@ -19,7 +19,7 @@
         <div class="group-info">
           <div class="group-name">{{ group.name }}</div>
           <div class="group-meta">
-            장비 {{ group.devices?.length || 0 }}대
+            장치 {{ group.devices?.length || 0 }}대
           </div>
         </div>
         <div v-if="modelValue === group.id" class="check-mark">✓</div>

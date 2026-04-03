@@ -133,7 +133,7 @@
           <div class="stat-value humidity">{{ avgHumidity }}<span class="stat-unit">%</span></div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">장비 가동 시간</div>
+          <div class="stat-label">장치 가동 시간</div>
           <div class="stat-value actuator">{{ actuatorHours }}<span class="stat-unit">시간</span></div>
         </div>
       </div>
@@ -146,9 +146,9 @@
         </div>
       </div>
 
-      <!-- 장비 가동 현황 차트 -->
+      <!-- 장치 가동 현황 차트 -->
       <div class="chart-card">
-        <h3 class="chart-title">장비 가동 현황</h3>
+        <h3 class="chart-title">장치 가동 현황</h3>
         <div class="chart-container">
           <Bar v-if="actuatorChartData" :data="actuatorChartData" :options="barChartOptions" />
         </div>
@@ -163,7 +163,7 @@
               <tr>
                 <th>시간</th>
                 <th v-for="col in tableColumns" :key="col.key">{{ col.label }}</th>
-                <th>가동 장비</th>
+                <th>가동 장치</th>
               </tr>
             </thead>
             <tbody>
@@ -460,7 +460,7 @@ const actuatorChartData = computed(() => {
   return {
     labels,
     datasets: [{
-      label: '가동 장비 수',
+      label: '가동 장치 수',
       data: actuatorData.value.map((d: any) => Number(d.total_actions)),
       backgroundColor: 'rgba(103, 58, 183, 0.7)',
       borderRadius: 6,
@@ -503,7 +503,7 @@ const tableColumns = computed(() => {
   ]
 })
 
-// 테이블 데이터 (실외 날씨 + 실내 센서 + 가동장비 통합)
+// 테이블 데이터 (실외 날씨 + 실내 센서 + 가동장치 통합)
 const tableData = computed(() => {
   const sensorMap = new Map<string, Record<string, number>>()
   const weatherMap = buildWeatherMap()

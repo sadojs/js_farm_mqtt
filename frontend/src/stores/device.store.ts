@@ -83,7 +83,7 @@ export const useDeviceStore = defineStore('device', () => {
     if (device) device.channelMapping = mapping
   }
 
-  /** 제어 후 장비 상태 검증 (1초 대기 후 상태 확인) */
+  /** 제어 후 장치 상태 검증 (1초 대기 후 상태 확인) */
   async function verifyDeviceStatus(deviceId: string, switchCode: string, expectedValue: boolean) {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))

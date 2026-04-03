@@ -1,7 +1,7 @@
 <template>
   <div class="step-condition">
     <h3 class="step-title">조건 설정</h3>
-    <p class="step-desc">{{ timeOnly ? '시간 기반 조건을 설정하세요.' : '센서 데이터 조건을 설정하세요.' }} 조건 충족 시 장비가 동작합니다.</p>
+    <p class="step-desc">{{ timeOnly ? '시간 기반 조건을 설정하세요.' : '센서 데이터 조건을 설정하세요.' }} 조건 충족 시 장치가 동작합니다.</p>
 
     <div class="condition-groups">
       <div

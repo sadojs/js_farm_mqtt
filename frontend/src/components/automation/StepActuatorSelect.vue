@@ -1,10 +1,10 @@
 <template>
   <div class="step-actuator">
-    <h3 class="step-title">장비 선택</h3>
-    <p class="step-desc">조건 충족 시 제어할 장비를 선택하세요</p>
+    <h3 class="step-title">장치 선택</h3>
+    <p class="step-desc">조건 충족 시 제어할 장치를 선택하세요</p>
 
     <div v-if="actuators.length === 0" class="empty">
-      선택한 그룹에 제어 가능한 장비가 없습니다.
+      선택한 그룹에 제어 가능한 장치가 없습니다.
     </div>
     <template v-else>
       <!-- 휀 그룹 (멀티 선택) -->
@@ -35,9 +35,9 @@
         </div>
       </div>
 
-      <!-- 기타 장비 (단일 선택) -->
+      <!-- 기타 장치 (단일 선택) -->
       <div v-if="others.length > 0" class="device-section">
-        <div v-if="fans.length > 0" class="section-label">기타 장비</div>
+        <div v-if="fans.length > 0" class="section-label">기타 장치</div>
         <div class="device-list">
           <div
             v-for="device in others"

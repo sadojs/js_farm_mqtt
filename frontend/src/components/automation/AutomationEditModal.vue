@@ -90,7 +90,7 @@ const ruleDescription = ref('')
 const conditionForm = ref<ConditionGroup>(createEmptyWizardForm().conditions)
 const irrigationForm = ref<IrrigationConditions>(createDefaultIrrigationConditions())
 
-// 장비 타입 감지
+// 장치 타입 감지
 const equipmentType = computed(() => {
   if (!props.rule) return undefined
   const actions = props.rule.actions as any
@@ -107,7 +107,7 @@ const isIrrigation = computed(() => {
   return equipmentType.value === 'irrigation'
 })
 
-// 관수 채널 매핑 — 룰의 대상 장비에서 가져옴
+// 관수 채널 매핑 — 룰의 대상 장치에서 가져옴
 function initChannelMapping() {
   const actions = props.rule?.actions as any
   const deviceId = actions?.targetDeviceIds?.[0] || actions?.targetDeviceId

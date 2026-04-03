@@ -1,9 +1,9 @@
 <template>
   <div class="step-device">
-    <h3 class="step-title">장비 및 동작 설정</h3>
-    <p class="step-desc">제어할 장비 유형과 동작을 선택하세요</p>
+    <h3 class="step-title">장치 및 동작 설정</h3>
+    <p class="step-desc">제어할 장치 유형과 동작을 선택하세요</p>
 
-    <!-- 장비 유형 선택 -->
+    <!-- 장치 유형 선택 -->
     <div class="device-selector">
       <button type="button" v-for="dt in deviceTypes" :key="dt.value" class="device-card" :class="{ active: selectedDevice === dt.value }" @click="selectDevice(dt.value)">
         <span class="device-icon">{{ dt.icon }}</span>

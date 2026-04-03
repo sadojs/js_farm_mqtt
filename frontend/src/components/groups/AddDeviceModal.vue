@@ -2,12 +2,12 @@
   <div v-if="show && targetGroup" class="modal-overlay" @click.self="$emit('close')">
     <div class="add-device-modal">
       <div class="add-modal-header">
-        <h3>{{ targetGroup?.name }}에 장비 추가</h3>
+        <h3>{{ targetGroup?.name }}에 장치 추가</h3>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="add-modal-body">
         <div v-if="unassignedDevices.length === 0" class="empty-state-sm">
-          <p>추가할 수 있는 장비가 없습니다.</p>
+          <p>추가할 수 있는 장치가 없습니다.</p>
         </div>
         <template v-else>
           <div
@@ -20,7 +20,7 @@
             <input type="checkbox" :checked="selected.includes(device.id)" @click.stop />
             <span class="device-row-icon">{{ getCategoryIcon(device.category) }}</span>
             <span :class="['type-tag', device.deviceType === 'sensor' ? 'sensor' : 'actuator']">
-              {{ device.deviceType === 'sensor' ? '센서' : '장비' }}
+              {{ device.deviceType === 'sensor' ? '센서' : '장치' }}
             </span>
             <span class="device-row-name">{{ device.name }}</span>
             <span :class="['status-indicator', device.online ? 'online' : 'offline']">
@@ -37,7 +37,7 @@
           @click="confirmAdd"
         >
           <span v-if="adding">추가 중...</span>
-          <span v-else>{{ selected.length === 0 ? '장비를 선택하세요' : `${selected.length}개 추가` }}</span>
+          <span v-else>{{ selected.length === 0 ? '장치를 선택하세요' : `${selected.length}개 추가` }}</span>
         </button>
       </div>
     </div>
@@ -109,8 +109,8 @@ const confirmAdd = async () => {
     emit('added')
     emit('close')
   } catch (err) {
-    console.error('장비 추가 실패:', err)
-    alert('장비 추가에 실패했습니다.')
+    console.error('장치 추가 실패:', err)
+    alert('장치 추가에 실패했습니다.')
   } finally {
     adding.value = false
   }

@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h2>자동화 룰</h2>
-        <p class="page-description">센서 값에 따라 장비를 자동으로 제어합니다</p>
+        <p class="page-description">센서 값에 따라 장치를 자동으로 제어합니다</p>
       </div>
       <button v-if="mainTab === 'rules'" class="btn-primary" @click="openWizard()">+ 룰 추가</button>
     </header>
@@ -32,7 +32,7 @@
       v-else-if="filteredRules.length === 0"
       icon="<circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'/>"
       title="자동화 규칙이 없습니다"
-      description="센서 값에 따라 장비를 자동으로 제어하는 규칙을 만들어보세요."
+      description="센서 값에 따라 장치를 자동으로 제어하는 규칙을 만들어보세요."
       action-label="+ 규칙 만들기"
       :action-fn="() => openWizard()"
     />
@@ -90,9 +90,9 @@
           </div>
         </template>
 
-        <!-- 장비 목록 -->
+        <!-- 장치 목록 -->
         <div v-if="getRuleDeviceNames(rule).length > 0" class="rule-devices">
-          <span class="device-label">대상 장비:</span>
+          <span class="device-label">대상 장치:</span>
           <span class="device-names">{{ getRuleDeviceNames(rule).join(', ') }}</span>
         </div>
 

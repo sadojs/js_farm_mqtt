@@ -1,18 +1,18 @@
 <template>
   <div class="device-status-wrapper">
     <div class="detail-grid">
-      <!-- 가동 중인 장비 -->
+      <!-- 가동 중인 장치 -->
       <div class="detail-card">
         <div class="detail-card-header">
           <div class="detail-icon devices">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </div>
-          <h3>가동 중인 장비</h3>
+          <h3>가동 중인 장치</h3>
           <span class="detail-count">{{ actuatorOnline }} / {{ actuatorCount }}</span>
         </div>
         <div class="detail-list">
           <div v-if="actuatorDevices.length === 0" class="detail-empty">
-            등록된 장비가 없습니다
+            등록된 장치가 없습니다
             <router-link to="/devices" class="empty-inline-link">설정하기</router-link>
           </div>
           <div

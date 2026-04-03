@@ -102,7 +102,7 @@ const irrigationForm = ref<IrrigationConditions>(createDefaultIrrigationConditio
 const stepList = [
   { num: 1, label: '그룹' },
   { num: 2, label: '센서' },
-  { num: 3, label: '장비' },
+  { num: 3, label: '장치' },
   { num: 4, label: '조건' },
   { num: 5, label: '확인' },
 ]
@@ -144,7 +144,7 @@ watch(() => props.visible, (open) => {
   }
 })
 
-// 선택된 장비의 equipmentType (첫 번째 선택 장비 기준)
+// 선택된 장치의 equipmentType (첫 번째 선택 장치 기준)
 const selectedEquipmentType = computed(() => {
   if (formData.value.actuatorDeviceIds.length === 0 || !formData.value.groupId) return undefined
   const group = groupStore.groups.find(g => g.id === formData.value.groupId)
@@ -157,7 +157,7 @@ const isIrrigation = computed(() => selectedEquipmentType.value === 'irrigation'
 // 로컬 채널 매핑 — UI 즉시 반영용 (API 응답 대기 없이 동작)
 const localChannelMapping = shallowRef<ChannelMapping | undefined>(undefined)
 
-// 장비 선택이 바뀌면 로컬 매핑 초기화
+// 장치 선택이 바뀌면 로컬 매핑 초기화
 watch(
   () => formData.value.actuatorDeviceIds[0],
   (deviceId) => {

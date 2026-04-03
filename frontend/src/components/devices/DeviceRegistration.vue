@@ -2,7 +2,7 @@
   <div class="modal-overlay" v-if="isOpen" @click.self="closeModal">
     <div class="modal-container">
       <div class="modal-header">
-        <h2>🔌 장비 등록</h2>
+        <h2>🔌 장치 등록</h2>
         <button class="btn-close" @click="closeModal">✕</button>
       </div>
 
@@ -16,11 +16,11 @@
           </div>
         </div>
 
-        <!-- Step 1: Zigbee 장비 불러오기 -->
+        <!-- Step 1: Zigbee 장치 불러오기 -->
         <div class="step-section" v-if="step === 1 && hasGateway">
           <div class="step-header">
             <span class="step-number">1</span>
-            <h3>Zigbee 장비 불러오기</h3>
+            <h3>Zigbee 장치 불러오기</h3>
           </div>
 
           <div class="project-info-box">
@@ -38,8 +38,8 @@
             @click="loadDevices"
             :disabled="loading || !selectedGatewayId"
           >
-            <span v-if="loading">⏳ Zigbee 장비를 불러오는 중...</span>
-            <span v-else>📡 장비 목록 불러오기</span>
+            <span v-if="loading">⏳ Zigbee 장치를 불러오는 중...</span>
+            <span v-else>📡 장치 목록 불러오기</span>
           </button>
 
           <!-- 에러 메시지 -->
@@ -50,9 +50,9 @@
           <!-- 기기 없음 메시지 -->
           <div v-if="noDevicesFound" class="empty-devices-box">
             <div class="empty-icon">📭</div>
-            <h3>페어링된 장비가 없습니다</h3>
-            <p>선택한 게이트웨이에 페어링된 Zigbee 장비가 없습니다.</p>
-            <p class="help-text">아래 버튼으로 페어링 모드를 켠 후, Zigbee 장비의 페어링 버튼을 눌러주세요.</p>
+            <h3>페어링된 장치가 없습니다</h3>
+            <p>선택한 게이트웨이에 페어링된 Zigbee 장치가 없습니다.</p>
+            <p class="help-text">아래 버튼으로 페어링 모드를 켠 후, Zigbee 장치의 페어링 버튼을 눌러주세요.</p>
             <button
               class="btn-primary btn-sm"
               style="margin-top: 0.75rem;"
@@ -64,7 +64,7 @@
           </div>
         </div>
 
-        <!-- Step 2: Zigbee 장비 선택 -->
+        <!-- Step 2: Zigbee 장치 선택 -->
         <div class="step-section" v-if="step === 2">
           <div class="step-header">
             <span class="step-number">2</span>
@@ -122,7 +122,7 @@
                     :class="{ active: getDeviceType(device.id) === 'actuator' }"
                     @click="setDeviceType(device.id, 'actuator')"
                   >
-                    ⚙️ 장비
+                    ⚙️ 장치
                   </button>
                 </div>
                 <div class="equipment-type-select" v-if="getDeviceType(device.id) === 'actuator'">
@@ -167,8 +167,8 @@
           <!-- Step 4 - ask: 그룹 추가 여부 -->
           <div v-if="wizardSubStep === 'ask'">
             <div class="wizard-success-icon">✅</div>
-            <h3 class="wizard-success-title">장비 등록이 완료되었습니다!</h3>
-            <p class="wizard-success-desc">등록한 장비를 그룹에 추가하시겠습니까?</p>
+            <h3 class="wizard-success-title">장치 등록이 완료되었습니다!</h3>
+            <p class="wizard-success-desc">등록한 장치를 그룹에 추가하시겠습니까?</p>
             <div class="wizard-ask-buttons">
               <button
                 class="btn-wizard-option"
@@ -203,7 +203,7 @@
               >
                 <input type="radio" :value="group.id" v-model="selectedGroupId" />
                 <span class="group-radio-name">{{ group.name }}</span>
-                <span class="group-radio-count">{{ group.devices?.length ?? 0 }}개 장비</span>
+                <span class="group-radio-count">{{ group.devices?.length ?? 0 }}개 장치</span>
               </label>
             </div>
             <div v-if="groupWizardError" class="error-box"><p>{{ groupWizardError }}</p></div>
@@ -251,21 +251,21 @@
                 :disabled="!newGroupName.trim() || groupAssigning"
                 @click="createGroupAndAssign"
               >
-                {{ groupAssigning ? '생성 중...' : '그룹 생성 및 장비 추가' }}
+                {{ groupAssigning ? '생성 중...' : '그룹 생성 및 장치 추가' }}
               </button>
             </div>
           </div>
 
         </div>
 
-        <!-- Step 3: 장비 이름 설정 및 확인 -->
+        <!-- Step 3: 장치 이름 설정 및 확인 -->
         <div class="step-section" v-if="step === 3">
           <div class="step-header">
             <span class="step-number">3</span>
-            <h3>장비 이름 확인 및 등록</h3>
+            <h3>장치 이름 확인 및 등록</h3>
           </div>
 
-          <p class="step-description">각 장비의 이름을 확인하고 필요시 수정하세요. 나중에 그룹에서 이 장비들을 할당합니다.</p>
+          <p class="step-description">각 장치의 이름을 확인하고 필요시 수정하세요. 나중에 그룹에서 이 장치들을 할당합니다.</p>
 
           <!-- 개폐기 그룹 이름 입력 -->
           <div v-if="hasOpenerType && openerPairValid" class="opener-group-name-box">
@@ -276,7 +276,7 @@
               class="form-input"
               placeholder="예: 1동 천창"
             />
-            <p class="help-text">열림/닫힘 장비 이름이 자동 생성됩니다: <strong>{{ openerGroupName || '개폐기' }} (열림)</strong>, <strong>{{ openerGroupName || '개폐기' }} (닫힘)</strong></p>
+            <p class="help-text">열림/닫힘 장치 이름이 자동 생성됩니다: <strong>{{ openerGroupName || '개폐기' }} (열림)</strong>, <strong>{{ openerGroupName || '개폐기' }} (닫힘)</strong></p>
           </div>
 
           <!-- 에러 메시지 -->
@@ -301,7 +301,7 @@
                   type="text"
                   v-model="device.name"
                   class="form-input"
-                  placeholder="장비 이름 입력"
+                  placeholder="장치 이름 입력"
                 />
                 <p class="device-name-id">센서 ID: {{ device.id }}</p>
               </div>
@@ -314,7 +314,7 @@
           </div>
 
           <div class="register-summary">
-            센서 <strong>{{ sensorCount }}개</strong> / 장비 <strong>{{ actuatorCount }}개</strong> - 총 <strong>{{ selectedDevices.length }}개</strong> 등록
+            센서 <strong>{{ sensorCount }}개</strong> / 장치 <strong>{{ actuatorCount }}개</strong> - 총 <strong>{{ selectedDevices.length }}개</strong> 등록
           </div>
 
           <div class="button-group">
@@ -492,7 +492,7 @@ const loadDevices = async () => {
       return
     }
 
-    // 이미 등록된 장비(zigbeeIeee 기준) 필터링
+    // 이미 등록된 장치(zigbeeIeee 기준) 필터링
     const registeredIeee = new Set(deviceStore.devices.map(d => d.zigbeeIeee))
     const gateway = gateways.value.find(g => g.id === selectedGatewayId.value)
 
@@ -523,7 +523,7 @@ const loadDevices = async () => {
     loading.value = false
     step.value = 2
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || 'Zigbee 장비 목록을 불러오지 못했습니다. 게이트웨이 연결을 확인하세요.'
+    errorMessage.value = err.response?.data?.message || 'Zigbee 장치 목록을 불러오지 못했습니다. 게이트웨이 연결을 확인하세요.'
     loading.value = false
   }
 }
@@ -571,7 +571,7 @@ const setEquipmentType = (deviceId: string, eqType: EquipmentType) => {
 
 const getEquipmentLabel = (eqType?: EquipmentType): string => {
   const opt = EQUIPMENT_TYPE_OPTIONS.find(o => o.value === eqType)
-  return opt?.label || '장비'
+  return opt?.label || '장치'
 }
 
 const sensorCount = computed(() => selectedDevices.value.filter(d => d.deviceType === 'sensor').length)
@@ -639,7 +639,7 @@ const registerDevices = async () => {
       closeModal()
     }
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || '장비 등록에 실패했습니다.'
+    errorMessage.value = err.response?.data?.message || '장치 등록에 실패했습니다.'
   } finally {
     registering.value = false
   }

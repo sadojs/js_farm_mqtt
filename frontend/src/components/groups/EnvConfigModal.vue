@@ -17,7 +17,7 @@
               @change="onSourceSelect(role.roleKey, ($event.target as HTMLSelectElement).value)"
             >
               <option value="">(미설정)</option>
-              <optgroup label="센서 장비">
+              <optgroup label="센서 장치">
                 <option
                   v-for="s in envSources.sensors"
                   :key="`sensor:${s.deviceId}:${s.sensorType}`"
@@ -47,7 +47,7 @@
               @change="onSourceSelect(role.roleKey, ($event.target as HTMLSelectElement).value)"
             >
               <option value="">(미설정)</option>
-              <optgroup label="센서 장비">
+              <optgroup label="센서 장치">
                 <option
                   v-for="s in envSources.sensors"
                   :key="`sensor:${s.deviceId}:${s.sensorType}`"

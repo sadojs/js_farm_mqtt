@@ -89,7 +89,7 @@ export interface DeviceControlRequest {
   }[]
 }
 
-/** Zigbee2MQTT bridge/devices에서 가져온 장비 정보 */
+/** Zigbee2MQTT bridge/devices에서 가져온 장치 정보 */
 export interface ZigbeeDeviceInfo {
   ieee_address: string
   friendly_name: string

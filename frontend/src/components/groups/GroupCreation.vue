@@ -41,13 +41,13 @@
           </div>
         </div>
 
-        <!-- 장비 선택 -->
+        <!-- 장치 선택 -->
         <div class="form-section">
-          <h3>장비 할당</h3>
-          <p class="section-desc">이 그룹에 포함할 센서와 장비를 선택하세요.</p>
+          <h3>장치 할당</h3>
+          <p class="section-desc">이 그룹에 포함할 센서와 장치를 선택하세요.</p>
 
           <div v-if="availableDevices.length === 0" class="empty-devices">
-            <p>등록된 장비가 없습니다. 먼저 장비를 등록하세요.</p>
+            <p>등록된 장치가 없습니다. 먼저 장치를 등록하세요.</p>
           </div>
 
           <template v-else>
@@ -55,7 +55,7 @@
               <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="장비 검색..."
+                placeholder="장치 검색..."
                 class="search-input"
               />
             </div>
@@ -87,9 +87,9 @@
               </div>
             </div>
 
-            <!-- 장비(액추에이터) 목록 -->
+            <!-- 장치(액추에이터) 목록 -->
             <div v-if="filteredActuators.length > 0" class="device-type-section">
-              <div class="type-label actuator">장비 ({{ filteredActuators.length }})</div>
+              <div class="type-label actuator">장치 ({{ filteredActuators.length }})</div>
               <div class="devices-list">
                 <div
                   v-for="device in filteredActuators"
@@ -116,9 +116,9 @@
           </template>
         </div>
 
-        <!-- 선택된 장비 미리보기 -->
+        <!-- 선택된 장치 미리보기 -->
         <div v-if="selectedDeviceIds.length > 0" class="form-section">
-          <h3>선택된 장비 ({{ selectedDeviceIds.length }})</h3>
+          <h3>선택된 장치 ({{ selectedDeviceIds.length }})</h3>
           <div class="selected-devices">
             <div
               v-for="deviceId in selectedDeviceIds"
