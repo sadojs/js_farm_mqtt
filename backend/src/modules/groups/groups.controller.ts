@@ -38,6 +38,7 @@ export class GroupsController {
         groupId: result.id, groupName: body.name,
         action: 'group.create', targetType: 'group',
         targetId: result.id, targetName: body.name,
+        details: { menu: '그룹 관리' },
       });
     }
     return result;
@@ -52,6 +53,7 @@ export class GroupsController {
         groupId: id, groupName: body.name || result.name,
         action: 'group.update', targetType: 'group',
         targetId: id, targetName: body.name || result.name,
+        details: { menu: '그룹 관리' },
       });
     }
     return result;

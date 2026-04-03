@@ -32,7 +32,7 @@ export class AutomationController {
       userId: user.id, userName: user.name || user.username,
       groupId: dto.groupId, action: 'rule.create', targetType: 'rule',
       targetId: result.id, targetName: dto.name,
-      details: { ruleType: result.ruleType, equipmentType: result.actions?.equipmentType },
+      details: { menu: '자동화', ruleType: result.ruleType, equipmentType: result.actions?.equipmentType },
     });
     return result;
   }
@@ -44,7 +44,7 @@ export class AutomationController {
       userId: user.id, userName: user.name || user.username,
       groupId: result.groupId, action: 'rule.update', targetType: 'rule',
       targetId: id, targetName: dto.name || result.name,
-      details: { ruleType: result.ruleType },
+      details: { menu: '자동화', ruleType: result.ruleType },
     });
     return result;
   }
@@ -62,7 +62,7 @@ export class AutomationController {
       userId: user.id, userName: user.name || user.username,
       groupId: result.groupId, action: result.enabled ? 'rule.enable' : 'rule.disable', targetType: 'rule',
       targetId: id, targetName: result.name,
-      details: { ruleType: result.ruleType, equipmentType: result.actions?.equipmentType },
+      details: { menu: '자동화', ruleType: result.ruleType, equipmentType: result.actions?.equipmentType },
     });
     return result;
   }
@@ -78,6 +78,7 @@ export class AutomationController {
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
       action: 'rule.delete', targetType: 'rule', targetId: id,
+      details: { menu: '자동화' },
     });
     return result;
   }

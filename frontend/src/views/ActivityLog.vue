@@ -63,6 +63,7 @@
             <span class="log-time">{{ formatTime(log.createdAt) }}</span>
           </div>
           <div class="log-summary">
+            <span v-if="getMenuLabel(log)" class="chip menu">{{ getMenuLabel(log) }}</span>
             <span v-if="log.groupName" class="chip">{{ log.groupName }}</span>
             <span v-if="log.targetName" class="chip device">{{ log.targetName }}</span>
             <span v-if="log.details?.equipmentType" class="chip">{{ formatEquipment(log.details.equipmentType) }}</span>
@@ -195,9 +196,16 @@ const ACTION_MAP: Record<string, { label: string; cls: string }> = {
 function getActionLabel(action: string) { return ACTION_MAP[action]?.label || action }
 function getActionClass(action: string) { return ACTION_MAP[action]?.cls || 'default' }
 
+const MENU_FALLBACK: Record<string, string> = {
+  device: '장치 관리', rule: '자동화', group: '그룹 관리', env_config: '환경설정', sensor: '센서',
+}
+function getMenuLabel(log: ActivityLogEntry): string {
+  return log.details?.menu || MENU_FALLBACK[log.targetType] || ''
+}
+
 function getActionDesc(log: ActivityLogEntry): string {
   const target = log.targetName ? `"${log.targetName}"` : ''
-  const typeMap: Record<string, string> = { device: '장비', rule: '룰', group: '그룹', env_config: '환경설정', sensor: '센서' }
+  const typeMap: Record<string, string> = { device: '장치', rule: '룰', group: '그룹', env_config: '환경설정', sensor: '센서' }
   const typeName = typeMap[log.targetType] || log.targetType
   if (log.action.endsWith('.control')) return `${target} ${typeName} 제어`
   if (log.action.endsWith('.register')) return `${target} ${typeName} 등록`
@@ -277,6 +285,7 @@ function formatTime(dateStr: string): string {
   background: var(--bg-badge); padding: 2px 8px; border-radius: 6px; white-space: nowrap;
 }
 .chip.device { color: var(--accent); font-weight: 600; }
+.chip.menu { color: #6a1b9a; background: #f3e5f5; font-weight: 600; }
 .chip.cmd { font-family: monospace; }
 .chip.error { color: #c62828; background: #ffebee; }
 

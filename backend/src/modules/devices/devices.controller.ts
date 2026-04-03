@@ -34,7 +34,7 @@ export class DevicesController {
       this.activityLog.log({
         userId: user.id, userName: user.name || user.username,
         action: 'device.register', targetType: 'device', targetName: d.name,
-        details: { category: d.category, deviceType: d.deviceType },
+        details: { menu: '장치 관리', category: d.category, deviceType: d.deviceType },
       });
     }
     return result;
@@ -74,7 +74,7 @@ export class DevicesController {
       userId: user.id, userName: user.name || user.username,
       action: 'device.control', targetType: 'device', targetId: id,
       targetName: result.deviceName,
-      details: { commands: body.commands, commandSummary: cmdSummary, equipmentType: result.equipmentType },
+      details: { menu: '장치 관리', commands: body.commands, commandSummary: cmdSummary, equipmentType: result.equipmentType },
     });
     return result;
   }
@@ -110,6 +110,7 @@ export class DevicesController {
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
       action: 'device.delete', targetType: 'device', targetId: id,
+      details: { menu: '장치 관리' },
     });
     return result;
   }
