@@ -167,6 +167,28 @@ export class IrrigationSchedulerService {
       estimatedEndAt: active.estimatedEndAt,
     });
 
+    // 관수 시작 로그 기록
+    const enabledZones = conditions.zones.filter((z: any) => z.enabled);
+    const totalIrrigationMin = enabledZones.reduce((sum: number, z: any) => sum + (z.duration || 0), 0);
+    const fertilizerMin = conditions.fertilizer?.enabled ? (conditions.fertilizer.duration || 0) : 0;
+    await this.logsRepo.save(
+      this.logsRepo.create({
+        ruleId: rule.id,
+        userId: rule.userId,
+        success: true,
+        conditionsMet: {
+          type: 'irrigation_started',
+          startTime: conditions.startTime,
+          deviceName: device.name,
+          enabledZones: enabledZones.length,
+          totalZones: conditions.zones.length,
+          irrigationMin: totalIrrigationMin,
+          fertilizerMin,
+        },
+        actionsExecuted: { status: 'started', estimatedDurationMin: Math.round(totalDurationMs / 60000) },
+      }),
+    );
+
     for (const action of timeline) {
       const timer = setTimeout(async () => {
         try {
@@ -217,8 +239,16 @@ export class IrrigationSchedulerService {
             ruleId: rule.id,
             userId: rule.userId,
             success: true,
-            conditionsMet: { type: 'irrigation', startTime: conditions.startTime },
-            actionsExecuted: { timeline: timeline.map(a => a.label) },
+            conditionsMet: {
+              type: 'irrigation',
+              startTime: conditions.startTime,
+              deviceName: device.name,
+              enabledZones: conditions.zones.filter((z: any) => z.enabled).length,
+              totalZones: conditions.zones.length,
+              irrigationMin: conditions.zones.filter((z: any) => z.enabled).reduce((s: number, z: any) => s + (z.duration || 0), 0),
+              fertilizerMin: conditions.fertilizer?.enabled ? (conditions.fertilizer.duration || 0) : 0,
+            },
+            actionsExecuted: { timeline: timeline.map(a => a.label), estimatedDurationMin: Math.round(totalDurationMs / 60000) },
           }),
         );
 
@@ -382,6 +412,17 @@ export class IrrigationSchedulerService {
         } catch (err: any) {
           this.logger.warn(`관수 중단 시 스위치 OFF 실패: ${err.message}`);
         }
+
+        // 취소 로그 기록
+        await this.logsRepo.save(
+          this.logsRepo.create({
+            ruleId,
+            userId: active.userId,
+            success: true,
+            conditionsMet: { type: 'irrigation_cancelled' },
+            actionsExecuted: { status: 'cancelled' },
+          }),
+        );
 
         this.eventsGateway.emitIrrigationStopped({ ruleId, tuyaDeviceId: friendlyName });
         this.logger.log(`관수 강제 중단: ruleId=${ruleId}`);

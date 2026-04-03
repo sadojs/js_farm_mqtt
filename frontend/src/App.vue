@@ -41,6 +41,10 @@
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
           <span>센서 알림</span>
         </router-link>
+        <router-link to="/activity-log" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>활동 로그</span>
+        </router-link>
         <router-link v-if="isAdmin" to="/config-deploy" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
           <span>설정 배포</span>
@@ -159,6 +163,10 @@
         <router-link to="/alerts" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
           <span>센서 알림</span>
+        </router-link>
+        <router-link to="/activity-log" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>활동 로그</span>
         </router-link>
         <router-link v-if="isAdmin" to="/config-deploy" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
@@ -442,32 +450,33 @@ body {
 }
 
 /* ========== 본문(우측 콘텐츠) 폰트 크기 조절 시스템 ========== */
+/* sm = :root 기본값 사용 */
+/* --content-scale: 기존 컴포넌트 호환 유지 */
+
 #app {
   --content-scale: 1;
-  --content-body-size: 16px;
-  --content-small-size: 14px;
-  --content-title-scale: 1;
-}
-
-#app.content-size-sm {
-  --content-scale: 1;
-  --content-body-size: 16px;
-  --content-small-size: 14px;
-  --content-title-scale: 1;
 }
 
 #app.content-size-md {
   --content-scale: 1.1;
-  --content-body-size: 17px;
-  --content-small-size: 15px;
-  --content-title-scale: 1.08;
+  --font-size-display: 35px;
+  --font-size-title: 24px;
+  --font-size-subtitle: 20px;
+  --font-size-body: 17px;
+  --font-size-label: 15px;
+  --font-size-caption: 13px;
+  --font-size-tiny: 12px;
 }
 
 #app.content-size-lg {
   --content-scale: 1.2;
-  --content-body-size: 18px;
-  --content-small-size: 16px;
-  --content-title-scale: 1.15;
+  --font-size-display: 38px;
+  --font-size-title: 26px;
+  --font-size-subtitle: 22px;
+  --font-size-body: 18px;
+  --font-size-label: 16px;
+  --font-size-caption: 14px;
+  --font-size-tiny: 13px;
 }
 
 #app {
@@ -783,7 +792,7 @@ body {
 .main-content {
   flex: 1;
   min-height: 100vh;
-  font-size: var(--content-body-size);
+  font-size: var(--font-size-body);
   line-height: 1.55;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -799,7 +808,7 @@ body {
 .main-content select,
 .main-content textarea,
 .main-content button {
-  font-size: calc(1em * var(--content-scale));
+  font-size: var(--font-size-body);
 }
 
 .main-content small,
@@ -808,14 +817,14 @@ body {
 .main-content .page-description,
 .main-content .target-label,
 .main-content .priority-badge {
-  font-size: var(--content-small-size) !important;
+  font-size: var(--font-size-label) !important;
 }
 
 .main-content .page-header h2,
 .main-content .rule-name,
 .main-content .modal-title,
 .main-content .step-title {
-  font-size: calc(1em * var(--content-title-scale)) !important;
+  font-size: var(--font-size-subtitle) !important;
 }
 
 #app.has-sidebar .main-content {

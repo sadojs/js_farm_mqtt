@@ -4,12 +4,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Controller('devices')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'farm_admin')
 export class DevicesController {
-  constructor(private devicesService: DevicesService) {}
+  constructor(
+    private devicesService: DevicesService,
+    private activityLog: ActivityLogService,
+  ) {}
 
   private getEffectiveUserId(user: any): string {
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
@@ -21,11 +25,19 @@ export class DevicesController {
   }
 
   @Post('register')
-  register(
+  async register(
     @CurrentUser() user: any,
     @Body() body: { devices: any[]; houseId?: string },
   ) {
-    return this.devicesService.registerBatch(this.getEffectiveUserId(user), body.devices, body.houseId);
+    const result = await this.devicesService.registerBatch(this.getEffectiveUserId(user), body.devices, body.houseId);
+    for (const d of body.devices) {
+      this.activityLog.log({
+        userId: user.id, userName: user.name || user.username,
+        action: 'device.register', targetType: 'device', targetName: d.name,
+        details: { category: d.category, deviceType: d.deviceType },
+      });
+    }
+    return result;
   }
 
   @Get(':id')
@@ -51,12 +63,20 @@ export class DevicesController {
   }
 
   @Post(':id/control')
-  control(
+  async control(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() body: { commands: { code: string; value: any }[] },
   ) {
-    return this.devicesService.controlDevice(id, this.getEffectiveUserId(user), body.commands);
+    const result = await this.devicesService.controlDevice(id, this.getEffectiveUserId(user), body.commands);
+    const cmdSummary = body.commands.map(c => `${c.code}=${c.value}`).join(', ');
+    this.activityLog.log({
+      userId: user.id, userName: user.name || user.username,
+      action: 'device.control', targetType: 'device', targetId: id,
+      targetName: result.deviceName,
+      details: { commands: body.commands, commandSummary: cmdSummary, equipmentType: result.equipmentType },
+    });
+    return result;
   }
 
   @Patch(':id/channel-mapping')
@@ -85,7 +105,12 @@ export class DevicesController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.devicesService.remove(id, this.getEffectiveUserId(user));
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    const result = await this.devicesService.remove(id, this.getEffectiveUserId(user));
+    this.activityLog.log({
+      userId: user.id, userName: user.name || user.username,
+      action: 'device.delete', targetType: 'device', targetId: id,
+    });
+    return result;
   }
 }

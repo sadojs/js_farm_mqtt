@@ -64,6 +64,12 @@ const router = createRouter({
       meta: { title: '센서 알림', requiresAuth: true }
     },
     {
+      path: '/activity-log',
+      name: 'activity-log',
+      component: () => import('../views/ActivityLog.vue'),
+      meta: { title: '활동 로그', requiresAuth: true }
+    },
+    {
       path: '/config-deploy',
       name: 'config-deploy',
       component: () => import('../views/ConfigDeploy.vue'),

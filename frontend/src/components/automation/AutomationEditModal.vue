@@ -19,6 +19,9 @@
           <StepIrrigationCondition
             v-if="isIrrigation"
             v-model="irrigationForm"
+            :channelMapping="localChannelMapping"
+            :editableMapping="canEditMapping"
+            @update:channelMapping="handleMappingUpdate"
           />
           <StepConditionBuilder
             v-else
@@ -51,14 +54,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, shallowRef, onBeforeUnmount } from 'vue'
 import type {
   AutomationRule, ConditionGroup, IrrigationConditions,
   CreateRuleRequest, WizardFormData,
 } from '../../types/automation.types'
+import type { ChannelMapping } from '../../types/device.types'
 import { createEmptyWizardForm, createDefaultIrrigationConditions } from '../../utils/automation-helpers'
 import { useAutomationStore } from '../../stores/automation.store'
 import { useDeviceStore } from '../../stores/device.store'
+import { useAuthStore } from '../../stores/auth.store'
+import { useGroupStore } from '../../stores/group.store'
 import StepConditionBuilder from './StepConditionBuilder.vue'
 import StepIrrigationCondition from './StepIrrigationCondition.vue'
 import StepReview from './StepReview.vue'
@@ -71,6 +77,11 @@ const emit = defineEmits<{ close: []; saved: [] }>()
 
 const automationStore = useAutomationStore()
 const deviceStore = useDeviceStore()
+const groupStore = useGroupStore()
+const { isAdmin, isFarmAdmin } = useAuthStore()
+
+const canEditMapping = computed(() => isAdmin || isFarmAdmin)
+const localChannelMapping = shallowRef<ChannelMapping | undefined>(undefined)
 
 const step = ref<'condition' | 'review'>('condition')
 const saving = ref(false)
@@ -95,6 +106,26 @@ const isIrrigation = computed(() => {
   if (props.rule?.conditions && (props.rule.conditions as any).type === 'irrigation') return true
   return equipmentType.value === 'irrigation'
 })
+
+// 관수 채널 매핑 — 룰의 대상 장비에서 가져옴
+function initChannelMapping() {
+  const actions = props.rule?.actions as any
+  const deviceId = actions?.targetDeviceIds?.[0] || actions?.targetDeviceId
+  if (!deviceId || !isIrrigation.value) { localChannelMapping.value = undefined; return }
+  const group = groupStore.groups.find(g => g.id === props.rule?.groupId)
+  const device = group?.devices?.find((d: any) => d.id === deviceId)
+  localChannelMapping.value = device ? { ...deviceStore.getEffectiveMapping(device as any) } : undefined
+}
+
+async function handleMappingUpdate(mapping: ChannelMapping) {
+  localChannelMapping.value = { ...mapping }
+  const actions = props.rule?.actions as any
+  const deviceId = actions?.targetDeviceIds?.[0] || actions?.targetDeviceId
+  if (!deviceId) return
+  try {
+    await deviceStore.updateChannelMapping(deviceId, mapping)
+  } catch { /* 저장 실패 시 무시 */ }
+}
 
 const isTimeOnly = computed(() => {
   return props.rule?.ruleType === 'time'
@@ -125,6 +156,8 @@ watch(() => props.visible, (open) => {
   step.value = 'condition'
   ruleName.value = props.rule.name
   ruleDescription.value = props.rule.description || ''
+
+  initChannelMapping()
 
   if (isIrrigation.value && props.rule.conditions) {
     irrigationForm.value = JSON.parse(JSON.stringify(props.rule.conditions))

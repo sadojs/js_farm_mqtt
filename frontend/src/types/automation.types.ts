@@ -57,7 +57,7 @@ export interface IrrigationConditions {
   startTime: string
   zones: IrrigationZoneConfig[]
   mixer: { enabled: boolean }
-  fertilizer: { duration: number; preStopWait: number }
+  fertilizer: { enabled: boolean; duration: number; preStopWait: number }
   schedule: { days: number[]; repeat: boolean }
 }
 

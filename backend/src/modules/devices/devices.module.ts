@@ -7,12 +7,14 @@ import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Device, AutomationRule, Gateway]),
     MqttModule,
     GatewayModule,
+    ActivityLogModule,
   ],
   controllers: [DevicesController],
   providers: [DevicesService],

@@ -4,12 +4,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'farm_admin', 'farm_user')
 export class GroupsController {
-  constructor(private groupsService: GroupsService) {}
+  constructor(
+    private groupsService: GroupsService,
+    private activityLog: ActivityLogService,
+  ) {}
 
   private getEffectiveUserId(user: any): string {
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
@@ -26,13 +30,31 @@ export class GroupsController {
   }
 
   @Post()
-  createGroup(@CurrentUser() user: any, @Body() body: any) {
-    return this.groupsService.createGroup(this.getEffectiveUserId(user), body);
+  async createGroup(@CurrentUser() user: any, @Body() body: any) {
+    const result = await this.groupsService.createGroup(this.getEffectiveUserId(user), body);
+    if (result) {
+      this.activityLog.log({
+        userId: user.id, userName: user.name || user.username,
+        groupId: result.id, groupName: body.name,
+        action: 'group.create', targetType: 'group',
+        targetId: result.id, targetName: body.name,
+      });
+    }
+    return result;
   }
 
   @Put(':id')
-  updateGroup(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
-    return this.groupsService.updateGroup(id, this.getEffectiveUserId(user), body);
+  async updateGroup(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+    const result = await this.groupsService.updateGroup(id, this.getEffectiveUserId(user), body);
+    if (result) {
+      this.activityLog.log({
+        userId: user.id, userName: user.name || user.username,
+        groupId: id, groupName: body.name || result.name,
+        action: 'group.update', targetType: 'group',
+        targetId: id, targetName: body.name || result.name,
+      });
+    }
+    return result;
   }
 
   @Delete(':id')

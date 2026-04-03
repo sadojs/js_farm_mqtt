@@ -177,7 +177,7 @@ export class DevicesService {
           for (const sw of allSwitches) offPayload[sw] = false;
           await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
           this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
-          return { success: true, deviceId: device.id, command: offPayload };
+          return { success: true, deviceId: device.id, command: offPayload, deviceName: device.name, equipmentType: device.equipmentType };
         }
       }
     }
@@ -187,7 +187,7 @@ export class DevicesService {
     await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommand);
 
     this.logger.log(`장비 제어: ${device.name} → ${JSON.stringify(mqttCommand)}`);
-    return { success: true, deviceId: device.id, command: mqttCommand };
+    return { success: true, deviceId: device.id, command: mqttCommand, deviceName: device.name, equipmentType: device.equipmentType };
   }
 
   async getDeviceStatus(id: string, userId: string) {

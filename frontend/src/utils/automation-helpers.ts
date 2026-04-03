@@ -204,7 +204,7 @@ export function createDefaultIrrigationConditions(): import('../types/automation
       { zone: 4, name: '4구역', duration: 30, waitTime: 5, enabled: true },
     ],
     mixer: { enabled: false },
-    fertilizer: { duration: 10, preStopWait: 5 },
+    fertilizer: { enabled: false, duration: 10, preStopWait: 5 },
     schedule: { days: [1, 2, 3, 4, 5, 6, 0], repeat: true },
   }
 }

@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth.store'
 import { useSensorStore } from '../stores/sensor.store'
 import { useDeviceStore } from '../stores/device.store'
 import { useNotificationStore } from '../stores/notification.store'
+import { useAutomationStore } from '../stores/automation.store'
 
 let socket: Socket | null = null
 
@@ -98,6 +99,34 @@ export function useWebSocket() {
         notificationStore.info('자동화 실행', `규칙 "${data.ruleName}" 이 실행되었습니다.`)
       } else {
         notificationStore.warning('자동화 실행 실패', `규칙 "${data.ruleName}" 실행에 실패했습니다.`)
+      }
+    })
+
+    // 관수 시작/종료 실시간 이벤트
+    socket.on('irrigation:started', (data) => {
+      const automationStore = useAutomationStore()
+      const status = automationStore.irrigationStatus.find(
+        s => s.tuyaDeviceId === data.tuyaDeviceId
+      )
+      if (status) {
+        status.isRunning = true
+        status.runningRule = {
+          ruleId: data.ruleId,
+          ruleName: data.ruleName,
+          startedAt: data.startedAt,
+          estimatedEndAt: data.estimatedEndAt,
+        }
+      }
+    })
+
+    socket.on('irrigation:stopped', (data) => {
+      const automationStore = useAutomationStore()
+      const status = automationStore.irrigationStatus.find(
+        s => s.tuyaDeviceId === data.tuyaDeviceId
+      )
+      if (status) {
+        status.isRunning = false
+        status.runningRule = undefined
       }
     })
 

@@ -150,6 +150,26 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${userId}`).emit('automation:executed', data);
   }
 
+  // 관수 시작 알림
+  emitIrrigationStarted(data: {
+    ruleId: string;
+    ruleName: string;
+    deviceId: string;
+    tuyaDeviceId: string;
+    startedAt: number;
+    estimatedEndAt: number;
+  }) {
+    this.server.emit('irrigation:started', data);
+  }
+
+  // 관수 종료 알림
+  emitIrrigationStopped(data: {
+    ruleId: string;
+    tuyaDeviceId: string;
+  }) {
+    this.server.emit('irrigation:stopped', data);
+  }
+
   // 일반 알림 — 사용자 room 기반으로 전송 (소켓 순회 제거)
   sendNotification(userId: string, notification: {
     type: string;

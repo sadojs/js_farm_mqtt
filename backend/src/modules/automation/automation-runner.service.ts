@@ -88,13 +88,32 @@ export class AutomationRunnerService {
       });
     }
 
+    // 로그에 요약 정보 포함
+    const deviceNames = actionResults
+      .map((r: any) => r.deviceName || r.deviceId)
+      .filter(Boolean);
+    const commandSummary = actionResults
+      .map((r: any) => {
+        if (r.commands) return Object.entries(r.commands).map(([k, v]) => `${k}=${v}`).join(', ');
+        return null;
+      })
+      .filter(Boolean)
+      .join('; ');
     await this.logsRepo.save(
       this.logsRepo.create({
         ruleId: rule.id,
         userId: rule.userId,
         success,
-        conditionsMet: conditionResult.details,
-        actionsExecuted: actionResults,
+        conditionsMet: {
+          ...conditionResult.details,
+          ruleName: rule.name,
+          equipmentType: rule.actions?.equipmentType || null,
+        },
+        actionsExecuted: {
+          deviceNames,
+          commandSummary: commandSummary || null,
+          results: actionResults,
+        },
         errorMessage,
       }),
     );
@@ -473,9 +492,9 @@ export class AutomationRunnerService {
         this.logger.log(
           `자동화 명령 전송: rule=${rule.name}, device=${device.name}, command=${JSON.stringify(mqttCommand)}`,
         );
-        results.push({ deviceId: device.id, success: true, command: mqttCommand });
+        results.push({ deviceId: device.id, deviceName: device.name, success: true, commands: mqttCommand });
       } catch (err: any) {
-        results.push({ deviceId: device.id, success: false, error: err?.message || 'MQTT command failed' });
+        results.push({ deviceId: device.id, deviceName: device.name, success: false, error: err?.message || 'MQTT command failed' });
       }
     }
 

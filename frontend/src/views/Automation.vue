@@ -98,7 +98,6 @@
 
         <!-- 카드 하단 -->
         <div class="rule-footer">
-          <span class="priority-badge">우선순위 {{ rule.priority }}</span>
           <label class="toggle-switch" @click.stop>
             <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
             <span class="toggle-slider"></span>
@@ -117,11 +116,11 @@
     </template>
     <!-- //규칙 목록 탭 -->
 
-    <!-- 실행 로그 탭 -->
-    <template v-if="mainTab === 'logs'">
-      <AutomationLogTimeline />
-    </template>
-    <!-- //실행 로그 탭 -->
+    <!-- 실행 로그 탭 → 활동 로그 페이지 안내 -->
+    <div v-if="mainTab === 'logs'" class="log-redirect">
+      <p>실행 로그가 활동 로그 페이지로 이동했습니다.</p>
+      <router-link to="/activity-log" class="btn-link">활동 로그 보기 →</router-link>
+    </div>
   </div>
 </template>
 
@@ -136,7 +135,7 @@ import { useNotificationStore } from '../stores/notification.store'
 import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
 import EmptyState from '../components/common/EmptyState.vue'
-import AutomationLogTimeline from '../components/automation/AutomationLogTimeline.vue'
+// AutomationLogTimeline → 활동 로그 페이지로 이전됨
 
 const automationStore = useAutomationStore()
 const groupStore = useGroupStore()
@@ -242,7 +241,9 @@ async function handleToggle(id: string) {
   const rule = rules.value.find(r => r.id === id)
   const newState = rule ? !rule.enabled : true
   try {
-    await automationStore.toggleRule(id)
+    // FR-03: 관수 룰 활성화 시 autoEnableRemote 전달
+    const isIrrigationEnable = newState && (rule?.conditions as any)?.type === 'irrigation'
+    await automationStore.toggleRule(id, isIrrigationEnable ? { autoEnableRemote: true } : undefined)
     notify.success('적용 완료', `${rule?.name || '룰'}이(가) ${newState ? '활성화' : '비활성화'}되었습니다`)
   } catch {
     notify.error('적용 실패', '룰 상태 변경에 실패했습니다')
@@ -370,6 +371,14 @@ onMounted(async () => {
 
 .loading-state, .empty-state {
   text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: calc(16px * var(--content-scale, 1));
+}
+.log-redirect {
+  text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: calc(15px * var(--content-scale, 1));
+}
+.log-redirect .btn-link {
+  display: inline-block; margin-top: 12px; padding: 10px 24px;
+  background: var(--accent); color: white; border-radius: 10px;
+  text-decoration: none; font-weight: 600; font-size: calc(14px * var(--content-scale, 1));
 }
 .empty-state .btn-primary { margin-top: 16px; }
 
@@ -519,15 +528,10 @@ onMounted(async () => {
 
 .rule-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
-}
-
-.priority-badge {
-  font-size: calc(14px * var(--content-scale, 1));
-  color: var(--text-muted);
 }
 
 /* 토글 */

@@ -11,6 +11,7 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { DevicesModule } from '../devices/devices.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { DevicesModule } from '../devices/devices.module';
     MqttModule,
     GatewayModule,
     DevicesModule,
+    ActivityLogModule,
   ],
   controllers: [AutomationController],
   providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService],

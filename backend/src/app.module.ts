@@ -20,6 +20,7 @@ import { SensorAlertsModule } from './modules/sensor-alerts/sensor-alerts.module
 import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
 import { HealthModule } from './modules/health/health.module';
+import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { HealthModule } from './modules/health/health.module';
     EnvConfigModule,
     ConfigDeployModule,
     HealthModule,
+    ActivityLogModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
