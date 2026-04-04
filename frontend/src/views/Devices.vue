@@ -1102,7 +1102,13 @@ input:checked + .toggle-slider:before {
 
   .devices-grid { grid-template-columns: 1fr; gap: 10px; }
   .device-card { padding: 14px; gap: 10px; border-radius: 12px; }
-  .opener-card { padding: 14px; border-radius: 12px; }
-  .irrigation-card { padding: 14px; border-radius: 12px; }
+  .opener-group-card { padding: 14px; border-radius: 12px; }
+  .irrigation-group-card { padding: 14px; border-radius: 12px; }
+  .opener-header { margin-bottom: 10px; }
+  .irrigation-header { margin-bottom: 10px; }
+  .card-top { gap: 8px; }
+  .btn-icon-delete { padding: 2px 10px; }
+  .btn-status { padding: 2px 10px; }
+  .type-badge { padding: 2px 8px; }
 }
 </style>
