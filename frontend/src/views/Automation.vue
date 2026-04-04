@@ -146,7 +146,7 @@ const { confirm } = useConfirm()
 type RuleKind = 'opener' | 'fan' | 'irrigation' | 'other'
 type TabType = 'all' | RuleKind
 // 개폐기 탭 표시 여부 (당분간 미사용, 필요 시 true로 변경)
-const SHOW_OPENER_TAB = false
+const SHOW_OPENER_TAB = true
 const activeTab = ref<TabType>('all')
 
 // 메인 탭: 규칙 목록 / 실행 로그
