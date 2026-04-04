@@ -1079,7 +1079,7 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rule-row:last-child { border-bottom: none; }
 .rule-row.clickable { cursor: pointer; transition: background 0.15s; }
 .rule-row.clickable:hover { background: var(--bg-secondary); }
-.rule-name { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.rule-name { font-size: var(--font-size-label) !important; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .rule-summary { flex: 1; color: var(--text-muted); font-size: calc(13px * var(--content-scale, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .no-devices {
