@@ -140,14 +140,12 @@
           </div>
         </div>
 
-        <!-- 센서: 큰 값 표시 -->
-        <div v-if="device.deviceType === 'sensor'" class="card-sensor-value">
+        <!-- 센서: 칩 스타일 표시 -->
+        <div v-if="device.deviceType === 'sensor'" class="card-sensor-chips">
           <template v-if="device.sensorData && Object.keys(device.sensorData).length > 0">
-            <div v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-big-value">
-              <span class="big-number">{{ formatSensorVal(key as string, val as number) }}</span>
-              <span class="big-unit">{{ SENSOR_META[key as string]?.unit || '' }}</span>
-              <span class="big-label">{{ SENSOR_META[key as string]?.label || key }}</span>
-            </div>
+            <span v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-chip">
+              {{ SENSOR_META[key as string]?.label || key }} <b>{{ formatSensorVal(key as string, val as number) }}{{ SENSOR_META[key as string]?.unit || '' }}</b>
+            </span>
           </template>
           <div v-else-if="device.online" class="sensor-loading">데이터 로딩 중...</div>
           <div v-else class="sensor-offline">오프라인</div>
@@ -795,39 +793,26 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
   color: var(--text-muted);
 }
 
-/* 센서 값 표시 */
-.card-sensor-value {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 8px;
-  padding: 12px;
+/* 센서 칩 스타일 */
+.card-sensor-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sensor-chip {
+  display: inline-block;
+  padding: 3px 10px;
   background: var(--sensor-value-bg);
-  border-radius: 10px;
-}
-
-.sensor-big-value {
-  text-align: center;
-  padding: 4px 0;
-}
-
-.big-number {
-  font-size: calc(18px * var(--content-scale, 1));
-  font-weight: 700;
+  border-radius: 14px;
+  font-size: var(--font-size-caption);
   color: var(--sensor-accent);
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.big-unit {
-  font-size: calc(12px * var(--content-scale, 1));
-  color: var(--text-muted);
-  margin-left: 1px;
-}
-
-.big-label {
-  display: block;
-  font-size: calc(12px * var(--content-scale, 1));
-  color: var(--text-muted);
-  margin-top: 2px;
+.sensor-chip b {
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .sensor-loading, .sensor-offline {
@@ -1107,8 +1092,8 @@ input:checked + .toggle-slider:before {
   .opener-header { margin-bottom: 10px; }
   .irrigation-header { margin-bottom: 10px; }
   .card-top { gap: 8px; }
-  .btn-icon-delete { padding: 2px 10px; }
-  .btn-status { padding: 2px 10px; }
-  .type-badge { padding: 2px 8px; }
+  .btn-icon-delete { padding: 0 18px; line-height: 1.8; }
+  .btn-status { padding: 0 18px; line-height: 1.8; }
+  .type-badge { padding: 0 18px; line-height: 1.8; }
 }
 </style>

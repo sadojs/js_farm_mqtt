@@ -60,11 +60,10 @@
                   <span class="sub-card-name">{{ device.name }}</span>
                   <span class="type-tag sensor">측정기</span>
                 </div>
-                <div v-if="device.sensorData && Object.keys(device.sensorData).length > 0" class="sub-card-sensor-grid">
-                  <div v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-grid-item">
-                    <span class="sensor-grid-value">{{ formatSensorVal(key as string, val as number) }}<span class="sensor-grid-unit">{{ getSensorUnit(key as string) }}</span></span>
-                    <span class="sensor-grid-label">{{ SENSOR_LABELS[key as string] || key }}</span>
-                  </div>
+                <div v-if="device.sensorData && Object.keys(device.sensorData).length > 0" class="sub-card-sensor-chips">
+                  <span v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-chip">
+                    {{ SENSOR_LABELS[key as string] || key }} <b>{{ formatSensorVal(key as string, val as number) }}{{ getSensorUnit(key as string) }}</b>
+                  </span>
                 </div>
                 <div v-else class="sub-card-value muted">{{ device.online ? '로딩 중...' : '오프라인' }}</div>
               </div>
@@ -927,40 +926,25 @@ onBeforeUnmount(() => {
 .type-tag.sensor { background: var(--sensor-bg); color: var(--sensor-accent); }
 .type-tag.actuator { background: var(--accent-bg); color: var(--accent); }
 
-.sub-card-sensor-grid {
+.sub-card-sensor-chips {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding: 2px 0;
 }
 
-.sensor-grid-item {
-  text-align: center;
-  padding: 4px 4px;
-  min-width: 50px;
-}
-
-.sensor-grid-value {
-  display: block;
-  font-size: calc(18px * var(--content-scale, 1));
-  font-weight: 700;
+.sensor-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--sensor-value-bg, var(--sensor-bg));
+  border-radius: 14px;
+  font-size: var(--font-size-caption);
   color: var(--sensor-accent);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.sensor-grid-unit {
-  font-size: calc(11px * var(--content-scale, 1));
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-left: 1px;
-}
-
-.sensor-grid-label {
-  display: block;
-  font-size: calc(11px * var(--content-scale, 1));
-  color: var(--text-muted);
-  margin-top: 2px;
+.sensor-chip b {
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .sub-card-value.muted {
