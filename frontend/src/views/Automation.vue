@@ -76,16 +76,12 @@
           </div>
         </template>
 
-        <!-- 일반 룰: 조건 / 동작 2단 -->
+        <!-- 일반 설정: 조건만 표시 -->
         <template v-else>
           <div class="rule-body">
             <div class="rule-section condition">
               <span class="section-title">조건</span>
               <span class="section-content">{{ formatConditionGroup(rule.conditions) }}</span>
-            </div>
-            <div class="rule-section action">
-              <span class="section-title">동작</span>
-              <span class="section-content">{{ formatAction(rule.actions) }}</span>
             </div>
           </div>
         </template>
@@ -129,7 +125,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAutomationStore } from '../stores/automation.store'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
-import { formatAction, formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
+import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
 import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
 import type { AutomationRule } from '../types/automation.types'
