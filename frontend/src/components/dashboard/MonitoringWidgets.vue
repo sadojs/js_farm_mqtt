@@ -15,7 +15,7 @@
         <div class="widget-advice" v-if="vpd">
           <template v-if="vpd.status === 'LOW'">습도 과다로 곰팡이병(잿빛곰팡이 등) 위험. 환기로 습도를 낮추세요.</template>
           <template v-else-if="vpd.status === 'OK'">방울토마토에 적정 범위입니다.</template>
-          <template v-else>건조하여 수분 스트레스 위험. 관수량을 늘리거나 미스트를 가동하세요.</template>
+          <template v-else>건조하여 수분 스트레스 위험. 관주량을 늘리거나 미스트를 가동하세요.</template>
         </div>
         <svg v-if="tempTrendPath" class="widget-sparkline" viewBox="0 0 120 32">
           <path :d="tempTrendPath" fill="none" stroke="var(--accent)" stroke-width="1.5" />
@@ -80,8 +80,8 @@
         <div class="widget-advice" v-if="rhRate">
           <template v-if="rhRate.statusKey === 'rapid-wet'">습도 급상승. 환기를 검토하세요.</template>
           <template v-else-if="rhRate.statusKey === 'wet'">습도 상승 추세. 모니터링하세요.</template>
-          <template v-else-if="rhRate.statusKey === 'rapid-drying'">습도 급하강. 관수 조치를 취하세요.</template>
-          <template v-else-if="rhRate.statusKey === 'drying'">습도 하강 중. 관수를 검토하세요.</template>
+          <template v-else-if="rhRate.statusKey === 'rapid-drying'">습도 급하강. 관주 조치를 취하세요.</template>
+          <template v-else-if="rhRate.statusKey === 'drying'">습도 하강 중. 관주를 검토하세요.</template>
           <template v-else>습도가 안정적입니다.</template>
         </div>
         <svg v-if="rhTrendPath" class="widget-sparkline" viewBox="0 0 120 32">
@@ -345,7 +345,7 @@ const envRecommendations = computed(() => {
     if (vpdVal.status === 'LOW' && RH > 85) {
       // 과습 긴급
       recs.push({
-        text: `과습 상태(VPD ${vpdVal.value}, 습도 ${RH}%). 환기창 50% 이상 오픈 + 관수 중단을 권장합니다.`,
+        text: `과습 상태(VPD ${vpdVal.value}, 습도 ${RH}%). 환기창 50% 이상 오픈 + 관주 중단을 권장합니다.`,
         level: 'danger', priority: 1,
       })
     } else if (vpdVal.status === 'LOW' && isOutdoorCold) {
@@ -363,22 +363,22 @@ const envRecommendations = computed(() => {
       })
     } else if (vpdVal.status === 'HIGH') {
       recs.push({
-        text: `건조 상태(VPD ${vpdVal.value}). 미스트 가동 또는 관수량 증가를 권장합니다.`,
+        text: `건조 상태(VPD ${vpdVal.value}). 미스트 가동 또는 관주량 증가를 권장합니다.`,
         level: 'danger', priority: 1,
       })
     }
   }
 
-  // ── 2. 관수 판단 (습도 + VPD 교차) ──
+  // ── 2. 관주 판단 (습도 + VPD 교차) ──
   if (RH != null && vpdVal) {
     if (vpdVal.status === 'LOW' || RH > 75) {
       recs.push({
-        text: '과습 경향으로 관수는 보류를 권장합니다.',
+        text: '과습 경향으로 관주는 보류를 권장합니다.',
         level: 'warn', priority: 3,
       })
     } else if (vpdVal.status === 'HIGH' && RH < 55) {
       recs.push({
-        text: `건조 상태(습도 ${RH}%). 관수를 실시하세요.`,
+        text: `건조 상태(습도 ${RH}%). 관주를 실시하세요.`,
         level: 'warn', priority: 3,
       })
     }

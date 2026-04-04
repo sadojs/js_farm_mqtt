@@ -1,7 +1,7 @@
 <template>
   <div class="irrigation-history-card">
     <div class="widget-header">
-      <h3>관수 현황</h3>
+      <h3>관주 현황</h3>
       <span v-if="stats.todayCount > 0" class="badge">오늘 {{ stats.todayCount }}회</span>
     </div>
 
@@ -11,7 +11,7 @@
           <span class="log-status" :class="getLogStatusClass(log)">
             {{ getLogTypeLabel(log) }}
           </span>
-          <span class="log-name">{{ log.ruleName || '관수' }}</span>
+          <span class="log-name">{{ log.ruleName || '관주' }}</span>
           <span class="log-time">{{ formatTime(log.executedAt) }}</span>
         </div>
         <div class="log-summary">
@@ -19,12 +19,12 @@
           <span v-if="log.conditionsMet?.startTime" class="summary-chip">{{ log.conditionsMet.startTime }}</span>
           <span v-if="log.conditionsMet?.enabledZones != null" class="summary-chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
           <span v-if="log.actionsExecuted?.estimatedDurationMin" class="summary-chip">소요 {{ log.actionsExecuted.estimatedDurationMin }}분</span>
-          <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관수 {{ log.conditionsMet.irrigationMin }}분</span>
+          <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관주 {{ log.conditionsMet.irrigationMin }}분</span>
           <span v-if="log.conditionsMet?.fertilizerMin" class="summary-chip">액비 {{ log.conditionsMet.fertilizerMin }}분</span>
         </div>
       </div>
     </div>
-    <div v-else class="empty-text">최근 관수 실행 이력이 없습니다</div>
+    <div v-else class="empty-text">최근 관주 실행 이력이 없습니다</div>
   </div>
 </template>
 

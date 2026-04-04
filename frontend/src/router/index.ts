@@ -25,7 +25,7 @@ const router = createRouter({
       path: '/sensors',
       name: 'sensors',
       component: () => import('../views/Sensors.vue'),
-      meta: { title: '센서 관리', requiresAuth: true }
+      meta: { title: '농장 환경', requiresAuth: true }
     },
     {
       path: '/automation',
@@ -37,7 +37,7 @@ const router = createRouter({
       path: '/groups',
       name: 'groups',
       component: () => import('../views/Groups.vue'),
-      meta: { title: '그룹 관리', requiresAuth: true }
+      meta: { title: '구역 관리', requiresAuth: true }
     },
     {
       path: '/devices',
@@ -55,19 +55,19 @@ const router = createRouter({
       path: '/reports',
       name: 'reports',
       component: () => import('../views/Reports.vue'),
-      meta: { title: '리포트 및 통계', requiresAuth: true }
+      meta: { title: '기록 보기', requiresAuth: true }
     },
 {
       path: '/alerts',
       name: 'alerts',
       component: () => import('../views/Alerts.vue'),
-      meta: { title: '센서 알림', requiresAuth: true }
+      meta: { title: '이상 알림', requiresAuth: true }
     },
     {
       path: '/activity-log',
       name: 'activity-log',
       component: () => import('../views/ActivityLog.vue'),
-      meta: { title: '활동 로그', requiresAuth: true }
+      meta: { title: '작업 내역', requiresAuth: true }
     },
     {
       path: '/config-deploy',

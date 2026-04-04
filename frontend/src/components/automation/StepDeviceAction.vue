@@ -49,11 +49,11 @@
     <!-- 관수 설정 -->
     <div v-if="selectedDevice === 'irrigation'" class="action-form">
       <div class="form-group">
-        <label class="field-label">관수 모드</label>
+        <label class="field-label">관주 모드</label>
         <div class="btn-group">
           <button type="button" class="btn-option" :class="{ active: irrigMode === 'water_only' }" @click="irrigMode = 'water_only'; emitAction()">물만</button>
-          <button type="button" class="btn-option" :class="{ active: irrigMode === 'fertilizer_only' }" @click="irrigMode = 'fertilizer_only'; emitAction()">비료만</button>
-          <button type="button" class="btn-option" :class="{ active: irrigMode === 'sequence' }" @click="irrigMode = 'sequence'; emitAction()">순차 실행</button>
+          <button type="button" class="btn-option" :class="{ active: irrigMode === 'fertilizer_only' }" @click="irrigMode = 'fertilizer_only'; emitAction()">양액만</button>
+          <button type="button" class="btn-option" :class="{ active: irrigMode === 'sequence' }" @click="irrigMode = 'sequence'; emitAction()">차례대로</button>
         </div>
       </div>
 
@@ -62,7 +62,7 @@
         <label class="field-label">단위</label>
         <div class="btn-group">
           <button type="button" class="btn-option" :class="{ active: irrigUnit === 'minutes' }" @click="irrigUnit = 'minutes'; emitAction()">시간(분)</button>
-          <button type="button" class="btn-option" :class="{ active: irrigUnit === 'liters' }" @click="irrigUnit = 'liters'; emitAction()">용량(L)</button>
+          <button type="button" class="btn-option" :class="{ active: irrigUnit === 'liters' }" @click="irrigUnit = 'liters'; emitAction()">양(리터)</button>
         </div>
       </div>
       <div v-if="irrigMode !== 'sequence'" class="form-group">
@@ -93,7 +93,7 @@ const emit = defineEmits<{ 'update:modelValue': [val: ActionValue] }>()
 const deviceTypes = [
   { value: 'roof_actuator' as DeviceType, icon: '🏠', label: '개폐기' },
   { value: 'ventilation_fan' as DeviceType, icon: '💨', label: '환풍기' },
-  { value: 'irrigation' as DeviceType, icon: '💧', label: '관수' },
+  { value: 'irrigation' as DeviceType, icon: '💧', label: '관주' },
 ]
 
 const selectedDevice = ref<DeviceType | null>(props.modelValue.deviceType)

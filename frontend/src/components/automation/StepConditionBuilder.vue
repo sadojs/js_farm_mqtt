@@ -1,7 +1,7 @@
 <template>
   <div class="step-condition">
-    <h3 class="step-title">조건 설정</h3>
-    <p class="step-desc">{{ timeOnly ? '시간 기반 조건을 설정하세요.' : '센서 데이터 조건을 설정하세요.' }} 조건 충족 시 장치가 동작합니다.</p>
+    <h3 class="step-title">작동 조건</h3>
+    <p class="step-desc">{{ timeOnly ? '시간 설정 조건을 설정하세요.' : '측정 데이터 조건을 설정하세요.' }} 조건에 맞으면 장치가 동작합니다.</p>
 
     <div class="condition-groups">
       <div
@@ -16,8 +16,8 @@
             @change="updateGroupLogic(($event.target as HTMLSelectElement).value as 'AND' | 'OR')"
             class="logic-select"
           >
-            <option value="AND">AND (모두 만족)</option>
-            <option value="OR">OR (하나 이상 만족)</option>
+            <option value="AND">모두 맞을 때</option>
+            <option value="OR">하나만 맞아도</option>
           </select>
         </div>
 
@@ -62,7 +62,7 @@
                     class="value-input small"
                   />
                   <span class="unit">{{ getUnit(cond.field) }}</span>
-                  <label>편차</label>
+                  <label>허용 범위</label>
                   <input
                     type="number"
                     :value="cond.deviation || 0"
@@ -163,7 +163,7 @@
 
     <!-- 시간대 스케줄러 (FR-03): timeOnly + fan -->
     <div v-if="timeOnly && isFan" class="time-scheduler">
-      <h4 class="scheduler-title">시간대 스케줄러</h4>
+      <h4 class="scheduler-title">시간대 일정</h4>
       <div v-for="(slot, i) in timeSlots" :key="i" class="time-slot">
         <input type="number" v-model.number="slot.start" min="0" max="23" class="value-input small" />
         <span class="unit">시</span>

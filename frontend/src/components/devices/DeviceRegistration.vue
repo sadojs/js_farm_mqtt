@@ -68,7 +68,7 @@
         <div class="step-section" v-if="step === 2">
           <div class="step-header">
             <span class="step-number">2</span>
-            <h3>센서 기기 선택</h3>
+            <h3>측정기 선택</h3>
           </div>
 
           <div class="search-box">
@@ -115,7 +115,7 @@
                     :class="{ active: getDeviceType(device.id) === 'sensor' }"
                     @click="setDeviceType(device.id, 'sensor')"
                   >
-                    🌡️ 센서
+                    🌡️ 측정기
                   </button>
                   <button
                     class="type-btn"
@@ -168,7 +168,7 @@
           <div v-if="wizardSubStep === 'ask'">
             <div class="wizard-success-icon">✅</div>
             <h3 class="wizard-success-title">장치 등록이 완료되었습니다!</h3>
-            <p class="wizard-success-desc">등록한 장치를 그룹에 추가하시겠습니까?</p>
+            <p class="wizard-success-desc">등록한 장치를 구역에 추가하시겠습니까?</p>
             <div class="wizard-ask-buttons">
               <button
                 class="btn-wizard-option"
@@ -177,8 +177,8 @@
                 @click="wizardSubStep = 'existing'"
               >
                 <span class="wizard-option-icon">📁</span>
-                <span class="wizard-option-label">기존 그룹에 추가</span>
-                <span v-if="groupStore.groups.length === 0" class="wizard-option-hint">그룹 없음</span>
+                <span class="wizard-option-label">기존 구역에 추가</span>
+                <span v-if="groupStore.groups.length === 0" class="wizard-option-hint">구역 없음</span>
               </button>
               <button class="btn-wizard-option" @click="wizardSubStep = 'create'">
                 <span class="wizard-option-icon">➕</span>
@@ -231,7 +231,7 @@
                 type="text"
                 v-model="newGroupName"
                 class="form-input"
-                placeholder="예: 1동, 관수 구역 A"
+                placeholder="예: 1동, 관주 구역 A"
               />
             </div>
             <div class="input-group">
@@ -240,7 +240,7 @@
                 v-model="newGroupDesc"
                 class="form-textarea"
                 rows="2"
-                placeholder="그룹에 대한 설명을 입력하세요"
+                placeholder="구역에 대한 설명을 입력하세요"
               ></textarea>
             </div>
             <div v-if="groupWizardError" class="error-box"><p>{{ groupWizardError }}</p></div>
@@ -265,7 +265,7 @@
             <h3>장치 이름 확인 및 등록</h3>
           </div>
 
-          <p class="step-description">각 장치의 이름을 확인하고 필요시 수정하세요. 나중에 그룹에서 이 장치들을 할당합니다.</p>
+          <p class="step-description">각 장치의 이름을 확인하고 필요시 수정하세요. 나중에 구역에서 이 장치들을 할당합니다.</p>
 
           <!-- 개폐기 그룹 이름 입력 -->
           <div v-if="hasOpenerType && openerPairValid" class="opener-group-name-box">
@@ -293,7 +293,7 @@
               <div class="device-name-left">
                 <span class="device-name-icon">{{ getCategoryIcon(device.category) }}</span>
                 <span :class="['type-badge', device.deviceType === 'sensor' ? 'sensor' : 'actuator']">
-                  {{ device.deviceType === 'sensor' ? '센서' : getEquipmentLabel(device.equipmentType) }}
+                  {{ device.deviceType === 'sensor' ? '측정기' : getEquipmentLabel(device.equipmentType) }}
                 </span>
               </div>
               <div class="device-name-input-wrap">
@@ -303,7 +303,7 @@
                   class="form-input"
                   placeholder="장치 이름 입력"
                 />
-                <p class="device-name-id">센서 ID: {{ device.id }}</p>
+                <p class="device-name-id">장치 ID: {{ device.id }}</p>
               </div>
               <div class="device-name-status">
                 <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
@@ -314,7 +314,7 @@
           </div>
 
           <div class="register-summary">
-            센서 <strong>{{ sensorCount }}개</strong> / 장치 <strong>{{ actuatorCount }}개</strong> - 총 <strong>{{ selectedDevices.length }}개</strong> 등록
+            측정기 <strong>{{ sensorCount }}개</strong> / 장치 <strong>{{ actuatorCount }}개</strong> - 총 <strong>{{ selectedDevices.length }}개</strong> 등록
           </div>
 
           <div class="button-group">
@@ -370,7 +370,7 @@ const guessEquipmentType = (category: string): EquipmentType => {
 
 const EQUIPMENT_TYPE_OPTIONS: { value: EquipmentType; label: string }[] = [
   { value: 'other', label: '기타' },
-  { value: 'irrigation', label: '관수' },
+  { value: 'irrigation', label: '관주' },
   { value: 'fan', label: '환풍기(휀)' },
   { value: 'opener_open', label: '개폐기(열림)' },
   { value: 'opener_close', label: '개폐기(닫힘)' },

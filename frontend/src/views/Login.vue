@@ -4,7 +4,7 @@
       <div class="login-header">
         <div class="logo">🌱</div>
         <h1>스마트 농업 플랫폼</h1>
-        <p>IoT 기반 농업 자동화 시스템</p>
+        <p>IoT 기반 농업 자동 제어 시스템</p>
       </div>
 
       <form class="login-form" @submit.prevent="handleLogin">

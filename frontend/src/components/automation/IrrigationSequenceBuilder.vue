@@ -1,6 +1,6 @@
 <template>
   <div class="sequence-builder">
-    <label class="field-label">관수 순서 설정</label>
+    <label class="field-label">관주 순서 설정</label>
 
     <div v-for="(step, idx) in steps" :key="idx" class="seq-step">
       <div class="step-header">

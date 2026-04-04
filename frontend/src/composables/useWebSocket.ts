@@ -96,9 +96,9 @@ export function useWebSocket() {
     socket.on('automation:executed', (data) => {
       const notificationStore = useNotificationStore()
       if (data.success) {
-        notificationStore.info('자동화 실행', `규칙 "${data.ruleName}" 이 실행되었습니다.`)
+        notificationStore.info('자동 제어 실행', `규칙 "${data.ruleName}" 이 실행되었습니다.`)
       } else {
-        notificationStore.warning('자동화 실행 실패', `규칙 "${data.ruleName}" 실행에 실패했습니다.`)
+        notificationStore.warning('자동 제어 실행 실패', `규칙 "${data.ruleName}" 실행에 실패했습니다.`)
       }
     })
 

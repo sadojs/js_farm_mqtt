@@ -2,20 +2,20 @@
   <div v-if="show" class="modal-overlay" @click.self="closeModal">
     <div class="modal-container">
       <div class="modal-header">
-        <h2>하우스 그룹 만들기</h2>
+        <h2>하우스 구역 만들기</h2>
         <button class="close-btn" @click="closeModal">✕</button>
       </div>
 
       <div class="modal-body">
         <!-- 그룹 정보 입력 -->
         <div class="form-section">
-          <h3>그룹 정보</h3>
+          <h3>구역 정보</h3>
           <div class="form-group">
-            <label>그룹 이름 *</label>
+            <label>구역 이름 *</label>
             <input
               v-model="groupData.name"
               type="text"
-              placeholder="예: 우용리 하우스 그룹"
+              placeholder="예: 우용리 하우스 구역"
               class="form-input"
             />
           </div>
@@ -24,7 +24,7 @@
             <label>설명</label>
             <textarea
               v-model="groupData.description"
-              placeholder="그룹에 대한 설명을 입력하세요"
+              placeholder="구역에 대한 설명을 입력하세요"
               class="form-textarea"
               rows="2"
             />
@@ -44,7 +44,7 @@
         <!-- 장치 선택 -->
         <div class="form-section">
           <h3>장치 할당</h3>
-          <p class="section-desc">이 그룹에 포함할 센서와 장치를 선택하세요.</p>
+          <p class="section-desc">이 구역에 포함할 측정기와 장치를 선택하세요.</p>
 
           <div v-if="availableDevices.length === 0" class="empty-devices">
             <p>등록된 장치가 없습니다. 먼저 장치를 등록하세요.</p>
@@ -62,7 +62,7 @@
 
             <!-- 센서 목록 -->
             <div v-if="filteredSensors.length > 0" class="device-type-section">
-              <div class="type-label sensor">센서 ({{ filteredSensors.length }})</div>
+              <div class="type-label sensor">측정기 ({{ filteredSensors.length }})</div>
               <div class="devices-list">
                 <div
                   v-for="device in filteredSensors"
@@ -143,7 +143,7 @@
           @click="handleCreate"
         >
           <span v-if="creating">생성 중...</span>
-          <span v-else>그룹 만들기</span>
+          <span v-else>구역 만들기</span>
         </button>
       </div>
     </div>
@@ -247,8 +247,8 @@ const handleCreate = async () => {
     emit('created')
     closeModal()
   } catch (err) {
-    console.error('그룹 생성 실패:', err)
-    alert('그룹 생성에 실패했습니다.')
+    console.error('구역 생성 실패:', err)
+    alert('구역 생성에 실패했습니다.')
   } finally {
     creating.value = false
   }

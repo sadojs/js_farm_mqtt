@@ -151,13 +151,13 @@ const recommendations = computed(() => {
 
   // VPD 판단
   if (vpd.value.status === 'LOW' && RH > 85) {
-    recs.push({ text: `과습(VPD ${vpd.value.value}, 습도 ${RH}%). 환기 + 관수 중단 권장`, level: 'danger', priority: 1 })
+    recs.push({ text: `과습(VPD ${vpd.value.value}, 습도 ${RH}%). 환기 + 관주 중단 권장`, level: 'danger', priority: 1 })
   } else if (vpd.value.status === 'LOW' && isOutdoorCold) {
     recs.push({ text: `습도 과다이나 외부가 ${outT}°C로 낮음. 소량 환기 + 순환팬 권장`, level: 'warn', priority: 2 })
   } else if (vpd.value.status === 'LOW') {
     recs.push({ text: `습도 과다(VPD ${vpd.value.value}). 환기를 권장합니다`, level: 'danger', priority: 1 })
   } else if (vpd.value.status === 'HIGH') {
-    recs.push({ text: `건조(VPD ${vpd.value.value}). 미스트 또는 관수 증가 권장`, level: 'danger', priority: 1 })
+    recs.push({ text: `건조(VPD ${vpd.value.value}). 미스트 또는 관주 증가 권장`, level: 'danger', priority: 1 })
   }
 
   // 온도 판단

@@ -56,9 +56,9 @@ interface TabItem {
 
 const mainTabs: TabItem[] = [
   { path: '/dashboard', icon: '\uD83D\uDCCA', label: '홈', ariaLabel: '대시보드로 이동' },
-  { path: '/sensors', icon: '\uD83D\uDCE1', label: '환경', ariaLabel: '환경 모니터링으로 이동' },
-  { path: '/automation', icon: '\u2699\uFE0F', label: '자동화', ariaLabel: '자동화 관리로 이동' },
-  { path: '/groups', icon: '\uD83D\uDC65', label: '그룹', ariaLabel: '그룹 관리로 이동' },
+  { path: '/sensors', icon: '\uD83D\uDCE1', label: '환경', ariaLabel: '농장 환경으로 이동' },
+  { path: '/automation', icon: '\u2699\uFE0F', label: '자동 제어', ariaLabel: '자동 제어 관리로 이동' },
+  { path: '/groups', icon: '\uD83D\uDC65', label: '구역', ariaLabel: '구역 관리로 이동' },
   { path: '/devices', icon: '\uD83D\uDD0C', label: '장치', ariaLabel: '장치 관리로 이동' },
 ]
 

@@ -1,7 +1,7 @@
 <template>
   <div class="step-sensor">
-    <h3 class="step-title">센서 선택</h3>
-    <p class="step-desc">조건으로 사용할 센서를 선택하거나, 시간 기반 자동화를 설정하세요</p>
+    <h3 class="step-title">측정기 선택</h3>
+    <p class="step-desc">조건으로 사용할 측정기를 선택하거나, 시간 설정 자동 제어를 설정하세요</p>
 
     <!-- 센서 미선택 (시간 기반) 옵션 -->
     <div
@@ -11,9 +11,9 @@
     >
       <div class="device-icon">🕐</div>
       <div class="device-info">
-        <div class="device-name">센서 미선택 (시간 기반)</div>
+        <div class="device-name">측정기 미선택 (시간 설정)</div>
         <div class="device-meta">
-          <span class="category">시간 조건만으로 자동화를 설정합니다</span>
+          <span class="category">시간 조건만으로 자동 제어를 설정합니다</span>
         </div>
       </div>
       <div class="check-box" :class="{ checked: noSensorMode }">
@@ -22,7 +22,7 @@
     </div>
 
     <div v-if="sensors.length === 0 && !noSensorMode" class="empty">
-      선택한 그룹에 센서가 없습니다.
+      선택한 구역에 측정기가 없습니다.
     </div>
     <div v-if="sensors.length > 0" class="device-list">
       <div

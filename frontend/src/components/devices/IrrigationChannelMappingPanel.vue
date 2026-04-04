@@ -1,6 +1,6 @@
 <template>
   <div v-if="authStore.isAdmin || authStore.isFarmAdmin" class="channel-mapping-panel">
-    <label class="mapping-section-label">채널 매핑 설정</label>
+    <label class="mapping-section-label">구역 매핑 설정</label>
     <div v-for="fnKey in MAPPING_FUNCTION_KEYS" :key="fnKey" class="mapping-row">
       <span class="mapping-fn-label">{{ FUNCTION_LABELS[fnKey as keyof ChannelMapping] }}</span>
       <select
@@ -64,9 +64,9 @@ async function saveMapping() {
   try {
     await deviceStore.updateChannelMapping(props.device.id, mapping as ChannelMapping)
     pendingMapping.value = null
-    notify.success('저장 완료', '채널 매핑이 저장되었습니다')
+    notify.success('저장 완료', '구역 매핑이 저장되었습니다')
   } catch {
-    notify.error('저장 실패', '채널 매핑 저장에 실패했습니다')
+    notify.error('저장 실패', '구역 매핑 저장에 실패했습니다')
   }
 }
 

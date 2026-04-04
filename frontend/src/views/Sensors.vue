@@ -2,7 +2,7 @@
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h2>환경 모니터링</h2>
+        <h2>농장 환경</h2>
         <p class="page-description">농장 환경을 종합적으로 확인합니다</p>
       </div>
       <button class="btn-refresh" @click="refreshAll" :disabled="refreshing">
@@ -12,15 +12,15 @@
 
     <!-- 로딩 -->
     <div v-if="loading" class="loading-state">
-      <p>센서 데이터를 불러오는 중...</p>
+      <p>측정 데이터를 불러오는 중...</p>
     </div>
 
     <!-- 센서 없음 -->
     <EmptyState
       v-else-if="sensorGroups.length === 0"
       icon="<polyline points='22 12 18 12 15 21 9 3 6 12 2 12'/>"
-      title="센서 데이터가 없습니다"
-      description="아직 센서가 등록된 그룹이 없습니다.&#10;① 장치 관리에서 센서 장치를 등록하세요&#10;② 그룹 관리에서 그룹을 만들고 배치하세요&#10;③ 이곳에서 실시간 데이터를 확인하세요"
+      title="측정 데이터가 없습니다"
+      description="아직 측정기가 등록된 구역이 없습니다.&#10;① 장치 관리에서 측정기를 등록하세요&#10;② 구역 관리에서 구역을 만들고 배치하세요&#10;③ 이곳에서 실시간 데이터를 확인하세요"
     >
       <router-link to="/devices" class="btn-cta" style="margin-top: 8px;">장치 관리로 이동</router-link>
     </EmptyState>
@@ -37,7 +37,7 @@
           <div class="group-title">
             <span class="expand-icon">{{ expandedGroups.has(group.id) ? '▼' : '▶' }}</span>
             <h3>{{ group.name }}</h3>
-            <span class="sensor-count">{{ group.sensors.length }}개 센서</span>
+            <span class="sensor-count">{{ group.sensors.length }}개 측정기</span>
           </div>
           <div class="group-summary">
             <span v-for="item in group.summaryItems" :key="item.label" class="summary-chip">

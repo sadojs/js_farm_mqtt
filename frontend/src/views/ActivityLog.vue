@@ -1,13 +1,13 @@
 <template>
   <div class="page-container">
     <div class="page-header">
-      <h2>활동 로그</h2>
+      <h2>작업 내역</h2>
     </div>
 
     <!-- 탭 -->
     <div class="log-tabs">
-      <button class="log-tab" :class="{ active: tab === 'execution' }" @click="switchTab('execution')">실행 로그</button>
-      <button class="log-tab" :class="{ active: tab === 'activity' }" @click="switchTab('activity')">행동 로그</button>
+      <button class="log-tab" :class="{ active: tab === 'execution' }" @click="switchTab('execution')">실행 기록</button>
+      <button class="log-tab" :class="{ active: tab === 'activity' }" @click="switchTab('activity')">행동 기록</button>
     </div>
 
     <!-- 실행 로그 탭 -->
@@ -27,7 +27,7 @@
               <span v-if="log.conditionsMet?.startTime" class="chip">{{ log.conditionsMet.startTime }}</span>
               <span v-if="log.conditionsMet?.enabledZones != null" class="chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
               <span v-if="log.actionsExecuted?.estimatedDurationMin" class="chip">소요 {{ log.actionsExecuted.estimatedDurationMin }}분</span>
-              <span v-if="log.conditionsMet?.irrigationMin" class="chip">관수 {{ log.conditionsMet.irrigationMin }}분</span>
+              <span v-if="log.conditionsMet?.irrigationMin" class="chip">관주 {{ log.conditionsMet.irrigationMin }}분</span>
               <span v-if="log.conditionsMet?.fertilizerMin" class="chip">액비 {{ log.conditionsMet.fertilizerMin }}분</span>
             </template>
             <template v-else-if="log.conditionsMet?.type === 'relay'">
@@ -67,7 +67,7 @@
             <span v-if="log.groupName" class="chip">{{ log.groupName }}</span>
             <span v-if="log.targetName" class="chip device">{{ log.targetName }}</span>
             <span v-if="log.details?.equipmentType" class="chip">{{ formatEquipment(log.details.equipmentType) }}</span>
-            <span v-if="log.details?.ruleType" class="chip">{{ log.details.ruleType === 'time' ? '시간 기반' : '센서 기반' }}</span>
+            <span v-if="log.details?.ruleType" class="chip">{{ log.details.ruleType === 'time' ? '시간 설정' : '측정값 설정' }}</span>
             <span v-if="log.details?.commandSummary" class="chip cmd">{{ log.details.commandSummary }}</span>
           </div>
         </div>
@@ -174,7 +174,7 @@ function getExecStatusClass(log: AutomationLogEntry): string {
 }
 
 function formatEquipment(type: string): string {
-  const m: Record<string, string> = { fan: '팬', irrigation: '관수', opener_open: '개폐기(열림)', opener_close: '개폐기(닫힘)', other: '기타' }
+  const m: Record<string, string> = { fan: '팬', irrigation: '관주', opener_open: '개폐기(열림)', opener_close: '개폐기(닫힘)', other: '기타' }
   return m[type] || type
 }
 
@@ -197,7 +197,7 @@ function getActionLabel(action: string) { return ACTION_MAP[action]?.label || ac
 function getActionClass(action: string) { return ACTION_MAP[action]?.cls || 'default' }
 
 const MENU_FALLBACK: Record<string, string> = {
-  device: '장치 관리', rule: '자동화', group: '그룹 관리', env_config: '환경설정', sensor: '센서',
+  device: '장치 관리', rule: '자동 제어', group: '구역 관리', env_config: '환경설정', sensor: '측정기',
 }
 function getMenuLabel(log: ActivityLogEntry): string {
   return log.details?.menu || MENU_FALLBACK[log.targetType] || ''
@@ -205,7 +205,7 @@ function getMenuLabel(log: ActivityLogEntry): string {
 
 function getActionDesc(log: ActivityLogEntry): string {
   const target = log.targetName ? `"${log.targetName}"` : ''
-  const typeMap: Record<string, string> = { device: '장치', rule: '룰', group: '그룹', env_config: '환경설정', sensor: '센서' }
+  const typeMap: Record<string, string> = { device: '장치', rule: '설정', group: '구역', env_config: '환경설정', sensor: '측정기' }
   const typeName = typeMap[log.targetType] || log.targetType
   if (log.action.endsWith('.control')) return `${target} ${typeName} 제어`
   if (log.action.endsWith('.register')) return `${target} ${typeName} 등록`

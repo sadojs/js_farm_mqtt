@@ -17,7 +17,7 @@
         </div>
         <div class="summary-text">
           <span class="summary-number">{{ groupCount }}</span>
-          <span class="summary-label">활성 그룹</span>
+          <span class="summary-label">활성 구역</span>
         </div>
       </div>
 
@@ -27,7 +27,7 @@
         </div>
         <div class="summary-text">
           <span class="summary-number">{{ ruleActive }} / {{ ruleCount }}</span>
-          <span class="summary-label">자동화 룰</span>
+          <span class="summary-label">자동 제어 설정</span>
         </div>
       </div>
 

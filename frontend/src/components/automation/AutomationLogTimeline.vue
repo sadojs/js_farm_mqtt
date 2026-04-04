@@ -6,7 +6,7 @@
       <EmptyState
         icon="rule"
         title="실행 기록이 없습니다"
-        description="자동화 룰이 실행되면 여기에 기록됩니다"
+        description="자동 제어 설정이 실행되면 여기에 기록됩니다"
       />
     </div>
     <div v-else class="log-timeline">
@@ -15,7 +15,7 @@
           <span class="log-status" :class="getLogStatusClass(log)">
             {{ getLogTypeLabel(log) }}
           </span>
-          <span class="log-name">{{ log.ruleName || log.conditionsMet?.ruleName || '자동화' }}</span>
+          <span class="log-name">{{ log.ruleName || log.conditionsMet?.ruleName || '자동 제어' }}</span>
           <span class="log-time">{{ formatTime(log.executedAt) }}</span>
         </div>
         <div class="log-summary">
@@ -25,7 +25,7 @@
             <span v-if="log.conditionsMet?.startTime" class="summary-chip">{{ log.conditionsMet.startTime }}</span>
             <span v-if="log.conditionsMet?.enabledZones != null" class="summary-chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
             <span v-if="log.actionsExecuted?.estimatedDurationMin" class="summary-chip">소요 {{ log.actionsExecuted.estimatedDurationMin }}분</span>
-            <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관수 {{ log.conditionsMet.irrigationMin }}분</span>
+            <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관주 {{ log.conditionsMet.irrigationMin }}분</span>
             <span v-if="log.conditionsMet?.fertilizerMin" class="summary-chip">액비 {{ log.conditionsMet.fertilizerMin }}분</span>
           </template>
           <!-- 릴레이 자동화 로그 -->
@@ -117,7 +117,7 @@ function getLogStatusClass(log: AutomationLogEntry): string {
 
 function formatEquipmentType(type: string): string {
   const map: Record<string, string> = {
-    fan: '팬', irrigation: '관수', opener_open: '개폐기(열림)',
+    fan: '팬', irrigation: '관주', opener_open: '개폐기(열림)',
     opener_close: '개폐기(닫힘)', other: '기타',
   }
   return map[type] || type

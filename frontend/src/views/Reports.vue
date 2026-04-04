@@ -2,7 +2,7 @@
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h2>리포트</h2>
+        <h2>기록 보기</h2>
         <p class="page-description">농장 운영 데이터를 분석합니다</p>
       </div>
     </header>
@@ -10,7 +10,7 @@
     <!-- 메인 탭 -->
     <div class="main-tabs">
       <button class="main-tab" :class="{ active: reportTab === 'data' }" @click="reportTab = 'data'">
-        센서 데이터
+        측정 기록
       </button>
       <button class="main-tab" :class="{ active: reportTab === 'compare' }" @click="reportTab = 'compare'">
         비교 분석
@@ -27,9 +27,9 @@
     <div class="filter-section">
       <div class="filter-row">
         <div class="filter-group">
-          <label>그룹 선택</label>
+          <label>구역 선택</label>
           <select v-model="selectedGroup" class="filter-select">
-            <option value="">전체 그룹</option>
+            <option value="">전체 구역</option>
             <option v-for="group in groups" :key="group.id" :value="group.id">
               {{ group.name }}
             </option>
@@ -37,7 +37,7 @@
         </div>
 
         <div class="filter-group">
-          <label>센서 타입</label>
+          <label>측정기 타입</label>
           <select v-model="selectedSensorType" class="filter-select">
             <option v-for="st in sensorTypeOptions" :key="st.value" :value="st.value">
               {{ st.label }}
@@ -185,7 +185,7 @@
       v-else
       icon="<line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/>"
       title="데이터가 없습니다"
-      :description="envWarning ? '환경 설정 후 리포트를 확인할 수 있습니다.' : '기간을 선택하여 조회해주세요.'"
+      :description="envWarning ? '환경 설정 후 기록을 확인할 수 있습니다.' : '기간을 선택하여 조회해주세요.'"
     />
 
     </template><!-- /센서 데이터 탭 -->

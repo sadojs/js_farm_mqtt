@@ -3,7 +3,7 @@
     <!-- 헤더 -->
     <header class="page-header">
       <div>
-        <h2>센서 알림</h2>
+        <h2>이상 알림</h2>
         <p class="page-description">센서 이상 감지 및 조치 안내</p>
       </div>
       <span v-if="unresolvedCount > 0" class="unresolved-badge">{{ unresolvedCount }}</span>
@@ -12,7 +12,7 @@
     <!-- 탭 -->
     <div class="tab-bar">
       <button :class="['tab-item', { active: activeTab === 'sensors' }]" @click="activeTab = 'sensors'">
-        활성 센서 <span class="tab-count">{{ activeSensors.length }}</span>
+        활성 측정기 <span class="tab-count">{{ activeSensors.length }}</span>
       </button>
       <button :class="['tab-item', { active: activeTab === 'alerts' }]" @click="activeTab = 'alerts'">
         알림 <span v-if="unresolvedCount > 0" class="tab-badge">{{ unresolvedCount }}</span>
@@ -24,11 +24,11 @@
 
     <!-- ═══ 탭1: 활성 센서 ═══ -->
     <template v-if="activeTab === 'sensors'">
-      <div v-if="sensorsLoading" class="loading-state">센서 목록을 불러오는 중...</div>
+      <div v-if="sensorsLoading" class="loading-state">측정기 목록을 불러오는 중...</div>
       <div v-else-if="activeSensors.length === 0" class="empty-state">
-        <h3>활성 센서가 없습니다</h3>
-        <p v-if="standbySensors.length > 0">대기 목록에서 센서를 활성화하세요.</p>
-        <p v-else>장치를 등록하고 센서를 활성화하세요.</p>
+        <h3>활성 측정기가 없습니다</h3>
+        <p v-if="standbySensors.length > 0">대기 목록에서 측정기를 활성화하세요.</p>
+        <p v-else>장치를 등록하고 측정기를 활성화하세요.</p>
         <router-link to="/devices" class="empty-cta-link">장치 관리</router-link>
       </div>
       <div v-else class="sensor-grid">
@@ -67,7 +67,7 @@
       <!-- 빈 상태 -->
       <div v-else-if="filteredAlerts.length === 0" class="empty-state">
         <h3>알림이 없습니다</h3>
-        <p>센서가 정상적으로 작동하고 있습니다.</p>
+        <p>측정기가 정상적으로 작동하고 있습니다.</p>
       </div>
 
       <!-- 알림 카드 리스트 -->
@@ -101,10 +101,10 @@
 
     <!-- ═══ 탭3: 대기 목록 ═══ -->
     <template v-if="activeTab === 'standby'">
-      <div v-if="sensorsLoading" class="loading-state">센서 목록을 불러오는 중...</div>
+      <div v-if="sensorsLoading" class="loading-state">측정기 목록을 불러오는 중...</div>
       <div v-else-if="standbySensors.length === 0" class="empty-state">
-        <h3>대기 중인 센서가 없습니다</h3>
-        <p>사용하지 않는 센서를 활성 센서 탭에서 대기로 이동할 수 있습니다.</p>
+        <h3>대기 중인 측정기가 없습니다</h3>
+        <p>사용하지 않는 측정기를 활성 측정기 탭에서 대기로 이동할 수 있습니다.</p>
       </div>
       <div v-else class="sensor-grid standby-grid">
         <div v-for="s in standbySensors" :key="s.deviceId + s.sensorType" class="sensor-card standby">
@@ -137,7 +137,7 @@
           </div>
 
           <div class="detail-info">
-            <div>센서: {{ detail.deviceName }} / {{ sensorTypeLabel(detail.sensorType) }}</div>
+            <div>측정기: {{ detail.deviceName }} / {{ sensorTypeLabel(detail.sensorType) }}</div>
             <div>감지 시각: {{ formatDate(detail.createdAt) }}</div>
           </div>
 
@@ -210,7 +210,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   flatline: '값 고정',
   spike: '급변',
   out_of_range: '범위 이탈',
-  unstable: '센서 불안정',
+  unstable: '측정기 불안정',
 }
 
 const SENSOR_TYPE_LABELS: Record<string, string> = {
@@ -349,7 +349,7 @@ async function loadSensors() {
     const res = await sensorAlertsApi.getSensors()
     sensors.value = res.data
   } catch {
-    notificationStore.error('오류', '센서 목록을 불러오지 못했습니다.')
+    notificationStore.error('오류', '측정기 목록을 불러오지 못했습니다.')
   } finally {
     sensorsLoading.value = false
   }

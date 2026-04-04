@@ -6,12 +6,12 @@
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="remove-modal-desc">
-        제거할 장치를 선택하세요. 장치 자체는 삭제되지 않으며 그룹에서만 해제됩니다.
+        제거할 장치를 선택하세요. 장치 자체는 삭제되지 않으며 구역에서만 해제됩니다.
       </div>
       <div class="add-modal-body">
         <!-- 센서 -->
         <template v-if="sensors.length > 0">
-          <div class="remove-section-label sensor">센서</div>
+          <div class="remove-section-label sensor">측정기</div>
           <div
             v-for="device in sensors"
             :key="device.id"
@@ -24,7 +24,7 @@
             <span class="device-row-name">{{ device.name }}</span>
             <span v-if="loadingDeps.has(device.id)" class="dep-loading">확인 중...</span>
             <span v-else-if="(warnings[device.id]?.length ?? 0) > 0" class="dep-warning">
-              ⚠ 자동화 룰: {{ warnings[device.id].map(r => r.name).join(', ') }}
+              ⚠ 자동 제어 설정: {{ warnings[device.id].map(r => r.name).join(', ') }}
             </span>
             <span :class="['status-indicator', device.online ? 'online' : 'offline']">
               {{ device.online ? '온라인' : '오프라인' }}
@@ -47,14 +47,14 @@
             <span class="device-row-name">{{ og.groupName }} <span class="pair-hint">(열림/닫힘 쌍)</span></span>
             <span v-if="loadingDeps.has(og.openDevice.id)" class="dep-loading">확인 중...</span>
             <span v-else-if="(warnings[og.openDevice.id]?.length ?? 0) > 0" class="dep-warning">
-              ⚠ 자동화 룰: {{ warnings[og.openDevice.id].map(r => r.name).join(', ') }}
+              ⚠ 자동 제어 설정: {{ warnings[og.openDevice.id].map(r => r.name).join(', ') }}
             </span>
           </div>
         </template>
 
         <!-- 관수 -->
         <template v-if="irrigations.length > 0">
-          <div class="remove-section-label actuator">관수</div>
+          <div class="remove-section-label actuator">관주</div>
           <div
             v-for="device in irrigations"
             :key="device.id"
@@ -67,7 +67,7 @@
             <span class="device-row-name">{{ device.name }}</span>
             <span v-if="loadingDeps.has(device.id)" class="dep-loading">확인 중...</span>
             <span v-else-if="(warnings[device.id]?.length ?? 0) > 0" class="dep-warning">
-              ⚠ 자동화 룰: {{ warnings[device.id].map(r => r.name).join(', ') }}
+              ⚠ 자동 제어 설정: {{ warnings[device.id].map(r => r.name).join(', ') }}
             </span>
             <span :class="['status-indicator', device.online ? 'online' : 'offline']">
               {{ device.online ? '온라인' : '오프라인' }}
@@ -90,7 +90,7 @@
             <span class="device-row-name">{{ device.name }}</span>
             <span v-if="loadingDeps.has(device.id)" class="dep-loading">확인 중...</span>
             <span v-else-if="(warnings[device.id]?.length ?? 0) > 0" class="dep-warning">
-              ⚠ 자동화 룰: {{ warnings[device.id].map(r => r.name).join(', ') }}
+              ⚠ 자동 제어 설정: {{ warnings[device.id].map(r => r.name).join(', ') }}
             </span>
             <span :class="['status-indicator', device.online ? 'online' : 'offline']">
               {{ device.online ? '온라인' : '오프라인' }}
@@ -104,7 +104,7 @@
       </div>
 
       <div v-if="hasWarning" class="remove-warning-banner">
-        ⚠ 선택한 장치 중 자동화 룰에서 사용 중인 항목이 있습니다. 자동화 룰을 먼저 수정해 주세요.
+        ⚠ 선택한 장치 중 자동 제어 설정에서 사용 중인 항목이 있습니다. 자동 제어 설정을 먼저 수정해 주세요.
       </div>
 
       <div class="add-modal-footer">
@@ -116,7 +116,7 @@
         >
           <span v-if="removing">제거 중...</span>
           <span v-else-if="checked.size === 0">장치를 선택하세요</span>
-          <span v-else-if="hasWarning">자동화 룰 먼저 처리 필요</span>
+          <span v-else-if="hasWarning">자동 제어 설정 먼저 처리 필요</span>
           <span v-else>{{ checked.size }}개 제거</span>
         </button>
       </div>
@@ -213,7 +213,7 @@ const confirmRemove = async () => {
     emit('removed')
     emit('close')
   } catch (err) {
-    console.error('그룹 장치 제거 실패:', err)
+    console.error('구역 장치 제거 실패:', err)
     alert('장치 제거에 실패했습니다.')
   } finally {
     removing.value = false

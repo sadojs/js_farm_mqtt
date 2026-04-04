@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h2>장치 관리</h2>
-        <p class="page-description">농장 장치와 센서를 관리합니다</p>
+        <p class="page-description">농장 장치와 측정기를 관리합니다</p>
       </div>
       <div class="header-actions">
         <!-- MQTT에서는 실시간 동기화됨 -->
@@ -30,7 +30,7 @@
           장치 ({{ actuatorDevices.length }})
         </button>
         <button class="tab" :class="{ active: activeTab === 'sensor' }" @click="activeTab = 'sensor'">
-          센서 ({{ sensorDevices.length }})
+          측정기 ({{ sensorDevices.length }})
         </button>
       </div>
     </div>
@@ -47,7 +47,7 @@
         ? '<circle cx=\'11\' cy=\'11\' r=\'8\'/><line x1=\'21\' y1=\'21\' x2=\'16.65\' y2=\'16.65\'/>'
         : '<path d=\'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9\'/><path d=\'M13.73 21a2 2 0 0 1-3.46 0\'/>'"
       :title="searchQuery ? '검색 결과가 없습니다' : '아직 등록된 장치가 없습니다'"
-      :description="searchQuery ? '다른 검색어를 입력해보세요.' : '센서 동기화를 통해 장치를 가져와 등록하세요.'"
+      :description="searchQuery ? '다른 검색어를 입력해보세요.' : '측정기 동기화를 통해 장치를 가져와 등록하세요.'"
       :action-label="!searchQuery && !authStore.isFarmUser ? '+ 장치 등록하기' : undefined"
       :action-fn="!searchQuery && !authStore.isFarmUser ? () => { showRegistrationModal = true } : undefined"
     />
@@ -116,7 +116,7 @@
             </div>
           </div>
         </div>
-        <!-- 채널 매핑 설정 패널 (admin/farm_admin 전용) -->
+        <!-- 구역 매핑 설정 패널 (admin/farm_admin 전용) -->
         <IrrigationChannelMappingPanel :device="device" />
       </div>
     </div>
@@ -132,7 +132,7 @@
         <div class="card-top">
           <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
           <span :class="['type-badge', device.deviceType === 'sensor' ? 'sensor' : 'actuator']">
-            {{ device.deviceType === 'sensor' ? '센서' : '장치' }}
+            {{ device.deviceType === 'sensor' ? '측정기' : '장치' }}
           </span>
           <div class="card-title">
             <h4>{{ device.name }}</h4>
@@ -363,7 +363,7 @@ async function handleIrrigationControl(device: Device, switchCode: string) {
     if (enabledCount > 0) {
       const ok = await confirm({
         title: '원격제어 끄기',
-        message: `원격제어를 끄면 이 장치의 자동화 룰 ${enabledCount}개도 비활성화됩니다.${deviceStatus?.isRunning ? '\n현재 가동 중인 관수도 중단됩니다.' : ''}`,
+        message: `원격제어를 끄면 이 장치의 자동 제어 설정 ${enabledCount}개도 비활성화됩니다.${deviceStatus?.isRunning ? '\n현재 가동 중인 관주도 중단됩니다.' : ''}`,
         confirmText: '끄기',
         variant: 'danger',
       })
@@ -398,11 +398,11 @@ async function handleIrrigationControl(device: Device, switchCode: string) {
     if (isRemoteControl && !newVal) {
       const bulkResult = await automationStore.bulkDisableByDevice(device.id)
       if (bulkResult.disabledCount > 0) {
-        notify.info('자동화 비활성화', `자동화 룰 ${bulkResult.disabledCount}개가 비활성화되었습니다`)
+        notify.info('자동 제어 비활성화', `자동 제어 설정 ${bulkResult.disabledCount}개가 비활성화되었습니다`)
       }
     }
   } catch (err) {
-    console.error('관수 장치 제어 실패:', err)
+    console.error('관주 장치 제어 실패:', err)
     notify.remove(loadingId)
     notify.error('제어 실패', '네트워크 오류가 발생했습니다')
   } finally {
@@ -467,10 +467,10 @@ const getCategoryLabel = (category: string): string => {
     'wk': '환풍기', 'fs': '환풍기',
     'cl': '개폐기', 'mc': '개폐기',
     'dj': '조명', 'dd': '조명',
-    'bh': '관수', 'sfkzq': '관수',
-    'wsdcg': '온습도계', 'co2bj': 'CO2센서', 'ldcg': '토양센서',
-    'mcs': '복합센서', 'ywbj': '우량계', 'pm25': '미세먼지',
-    'qxj': '기상관측센서', 'hjjcy': '환경검측기',
+    'bh': '관주', 'sfkzq': '관주',
+    'wsdcg': '온습도계', 'co2bj': 'CO2 측정기', 'ldcg': '토양 측정기',
+    'mcs': '통합 측정기', 'ywbj': '우량계', 'pm25': '미세먼지',
+    'qxj': '기상관측 측정기', 'hjjcy': '환경검측기',
   }
   return labels[category] || category
 }

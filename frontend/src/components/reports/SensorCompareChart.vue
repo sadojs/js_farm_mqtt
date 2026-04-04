@@ -4,7 +4,7 @@
     <div class="compare-controls">
       <div class="compare-row">
         <div class="compare-group">
-          <label>그룹 1</label>
+          <label>구역 1</label>
           <select v-model="group1Id" class="compare-select">
             <option value="">선택</option>
             <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -12,7 +12,7 @@
         </div>
         <span class="compare-vs">vs</span>
         <div class="compare-group">
-          <label>그룹 2</label>
+          <label>구역 2</label>
           <select v-model="group2Id" class="compare-select">
             <option value="">선택</option>
             <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -87,8 +87,8 @@
     <div v-else-if="!loading && !chartData" class="compare-placeholder">
       <EmptyState
         icon="chart"
-        title="비교할 그룹과 항목을 선택하세요"
-        description="두 그룹의 센서 데이터를 오버레이 차트로 비교합니다"
+        title="비교할 구역과 항목을 선택하세요"
+        description="두 구역의 측정 데이터를 오버레이 차트로 비교합니다"
       />
     </div>
   </div>
@@ -128,8 +128,8 @@ const metricOptions = [
 ]
 
 const metricUnit = computed(() => metricOptions.find(m => m.value === metric.value)?.unit || '')
-const group1Name = computed(() => groups.value.find(g => g.id === group1Id.value)?.name || '그룹 1')
-const group2Name = computed(() => groups.value.find(g => g.id === group2Id.value)?.name || '그룹 2')
+const group1Name = computed(() => groups.value.find(g => g.id === group1Id.value)?.name || '구역 1')
+const group2Name = computed(() => groups.value.find(g => g.id === group2Id.value)?.name || '구역 2')
 const canCompare = computed(() => group1Id.value && group2Id.value && group1Id.value !== group2Id.value)
 
 const PERIOD_MS: Record<string, number> = {

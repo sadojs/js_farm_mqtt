@@ -31,7 +31,7 @@ export const FIELD_LABELS: Record<string, string> = {
   soil_moisture: '토양 수분',
   ph: 'PH',
   ec: 'EC',
-  rain: '비 센서',
+  rain: '비 측정기',
   // env role keys
   internal_temp: '내부 온도',
   internal_humidity: '내부 습도',

@@ -24,10 +24,10 @@ export const DEFAULT_CHANNEL_MAPPING: ChannelMapping = {
 
 export const FUNCTION_LABELS: Record<keyof ChannelMapping, string> = {
   remote_control:       '원격제어 ON/OFF',
-  zone_1:               '1구역 관수',
-  zone_2:               '2구역 관수',
-  zone_3:               '3구역 관수',
-  zone_4:               '4구역 관수',
+  zone_1:               '1구역 관주',
+  zone_2:               '2구역 관주',
+  zone_3:               '3구역 관주',
+  zone_4:               '4구역 관주',
   fertilizer_b_contact: '액비/교반기 B접점',
   mixer:                '교반기',
   fertilizer_motor:     '액비모터',

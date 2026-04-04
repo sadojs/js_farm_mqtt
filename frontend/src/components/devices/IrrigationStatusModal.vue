@@ -8,7 +8,7 @@
       <div class="status-modal-body">
         <!-- 컬럼 헤더 -->
         <div class="status-header-row">
-          <span class="col-label">채널</span>
+          <span class="col-label">구역</span>
           <span class="col-auto">자동화</span>
           <span class="col-state">상태</span>
         </div>
@@ -44,9 +44,9 @@
         <div class="summary-row">
           <span class="summary-icon">🤖</span>
           <span v-if="deviceStatus.enabledRuleCount > 0" class="summary-text">
-            자동화: 활성 ({{ deviceStatus.enabledRuleCount }}개 룰)
+            자동 제어: 활성 ({{ deviceStatus.enabledRuleCount }}개 설정)
           </span>
-          <span v-else class="summary-text summary-inactive">자동화: 비활성</span>
+          <span v-else class="summary-text summary-inactive">자동 제어: 비활성</span>
         </div>
         <div v-if="deviceStatus.isRunning && deviceStatus.runningRule" class="summary-row">
           <span class="summary-icon">⏱</span>
@@ -136,7 +136,7 @@ function isZoneOrControl(fnKey: string): boolean {
   return fnKey.startsWith('zone_') || fnKey === 'mixer' || fnKey === 'fertilizer_motor'
 }
 
-// 자동화 룰에서의 해당 채널 ON/OFF 상태
+// 자동 제어 설정에서의 해당 구역 ON/OFF 상태
 function getAutoState(fnKey: string): 'on' | 'off' | null {
   return zoneAutoMap.value[fnKey] || null
 }

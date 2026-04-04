@@ -1,7 +1,7 @@
 <template>
   <div class="step-irrigation">
-    <h3 class="step-title">관수 조건 설정</h3>
-    <p class="step-desc">관수 스케줄과 구역별 설정을 입력하세요.</p>
+    <h3 class="step-title">관주 조건 설정</h3>
+    <p class="step-desc">관주 일정과 구역별 설정을 입력하세요.</p>
 
     <!-- 1. 시작시간 설정 -->
     <div class="section">
@@ -44,7 +44,7 @@
 
     <!-- 2. 상세 설정 -->
     <div class="section">
-      <label class="section-label">관수 채널 설정</label>
+      <label class="section-label">관주 구역 설정</label>
 
       <!-- 구역 1~4 (zone > 4는 미지원으로 표시 제외) -->
       <div v-for="zone in form.zones.filter(z => z.zone <= 4)" :key="zone.zone" class="setting-row zone-row">
@@ -68,14 +68,14 @@
         </div>
         <div class="setting-fields">
           <div class="field-group">
-            <label class="field-label">관수시간</label>
+            <label class="field-label">관주 시간</label>
             <div class="input-with-unit">
               <input type="number" v-model.number="zone.duration" min="1" class="num-input" />
               <span class="unit">분</span>
             </div>
           </div>
           <div class="field-group">
-            <label class="field-label">대기시간</label>
+            <label class="field-label">쉬는 시간</label>
             <div class="input-with-unit">
               <input type="number" v-model.number="zone.waitTime" min="0" class="num-input" />
               <span class="unit">분</span>
@@ -148,8 +148,8 @@
 
     <!-- 3. 채널 매핑 (admin/farm_admin + editableMapping 시에만 표시) -->
     <div v-if="editableMapping" class="section">
-      <label class="section-label">원격제어 채널 설정</label>
-      <p class="mapping-desc">각 기능에 연결된 물리 스위치 채널을 설정합니다.</p>
+      <label class="section-label">원격제어 구역 설정</label>
+      <p class="mapping-desc">각 기능에 연결된 물리 스위치 구역을 설정합니다.</p>
 
       <div class="mapping-row">
         <span class="mapping-label">원격제어 ON/OFF</span>

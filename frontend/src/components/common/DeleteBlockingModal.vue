@@ -10,11 +10,11 @@
       <div class="blocking-icon">&#x26A0;&#xFE0F;</div>
       <h3 class="blocking-title">삭제할 수 없습니다</h3>
 
-      <!-- 자동화 룰 섹션 -->
+      <!-- 자동 제어 설정 섹션 -->
       <template v-if="rules.length > 0">
         <p class="blocking-desc">
           <strong>"{{ targetName }}"</strong>{{ subjectLabel }}
-          다음 자동화 룰에서 사용 중입니다:
+          다음 자동 제어 설정에서 사용 중입니다:
         </p>
         <ul class="rule-list">
           <li v-for="rule in rules" :key="rule.id" class="rule-item">
@@ -26,14 +26,14 @@
         </ul>
       </template>
 
-      <!-- 그룹 섹션 -->
+      <!-- 구역 섹션 -->
       <template v-if="groups && groups.length > 0">
         <p class="blocking-desc" :class="{ 'mt-section': rules.length > 0 }">
           <template v-if="rules.length === 0">
-            <strong>"{{ targetName }}"</strong>은(는) 다음 그룹에 포함되어 있습니다:
+            <strong>"{{ targetName }}"</strong>은(는) 다음 구역에 포함되어 있습니다:
           </template>
           <template v-else>
-            또한 다음 그룹에도 속해 있습니다:
+            또한 다음 구역에도 속해 있습니다:
           </template>
         </p>
         <ul class="group-list">
@@ -78,7 +78,7 @@ const router = useRouter()
 
 const subjectLabel = computed(() => {
   if (props.type === 'opener-pair') return '의 열림/닫힘 장치 중 하나 이상이'
-  if (props.type === 'group') return '은(는) 대상 그룹으로 지정되어'
+  if (props.type === 'group') return '은(는) 대상 구역으로 지정되어'
   return '은(는)'
 })
 
@@ -88,13 +88,13 @@ const groupsOnly = computed(() =>
 
 const blockingGuide = computed(() => {
   if (groupsOnly.value) {
-    return '먼저 그룹에서 장치를 제거한 후 다시 시도해 주세요.'
+    return '먼저 구역에서 장치를 제거한 후 다시 시도해 주세요.'
   }
-  return '위 자동화 룰에서 먼저 제거하거나 룰을 삭제한 후 다시 시도해 주세요.'
+  return '위 자동 제어 설정에서 먼저 제거하거나 설정을 삭제한 후 다시 시도해 주세요.'
 })
 
 const navigateLabel = computed(() =>
-  groupsOnly.value ? '그룹 관리로 이동' : '자동화 관리로 이동'
+  groupsOnly.value ? '구역 관리로 이동' : '자동 제어 관리로 이동'
 )
 
 const handleNavigate = () => {

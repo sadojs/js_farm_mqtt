@@ -4,7 +4,7 @@
       <div class="more-menu" @click.stop role="menu" aria-label="추가 메뉴">
         <router-link to="/reports" class="more-item" role="menuitem" @click="$emit('close')">
           <span class="more-icon">📈</span>
-          <span>리포트</span>
+          <span>기록 보기</span>
         </router-link>
         <router-link v-if="isAdmin" to="/users" class="more-item" role="menuitem" @click="$emit('close')">
           <span class="more-icon">👤</span>

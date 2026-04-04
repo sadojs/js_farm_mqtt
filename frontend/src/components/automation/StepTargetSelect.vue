@@ -1,11 +1,11 @@
 <template>
   <div class="step-target">
-    <h3 class="step-title">그룹 선택</h3>
-    <p class="step-desc">자동화를 적용할 그룹을 선택하세요</p>
+    <h3 class="step-title">구역 선택</h3>
+    <p class="step-desc">자동 제어를 적용할 구역을 선택하세요</p>
 
-    <div v-if="groupStore.loading" class="loading">그룹 로딩 중...</div>
+    <div v-if="groupStore.loading" class="loading">구역 로딩 중...</div>
     <div v-else-if="groupStore.groups.length === 0" class="empty">
-      등록된 그룹이 없습니다. 먼저 그룹을 만들어주세요.
+      등록된 구역이 없습니다. 먼저 구역을 만들어주세요.
     </div>
     <div v-else class="group-list">
       <div

@@ -1,11 +1,11 @@
 <template>
   <div class="step-review">
     <h3 class="step-title">최종 확인</h3>
-    <p class="step-desc">룰 정보를 확인하고 이름을 입력하세요</p>
+    <p class="step-desc">설정 정보를 확인하고 이름을 입력하세요</p>
 
-    <!-- 룰 이름 -->
+    <!-- 설정 이름 -->
     <div class="form-field">
-      <label class="field-label">룰 이름 *</label>
+      <label class="field-label">설정 이름 *</label>
       <input
         type="text"
         :value="formData.name"
@@ -21,7 +21,7 @@
       <textarea
         :value="formData.description"
         @input="$emit('update:description', ($event.target as HTMLTextAreaElement).value)"
-        placeholder="자동화 룰에 대한 설명을 입력하세요"
+        placeholder="자동 제어 설정에 대한 설명을 입력하세요"
         class="field-textarea"
         rows="2"
       />
@@ -32,12 +32,12 @@
       <h4 class="summary-title">설정 요약</h4>
 
       <div class="summary-row">
-        <span class="summary-label">그룹</span>
+        <span class="summary-label">구역</span>
         <span class="summary-value">{{ groupName }}</span>
       </div>
 
       <div class="summary-row">
-        <span class="summary-label">센서</span>
+        <span class="summary-label">측정기</span>
         <span class="summary-value">{{ sensorNames }}</span>
       </div>
 
@@ -57,7 +57,7 @@
           <span class="summary-value">{{ activeZonesSummary }}</span>
         </div>
         <div class="summary-row">
-          <span class="summary-label">스케줄</span>
+          <span class="summary-label">일정</span>
           <span class="summary-value">{{ scheduleSummary }}</span>
         </div>
       </template>
@@ -99,7 +99,7 @@ const selectedGroup = computed(() =>
 const groupName = computed(() => selectedGroup.value?.name || '-')
 
 const sensorNames = computed(() => {
-  if (props.formData.sensorDeviceIds.length === 0) return '미선택 (시간 기반)'
+  if (props.formData.sensorDeviceIds.length === 0) return '미선택 (시간 설정)'
   const devices = selectedGroup.value?.devices || []
   return props.formData.sensorDeviceIds
     .map(id => devices.find(d => d.id === id)?.name || id)
