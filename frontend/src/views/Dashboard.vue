@@ -2,7 +2,7 @@
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h2>대시보드</h2>
+        <h2>우리 농장</h2>
         <p class="page-description">농장의 현재 상태를 한눈에 확인하세요</p>
       </div>
       <div class="header-actions">

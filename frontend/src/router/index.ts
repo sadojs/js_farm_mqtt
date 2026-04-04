@@ -19,7 +19,7 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/Dashboard.vue'),
-      meta: { title: '대시보드', requiresAuth: true }
+      meta: { title: '우리 농장', requiresAuth: true }
     },
     {
       path: '/sensors',
