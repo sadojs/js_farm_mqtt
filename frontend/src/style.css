@@ -36,13 +36,13 @@
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   /* Typography Scale (sm 기본값, App.vue에서 md/lg 오버라이드) */
-  --font-size-display: 32px;
-  --font-size-title: 22px;
-  --font-size-subtitle: 18px;
-  --font-size-body: 16px;
-  --font-size-label: 14px;
-  --font-size-caption: 12px;
-  --font-size-tiny: 11px;
+  --font-size-display: 35px;
+  --font-size-title: 24px;
+  --font-size-subtitle: 20px;
+  --font-size-body: 17px;
+  --font-size-label: 15px;
+  --font-size-caption: 13px;
+  --font-size-tiny: 12px;
 }
 
 /* Scrollbar */

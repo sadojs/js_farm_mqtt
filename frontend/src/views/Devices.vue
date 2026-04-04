@@ -811,7 +811,7 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
 }
 
 .big-number {
-  font-size: calc(22px * var(--content-scale, 1));
+  font-size: calc(18px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--sensor-accent);
   font-variant-numeric: tabular-nums;

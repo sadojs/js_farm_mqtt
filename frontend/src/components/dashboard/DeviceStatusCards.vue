@@ -338,7 +338,12 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .detail-grid { grid-template-columns: 1fr; }
+  .device-status-wrapper { margin-bottom: 16px; }
+  .detail-grid { grid-template-columns: 1fr; gap: 10px; }
+  .detail-card { border-radius: 12px; }
+  .detail-card-header { padding: 12px 14px; gap: 10px; }
+  .detail-icon { width: 34px; height: 34px; }
+  .detail-icon svg { width: 17px; height: 17px; }
   .detail-list { max-height: 240px; }
 }
 </style>
