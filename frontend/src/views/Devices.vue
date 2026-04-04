@@ -782,7 +782,7 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
 }
 
 .card-title h4 {
-  font-size: calc(18px * var(--content-scale, 1));
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -956,7 +956,7 @@ input:checked + .toggle-slider:before {
 }
 
 .opener-title {
-  font-size: calc(18px * var(--content-scale, 1));
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -1034,7 +1034,7 @@ input:checked + .toggle-slider:before {
 
 .irrigation-title {
   flex: 1;
-  font-size: calc(18px * var(--content-scale, 1));
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -1100,6 +1100,9 @@ input:checked + .toggle-slider:before {
   .tab-filter { width: 100%; }
   .tab { flex: 1; text-align: center; }
 
-  .devices-grid { grid-template-columns: 1fr; }
+  .devices-grid { grid-template-columns: 1fr; gap: 10px; }
+  .device-card { padding: 14px; gap: 10px; border-radius: 12px; }
+  .opener-card { padding: 14px; border-radius: 12px; }
+  .irrigation-card { padding: 14px; border-radius: 12px; }
 }
 </style>
