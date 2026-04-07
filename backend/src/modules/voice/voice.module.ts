@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { DevicesModule } from '../devices/devices.module';
 import { AutomationModule } from '../automation/automation.module';
@@ -9,7 +11,7 @@ import { VoiceService } from './voice.service';
 import { MidForecastService } from './mid-forecast.service';
 
 @Module({
-  imports: [UsersModule, DevicesModule, AutomationModule, DashboardModule, SensorAlertsModule],
+  imports: [TypeOrmModule.forFeature([User]), UsersModule, DevicesModule, AutomationModule, DashboardModule, SensorAlertsModule],
   controllers: [VoiceController],
   providers: [VoiceService, MidForecastService],
 })

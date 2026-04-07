@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { DevicesService } from '../devices/devices.service';
 import { AutomationService } from '../automation/automation.service';
@@ -24,6 +27,8 @@ export class VoiceService {
   private readonly logger = new Logger(VoiceService.name);
 
   constructor(
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
     private usersService: UsersService,
     private devicesService: DevicesService,
     private automationService: AutomationService,
@@ -39,15 +44,67 @@ export class VoiceService {
       // 1. 사용자 농장의 모든 데이터를 수집
       const context = await this.buildContext(effectiveUserId);
 
-      // 2. Claude Code CLI에 데이터 + 질문을 함께 전달
+      // 2. Claude Code CLI에 데이터 + 질문을 함께 전달 (재시도 1회)
       const prompt = this.buildPrompt(text, context);
-      const parsed = await this.askClaude(prompt);
+      let parsed: any;
+      try {
+        parsed = await this.askClaude(prompt);
+      } catch (firstError) {
+        this.logger.warn(`Claude 1차 호출 실패, 재시도: ${firstError.message}`);
+        parsed = await this.askClaude(prompt);
+      }
 
-      // 3. 실행이 필요한 액션만 처리, 나머지는 Claude 답변 그대로
-      return this.executeAction(effectiveUserId, parsed);
+      // 3. 실행이 필요한 액션만 처리
+      const result = await this.executeAction(effectiveUserId, parsed);
+
+      // 4. 장치 제어 성공 시 별칭 학습
+      if (result.success && parsed.action === 'control' && parsed.deviceId) {
+        await this.learnAlias(effectiveUserId, text, parsed.deviceId);
+      }
+
+      return result;
     } catch (error) {
       this.logger.error(`음성 명령 처리 실패: ${error.message}`);
       return { success: false, speech: '명령 처리 중 오류가 발생했습니다. 다시 시도해주세요.' };
+    }
+  }
+
+  /** 장치 제어 성공 시 음성 텍스트에서 장치명 부분을 별칭으로 저장 */
+  private async learnAlias(effectiveUserId: string, rawText: string, deviceId: string): Promise<void> {
+    try {
+      const devices = await this.devicesService.findAllByUser(effectiveUserId);
+      const device = devices.find((d) => d.id === deviceId);
+      if (!device) return;
+
+      // 정확한 장치명이 이미 포함되어 있으면 학습 불필요
+      if (rawText.includes(device.name)) return;
+
+      // 명령 키워드 제거 → 남은 부분이 사용자가 말한 장치명
+      const removeWords = ['켜줘', '꺼줘', '켜', '꺼', '열어', '닫아', '시작', '중지', '돌려', '틀어',
+        '좀', '해줘', '줘', '주세요', '를', '을', '에', '지금', '다시', '한번'];
+      let alias = rawText;
+      for (const w of removeWords) alias = alias.replace(new RegExp(w, 'g'), '');
+      alias = alias.replace(/\s+/g, ' ').trim();
+
+      if (!alias || alias.length < 2 || alias === device.name) return;
+
+      // 기존 별칭과 동일하면 스킵
+      const userRecord = await this.usersRepo.findOne({ where: { id: effectiveUserId } });
+      if (!userRecord) return;
+      const aliases = userRecord.voiceAliases || {};
+      if (aliases[alias] === device.name) return;
+
+      // 별칭 저장 (최대 50개, 오래된 것 제거)
+      aliases[alias] = device.name;
+      const keys = Object.keys(aliases);
+      if (keys.length > 50) {
+        delete aliases[keys[0]];
+      }
+      userRecord.voiceAliases = aliases;
+      await this.usersRepo.save(userRecord);
+      this.logger.log(`별칭 학습: "${alias}" → "${device.name}" (userId: ${effectiveUserId})`);
+    } catch {
+      // 학습 실패는 무시
     }
   }
 
@@ -145,7 +202,7 @@ export class VoiceService {
     return `너는 스마트팜 AI 어시스턴트야. 농부의 음성 명령을 해석하고, 전문적인 재배 조언도 제공해.
 현재 시간: ${currentTime}
 음성 인식 오류가 있을 수 있어 (예: "석문리"→"성문리"). 가장 유사한 장치를 찾아줘.
-
+${context.aliases ? `\n학습된 별칭 (이전에 매칭 성공한 발음→장치명):\n${context.aliases}\n` : ''}
 === 사용자 농장 데이터 ===
 
 장치 목록:
@@ -595,6 +652,14 @@ ${logInfo}
       midForecast: midForecasts,
       todayLogs,
       recentAlerts,
+      aliases: this.formatAliases(user?.voiceAliases),
     };
+  }
+
+  private formatAliases(voiceAliases: Record<string, string> | undefined): string {
+    if (!voiceAliases) return '';
+    const entries = Object.entries(voiceAliases);
+    if (entries.length === 0) return '';
+    return entries.map(([alias, name]) => `  - "${alias}" → "${name}"`).join('\n');
   }
 }

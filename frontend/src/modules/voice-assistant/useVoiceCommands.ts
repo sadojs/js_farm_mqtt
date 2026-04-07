@@ -13,15 +13,17 @@ export function useVoiceCommands() {
   const messages = ref<ChatMessage[]>([])
   const isProcessing = ref(false)
 
+  async function callApi(text: string) {
+    return apiClient.post('/voice/command', { text }, { timeout: 30000 })
+  }
+
   async function sendCommand(text: string): Promise<string> {
-    // 사용자 메시지 추가
     messages.value.push({
       role: 'user',
       text,
       timestamp: new Date(),
     })
 
-    // 최근 10개만 유지
     if (messages.value.length > 10) {
       messages.value = messages.value.slice(-10)
     }
@@ -29,20 +31,38 @@ export function useVoiceCommands() {
     isProcessing.value = true
 
     try {
-      const { data } = await apiClient.post('/voice/command', { text }, { timeout: 30000 })
+      // 1차 시도
+      let data: any
+      try {
+        const res = await callApi(text)
+        data = res.data
+      } catch (firstError: any) {
+        // 타임아웃/네트워크 에러 시 1회 재시도
+        if (firstError.code === 'ECONNABORTED' || !firstError.response) {
+          try {
+            const res = await callApi(text)
+            data = res.data
+          } catch {
+            throw firstError
+          }
+        } else {
+          throw firstError
+        }
+      }
 
-      const assistantMsg: ChatMessage = {
+      messages.value.push({
         role: 'assistant',
         text: data.speech,
         timestamp: new Date(),
         parsedBy: data.parsedBy,
         success: data.success,
-      }
-      messages.value.push(assistantMsg)
+      })
 
       return data.speech
     } catch (error: any) {
-      const errMsg = '서버와 통신에 실패했습니다. 잠시 후 다시 시도해주세요.'
+      const errMsg = error.code === 'ECONNABORTED'
+        ? '응답 시간이 초과되었습니다. 다시 시도해주세요.'
+        : '서버와 통신에 실패했습니다. 잠시 후 다시 시도해주세요.'
       messages.value.push({
         role: 'assistant',
         text: errMsg,

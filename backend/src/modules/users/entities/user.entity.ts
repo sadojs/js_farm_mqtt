@@ -8,7 +8,7 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true, length: 50 })
+  @Column({ unique: true, length: 100 })
   username: string;
 
   @Column({ name: 'password_hash' })
@@ -25,6 +25,9 @@ export class User {
 
   @Column({ nullable: true })
   address: string;
+
+  @Column({ name: 'voice_aliases', type: 'jsonb', default: '{}' })
+  voiceAliases: Record<string, string>;
 
   @Column({ default: 'active' })
   status: 'active' | 'inactive';
