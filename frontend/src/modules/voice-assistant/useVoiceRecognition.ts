@@ -81,6 +81,14 @@ export function useVoiceRecognition() {
     }
   }
 
+  // 모바일: 사용자 제스처 시점에 빈 음성으로 speechSynthesis 활성화
+  function unlockAudio() {
+    if (!window.speechSynthesis) return
+    const empty = new SpeechSynthesisUtterance('')
+    empty.volume = 0
+    window.speechSynthesis.speak(empty)
+  }
+
   function speak(text: string): Promise<void> {
     return new Promise((resolve) => {
       if (!window.speechSynthesis) {
@@ -96,8 +104,15 @@ export function useVoiceRecognition() {
       utterance.rate = 1.1
       utterance.pitch = 1.0
 
-      utterance.onend = () => resolve()
-      utterance.onerror = () => resolve()
+      // 모바일에서 onend가 안 불리는 버그 대비 타임아웃
+      const maxWait = Math.max(text.length * 150, 3000) // 글자당 150ms, 최소 3초
+      const timer = setTimeout(() => {
+        window.speechSynthesis.cancel()
+        resolve()
+      }, maxWait)
+
+      utterance.onend = () => { clearTimeout(timer); resolve() }
+      utterance.onerror = () => { clearTimeout(timer); resolve() }
 
       window.speechSynthesis.speak(utterance)
     })
@@ -121,5 +136,6 @@ export function useVoiceRecognition() {
     stopListening,
     speak,
     cancelSpeak,
+    unlockAudio,
   }
 }

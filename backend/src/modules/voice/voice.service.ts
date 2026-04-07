@@ -53,7 +53,7 @@ export class VoiceService {
 
   private async askClaude(prompt: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      const child = require('child_process').spawn('claude', ['-p', '--output-format', 'text'], {
+      const child = require('child_process').spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text'], {
         timeout: 30000,
         env: { ...process.env, LANG: 'ko_KR.UTF-8' },
       });
@@ -138,7 +138,12 @@ export class VoiceService {
       ? context.recentAlerts.map((a) => `  - ${a.time} | ${a.deviceName} | ${a.sensorType} | ${a.alertType} | ${a.severity} | ${a.message}${a.resolved ? ' (해결됨)' : ''}`).join('\n')
       : '  (최근 알림 없음)';
 
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const currentTime = `${kstTime.getUTCFullYear()}-${String(kstTime.getUTCMonth() + 1).padStart(2, '0')}-${String(kstTime.getUTCDate()).padStart(2, '0')} ${String(kstTime.getUTCHours()).padStart(2, '0')}:${String(kstTime.getUTCMinutes()).padStart(2, '0')} KST`;
+
     return `너는 스마트팜 AI 어시스턴트야. 농부의 음성 명령을 해석하고, 전문적인 재배 조언도 제공해.
+현재 시간: ${currentTime}
 음성 인식 오류가 있을 수 있어 (예: "석문리"→"성문리"). 가장 유사한 장치를 찾아줘.
 
 === 사용자 농장 데이터 ===

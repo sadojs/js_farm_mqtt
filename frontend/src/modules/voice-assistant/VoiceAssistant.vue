@@ -70,7 +70,7 @@
             v-if="isSupported"
             class="btn-mic"
             :class="{ active: isListening }"
-            :disabled="isProcessing || isSpeaking"
+            :disabled="isProcessing"
             @click="handleVoiceInput"
           >
             {{ isListening ? '⏹' : '🎙' }}
@@ -105,7 +105,7 @@ import { ref, nextTick, watch } from 'vue'
 import { useVoiceRecognition } from './useVoiceRecognition'
 import { useVoiceCommands } from './useVoiceCommands'
 
-const { isSupported, isListening, interimText, startListening, stopListening, speak, cancelSpeak } = useVoiceRecognition()
+const { isSupported, isListening, interimText, startListening, stopListening, speak, cancelSpeak, unlockAudio } = useVoiceRecognition()
 const { messages, isProcessing, sendCommand } = useVoiceCommands()
 
 const panelOpen = ref(false)
@@ -132,9 +132,17 @@ function closePanel() {
 }
 
 async function handleVoiceInput() {
+  unlockAudio() // 모바일 TTS 활성화
+
   if (isListening.value) {
     stopListening()
     return
+  }
+
+  // TTS 중이면 중단
+  if (isSpeaking.value) {
+    cancelSpeak()
+    isSpeaking.value = false
   }
 
   try {
@@ -151,6 +159,7 @@ async function handleVoiceInput() {
 async function handleTextInput() {
   const text = textInput.value.trim()
   if (!text || isProcessing.value) return
+  unlockAudio() // 모바일 TTS 활성화
   textInput.value = ''
   await processCommand(text)
 }
@@ -247,7 +256,6 @@ watch(() => messages.value.length, () => {
   left: 0;
   right: 0;
   max-height: 45dvh;
-  background: var(--card-bg, #fff);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   display: flex;
@@ -424,14 +432,39 @@ watch(() => messages.value.length, () => {
   transform: translateY(100%);
 }
 
-/* 다크모드 */
-:root[data-theme='dark'] .voice-panel {
-  background: #1e293b;
+/* 다크모드 — CSS 변수 기반 (theme-dark 클래스가 부모에 있으므로 변수로 처리) */
+.voice-panel {
+  background: var(--bg-card, #fff);
+  color: var(--text-primary, #1e293b);
 }
-:root[data-theme='dark'] .text-input {
-  background: #334155;
-  color: #fff;
-  border-color: #475569;
+.panel-title {
+  color: var(--text-primary, #1e293b);
+}
+.btn-close {
+  color: var(--text-muted, #64748b);
+}
+.message.assistant .msg-text {
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-primary, #1e293b);
+}
+.empty-hint {
+  color: var(--text-muted, #94a3b8);
+}
+.panel-header {
+  border-color: var(--border-color, #e2e8f0);
+}
+.panel-input {
+  border-color: var(--border-color, #e2e8f0);
+}
+.text-input {
+  background: var(--bg-input, #fff);
+  color: var(--text-primary, #1e293b);
+  border-color: var(--border-color, #e2e8f0);
+}
+.btn-mic {
+  background: var(--bg-input, #fff);
+  color: var(--text-primary, #1e293b);
+  border-color: var(--border-color, #e2e8f0);
 }
 
 /* 데스크톱: 패널을 우측 하단에 */
