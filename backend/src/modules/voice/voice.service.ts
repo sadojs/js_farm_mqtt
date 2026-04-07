@@ -192,6 +192,19 @@ ${logInfo}
 - 장치명, 시간, 동작(on/off), 반복요일을 추출해서 반환
 - 정보가 부족하면 chat으로 질문해
 
+자동화 룰 수정:
+- "관수 시간을 9시로 바꿔", "환기 룰 시간 변경해줘" → update_rule
+- ruleId + 변경할 필드(startTime, enabled, name 등)를 반환
+- 반드시 기존 룰 목록에서 매칭되는 ruleId를 사용
+
+다중 장치 일괄 제어:
+- "전체 팬 다 꺼줘", "1동 전체 꺼", "모든 장치 꺼" → bulk_control
+- deviceIds 배열 + command를 반환
+- 장치 목록에서 조건에 맞는 장치들의 ID를 모두 포함
+- 특정 타입만: "팬 전부 꺼" → fan 타입 장치만
+- 특정 그룹만: "1동 전체 꺼" → 이름에 "1동" 포함된 장치만
+- 관수는 제외! 관수는 반드시 자동화 룰로만 실행
+
 과거형 = 이력 질문:
 - "돌렸어?", "켰어?" → 오늘 로그 확인. 절대 제어 명령 아님.
 
@@ -219,6 +232,8 @@ ${logInfo}
 자동화 토글: {"action":"automation_toggle","ruleId":"UUID","enabled":true|false,"speech":"응답"}
 자동화 즉시 실행: {"action":"automation_run","ruleId":"UUID","speech":"응답"}
 자동화 룰 생성: {"action":"create_rule","name":"룰 이름","deviceType":"fan|irrigation|opener","startTime":"HH:MM","command":"on|off","daysOfWeek":[0,1,2,3,4,5,6],"duration":30,"speech":"응답"}
+자동화 룰 수정: {"action":"update_rule","ruleId":"UUID","updates":{"startTime":"HH:MM"},"speech":"응답"}
+다중 장치 제어: {"action":"bulk_control","deviceIds":["UUID1","UUID2"],"command":"on|off","speech":"응답"}
 그 외 모든 질문/대화/조언: {"action":"chat","speech":"데이터 기반 답변"}
 
 농부의 명령: "${text}"`;
@@ -234,6 +249,10 @@ ${logInfo}
         return this.handleAutomationRun(effectiveUserId, parsed.ruleId);
       case 'create_rule':
         return this.handleCreateRule(effectiveUserId, parsed);
+      case 'update_rule':
+        return this.handleUpdateRule(effectiveUserId, parsed);
+      case 'bulk_control':
+        return this.handleBulkControl(effectiveUserId, parsed);
       case 'chat':
         return { success: true, speech: parsed.speech || '무엇을 도와드릴까요?' };
       default:
@@ -423,6 +442,104 @@ ${logInfo}
     } catch (error) {
       this.logger.error(`룰 생성 실패: ${error.message}`);
       return { success: false, speech: '자동화 룰 생성에 실패했습니다.', action: 'create_rule' };
+    }
+  }
+
+  private async handleUpdateRule(effectiveUserId: string, parsed: any): Promise<VoiceResponse> {
+    try {
+      const { ruleId, updates } = parsed;
+      if (!ruleId) {
+        return { success: false, speech: '수정할 룰을 찾을 수 없습니다.', action: 'update_rule' };
+      }
+
+      const rules = await this.automationService.findAll(effectiveUserId);
+      const rule = rules.find((r) => r.id === ruleId);
+      if (!rule) {
+        return { success: false, speech: '해당 룰을 찾을 수 없습니다.', action: 'update_rule' };
+      }
+
+      const updatePayload: any = {};
+
+      // 이름 변경
+      if (updates?.name) updatePayload.name = updates.name;
+
+      // 시간 변경 (관수 룰: startTime, 일반 룰: conditions)
+      if (updates?.startTime) {
+        const conditions = JSON.parse(JSON.stringify(rule.conditions || {}));
+        if (conditions.type === 'irrigation') {
+          conditions.startTime = updates.startTime;
+        } else if (conditions.groups?.[0]?.conditions?.[0]) {
+          const [h, m] = updates.startTime.split(':').map(Number);
+          const cond = conditions.groups[0].conditions[0];
+          const duration = cond.value ? (cond.value[1] - cond.value[0]) : 100;
+          cond.value = [h * 100 + m, h * 100 + m + duration];
+        }
+        updatePayload.conditions = conditions;
+      }
+
+      // 활성화/비활성화
+      if (updates?.enabled !== undefined) updatePayload.enabled = updates.enabled;
+
+      await this.automationService.update(rule.id, effectiveUserId, updatePayload);
+      return { success: true, speech: parsed.speech || `${rule.name} 룰을 수정했습니다.`, action: 'update_rule' };
+    } catch (error) {
+      this.logger.error(`룰 수정 실패: ${error.message}`);
+      return { success: false, speech: '룰 수정에 실패했습니다.', action: 'update_rule' };
+    }
+  }
+
+  private async handleBulkControl(effectiveUserId: string, parsed: any): Promise<VoiceResponse> {
+    try {
+      const { deviceIds, command } = parsed;
+      if (!deviceIds || deviceIds.length === 0) {
+        return { success: false, speech: '제어할 장치를 찾을 수 없습니다.', action: 'bulk_control' };
+      }
+
+      const devices = await this.devicesService.findAllByUser(effectiveUserId);
+      const value = command === 'on' || command === 'open';
+      const results: string[] = [];
+      let successCount = 0;
+
+      for (const deviceId of deviceIds) {
+        const device = devices.find((d) => d.id === deviceId);
+        if (!device) continue;
+
+        // 관수는 스킵
+        if (device.equipmentType === 'irrigation') continue;
+
+        if (!device.online) {
+          results.push(`${device.name} (오프라인)`);
+          continue;
+        }
+
+        try {
+          // 개폐기 인터록
+          const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+          if (isOpener && value && device.pairedDeviceId) {
+            const paired = devices.find((d) => d.id === device.pairedDeviceId);
+            if (paired?.online) {
+              await this.devicesService.controlDevice(paired.id, effectiveUserId, [{ code: 'switch_1', value: false }]);
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
+
+          await this.devicesService.controlDevice(device.id, effectiveUserId, [{ code: 'switch_1', value }]);
+          successCount++;
+        } catch {
+          results.push(`${device.name} (실패)`);
+        }
+      }
+
+      const cmdLabel = value ? '켰습니다' : '껐습니다';
+      const failInfo = results.length > 0 ? ` (${results.join(', ')})` : '';
+      return {
+        success: true,
+        speech: parsed.speech || `${successCount}개 장치를 ${cmdLabel}.${failInfo}`,
+        action: 'bulk_control',
+      };
+    } catch (error) {
+      this.logger.error(`일괄 제어 실패: ${error.message}`);
+      return { success: false, speech: '일괄 제어에 실패했습니다.', action: 'bulk_control' };
     }
   }
 
