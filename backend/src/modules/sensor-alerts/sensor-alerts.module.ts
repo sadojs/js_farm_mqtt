@@ -10,5 +10,6 @@ import { SensorAlertsService } from './sensor-alerts.service';
   imports: [TypeOrmModule.forFeature([SensorAlert, SensorStandby, Device])],
   controllers: [SensorAlertsController],
   providers: [SensorAlertsService],
+  exports: [SensorAlertsService],
 })
 export class SensorAlertsModule {}

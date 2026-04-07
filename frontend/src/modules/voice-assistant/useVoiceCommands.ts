@@ -29,7 +29,7 @@ export function useVoiceCommands() {
     isProcessing.value = true
 
     try {
-      const { data } = await apiClient.post('/voice/command', { text })
+      const { data } = await apiClient.post('/voice/command', { text }, { timeout: 30000 })
 
       const assistantMsg: ChatMessage = {
         role: 'assistant',

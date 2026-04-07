@@ -3,6 +3,7 @@ import { UsersService } from '../users/users.service';
 import { DevicesService } from '../devices/devices.service';
 import { AutomationService } from '../automation/automation.service';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { SensorAlertsService } from '../sensor-alerts/sensor-alerts.service';
 import { MidForecastService } from './mid-forecast.service';
 
 interface AuthUser {
@@ -27,6 +28,7 @@ export class VoiceService {
     private devicesService: DevicesService,
     private automationService: AutomationService,
     private dashboardService: DashboardService,
+    private sensorAlertsService: SensorAlertsService,
     private midForecast: MidForecastService,
   ) {}
 
@@ -34,14 +36,14 @@ export class VoiceService {
     const effectiveUserId = this.usersService.getEffectiveUserId(user);
 
     try {
-      // 1. 사용자 농장 컨텍스트 구성
+      // 1. 사용자 농장의 모든 데이터를 수집
       const context = await this.buildContext(effectiveUserId);
 
-      // 2. Claude Code CLI로 해석 요청
+      // 2. Claude Code CLI에 데이터 + 질문을 함께 전달
       const prompt = this.buildPrompt(text, context);
       const parsed = await this.askClaude(prompt);
 
-      // 3. 해석 결과로 명령 실행
+      // 3. 실행이 필요한 액션만 처리, 나머지는 Claude 답변 그대로
       return this.executeAction(effectiveUserId, parsed);
     } catch (error) {
       this.logger.error(`음성 명령 처리 실패: ${error.message}`);
@@ -68,7 +70,6 @@ export class VoiceService {
           return;
         }
 
-        // JSON 블록 추출
         const jsonMatch = stdout.match(/```json\s*([\s\S]*?)```/) || stdout.match(/(\{[\s\S]*\})/);
         if (!jsonMatch) {
           this.logger.warn(`Claude 응답에서 JSON을 추출할 수 없음: ${stdout.slice(0, 200)}`);
@@ -85,7 +86,6 @@ export class VoiceService {
 
       child.on('error', (err) => reject(err));
 
-      // stdin으로 프롬프트 전달
       child.stdin.write(prompt);
       child.stdin.end();
     });
@@ -100,20 +100,48 @@ export class VoiceService {
       .map((r) => `  - ID: ${r.id} | 이름: "${r.name}" | ${r.enabled ? '활성' : '비활성'}`)
       .join('\n');
 
-    // 실내 센서 현재값
-    const s = context.sensorData;
-    const sensorInfo = s
-      ? `  온도: ${s.temperature ?? '-'}°C, 습도: ${s.humidity ?? '-'}%, 이슬점: ${s.dewPoint ?? '-'}°C, 자외선: ${s.uv ?? '-'}, 강우량: ${s.rainfall ?? 0}mm`
+    const sensorInfo = context.sensorData
+      ? `  온도: ${context.sensorData.temperature ?? '-'}°C, 습도: ${context.sensorData.humidity ?? '-'}%, 이슬점: ${context.sensorData.dewPoint ?? '-'}°C, 자외선: ${context.sensorData.uv ?? '-'}, 강우량: ${context.sensorData.rainfall ?? 0}mm`
       : '  (측정기 데이터 없음)';
 
-    // 오늘 실행 로그
     const logInfo = context.todayLogs.length > 0
       ? context.todayLogs.map((l) => `  - ${l.time} | ${l.ruleName} | ${l.status}`).join('\n')
       : '  (오늘 실행 이력 없음)';
 
-    return `너는 스마트팜 음성 어시스턴트야. 농부의 음성 명령을 해석해서 정확한 JSON 액션을 반환해.
+    const weatherInfo = context.currentWeather
+      ? `  온도: ${context.currentWeather.temperature ?? '-'}°C, 습도: ${context.currentWeather.humidity ?? '-'}%, 풍속: ${context.currentWeather.windSpeed ?? '-'}m/s, 강수: ${context.currentWeather.precipitation ?? 0}mm, 상태: ${context.currentWeather.condition}`
+      : '  (외부 날씨 데이터 없음)';
 
-음성 인식 오류가 있을 수 있어. 예: "석문리"가 "성문리", "성문lee" 등으로 인식될 수 있으니 가장 유사한 장치를 찾아줘.
+    const shortForecastInfo = context.shortForecast.length > 0
+      ? context.shortForecast.map((f) => {
+          const parts = [`  - ${f.date}`];
+          if (f.amSky && f.pmSky && f.amSky !== f.pmSky) parts.push(`오전 ${f.amSky}/오후 ${f.pmSky}`);
+          else if (f.amSky) parts.push(f.amSky);
+          if (f.minTemp != null && f.maxTemp != null) parts.push(`${f.minTemp}~${f.maxTemp}°C`);
+          else if (f.maxTemp != null) parts.push(`최고 ${f.maxTemp}°C`);
+          if (f.rainPct != null && f.rainPct > 0) parts.push(`강수확률 ${f.rainPct}%`);
+          return parts.join(' | ');
+        }).join('\n')
+      : '  (단기예보 없음)';
+
+    const midForecastInfo = context.midForecast.length > 0
+      ? context.midForecast.map((f) => {
+          const parts = [`  - ${f.day}일 후`];
+          if (f.skyAm) parts.push(f.skyAm);
+          if (f.minTemp != null && f.maxTemp != null) parts.push(`${f.minTemp}~${f.maxTemp}°C`);
+          if (f.rainAmPct != null && f.rainAmPct > 0) parts.push(`강수확률 ${Math.max(f.rainAmPct, f.rainPmPct ?? 0)}%`);
+          return parts.join(' | ');
+        }).join('\n')
+      : '  (중기예보 없음)';
+
+    const alertInfo = context.recentAlerts.length > 0
+      ? context.recentAlerts.map((a) => `  - ${a.time} | ${a.deviceName} | ${a.sensorType} | ${a.alertType} | ${a.severity} | ${a.message}${a.resolved ? ' (해결됨)' : ''}`).join('\n')
+      : '  (최근 알림 없음)';
+
+    return `너는 스마트팜 AI 어시스턴트야. 농부의 음성 명령을 해석하고, 전문적인 재배 조언도 제공해.
+음성 인식 오류가 있을 수 있어 (예: "석문리"→"성문리"). 가장 유사한 장치를 찾아줘.
+
+=== 사용자 농장 데이터 ===
 
 장치 목록:
 ${deviceList || '  (없음)'}
@@ -121,64 +149,72 @@ ${deviceList || '  (없음)'}
 자동화 룰 목록:
 ${ruleList || '  (없음)'}
 
-현재 하우스 실내 센서:
+하우스 실내 센서 (현재):
 ${sensorInfo}
+
+외부 날씨 (현재):
+${weatherInfo}
+
+단기 예보 (오늘~3일 후):
+${shortForecastInfo}
+
+중기 예보 (4~10일 후):
+${midForecastInfo}
+
+최근 센서 알림:
+${alertInfo}
 
 오늘 자동화 실행 로그:
 ${logInfo}
 
-중요: 장치 직접 제어 vs 자동화 룰은 완전히 다른 것이야!
+=== 실행 규칙 ===
 
-관수(irrigation) 특별 규칙:
-- 관수는 반드시 자동화 룰로만 동작함. 절대 control로 직접 제어하지 마!
-- "관수 돌려", "관수 실행해", "관수 시작", "관수 한번 돌려", "관수 실행시켜" → 반드시 automation_run JSON을 반환해
-- "한번더", "다시", "지금" 등의 부사가 붙어도 동일하게 automation_run으로 처리
-- 관수 관련 자동화 룰이 1개면 해당 ruleId로 automation_run 반환
-- 관수 관련 룰이 여러 개면 chat으로 "관수 룰이 N개 있습니다: A, B. 어떤 걸 실행할까요?" 반환
-- 관수 관련 룰이 0개면 chat으로 "관수 자동화 룰이 없습니다" 반환
-- "관수 룰 켜줘/꺼줘" → automation_toggle (활성화/비활성화)
+장치 제어:
+- "팬 켜", "개폐기 열어" → control (장치 직접 ON/OFF)
+- 개폐기 열어 = opener_open에 on, 개폐기 닫아 = opener_close에 on
 
-팬/개폐기 등 일반 장치:
-- "팬 켜", "개폐기 열어" → 장치 직접 제어 (control)
-- "팬 룰 켜줘" → automation_toggle
+관수 특별 규칙:
+- 관수는 반드시 자동화 룰로만 실행. 절대 control 금지!
+- "관수 돌려/실행/시작" → automation_run
+- 관수 룰 1개면 바로 실행, 여러 개면 목록 보여주고 질문 (chat)
+
+자동화:
+- "룰/자동화/스케줄" 단어 있어야 자동화 관련
+- "룰 실행" → automation_run, "룰 켜/꺼" → automation_toggle
+
+자동화 룰 음성 생성:
+- "매일 아침 6시에 환기 30분" 같은 요청 → create_rule
+- 장치명, 시간, 동작(on/off), 반복요일을 추출해서 반환
+- 정보가 부족하면 chat으로 질문해
 
 과거형 = 이력 질문:
-- "관수 돌렸어?", "팬 켰어?", "오늘 관수 했어?" → 오늘 실행 로그를 확인해서 답변 (chat)
-- 과거형은 절대 장치 제어(control)나 automation_run으로 해석하지 마
+- "돌렸어?", "켰어?" → 오늘 로그 확인. 절대 제어 명령 아님.
 
-장치 제어 규칙:
-- 개폐기 열어 = opener_open 장치에 command: "on"
-- 개폐기 닫아 = opener_close 장치에 command: "on"
-- 팬/관수 등: on=켜기, off=끄기
-- 인터록은 서버에서 자동 처리하니 단순히 on/off만 보내면 됨
+=== AI 조언 역할 ===
 
-자동화 규칙:
-- "룰 실행해", "자동화 당장 실행" → automation_run (즉시 실행)
-- "룰 켜줘", "자동화 켜/꺼" → automation_toggle (활성화/비활성화)
-- 반드시 "룰", "자동화", "스케줄" 단어가 포함되어야 자동화 관련으로 처리
+재배 조언:
+- 센서 데이터 + 날씨를 분석하여 농사 조언 제공
+- "환기해야 해?", "온도가 너무 높은데 어떻게 해?" 같은 질문에 현재 데이터 기반 조언
+- 이슬점, 습도, 온도를 종합하여 환기/난방/차광 추천
+- 날씨 예보를 고려한 작업 일정 제안
 
-날씨/환경 규칙:
-- 실내 온도, 하우스 환경, 습도 등 질문 → 위의 센서 데이터로 직접 답변 (chat 사용)
-- "지금 날씨", "밖에 날씨" → weather (외부 기상)
-- "오늘 날씨" → short_forecast, days: ["오늘"]만
-- "내일 날씨" → short_forecast, days: ["내일"]만
-- "모레 비 와?" → short_forecast, days: ["모레"]만
-- "내일 모레 날씨" → short_forecast, days: ["내일", "모레"]
-- "3일간 날씨" → short_forecast, days: ["오늘", "내일", "모레"]
-- "이번주 날씨", "다음주", "주간 예보" → forecast (중기예보, 4~10일)
-- 묻는 날짜만 답변해. 오늘 날씨를 물어봤으면 오늘만, 내일만 물어봤으면 내일만 답변해
+병해충 경고:
+- "잎에 반점이 생겼어", "곰팡이가 보여" 같은 증상 설명에 병해충 추정
+- 현재 센서 데이터(고온다습 등)와 연관지어 가능성 높은 병해 안내
+- 응급 조치 방법과 예방법 제공
 
-반드시 아래 JSON 형식 중 하나로만 응답해. 다른 텍스트 없이 JSON만 출력해:
+센서 이상 알림 대화:
+- "왜 알림 왔어?", "뭐가 문제야?" → 위의 최근 센서 알림 데이터로 원인 설명
+- 어떤 센서에서 어떤 이상이 감지되었는지 쉽게 설명
+- 조치 방법 추천
 
-장치 제어: {"action":"control","deviceId":"UUID","command":"on|off","speech":"응답 메시지"}
-현재 날씨(외부): {"action":"weather","speech":""}
-단기 예보: {"action":"short_forecast","days":["오늘"],"speech":""}
-중기 예보(4~10일): {"action":"forecast","speech":""}
-장치 상태: {"action":"device_status","speech":""}
-자동화 목록: {"action":"automation_list","speech":""}
-자동화 토글: {"action":"automation_toggle","ruleId":"UUID","enabled":true|false,"speech":"응답 메시지"}
-자동화 즉시 실행: {"action":"automation_run","ruleId":"UUID","speech":"응답 메시지"}
-일반 대화/센서 질문: {"action":"chat","speech":"센서 데이터를 활용한 답변"}
+=== JSON 형식 (반드시 하나만, 텍스트 없이 JSON만) ===
+
+장치 제어: {"action":"control","deviceId":"UUID","command":"on|off","speech":"응답"}
+자동화 토글: {"action":"automation_toggle","ruleId":"UUID","enabled":true|false,"speech":"응답"}
+자동화 즉시 실행: {"action":"automation_run","ruleId":"UUID","speech":"응답"}
+자동화 룰 생성: {"action":"create_rule","name":"룰 이름","deviceType":"fan|irrigation|opener","startTime":"HH:MM","command":"on|off","daysOfWeek":[0,1,2,3,4,5,6],"duration":30,"speech":"응답"}
+그 외 모든 질문/대화/조언: {"action":"chat","speech":"데이터 기반 답변"}
 
 농부의 명령: "${text}"`;
   }
@@ -187,24 +223,16 @@ ${logInfo}
     switch (parsed.action) {
       case 'control':
         return this.handleControl(effectiveUserId, parsed.deviceId, parsed.command, parsed.speech);
-      case 'weather':
-        return this.handleWeather(effectiveUserId);
-      case 'short_forecast':
-        return this.handleShortForecast(effectiveUserId, parsed.days);
-      case 'forecast':
-        return this.handleForecast(effectiveUserId);
-      case 'device_status':
-        return this.handleDeviceStatus(effectiveUserId);
-      case 'automation_list':
-        return this.handleAutomationList(effectiveUserId);
       case 'automation_toggle':
         return this.handleAutomationToggle(effectiveUserId, parsed.ruleId, parsed.enabled);
       case 'automation_run':
         return this.handleAutomationRun(effectiveUserId, parsed.ruleId);
+      case 'create_rule':
+        return this.handleCreateRule(effectiveUserId, parsed);
       case 'chat':
         return { success: true, speech: parsed.speech || '무엇을 도와드릴까요?' };
       default:
-        return { success: false, speech: parsed.speech || '명령을 이해하지 못했어요.' };
+        return { success: true, speech: parsed.speech || '명령을 이해하지 못했어요.' };
     }
   }
 
@@ -255,104 +283,6 @@ ${logInfo}
     } catch (error) {
       return { success: false, speech: `${device.name} 제어에 실패했습니다.`, action: 'control' };
     }
-  }
-
-  private async handleWeather(effectiveUserId: string): Promise<VoiceResponse> {
-    try {
-      const data = await this.dashboardService.getWeatherForUser(effectiveUserId);
-      if (!data.weather) {
-        return { success: false, speech: '날씨 정보를 가져올 수 없습니다.', action: 'weather' };
-      }
-      const w = data.weather;
-      const loc = data.location?.level2 || '';
-      const speech = `현재 ${loc} 날씨입니다. 온도 ${w.temperature ?? '-'}도, 습도 ${w.humidity ?? '-'}%, 풍속 ${w.windSpeed ?? '-'}미터입니다.${w.precipitation > 0 ? ` 강수량 ${w.precipitation}밀리미터입니다.` : ''}`;
-      return { success: true, speech, action: 'weather', data: w };
-    } catch {
-      return { success: false, speech: '날씨 정보를 가져올 수 없습니다.', action: 'weather' };
-    }
-  }
-
-  private async handleShortForecast(effectiveUserId: string, days?: string[]): Promise<VoiceResponse> {
-    try {
-      const user = await this.usersService.findOne(effectiveUserId);
-      if (!user?.address) {
-        return { success: false, speech: '주소가 설정되어 있지 않아 예보를 조회할 수 없습니다.', action: 'short_forecast' };
-      }
-      const result = await this.midForecast.getShortForecast(user.address);
-      if (!result.data) {
-        return { success: false, speech: result.speech, action: 'short_forecast' };
-      }
-
-      // 요청한 날짜만 필터링
-      let filtered = result.data;
-      if (days && days.length > 0) {
-        filtered = result.data.filter((f) => days.includes(f.date));
-      }
-
-      if (filtered.length === 0) {
-        return { success: false, speech: '해당 날짜의 예보 데이터가 없습니다.', action: 'short_forecast' };
-      }
-
-      // 필터된 결과로 음성 응답 생성
-      const lines: string[] = [];
-      for (const f of filtered) {
-        const parts: string[] = [f.date];
-        if (f.amSky && f.pmSky && f.amSky !== f.pmSky) {
-          parts.push(`오전 ${f.amSky}, 오후 ${f.pmSky}`);
-        } else if (f.amSky || f.pmSky) {
-          parts.push(f.amSky || f.pmSky!);
-        }
-        if (f.minTemp != null && f.maxTemp != null) {
-          parts.push(`${f.minTemp}도에서 ${f.maxTemp}도`);
-        } else if (f.maxTemp != null) {
-          parts.push(`최고 ${f.maxTemp}도`);
-        }
-        if (f.rainPct != null && f.rainPct > 0) {
-          parts.push(`강수확률 ${f.rainPct}%`);
-        }
-        lines.push(parts.join(', '));
-      }
-
-      return { success: true, speech: lines.join('. '), action: 'short_forecast', data: filtered };
-    } catch {
-      return { success: false, speech: '단기 예보를 가져올 수 없습니다.', action: 'short_forecast' };
-    }
-  }
-
-  private async handleForecast(effectiveUserId: string): Promise<VoiceResponse> {
-    try {
-      const user = await this.usersService.findOne(effectiveUserId);
-      if (!user?.address) {
-        return { success: false, speech: '주소가 설정되어 있지 않아 예보를 조회할 수 없습니다.', action: 'forecast' };
-      }
-      const result = await this.midForecast.getMidForecast(user.address);
-      return { success: !!result.data, speech: result.speech, action: 'forecast', data: result.data };
-    } catch {
-      return { success: false, speech: '중기 예보를 가져올 수 없습니다.', action: 'forecast' };
-    }
-  }
-
-  private async handleDeviceStatus(effectiveUserId: string): Promise<VoiceResponse> {
-    const devices = await this.devicesService.findAllByUser(effectiveUserId);
-    const actuators = devices.filter((d) => d.deviceType === 'actuator');
-    if (actuators.length === 0) {
-      return { success: true, speech: '등록된 장치가 없습니다.', action: 'device_status' };
-    }
-    const online = actuators.filter((d) => d.online);
-    const offline = actuators.filter((d) => !d.online);
-    const parts: string[] = [`총 ${actuators.length}개 장치.`];
-    if (online.length > 0) parts.push(`온라인: ${online.map((d) => d.name).join(', ')}`);
-    if (offline.length > 0) parts.push(`오프라인 ${offline.length}개`);
-    return { success: true, speech: parts.join(' '), action: 'device_status' };
-  }
-
-  private async handleAutomationList(effectiveUserId: string): Promise<VoiceResponse> {
-    const rules = await this.automationService.findAll(effectiveUserId);
-    if (rules.length === 0) {
-      return { success: true, speech: '등록된 자동화 룰이 없습니다.', action: 'automation_list' };
-    }
-    const parts = rules.map((r) => `${r.name} ${r.enabled ? '활성' : '비활성'}`);
-    return { success: true, speech: `자동화 룰 ${rules.length}개: ${parts.join(', ')}`, action: 'automation_list' };
   }
 
   private async handleAutomationToggle(effectiveUserId: string, ruleId: string, enabled: boolean): Promise<VoiceResponse> {
@@ -434,12 +364,75 @@ ${logInfo}
     }
   }
 
+  private async handleCreateRule(effectiveUserId: string, parsed: any): Promise<VoiceResponse> {
+    try {
+      const { name, deviceType, startTime, command, daysOfWeek, duration } = parsed;
+      if (!name || !startTime) {
+        return { success: true, speech: parsed.speech || '룰 이름과 시작 시간을 말씀해주세요.', action: 'create_rule' };
+      }
+
+      // 장치 찾기
+      const devices = await this.devicesService.findAllByUser(effectiveUserId);
+      const actuators = devices.filter((d) => d.deviceType === 'actuator');
+      let target = actuators.find((d) => d.equipmentType === deviceType);
+      if (!target) target = actuators.find((d) => d.name.includes(deviceType));
+      if (!target && actuators.length > 0) target = actuators[0];
+
+      if (!target) {
+        return { success: false, speech: '해당 장치를 찾을 수 없습니다.', action: 'create_rule' };
+      }
+
+      // 시간 파싱 → between 범위
+      const [h, m] = startTime.split(':').map(Number);
+      const startVal = h * 100 + m;
+      const endMin = m + (duration || 30);
+      const endH = h + Math.floor(endMin / 60);
+      const endVal = endH * 100 + (endMin % 60);
+
+      const payload = {
+        name,
+        conditions: {
+          logic: 'AND',
+          target: {},
+          groups: [{
+            logic: 'AND',
+            conditions: [{
+              field: 'hour',
+              operator: 'between',
+              value: [startVal, endVal],
+              daysOfWeek: daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
+            }],
+          }],
+        },
+        actions: {
+          targetDeviceId: target.id,
+          targetDeviceIds: [target.id],
+          command: command || 'on',
+          deviceType: target.equipmentType,
+        },
+        priority: 0,
+      };
+
+      await this.automationService.create(effectiveUserId, payload as any);
+      return { success: true, speech: parsed.speech || `${name} 룰을 생성했습니다.`, action: 'create_rule' };
+    } catch (error) {
+      this.logger.error(`룰 생성 실패: ${error.message}`);
+      return { success: false, speech: '자동화 룰 생성에 실패했습니다.', action: 'create_rule' };
+    }
+  }
+
   private async buildContext(effectiveUserId: string) {
-    const [devices, rules, widgetData, logsResult] = await Promise.all([
+    const user = await this.usersService.findOne(effectiveUserId);
+
+    const [devices, rules, widgetData, logsResult, weatherData, shortForecast, midForecast, alertsResult] = await Promise.all([
       this.devicesService.findAllByUser(effectiveUserId),
       this.automationService.findAll(effectiveUserId),
       this.dashboardService.getWidgetData(effectiveUserId).catch(() => null),
       this.automationService.getLogs(effectiveUserId, { page: 1, limit: 20 }).catch(() => ({ data: [] })),
+      user?.address ? this.dashboardService.getWeatherForUser(effectiveUserId).catch(() => null) : null,
+      user?.address ? this.midForecast.getShortForecast(user.address).catch(() => ({ data: null })) : { data: null },
+      user?.address ? this.midForecast.getMidForecast(user.address).catch(() => ({ data: null })) : { data: null },
+      this.sensorAlertsService.findAll(effectiveUserId, { limit: 10 }).catch(() => ({ data: [], total: 0 })),
     ]);
 
     // 오늘 로그만 필터
@@ -453,13 +446,33 @@ ${logInfo}
         status: l.conditionsMet?.type || l.status || 'executed',
       }));
 
+    // 중기예보에서 데이터 있는 날만
+    const midForecasts = (midForecast.data?.forecasts || []).filter(
+      (f: any) => f.skyAm || f.minTemp != null,
+    );
+
+    // 최근 알림 가공
+    const recentAlerts = (alertsResult.data || []).slice(0, 10).map((a: any) => ({
+      time: new Date(a.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      deviceName: a.deviceName || '(알 수 없음)',
+      sensorType: a.sensorType,
+      alertType: a.alertType,
+      severity: a.severity,
+      message: a.message,
+      resolved: a.resolved,
+    }));
+
     return {
       devices: devices
         .filter((d) => d.deviceType === 'actuator')
         .map((d) => ({ id: d.id, name: d.name, equipmentType: d.equipmentType || 'other', online: d.online })),
       rules: rules.map((r) => ({ id: r.id, name: r.name, enabled: r.enabled })),
       sensorData: widgetData?.inside || null,
+      currentWeather: weatherData?.weather || null,
+      shortForecast: shortForecast.data || [],
+      midForecast: midForecasts,
       todayLogs,
+      recentAlerts,
     };
   }
 }
