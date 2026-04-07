@@ -21,11 +21,12 @@ import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
 import { HealthModule } from './modules/health/health.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { VoiceModule } from './modules/voice/voice.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../.env'] }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
@@ -56,6 +57,7 @@ import { RetentionService } from './common/retention.service';
     ConfigDeployModule,
     HealthModule,
     ActivityLogModule,
+    VoiceModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

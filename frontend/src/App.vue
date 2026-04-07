@@ -218,6 +218,7 @@
 
     <ConfirmDialog />
     <ToastContainer />
+    <VoiceAssistant v-if="isAuthenticated" />
   </div>
 </template>
 
@@ -230,6 +231,7 @@ import { useWebSocket } from './composables/useWebSocket'
 import ConfirmDialog from './components/common/ConfirmDialog.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
 import NotificationCenter from './components/common/NotificationCenter.vue'
+import VoiceAssistant from './modules/voice-assistant/VoiceAssistant.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

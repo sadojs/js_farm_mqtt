@@ -5,9 +5,10 @@ import { DataSource, Repository } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { AutomationLog } from './entities/automation-log.entity';
 import { Device } from '../devices/entities/device.entity';
-import { Gateway } from '../gateway-manager/entities/gateway.entity';
-import { MqttService } from '../mqtt/mqtt.service';
+import { TuyaProject } from '../users/entities/tuya-project.entity';
+import { TuyaService } from '../integrations/tuya/tuya.service';
 import { EventsGateway } from '../gateway/events.gateway';
+import { decryptTuyaSecret } from '../../common/utils/crypto.util';
 
 type LogicOp = 'AND' | 'OR';
 
@@ -25,9 +26,9 @@ export class AutomationRunnerService {
     private readonly logsRepo: Repository<AutomationLog>,
     @InjectRepository(Device)
     private readonly devicesRepo: Repository<Device>,
-    @InjectRepository(Gateway)
-    private readonly gatewayRepo: Repository<Gateway>,
-    private readonly mqttService: MqttService,
+    @InjectRepository(TuyaProject)
+    private readonly tuyaRepo: Repository<TuyaProject>,
+    private readonly tuyaService: TuyaService,
     private readonly eventsGateway: EventsGateway,
     private readonly dataSource: DataSource,
   ) {}
@@ -44,6 +45,50 @@ export class AutomationRunnerService {
     }
   }
 
+  /** 조건 무시, 액션만 즉시 실행 (음성 명령 등에서 사용) */
+  async forceExecuteRule(rule: AutomationRule) {
+    this.logger.log(`강제 실행: rule=${rule.name} (조건 무시)`);
+    const actionResults: any[] = [];
+    let success = true;
+    let errorMessage: string | undefined;
+
+    try {
+      const actions = Array.isArray(rule.actions) ? rule.actions : [rule.actions];
+      for (const action of actions) {
+        const executed = await this.executeAction(rule, action);
+        actionResults.push(executed);
+      }
+
+      this.eventsGateway.broadcastAutomationExecuted({
+        ruleId: rule.id,
+        ruleName: rule.name,
+        success: true,
+        actions: actionResults,
+      });
+    } catch (err: any) {
+      success = false;
+      errorMessage = err?.message || '강제 실행 실패';
+      this.logger.error(`Rule ${rule.id} force execution failed: ${errorMessage}`);
+    }
+
+    const deviceNames = actionResults
+      .flatMap((r: any) => r.devices || [])
+      .map((d: any) => d.deviceName || d.deviceId)
+      .filter(Boolean);
+    await this.logsRepo.save(
+      this.logsRepo.create({
+        ruleId: rule.id,
+        userId: rule.userId,
+        success,
+        conditionsMet: { type: 'force_execute', ruleName: rule.name },
+        actionsExecuted: { deviceNames, results: actionResults },
+        errorMessage,
+      }),
+    );
+
+    return { executed: success, actions: actionResults, errorMessage };
+  }
+
   async executeRule(rule: AutomationRule) {
     const evaluatedAt = new Date();
     const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
@@ -53,7 +98,7 @@ export class AutomationRunnerService {
       return { executed: false, reason: 'conditions_not_met', details: conditionResult.details };
     }
 
-    // 조건 만족 + 릴레이 모드: ON/OFF 사이클로 실행
+    // 릴레이 모드 체크: 조건이 매칭된 시간 범위 내에서 ON/OFF 사이클 실행
     const relayResult = this.checkRelayCycle(rule, evaluatedAt);
     if (relayResult) {
       // 릴레이 상태 변경 시에만 실행 (ON→OFF 또는 OFF→ON)
@@ -62,7 +107,7 @@ export class AutomationRunnerService {
         return { executed: false, reason: 'relay_state_unchanged' };
       }
       this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase });
-      return this.executeRelayAction(rule, relayResult, evaluatedAt);
+      return this.executeRelayAction(rule, relayResult);
     }
 
     // 일반 자동화: 이미 조건 충족 중이면 중복 실행 방지
@@ -87,7 +132,7 @@ export class AutomationRunnerService {
         await this.markOnceConditionsExecuted(rule, conditionResult.onceConditionHits, evaluatedAt);
       }
 
-      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
+      this.eventsGateway.broadcastAutomationExecuted({
         ruleId: rule.id,
         ruleName: rule.name,
         success: true,
@@ -95,9 +140,9 @@ export class AutomationRunnerService {
       });
     } catch (err: any) {
       success = false;
-      errorMessage = err?.message || '자동화 액션 실행 실패';
+      errorMessage = err?.message || '자동 제어 액션 실행 실패';
       this.logger.error(`Rule ${rule.id} execution failed: ${errorMessage}`);
-      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
+      this.eventsGateway.broadcastAutomationExecuted({
         ruleId: rule.id,
         ruleName: rule.name,
         success: false,
@@ -112,10 +157,7 @@ export class AutomationRunnerService {
       .filter(Boolean);
     const commandSummary = actionResults
       .flatMap((r: any) => r.devices || [])
-      .map((d: any) => {
-        if (d.commands) return Object.entries(d.commands).map(([k, v]) => `${k}=${v}`).join(', ');
-        return null;
-      })
+      .map((d: any) => d.commands?.map((c: any) => `${c.code}=${c.value}`)?.join(', '))
       .filter(Boolean)
       .join('; ');
     await this.logsRepo.save(
@@ -328,6 +370,7 @@ export class AutomationRunnerService {
       return currentHour >= start || currentHour <= end;
     }
 
+    // 하위호환: 기존 eq 조건은 해당 시간 한 시간 범위로 처리
     if (operator === 'eq') {
       return currentHour === Number(value);
     }
@@ -472,6 +515,13 @@ export class AutomationRunnerService {
   }
 
   private async executeAction(rule: AutomationRule, action: any) {
+    const credentials = await this.tuyaRepo.findOne({
+      where: { userId: rule.userId, enabled: true },
+    });
+    if (!credentials) {
+      throw new Error('활성화된 Tuya 프로젝트 설정이 없습니다.');
+    }
+
     // targetDeviceId(단일) 또는 targetDeviceIds(배열)가 있으면 특정 장비를 사용
     let candidateDevices: Device[];
     const targetIds = action?.targetDeviceId
@@ -491,29 +541,54 @@ export class AutomationRunnerService {
       throw new Error(`제어 가능한 장비를 찾을 수 없습니다.`);
     }
 
-    const mqttCommand = this.buildMqttCommand(action);
+    const commands = this.buildCommandCandidates(action);
+    if (commands.length === 0) {
+      throw new Error(`지원하지 않는 명령입니다. command=${action?.command || 'unknown'}`);
+    }
 
     const results: any[] = [];
     for (const device of candidateDevices) {
-      if (!device.friendlyName || !device.gatewayId) {
-        results.push({ deviceId: device.id, success: false, error: 'friendlyName 또는 gatewayId 없음' });
-        continue;
+      this.logger.log(
+        `자동 제어 명령 전송: rule=${rule.name}, device=${device.name}(${device.tuyaDeviceId}), command=${JSON.stringify(commands[0])}`,
+      );
+      let sent = false;
+      let lastError = '';
+      for (const commandSet of commands) {
+        try {
+          const res = await this.tuyaService.sendDeviceCommand(
+            {
+              accessId: credentials.accessId,
+              accessSecret: decryptTuyaSecret(credentials.accessSecretEncrypted),
+              endpoint: credentials.endpoint,
+            },
+            device.tuyaDeviceId,
+            commandSet,
+          );
+          if (res?.success) {
+            sent = true;
+            results.push({
+              deviceId: device.id,
+              deviceName: device.name,
+              tuyaDeviceId: device.tuyaDeviceId,
+              success: true,
+              commands: commandSet,
+            });
+            break;
+          }
+          lastError = res?.msg || 'Tuya command failed';
+        } catch (err: any) {
+          lastError = err?.response?.data?.msg || err?.message || 'Tuya command failed';
+        }
       }
 
-      const gateway = await this.gatewayRepo.findOne({ where: { id: device.gatewayId } });
-      if (!gateway) {
-        results.push({ deviceId: device.id, success: false, error: '게이트웨이를 찾을 수 없음' });
-        continue;
-      }
-
-      try {
-        await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommand);
-        this.logger.log(
-          `자동화 명령 전송: rule=${rule.name}, device=${device.name}, command=${JSON.stringify(mqttCommand)}`,
-        );
-        results.push({ deviceId: device.id, deviceName: device.name, success: true, commands: mqttCommand });
-      } catch (err: any) {
-        results.push({ deviceId: device.id, deviceName: device.name, success: false, error: err?.message || 'MQTT command failed' });
+      if (!sent) {
+        results.push({
+          deviceId: device.id,
+          deviceName: device.name,
+          tuyaDeviceId: device.tuyaDeviceId,
+          success: false,
+          error: lastError || 'Unknown error',
+        });
       }
     }
 
@@ -522,19 +597,10 @@ export class AutomationRunnerService {
       throw new Error(`일부 장비 명령 전송 실패: ${JSON.stringify(results)}`);
     }
 
-    return { action, devices: results };
-  }
-
-  /** 자동화 액션 → MQTT 커맨드 변환 */
-  private buildMqttCommand(action: any): object {
-    const command = action?.command;
-    if (command === 'on' || command === 'open') return { state: 'ON' };
-    if (command === 'off' || command === 'close') return { state: 'OFF' };
-    if (command === 'position' && action?.parameters?.percentage != null) {
-      return { position: Number(action.parameters.percentage) };
-    }
-    // 기본: on/off 토글
-    return { state: command !== 'off' ? 'ON' : 'OFF' };
+    return {
+      action,
+      devices: results,
+    };
   }
 
   private async findTargetDevices(rule: AutomationRule, deviceType?: string) {
@@ -573,6 +639,57 @@ export class AutomationRunnerService {
     return false;
   }
 
+  private buildCommandCandidates(action: any): { code: string; value: any }[][] {
+    const command = action?.command;
+    const deviceType = action?.deviceType;
+    const params = action?.parameters || {};
+
+    // 새로운 형식: targetDeviceIds/targetDeviceId + on/off 명령
+    if (action?.targetDeviceId || (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds.length > 0)) {
+      const isOn = command !== 'off';
+      return [
+        [{ code: 'switch_1', value: isOn }],
+        [{ code: 'switch', value: isOn }],
+      ];
+    }
+
+    if (deviceType === 'roof_actuator') {
+      const isOpen = command === 'open';
+      const percentage = Number(params.percentage ?? (isOpen ? 100 : 0));
+      return [
+        [{ code: 'switch', value: isOpen }],
+        [{ code: 'switch_1', value: isOpen }],
+        [{ code: 'percent_control', value: Math.max(0, Math.min(100, percentage)) }],
+      ];
+    }
+
+    if (deviceType === 'ventilation_fan') {
+      const isOn = command === 'on';
+      const speedMap: Record<string, string> = { low: 'low', mid: 'middle', high: 'high' };
+      const speed = speedMap[params.speed] || 'middle';
+      if (!isOn) {
+        return [
+          [{ code: 'switch', value: false }],
+          [{ code: 'switch_1', value: false }],
+        ];
+      }
+      return [
+        [{ code: 'switch', value: true }, { code: 'fan_speed_enum', value: speed }],
+        [{ code: 'switch_1', value: true }, { code: 'fan_speed_enum', value: speed }],
+        [{ code: 'switch', value: true }],
+      ];
+    }
+
+    if (deviceType === 'irrigation') {
+      return [
+        [{ code: 'switch', value: true }],
+        [{ code: 'switch_1', value: true }],
+        [{ code: 'start', value: true }],
+      ];
+    }
+
+    return [];
+  }
 
   private async markOnceConditionsExecuted(rule: AutomationRule, hits: string[], executedAt: Date) {
     const nextConditions = structuredClone(rule.conditions || {});
@@ -628,7 +745,7 @@ export class AutomationRunnerService {
     await this.rulesRepo.save(rule);
   }
 
-  // 릴레이 사이클 체크: 조건에 relay=true가 있으면 시작 시각부터 ON/OFF 사이클 계산
+  // 릴레이 사이클 체크: 조건에 relay=true가 있으면 시간 범위 시작부터 경과 분 기반 ON/OFF 결정
   private checkRelayCycle(rule: AutomationRule, now: Date): { isOnPhase: boolean; condition: any } | null {
     const conditions = rule.conditions;
     if (!conditions?.groups?.length) return null;
@@ -640,13 +757,16 @@ export class AutomationRunnerService {
           const offMinutes = cond.relayOffMinutes || 10;
           const cycleLength = onMinutes + offMinutes;
 
-          // 시간 범위 시작점부터의 경과 분 계산
+          // 시간 범위 시작점부터 경과된 총 분을 기준으로 사이클 위치 계산
           let startHour = 0;
-          if (cond.field === 'hour' && Array.isArray(cond.value) && cond.value.length === 2) {
+          if (cond.field === 'hour' && Array.isArray(cond.value)) {
             startHour = Number(cond.value[0]);
           }
-          const minutesSinceStart = (now.getHours() - startHour) * 60 + now.getMinutes();
-          const cyclePosition = ((minutesSinceStart % cycleLength) + cycleLength) % cycleLength;
+          const currentHour = now.getHours();
+          const currentMinute = now.getMinutes();
+          const elapsedMinutes = (currentHour - startHour) * 60 + currentMinute;
+
+          const cyclePosition = ((elapsedMinutes % cycleLength) + cycleLength) % cycleLength;
           const isOnPhase = cyclePosition < onMinutes;
           return { isOnPhase, condition: cond };
         }
@@ -655,7 +775,7 @@ export class AutomationRunnerService {
     return null;
   }
 
-  private async executeRelayAction(rule: AutomationRule, relay: { isOnPhase: boolean; condition: any }, now: Date) {
+  private async executeRelayAction(rule: AutomationRule, relay: { isOnPhase: boolean; condition: any }) {
     const action = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
     const actionOverride = { ...action, command: relay.isOnPhase ? 'on' : 'off' };
 

@@ -100,6 +100,7 @@ services:
       - ZIGBEE2MQTT_URL=http://zigbee2mqtt:8080
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - KMA_API_KEY=${KMA_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
