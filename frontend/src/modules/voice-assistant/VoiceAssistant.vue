@@ -252,7 +252,7 @@ watch(() => messages.value.length, () => {
   height: 44px;
   border-radius: 22px 0 0 22px;
   border: none;
-  background: linear-gradient(135deg, rgba(109,40,217,0.55) 0%, rgba(79,70,229,0.5) 50%, rgba(37,99,235,0.45) 100%);
+  background: linear-gradient(135deg, rgba(109,40,217,0.75) 0%, rgba(79,70,229,0.7) 50%, rgba(37,99,235,0.65) 100%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
@@ -276,7 +276,7 @@ watch(() => messages.value.length, () => {
 .slide-arrows {
   font-size: 14px;
   font-weight: 300;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.7);
   letter-spacing: -2px;
   animation: arrows-slide 2s ease-in-out infinite;
   flex-shrink: 0;
