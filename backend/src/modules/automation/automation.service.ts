@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
@@ -36,6 +36,7 @@ export class AutomationService {
   }
 
   async create(userId: string, dto: CreateRuleDto) {
+    this.validateIrrigationConditions(dto.conditions);
     const conditionsWithTarget = this.prepareConditions(dto.conditions, dto.houseId);
     const ruleType = this.determineRuleType(conditionsWithTarget);
     const rule = this.rulesRepo.create({
@@ -61,6 +62,7 @@ export class AutomationService {
     if (dto.groupId !== undefined) rule.groupId = dto.groupId;
     const nextHouseId = dto.houseId ?? rule.conditions?.target?.houseId;
     if (dto.conditions !== undefined) {
+      this.validateIrrigationConditions(dto.conditions);
       rule.conditions = this.prepareConditions(dto.conditions, nextHouseId);
       rule.ruleType = this.determineRuleType(rule.conditions);
     } else if (dto.houseId !== undefined) {
@@ -185,6 +187,31 @@ export class AutomationService {
     const rule = await this.rulesRepo.findOne({ where: { id, userId } });
     if (!rule) throw new NotFoundException();
     return this.runnerService.forceExecuteRule(rule);
+  }
+
+  private validateIrrigationConditions(conditions: any): void {
+    if (!conditions || conditions.type !== 'irrigation') return;
+    const fertilizer = conditions.fertilizer;
+    if (!fertilizer?.enabled) return;
+
+    const fertTotal = (fertilizer.duration || 0) + (fertilizer.preStopWait || 0);
+    if (fertTotal <= 0) return;
+
+    const zones = conditions.zones || [];
+    const violations: string[] = [];
+    for (const zone of zones) {
+      if (!zone.enabled) continue;
+      if ((zone.duration || 0) < fertTotal) {
+        violations.push(
+          `${zone.name || zone.zone + '구역'}: 관주시간(${zone.duration}분) < 투여시간(${fertilizer.duration}분)+종료전대기(${fertilizer.preStopWait}분)=${fertTotal}분`,
+        );
+      }
+    }
+    if (violations.length > 0) {
+      throw new BadRequestException(
+        `관주시간이 액비 투여시간+종료전대기보다 짧습니다: ${violations.join(', ')}`,
+      );
+    }
   }
 
   private determineRuleType(conditions: any): 'weather' | 'time' | 'hybrid' {
