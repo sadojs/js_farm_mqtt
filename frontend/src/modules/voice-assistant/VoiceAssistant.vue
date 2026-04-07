@@ -1,26 +1,23 @@
 <template>
   <div class="voice-assistant">
-    <!-- 플로팅 마이크 버튼 (패널 열리면 숨김) -->
-    <button
+    <!-- 플로팅 마이크 버튼 (패널 열리면 숨김, 스와이프로 접기) -->
+    <div
       v-if="!panelOpen"
-      class="voice-fab"
-      @click="openPanel"
-      title="음성 어시스턴트"
+      class="voice-fab-wrap"
+      :class="{ collapsed: fabCollapsed }"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend.passive="onTouchEnd"
     >
-      <svg class="fab-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- 마이크 본체 -->
-        <rect x="9" y="3" width="6" height="10" rx="3" fill="white"/>
-        <!-- 마이크 아래 호 -->
-        <path d="M6 12C6 15.3 8.7 18 12 18C15.3 18 18 15.3 18 12" stroke="white" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-        <!-- 마이크 스탠드 -->
-        <line x1="12" y1="18" x2="12" y2="21" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-        <!-- AI 파동 -->
-        <path d="M3 9C3 9 4 11 3 13" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linecap="round"/>
-        <path d="M1 8C1 8 2.5 11 1 14" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-linecap="round"/>
-        <path d="M21 9C21 9 20 11 21 13" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linecap="round"/>
-        <path d="M23 8C23 8 21.5 11 23 14" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-linecap="round"/>
-      </svg>
-    </button>
+      <button class="voice-fab" @click="onFabClick" title="음성 어시스턴트">
+        <svg class="fab-svg" viewBox="0 0 24 24" fill="none">
+          <rect x="9" y="3" width="6" height="10" rx="3" fill="white"/>
+          <path d="M6 12C6 15.3 8.7 18 12 18C15.3 18 18 15.3 18 12" stroke="white" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <line x1="12" y1="18" x2="12" y2="21" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <span class="slide-arrows">›››</span>
+      </button>
+    </div>
 
     <!-- 대화 패널 -->
     <Transition name="slide-up">
@@ -112,6 +109,41 @@ const panelOpen = ref(false)
 const textInput = ref('')
 const isSpeaking = ref(false)
 const messagesEl = ref<HTMLElement | null>(null)
+const fabCollapsed = ref(false)
+
+// 스와이프 접기
+let touchStartX = 0
+let touchStartY = 0
+let swiping = false
+
+function onTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  swiping = false
+}
+
+function onTouchMove(e: TouchEvent) {
+  const dx = e.touches[0].clientX - touchStartX
+  const dy = Math.abs(e.touches[0].clientY - touchStartY)
+  if (Math.abs(dx) > 15 && dy < 30) swiping = true
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const dx = (e.changedTouches[0]?.clientX || 0) - touchStartX
+  if (swiping && Math.abs(dx) > 40) {
+    // 오른쪽 스와이프 → 접기, 왼쪽 스와이프 → 펼치기
+    fabCollapsed.value = dx > 0
+  }
+  swiping = false
+}
+
+function onFabClick() {
+  if (fabCollapsed.value) {
+    fabCollapsed.value = false
+  } else {
+    openPanel()
+  }
+}
 const textInputEl = ref<HTMLInputElement | null>(null)
 
 function openPanel() {
@@ -200,42 +232,73 @@ watch(() => messages.value.length, () => {
   pointer-events: auto;
 }
 
-/* 플로팅 버튼 */
-.voice-fab {
+/* 플로팅 버튼 래퍼 */
+.voice-fab-wrap {
   position: fixed;
-  right: 20px;
-  bottom: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  right: -6px;
+  bottom: 90px;
+  z-index: 10001;
+  transition: right 0.3s ease;
+}
+
+.voice-fab-wrap.collapsed {
+  right: -52px;
+}
+
+/* 캡슐 버튼 */
+.voice-fab {
+  position: relative;
+  width: 88px;
+  height: 44px;
+  border-radius: 22px 0 0 22px;
   border: none;
-  background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 50%, #2563eb 100%);
+  background: linear-gradient(135deg, rgba(109,40,217,0.55) 0%, rgba(79,70,229,0.5) 50%, rgba(37,99,235,0.45) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  box-shadow:
-    0 4px 15px rgba(109, 40, 217, 0.4),
-    0 0 20px rgba(79, 70, 229, 0.2);
+  box-shadow: -2px 2px 10px rgba(109, 40, 217, 0.2);
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 10001;
-  padding: 0;
-}
-
-.voice-fab:hover {
-  transform: scale(1.1);
-  box-shadow:
-    0 6px 20px rgba(109, 40, 217, 0.5),
-    0 0 30px rgba(79, 70, 229, 0.3);
-}
-
-.voice-fab:active {
-  transform: scale(0.95);
+  padding: 0 4px 0 8px;
+  touch-action: pan-y;
+  overflow: hidden;
+  gap: 2px;
 }
 
 .fab-svg {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* ››› 슬라이드 화살표 (아이폰 전원 느낌) */
+.slide-arrows {
+  font-size: 14px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: -2px;
+  animation: arrows-slide 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes arrows-slide {
+  0% { opacity: 0.2; transform: translateX(-4px); }
+  50% { opacity: 0.8; transform: translateX(4px); }
+  100% { opacity: 0.2; transform: translateX(-4px); }
+}
+
+.collapsed .voice-fab {
+  opacity: 0.4;
+  box-shadow: -1px 1px 6px rgba(0,0,0,0.1);
+}
+
+.collapsed .slide-arrows {
+  animation-direction: reverse;
+}
+
+.voice-fab:active {
+  transform: scale(0.96);
 }
 
 /* 오버레이 */
