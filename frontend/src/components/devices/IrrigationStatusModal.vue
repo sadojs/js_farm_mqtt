@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import type { Device, ChannelMapping } from '@/types/device.types'
+import type { Device } from '@/types/device.types'
 import { FUNCTION_LABELS } from '@/types/device.types'
 import { useDeviceStore } from '@/stores/device.store'
 import { useAutomationStore } from '@/stores/automation.store'
@@ -80,7 +80,7 @@ const mapping = computed<Record<string, string | undefined>>(() =>
   props.device ? deviceStore.getEffectiveMapping(props.device) : {}
 )
 const mappingKeys = computed(() =>
-  (Object.keys(FUNCTION_LABELS) as (keyof ChannelMapping)[]).filter(key => key in mapping.value)
+  Object.keys(FUNCTION_LABELS).filter(key => key in mapping.value)
 )
 
 const deviceStatus = computed(() =>
@@ -158,6 +158,7 @@ onMounted(() => {
 .status-modal {
   background: var(--bg-card); border-radius: 16px; width: 100%;
   max-width: 460px; box-shadow: var(--shadow-modal);
+  max-height: calc(100vh - 40px); display: flex; flex-direction: column;
 }
 .status-modal-header {
   display: flex; justify-content: space-between; align-items: center;

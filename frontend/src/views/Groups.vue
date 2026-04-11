@@ -593,8 +593,26 @@ const toggleRule = async (ruleId: string) => {
     // FR-03: 관주 설정 활성화 시 원격제어 자동 ON
     const isIrrigationEnable = newState && (rule?.conditions as any)?.type === 'irrigation'
     await automationStore.toggleRule(ruleId, isIrrigationEnable ? { autoEnableRemote: true } : undefined)
-    // 설정 토글 후 장치 상태 + 관주 상태 갱신
+
     if ((rule?.conditions as any)?.type === 'irrigation') {
+      // 관주 설정 활성화 시: 원격제어 + B접점 낙관적 즉시 반영 (전파 지연 우회)
+      if (isIrrigationEnable) {
+        const actions = rule?.actions as any
+        const deviceIds: string[] = [
+          ...(Array.isArray(actions?.targetDeviceIds) ? actions.targetDeviceIds : []),
+          ...(actions?.targetDeviceId ? [actions.targetDeviceId] : []),
+        ]
+        for (const deviceId of deviceIds) {
+          const device = deviceStore.devices.find(d => d.id === deviceId)
+          if (device) {
+            const mapping = deviceStore.getEffectiveMapping(device)
+            if (!device.switchStates) device.switchStates = {}
+            if (mapping['remote_control']) device.switchStates[mapping['remote_control']] = true
+            if (mapping['fertilizer_b_contact']) device.switchStates[mapping['fertilizer_b_contact']] = true
+          }
+        }
+      }
+      // 설정 토글 후 장치 상태 + 관주 상태 갱신
       await Promise.all([
         automationStore.fetchIrrigationStatus(),
         deviceStore.fetchAllActuatorStatuses(),

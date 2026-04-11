@@ -5,8 +5,7 @@ import { Device } from './entities/device.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttService } from '../mqtt/mqtt.service';
-import { EventsGateway } from '../gateway/events.gateway';
-import { DEFAULT_CHANNEL_MAPPING, AVAILABLE_SWITCH_CODES } from './channel-mapping.constants';
+import { AVAILABLE_SWITCH_CODES, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
 
 const DEVICE_DEPENDENCY_SQL = `
   SELECT id, name, enabled FROM automation_rules
@@ -32,7 +31,6 @@ export class DevicesService {
     @InjectRepository(AutomationRule) private rulesRepo: Repository<AutomationRule>,
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private mqttService: MqttService,
-    private eventsGateway: EventsGateway,
   ) {}
 
   async findAllByUser(userId: string) {
@@ -120,8 +118,12 @@ export class DevicesService {
     return results;
   }
 
-  getEffectiveMapping(device: Device): Record<string, string> {
-    return device.channelMapping ?? { ...DEFAULT_CHANNEL_MAPPING };
+  getEffectiveMapping(device: Device, switchCodes?: string[]): Record<string, string> {
+    if (device.channelMapping) return { ...device.channelMapping };
+    const deviceAny = device as any;
+    const codes = switchCodes ?? (deviceAny.switchStates ? Object.keys(deviceAny.switchStates) : []);
+    const count = detectChannelCount(codes);
+    return { ...getDefaultMappingByCount(count) };
   }
 
   async updateChannelMapping(
@@ -177,6 +179,25 @@ export class DevicesService {
           for (const sw of allSwitches) offPayload[sw] = false;
           await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
           this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
+          // 원격제어 OFF → 해당 장치의 활성 관주 자동화 룰 전체 비활성화
+          try {
+            const allRules = await this.rulesRepo.find({ where: { userId: device.userId, enabled: true } });
+            const toDisable = allRules.filter(r => {
+              if ((r.conditions as any)?.type !== 'irrigation') return false;
+              const acts = r.actions as any;
+              const ids: string[] = [];
+              if (acts?.targetDeviceId) ids.push(acts.targetDeviceId);
+              if (Array.isArray(acts?.targetDeviceIds)) ids.push(...acts.targetDeviceIds);
+              return ids.includes(id);
+            });
+            if (toDisable.length > 0) {
+              for (const r of toDisable) r.enabled = false;
+              await this.rulesRepo.save(toDisable);
+              this.logger.log(`원격제어 OFF → 관주 룰 ${toDisable.length}개 자동 비활성화: ${device.name}`);
+            }
+          } catch (err: any) {
+            this.logger.warn(`관주 룰 비활성화 실패: ${err.message}`);
+          }
           return { success: true, deviceId: device.id, command: offPayload, deviceName: device.name, equipmentType: device.equipmentType };
         }
       }

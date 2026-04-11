@@ -386,6 +386,7 @@ export class AutomationService {
   }
 
   /** 원격제어 자동 ON (FR-03) */
+  /** 원격제어 자동 ON (FR-03) — B접점 페어 동시 ON */
   private async ensureRemoteControlOn(deviceId: string): Promise<boolean> {
     try {
       const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
@@ -395,21 +396,11 @@ export class AutomationService {
       const remoteCode = mapping['remote_control'];
       if (!remoteCode) return false;
 
-      const credentials = await this.tuyaRepo.findOne({
-        where: { userId: device.userId, enabled: true },
-      });
-      if (!credentials) return false;
-
-      const tuyaCreds = {
-        accessId: credentials.accessId,
-        accessSecret: decryptTuyaSecret(credentials.accessSecretEncrypted),
-        endpoint: credentials.endpoint,
-      };
-
-      await this.tuyaService.sendDeviceCommand(tuyaCreds, device.tuyaDeviceId, [
+      // devicesService.controlDevice 경유 → B접점 페어링 로직 자동 실행 (MQTT)
+      await this.devicesService.controlDevice(deviceId, device.userId, [
         { code: remoteCode, value: true },
       ]);
-      this.logger.log(`원격제어 자동 ON: ${device.name}`);
+      this.logger.log(`원격제어 + B접점 자동 ON: ${device.name}`);
       return true;
     } catch (err: any) {
       this.logger.warn(`원격제어 자동 ON 실패: ${err.message}`);

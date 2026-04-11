@@ -108,12 +108,16 @@ const isIrrigation = computed(() => {
 })
 
 // 관수 채널 매핑 — 룰의 대상 장치에서 가져옴
-function initChannelMapping() {
+async function initChannelMapping() {
   const actions = props.rule?.actions as any
   const deviceId = actions?.targetDeviceIds?.[0] || actions?.targetDeviceId
   if (!deviceId || !isIrrigation.value) { localChannelMapping.value = undefined; return }
-  const group = groupStore.groups.find(g => g.id === props.rule?.groupId)
-  const device = group?.devices?.find((d: any) => d.id === deviceId)
+  let device = deviceStore.devices.find(d => d.id === deviceId)
+    ?? groupStore.groups.find(g => g.id === props.rule?.groupId)?.devices?.find((d: any) => d.id === deviceId)
+  if (device && !(device as any).switchStates) {
+    await deviceStore.fetchDeviceStatus(deviceId)
+    device = deviceStore.devices.find(d => d.id === deviceId)
+  }
   localChannelMapping.value = device ? { ...deviceStore.getEffectiveMapping(device as any) } : undefined
 }
 
@@ -150,14 +154,14 @@ const reviewFormData = computed<WizardFormData>(() => {
 const canSave = computed(() => !!ruleName.value.trim())
 
 // visible 변경 시 폼 초기화
-watch(() => props.visible, (open) => {
+watch(() => props.visible, async (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
   if (!open || !props.rule) return
   step.value = 'condition'
   ruleName.value = props.rule.name
   ruleDescription.value = props.rule.description || ''
 
-  initChannelMapping()
+  await initChannelMapping()
 
   if (isIrrigation.value && props.rule.conditions) {
     irrigationForm.value = JSON.parse(JSON.stringify(props.rule.conditions))

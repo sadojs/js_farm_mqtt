@@ -160,10 +160,15 @@ const localChannelMapping = shallowRef<ChannelMapping | undefined>(undefined)
 // 장치 선택이 바뀌면 로컬 매핑 초기화
 watch(
   () => formData.value.actuatorDeviceIds[0],
-  (deviceId) => {
+  async (deviceId) => {
     if (!deviceId || !isIrrigation.value) { localChannelMapping.value = undefined; return }
-    const group = groupStore.groups.find(g => g.id === formData.value.groupId)
-    const device = group?.devices?.find((d: any) => d.id === deviceId)
+    let device = deviceStore.devices.find(d => d.id === deviceId)
+      ?? groupStore.groups.find(g => g.id === formData.value.groupId)?.devices?.find((d: any) => d.id === deviceId)
+    // switchStates 미로드 상태면 API 호출해서 포트 수 확정
+    if (device && !(device as any).switchStates) {
+      await deviceStore.fetchDeviceStatus(deviceId)
+      device = deviceStore.devices.find(d => d.id === deviceId)
+    }
     localChannelMapping.value = device ? { ...deviceStore.getEffectiveMapping(device as any) } : undefined
   },
   { immediate: true },
