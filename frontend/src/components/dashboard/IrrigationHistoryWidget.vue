@@ -15,6 +15,7 @@
           <span class="log-time">{{ formatTime(log.executedAt) }}</span>
         </div>
         <div class="log-summary">
+          <span v-if="log.conditionsMet?.groupName" class="summary-chip group">{{ log.conditionsMet.groupName }}</span>
           <span v-if="log.conditionsMet?.deviceName" class="summary-chip device">{{ log.conditionsMet.deviceName }}</span>
           <span v-if="log.conditionsMet?.startTime" class="summary-chip">{{ log.conditionsMet.startTime }}</span>
           <span v-if="log.conditionsMet?.enabledZones != null" class="summary-chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
@@ -151,6 +152,10 @@ onMounted(async () => {
   padding: 2px 8px;
   border-radius: 6px;
   white-space: nowrap;
+}
+.summary-chip.group {
+  color: #5c6bc0;
+  font-weight: 600;
 }
 .summary-chip.device {
   color: var(--accent);
