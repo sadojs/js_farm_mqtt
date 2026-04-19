@@ -209,16 +209,14 @@ import UserFormModal from '@/components/admin/UserFormModal.vue'
 import { userApi } from '../api/user.api'
 import { gatewayApi } from '../api/gateway.api'
 import { useAuthStore } from '../stores/auth.store'
+import apiClient from '../api/client'
 
 const cropFeatureMap = ref<Record<string, boolean>>({})
 
 async function fetchCropFeatureMap(): Promise<Record<string, boolean>> {
   try {
-    const res = await fetch('/api/crop-management/feature/all', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
-    })
-    if (!res.ok) return {}
-    return await res.json()
+    const { data } = await apiClient.get<Record<string, boolean>>('/crop-management/feature/all')
+    return data
   } catch {
     return {}
   }
@@ -228,17 +226,8 @@ async function toggleUserCropFeature(user: { id: string }) {
   const current = cropFeatureMap.value[user.id] !== false
   const next = !current
   try {
-    const res = await fetch(`/api/crop-management/feature/users/${user.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-      },
-      body: JSON.stringify({ enabled: next }),
-    })
-    if (res.ok) {
-      cropFeatureMap.value = { ...cropFeatureMap.value, [user.id]: next }
-    }
+    await apiClient.patch(`/crop-management/feature/users/${user.id}`, { enabled: next })
+    cropFeatureMap.value = { ...cropFeatureMap.value, [user.id]: next }
   } catch (err) {
     console.error('생육관리 설정 변경 실패:', err)
   }

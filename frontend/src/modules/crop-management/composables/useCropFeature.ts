@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue'
+import apiClient from '../../../api/client'
 
 interface FeatureState {
   enabled: boolean
@@ -12,12 +13,8 @@ const loaded = ref(false)
 
 async function fetchFeature() {
   try {
-    const res = await fetch('/api/crop-management/feature', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
-    })
-    if (res.ok) {
-      state.value = await res.json()
-    }
+    const { data } = await apiClient.get<FeatureState>('/crop-management/feature')
+    state.value = data
   } catch {
     // 오류 시 기본값 유지 (true)
   } finally {
@@ -26,15 +23,7 @@ async function fetchFeature() {
 }
 
 async function setFeature(enabled: boolean, scope: 'platform' | 'personal' = 'personal') {
-  const res = await fetch('/api/crop-management/feature', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-    },
-    body: JSON.stringify({ enabled, scope }),
-  })
-  if (!res.ok) throw new Error('설정 저장 실패')
+  await apiClient.patch('/crop-management/feature', { enabled, scope })
   await fetchFeature()
 }
 
