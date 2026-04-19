@@ -75,6 +75,12 @@ const router = createRouter({
       component: () => import('../views/ConfigDeploy.vue'),
       meta: { title: '설정 배포', requiresAuth: true, requiresAdmin: true }
     },
+    {
+      path: '/crop-management',
+      name: 'crop-management',
+      component: () => import('../modules/crop-management/CropManagementView.vue'),
+      meta: { title: '생육관리', requiresAuth: true }
+    },
   ]
 })
 

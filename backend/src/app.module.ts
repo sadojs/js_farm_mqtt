@@ -22,6 +22,7 @@ import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module
 import { HealthModule } from './modules/health/health.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { VoiceModule } from './modules/voice/voice.module';
+import { CropManagementModule } from './modules/crop-management/crop-management.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
@@ -58,6 +59,7 @@ import { RetentionService } from './common/retention.service';
     HealthModule,
     ActivityLogModule,
     VoiceModule,
+    CropManagementModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

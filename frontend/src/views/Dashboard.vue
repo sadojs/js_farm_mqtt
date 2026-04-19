@@ -81,6 +81,9 @@
 
       <!-- 관수 실행 이력 위젯 -->
       <IrrigationHistoryWidget v-else-if="widget.type === 'irrigation-history'" />
+
+      <!-- 생육 현황 위젯 -->
+      <GddDashboardWidget v-else-if="widget.type === 'gdd' && cropFeature.enabled" />
     </template>
   </div>
 </template>
@@ -91,7 +94,11 @@ import { dashboardApi } from '../api/dashboard.api'
 import SummaryCards from '../components/dashboard/SummaryCards.vue'
 import DeviceStatusCards from '../components/dashboard/DeviceStatusCards.vue'
 import IrrigationHistoryWidget from '../components/dashboard/IrrigationHistoryWidget.vue'
+import GddDashboardWidget from '../modules/crop-management/GddDashboardWidget.vue'
 import { useDashboardLayout } from '../composables/useDashboardLayout'
+import { useCropFeature } from '../modules/crop-management/composables/useCropFeature'
+
+const { feature: cropFeature } = useCropFeature()
 
 const { isEditMode, layout, visibleWidgets, toggleWidget, moveWidget, enterEditMode, exitEditMode, resetLayout } = useDashboardLayout()
 
