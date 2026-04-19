@@ -59,25 +59,6 @@
         </router-link>
       </nav>
 
-      <!-- 폰트 크기 조절 -->
-      <div class="font-size-control">
-        <span class="font-size-label">글자 크기</span>
-        <div class="font-size-buttons">
-          <button :class="{ active: fontSize === 'sm' }" @click="setFontSize('sm')">가</button>
-          <button :class="{ active: fontSize === 'md' }" @click="setFontSize('md')">가</button>
-          <button :class="{ active: fontSize === 'lg' }" @click="setFontSize('lg')">가</button>
-        </div>
-      </div>
-
-      <!-- 테마 모드 -->
-      <div class="theme-control">
-        <span class="theme-label">화면 모드</span>
-        <div class="theme-buttons">
-          <button :class="{ active: theme === 'light' }" @click="setTheme('light')">밝게</button>
-          <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">어둡게</button>
-        </div>
-      </div>
-
       <!-- 알림 + 시계/버전 -->
       <div class="sidebar-bottom-info">
         <div class="sidebar-notification-row">
@@ -258,7 +239,7 @@ const isAdmin = computed(() => authStore.isAdmin)
 const isFarmUser = computed(() => authStore.isFarmUser)
 const isFarmAdmin = computed(() => authStore.isFarmAdmin)
 
-const { feature: cropFeature, setFeature: setCropFeature } = useCropFeature()
+const { feature: cropFeature, fetchFeature: fetchCropFeature, setFeature: setCropFeature } = useCropFeature()
 const showSettings = ref(false)
 
 async function toggleCropFeature() {
@@ -309,6 +290,7 @@ function setTheme(mode: ThemeMode) {
 onMounted(() => {
   if (authStore.isAuthenticated) {
     connect()
+    fetchCropFeature()
   }
   updateClock()
   clockTimer = setInterval(updateClock, 10000)
