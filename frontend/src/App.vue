@@ -37,7 +37,7 @@
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
           <span>기록 보기</span>
         </router-link>
-        <router-link to="/crop-management" class="sidebar-link">
+        <router-link v-if="cropFeature.enabled" to="/crop-management" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M8 12a4 4 0 0 1 8 0"/><path d="M12 12V2"/></svg></span>
           <span>생육관리</span>
         </router-link>
@@ -97,6 +97,9 @@
             <span class="user-name">{{ userName }}</span>
             <span class="user-role">{{ userRole }}</span>
           </div>
+          <button class="btn-settings" @click="showSettings = true" aria-label="환경설정" title="환경설정">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
         </div>
         <button class="btn-logout" @click="handleLogout" aria-label="로그아웃">
           로그아웃
@@ -112,7 +115,14 @@
         <span></span>
       </button>
       <div class="mobile-brand">스마트팜</div>
-      <NotificationCenter />
+      <div class="mobile-header-actions">
+        <div class="mobile-fontsize-toggle" aria-label="글자 크기">
+          <button :class="['btn-font-sm', { active: fontSize === 'sm' }]" @click="setFontSize('sm')" aria-label="작게">가</button>
+          <button :class="['btn-font-md', { active: fontSize === 'md' }]" @click="setFontSize('md')" aria-label="보통">가</button>
+          <button :class="['btn-font-lg', { active: fontSize === 'lg' }]" @click="setFontSize('lg')" aria-label="크게">가</button>
+        </div>
+        <NotificationCenter />
+      </div>
     </header>
 
     <!-- 모바일 드로어 오버레이 -->
@@ -164,7 +174,7 @@
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
           <span>기록 보기</span>
         </router-link>
-        <router-link to="/crop-management" class="sidebar-link" @click="isDrawerOpen = false">
+        <router-link v-if="cropFeature.enabled" to="/crop-management" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M8 12a4 4 0 0 1 8 0"/><path d="M12 12V2"/></svg></span>
           <span>생육관리</span>
         </router-link>
@@ -186,25 +196,6 @@
         </router-link>
       </nav>
 
-      <!-- 모바일 폰트 크기 조절 -->
-      <div class="font-size-control">
-        <span class="font-size-label">글자 크기</span>
-        <div class="font-size-buttons">
-          <button :class="{ active: fontSize === 'sm' }" @click="setFontSize('sm')">가</button>
-          <button :class="{ active: fontSize === 'md' }" @click="setFontSize('md')">가</button>
-          <button :class="{ active: fontSize === 'lg' }" @click="setFontSize('lg')">가</button>
-        </div>
-      </div>
-
-      <!-- 모바일 테마 모드 -->
-      <div class="theme-control">
-        <span class="theme-label">화면 모드</span>
-        <div class="theme-buttons">
-          <button :class="{ active: theme === 'light' }" @click="setTheme('light')">밝게</button>
-          <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">어둡게</button>
-        </div>
-      </div>
-
       <div class="sidebar-footer">
         <div class="sidebar-user">
           <div class="user-avatar">{{ userInitial }}</div>
@@ -212,6 +203,9 @@
             <span class="user-name">{{ userName }}</span>
             <span class="user-role">{{ userRole }}</span>
           </div>
+          <button class="btn-settings" @click="showSettings = true; isDrawerOpen = false" aria-label="환경설정" title="환경설정">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
         </div>
         <button class="btn-logout" @click="handleLogout" aria-label="로그아웃">
           로그아웃
@@ -227,6 +221,17 @@
     <ConfirmDialog />
     <ToastContainer />
     <VoiceAssistant v-if="isAuthenticated" />
+    <UserSettingsModal
+      v-if="showSettings"
+      :fontSize="fontSize"
+      :theme="theme"
+      :isFarmAdmin="isFarmAdmin"
+      :cropFeature="cropFeature"
+      @close="showSettings = false"
+      @set-font="setFontSize"
+      @set-theme="setTheme"
+      @toggle-crop="toggleCropFeature"
+    />
   </div>
 </template>
 
@@ -240,6 +245,8 @@ import ConfirmDialog from './components/common/ConfirmDialog.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
 import NotificationCenter from './components/common/NotificationCenter.vue'
 import VoiceAssistant from './modules/voice-assistant/VoiceAssistant.vue'
+import UserSettingsModal from './components/common/UserSettingsModal.vue'
+import { useCropFeature } from './modules/crop-management/composables/useCropFeature'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -249,6 +256,14 @@ const { connect, disconnect } = useWebSocket()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const isFarmUser = computed(() => authStore.isFarmUser)
+const isFarmAdmin = computed(() => authStore.isFarmAdmin)
+
+const { feature: cropFeature, setFeature: setCropFeature } = useCropFeature()
+const showSettings = ref(false)
+
+async function toggleCropFeature() {
+  await setCropFeature(!cropFeature.value.userEnabled, 'personal')
+}
 const userName = computed(() => authStore.user?.name || '사용자')
 const userRole = computed(() => {
   if (isAdmin.value) return '플랫폼 관리자'
@@ -798,6 +813,28 @@ body {
   color: var(--danger);
 }
 
+.btn-settings {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: none;
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-settings:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ========== 메인 콘텐츠 ========== */
 .main-content {
   flex: 1;
@@ -911,6 +948,42 @@ body {
   .mobile-brand {
     font-size: 18px;
     font-weight: 700;
+    color: var(--accent);
+  }
+
+  .mobile-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-fontsize-toggle {
+    display: flex;
+    gap: 2px;
+  }
+
+  .mobile-fontsize-toggle button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    color: var(--text-link);
+    font-weight: 600;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-font-sm { font-size: 11px; }
+  .btn-font-md { font-size: 13px; }
+  .btn-font-lg { font-size: 15px; }
+
+  .mobile-fontsize-toggle button.active {
+    background: var(--accent-bg);
+    border-color: var(--accent);
     color: var(--accent);
   }
 

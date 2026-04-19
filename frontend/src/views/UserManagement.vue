@@ -25,58 +25,68 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in users" :key="user.id">
-            <td>
-              <div class="user-name">
-                <div class="user-avatar">{{ user.name.charAt(0) }}</div>
-                <span>{{ user.name }}</span>
-              </div>
-            </td>
-            <td>{{ user.username }}</td>
-            <td>
-              <span class="role-badge" :class="user.role">
-                {{ roleLabel(user.role) }}
-              </span>
-              <span v-if="user.parentUserName" class="parent-badge">
-                {{ user.parentUserName }}
-              </span>
-            </td>
-            <td>
-              <span class="address-text">{{ user.address || '-' }}</span>
-            </td>
-            <td>
-              <div v-if="user.gateways?.length" class="gateway-list">
-                <span v-for="gw in user.gateways" :key="gw.id" class="gateway-tag" :class="gw.status">
-                  {{ gw.gatewayId }}
+          <template v-for="user in users" :key="user.id">
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar">{{ user.name.charAt(0) }}</div>
+                  <span>{{ user.name }}</span>
+                </div>
+              </td>
+              <td>{{ user.username }}</td>
+              <td>
+                <span class="role-badge" :class="user.role">
+                  {{ roleLabel(user.role) }}
                 </span>
-              </div>
-              <span v-else class="text-muted">미등록</span>
-            </td>
-            <td>{{ user.createdAt }}</td>
-            <td>
-              <span class="status-badge" :class="user.status">
-                {{ user.status === 'active' ? '활성' : '비활성' }}
-              </span>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button
-                  class="btn-icon"
-                  title="편집"
-                  @click="editUser(user)"
-                >
-                  ✏️
-                </button>
-                <button
-                  class="btn-icon danger"
-                  title="삭제"
-                  @click="deleteUser(user)"
-                >
-                  🗑️
-                </button>
-              </div>
-            </td>
-          </tr>
+                <span v-if="user.parentUserName" class="parent-badge">
+                  {{ user.parentUserName }}
+                </span>
+              </td>
+              <td>
+                <span class="address-text">{{ user.address || '-' }}</span>
+              </td>
+              <td>
+                <div v-if="user.gateways?.length" class="gateway-list">
+                  <span v-for="gw in user.gateways" :key="gw.id" class="gateway-tag" :class="gw.status">
+                    {{ gw.gatewayId }}
+                  </span>
+                </div>
+                <span v-else class="text-muted">미등록</span>
+              </td>
+              <td>{{ user.createdAt }}</td>
+              <td>
+                <span class="status-badge" :class="user.status">
+                  {{ user.status === 'active' ? '활성' : '비활성' }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn-icon" title="편집" @click="editUser(user)">✏️</button>
+                  <button class="btn-icon danger" title="삭제" @click="deleteUser(user)">🗑️</button>
+                </div>
+              </td>
+            </tr>
+            <!-- 2행: 기능 설정 (farm_admin만) -->
+            <tr v-if="user.role === 'farm_admin'" class="user-feature-row">
+              <td colspan="8">
+                <div class="feature-row-inner">
+                  <span class="features-label">기능 설정</span>
+                  <div class="feature-toggle-item">
+                    <span class="feature-toggle-name">🌱 생육관리</span>
+                    <button
+                      class="toggle-btn"
+                      :class="{ on: cropFeatureMap[user.id] !== false }"
+                      @click="toggleUserCropFeature(user)"
+                      :title="cropFeatureMap[user.id] !== false ? '끄기' : '켜기'"
+                    >
+                      <span class="toggle-knob" />
+                    </button>
+                    <span class="toggle-state-label">{{ cropFeatureMap[user.id] !== false ? '켜짐' : '꺼짐' }}</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
 
@@ -200,6 +210,40 @@ import { userApi } from '../api/user.api'
 import { gatewayApi } from '../api/gateway.api'
 import { useAuthStore } from '../stores/auth.store'
 
+const cropFeatureMap = ref<Record<string, boolean>>({})
+
+async function fetchCropFeatureMap(): Promise<Record<string, boolean>> {
+  try {
+    const res = await fetch('/api/crop-management/feature/all', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
+    })
+    if (!res.ok) return {}
+    return await res.json()
+  } catch {
+    return {}
+  }
+}
+
+async function toggleUserCropFeature(user: { id: string }) {
+  const current = cropFeatureMap.value[user.id] !== false
+  const next = !current
+  try {
+    const res = await fetch(`/api/crop-management/feature/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+      body: JSON.stringify({ enabled: next }),
+    })
+    if (res.ok) {
+      cropFeatureMap.value = { ...cropFeatureMap.value, [user.id]: next }
+    }
+  } catch (err) {
+    console.error('생육관리 설정 변경 실패:', err)
+  }
+}
+
 interface User {
   id: string
   name: string
@@ -242,8 +286,12 @@ const farmAdminUsers = computed(() =>
 async function fetchUsers() {
   loading.value = true
   try {
-    const { data } = await userApi.getAll()
+    const [{ data }, featureMap] = await Promise.all([
+      userApi.getAll(),
+      fetchCropFeatureMap(),
+    ])
     users.value = data as any
+    cropFeatureMap.value = featureMap
   } catch (err) {
     console.error('사용자 목록 조회 실패:', err)
   } finally {
@@ -739,6 +787,82 @@ const saveUser = async (userData: any) => {
   border: 1px solid var(--border-input, #ddd);
   border-radius: 8px;
   cursor: pointer;
+}
+
+.user-feature-row td {
+  padding: 0;
+  border-bottom: 2px solid var(--border-light);
+}
+
+.feature-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  flex-wrap: wrap;
+}
+
+.features-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.feature-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feature-toggle-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.toggle-btn {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--border-color, #ccc);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.toggle-btn.on {
+  background: #4caf50;
+}
+
+.toggle-btn .toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  display: block;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-btn.on .toggle-knob {
+  transform: translateX(18px);
+}
+
+.toggle-state-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 28px;
 }
 
 @media (max-width: 1024px) {
