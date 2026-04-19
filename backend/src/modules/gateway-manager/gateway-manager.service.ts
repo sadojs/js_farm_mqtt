@@ -86,4 +86,15 @@ export class GatewayManagerService {
       { status, lastSeen: new Date() },
     );
   }
+
+  async updateZigbeeStatus(gatewayId: string, zigbeeStatus: string) {
+    await this.gatewayRepo.update({ gatewayId }, { zigbeeStatus });
+  }
+
+  async updateAgentStatus(gatewayId: string, agentStatus: string) {
+    await this.gatewayRepo.update(
+      { gatewayId },
+      { agentStatus, status: agentStatus, lastSeen: new Date() },
+    );
+  }
 }

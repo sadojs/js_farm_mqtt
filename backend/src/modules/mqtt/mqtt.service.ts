@@ -72,6 +72,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       'farm/+/z2m/bridge/state',        // 게이트웨이 상태
       'farm/+/z2m/bridge/devices',      // 페어링된 장비 목록
       'farm/+/config/response',         // Config Agent 응답
+      'farm/+/agent/status',            // Config Agent 하트비트
     ];
 
     for (const topic of topics) {
@@ -96,6 +97,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     // Config Agent 응답: farm/{gw}/config/response
     if (namespace === 'config' && parts[3] === 'response') {
       this.configDeployService?.handleConfigResponse(gatewayId, payload);
+      return;
+    }
+
+    // Config Agent 하트비트: farm/{gw}/agent/status
+    if (namespace === 'agent' && parts[3] === 'status') {
+      this.bridgeHandler.handleAgentStatus(gatewayId, payload);
       return;
     }
 

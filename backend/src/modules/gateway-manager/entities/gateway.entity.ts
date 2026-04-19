@@ -26,6 +26,12 @@ export class Gateway {
   @Column({ default: 'offline' })
   status: string;
 
+  @Column({ name: 'agent_status', default: 'offline' })
+  agentStatus: string;
+
+  @Column({ name: 'zigbee_status', default: 'offline' })
+  zigbeeStatus: string;
+
   @Column({ name: 'last_seen', nullable: true })
   lastSeen: Date;
 

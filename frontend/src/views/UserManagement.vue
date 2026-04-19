@@ -89,6 +89,7 @@
     <header class="page-header" style="margin-top: 40px;">
       <h2>📡 게이트웨이 관리</h2>
       <p class="page-description">라즈베리파이 Zigbee 게이트웨이를 등록하고 관리하세요</p>
+      <button class="btn-secondary" @click="fetchGateways" title="새로고침">🔄 새로고침</button>
       <button class="btn-primary" @click="openNewGatewayModal">
         + 게이트웨이 등록
       </button>
@@ -102,7 +103,9 @@
             <th>이름</th>
             <th>소유자</th>
             <th>위치</th>
-            <th>상태</th>
+            <th>Pi 상태</th>
+            <th>Zigbee 상태</th>
+            <th>최종 접속</th>
             <th>작업</th>
           </tr>
         </thead>
@@ -113,9 +116,17 @@
             <td>{{ getUserName(gw.userId) }}</td>
             <td>{{ gw.location || '-' }}</td>
             <td>
-              <span class="status-badge" :class="gw.status === 'online' ? 'active' : 'inactive'">
-                {{ gw.status === 'online' ? '🟢 온라인' : '🔴 오프라인' }}
+              <span class="status-badge" :class="gw.agentStatus === 'online' ? 'active' : 'inactive'">
+                {{ gw.agentStatus === 'online' ? '🟢 온라인' : '🔴 오프라인' }}
               </span>
+            </td>
+            <td>
+              <span class="status-badge" :class="gw.zigbeeStatus === 'online' ? 'active' : (gw.agentStatus === 'online' ? 'warning' : 'inactive')">
+                {{ gw.zigbeeStatus === 'online' ? '🟢 연결됨' : (gw.agentStatus === 'online' ? '🟡 동글 없음' : '🔴 오프라인') }}
+              </span>
+            </td>
+            <td>
+              <span class="last-seen-text">{{ formatLastSeen(gw.lastSeen) }}</span>
             </td>
             <td>
               <div class="action-buttons">
@@ -247,6 +258,17 @@ async function fetchGateways() {
   } catch {
     gatewayList.value = []
   }
+}
+
+function formatLastSeen(lastSeen: string | null): string {
+  if (!lastSeen) return '-'
+  const diff = Date.now() - new Date(lastSeen).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return '방금 전'
+  if (min < 60) return `${min}분 전`
+  const hour = Math.floor(min / 60)
+  if (hour < 24) return `${hour}시간 전`
+  return `${Math.floor(hour / 24)}일 전`
 }
 
 /** 모든 데이터 새로고침 */
@@ -569,6 +591,16 @@ const saveUser = async (userData: any) => {
 .status-badge.inactive {
   background: #ffebee;
   color: #c62828;
+}
+
+.status-badge.warning {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.last-seen-text {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .action-buttons {

@@ -21,8 +21,20 @@ export class MqttBridgeHandler {
       return;
     }
 
-    await this.gatewayService.updateStatus(gatewayId, data.state);
-    this.logger.log(`게이트웨이 ${gatewayId} → ${data.state}`);
+    await this.gatewayService.updateZigbeeStatus(gatewayId, data.state);
+    this.logger.log(`게이트웨이 ${gatewayId} Zigbee → ${data.state}`);
+  }
+
+  async handleAgentStatus(gatewayId: string, payload: Buffer) {
+    let data: { status: string };
+    try {
+      data = JSON.parse(payload.toString());
+    } catch {
+      return;
+    }
+
+    await this.gatewayService.updateAgentStatus(gatewayId, data.status);
+    this.logger.log(`게이트웨이 ${gatewayId} Agent → ${data.status}`);
   }
 
   async handleBridgeDevices(gatewayId: string, payload: Buffer) {

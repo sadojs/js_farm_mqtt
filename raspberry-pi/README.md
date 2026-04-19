@@ -5,20 +5,22 @@
 ## 시스템 구성
 
 ```
-라즈베리파이 (게이트웨이)              맥미니 (서버)
+라즈베리파이 (게이트웨이)              개발 서버 (맥북/서버)
 ┌───────────────────────┐         ┌──────────────────────┐
 │ Zigbee2MQTT           │         │ Mosquitto (Broker)   │
 │   - Zigbee 장비 관리   │──MQTT──▶│ Backend (NestJS)     │
 │   - 센서 데이터 수집   │         │ Frontend (Vue 3)     │
-│ Config Agent          │         │ PostgreSQL + Redis   │
+│ Config Agent          │◀ MQTT ──│ PostgreSQL           │
 │   - 원격 설정 배포 수신 │         │                      │
-│ Tuya ZNDongle-E (USB) │         │                      │
+│   - Pi 상태 하트비트   │         │                      │
+│ Zigbee ZNDongle (USB) │         │                      │
 └───────────────────────┘         └──────────────────────┘
 ```
 
-- MQTT Broker는 **맥미니에서 실행** (방식 A: 중앙 Broker)
+- MQTT Broker는 **개발 서버(맥북 등)에서 실행** (방식 A: 중앙 Broker)
 - 라즈베리파이는 Zigbee2MQTT + Config Agent만 실행
 - 라즈베리파이가 NAT 뒤에 있어도 동작 (아웃바운드 MQTT 연결)
+- **게이트웨이 이중 상태**: Pi 상태(config-agent 하트비트) + Zigbee 상태(Z2M bridge) 별도 표시
 
 ---
 
@@ -34,10 +36,11 @@
 | 이더넷 케이블 또는 WiFi | 네트워크 연결용 | 유선 권장 (안정성) |
 | SD카드 리더기 | 맥에서 SD카드 굽기용 | |
 
-또한 맥미니에서 미리 확인할 것:
-- 맥미니의 IP 주소 (예: `172.30.1.60`)
-- 맥미니에서 Mosquitto(MQTT Broker)가 실행 중인지 확인
-- 게이트웨이에 부여할 ID (예: `farm01`, `farm02`)
+또한 개발 서버에서 미리 확인할 것:
+- 개발 서버(맥북)의 IP 주소 (예: `172.30.1.42`)
+- 서버에서 Mosquitto(MQTT Broker)가 실행 중인지 확인
+- MQTT 사용자명 및 비밀번호 (Mosquitto 설정과 일치해야 함)
+- 게이트웨이에 부여할 ID (예: `farm01`, `lgw-dev`)
 
 ---
 
@@ -206,15 +209,20 @@ sudo bash setup.sh
 ============================================
 
 게이트웨이 ID (예: farm01): farm01          ← 이 파이의 고유 ID 입력
-맥미니(서버) IP 주소 (예: 172.30.1.60): 172.30.1.60    ← 맥미니 IP 입력
+개발 서버 IP 주소 (예: 172.30.1.42): 172.30.1.42    ← 서버 IP 입력
+MQTT 사용자명 (기본: smartfarm): smartfarm         ← Enter 누르면 기본값 사용
+MQTT 비밀번호: ****                               ← Mosquitto 비밀번호 입력
 ```
 
-이후 자동으로 진행됩니다 (약 5~10분):
+> **MQTT 인증**: Mosquitto를 `allow_anonymous false`로 설정한 경우 반드시 사용자명/비밀번호를 입력해야 합니다.
+> 개발 환경에서 `allow_anonymous true`라면 아무 값이나 입력해도 됩니다.
+
+이후 자동으로 진행됩니다 (약 10~20분):
 
 ```
 [INFO] Step 1/5: 시스템 업데이트...
 [INFO] Step 2/5: Node.js 20.x 설치...
-[INFO] Step 3/5: Zigbee2MQTT 설치...          ← 가장 오래 걸림 (npm ci)
+[INFO] Step 3/5: Zigbee2MQTT 설치...          ← 가장 오래 걸림 (pnpm install + build)
 [INFO] Step 4/5: USB 권한 및 서비스 등록...
 [INFO] Step 5/5: Config Agent 설치...
 
@@ -225,12 +233,14 @@ sudo bash setup.sh
   게이트웨이 ID:     farm01
   MQTT 토픽:         farm/farm01/z2m/#
   Zigbee2MQTT 웹UI:  http://172.30.1.xx:8080
-  연결 대상 Broker:   mqtt://172.30.1.60:1883
+  연결 Broker:       mqtt://172.30.1.42:1883
 
-  Config Agent:      MQTT 기반 원격 설정 관리
-    설정 배포 토픽:   farm/farm01/config/request
-    자동 롤백:       60초 내 MQTT 재연결 실패 시
+  서비스 상태 확인:
+    sudo systemctl status config-agent
+    sudo systemctl status zigbee2mqtt
 ```
+
+> **Zigbee 동글 미연결 시**: setup.sh가 `/dev/ttyUSB0` 또는 `/dev/ttyZigbee`를 감지하지 못하면 zigbee2mqtt 서비스는 시작하지 않습니다. 동글 연결 후 `sudo systemctl start zigbee2mqtt`로 수동 시작하세요.
 
 ---
 
@@ -279,14 +289,16 @@ ls -la /dev/ttyZigbee
 
 ---
 
-## Step 6: 맥미니 웹서비스에서 게이트웨이 등록
+## Step 6: 서버 웹서비스에서 게이트웨이 등록
 
-1. 스마트팜 웹 (`http://localhost:5174`) 접속
-2. **장비 관리** 페이지로 이동
+1. 스마트팜 웹 (`https://localhost:5174`) 접속
+2. **사용자 관리** → **게이트웨이 관리** 또는 **장비 관리** 페이지로 이동
 3. 게이트웨이 추가:
    - 게이트웨이 ID: `farm01` (setup.sh에서 입력한 값)
    - 이름: `1동 하우스` (원하는 이름)
    - 위치: `하우스 1동` (선택)
+4. config-agent가 MQTT로 연결되면 **Pi 상태**가 🟢 온라인으로 바뀝니다
+5. Zigbee 동글이 연결되면 **Zigbee 상태**도 🟢 연결됨으로 바뀝니다
 
 ---
 
@@ -358,11 +370,22 @@ sudo systemctl restart zigbee2mqtt config-agent
 farm/{게이트웨이ID}/z2m/{장비이름}               → 센서 데이터 (JSON)
 farm/{게이트웨이ID}/z2m/{장비이름}/set           ← 장비 제어 명령
 farm/{게이트웨이ID}/z2m/{장비이름}/availability  → 온라인/오프라인
-farm/{게이트웨이ID}/z2m/bridge/state             → 게이트웨이 상태
+farm/{게이트웨이ID}/z2m/bridge/state             → Zigbee 브릿지 상태 (zigbeeStatus)
 farm/{게이트웨이ID}/z2m/bridge/devices           → 페어링된 장비 목록
 farm/{게이트웨이ID}/config/request               ← 서버→파이: 설정 배포 요청
 farm/{게이트웨이ID}/config/response              → 파이→서버: 설정 배포 결과
+farm/{게이트웨이ID}/agent/status                 → 파이→서버: Pi 상태 하트비트 (agentStatus, 60초 주기)
 ```
+
+### 게이트웨이 이중 상태
+
+| 상태 | MQTT 토픽 | 의미 |
+|------|-----------|------|
+| **Pi 상태** (agentStatus) | `farm/{gw}/agent/status` | config-agent 프로세스 생존 여부 |
+| **Zigbee 상태** (zigbeeStatus) | `farm/{gw}/z2m/bridge/state` | Zigbee2MQTT + 동글 연결 여부 |
+
+- Pi 상태 = 🟢 온라인, 동글 없음 → Zigbee 상태 = 🟡 동글 없음 (정상)
+- Pi 상태 = 🟢 온라인, 동글 있음 → 둘 다 🟢 (완전 정상)
 
 ---
 
@@ -401,18 +424,37 @@ node index.js
 ### MQTT Broker 연결 안됨
 
 ```bash
-# 맥미니에서 Mosquitto 확인 (맥미니 터미널에서)
-docker compose ps | grep mosquitto
-# sfm-mosquitto   running   0.0.0.0:1883->1883/tcp
+# 개발 서버에서 Mosquitto 확인
+brew services list | grep mosquitto
+# mosquitto  started  ...
 
-# 라즈베리파이에서 연결 테스트
+# 라즈베리파이에서 연결 테스트 (MQTT 인증 사용 시)
 apt install -y mosquitto-clients
-mosquitto_pub -h 172.30.1.60 -t "test" -m "hello"
+mosquitto_pub -h 172.30.1.42 -u smartfarm -P 비밀번호 -t "test" -m "hello"
 # 오류 없으면 성공
 
-# 방화벽 문제 시 (맥미니에서)
-# macOS는 기본적으로 방화벽 OFF
-# 만약 켜져있다면: 시스템 설정 > 네트워크 > 방화벽 > 1883 포트 허용
+# 방화벽 문제 시 (개발 서버 맥북에서)
+# macOS는 기본적으로 방화벽 OFF (시스템 설정 > 네트워크 > 방화벽 확인)
+# 켜져있다면 1883 포트 허용 또는 방화벽 비활성화 (개발 환경)
+```
+
+### config-agent MQTT 인증 오류
+
+```bash
+# 로그에서 인증 오류 확인
+journalctl -u config-agent -n 20 --no-pager
+# "Connection refused: Not authorized" → 사용자명/비밀번호 불일치
+
+# 서비스 환경변수 확인
+cat /etc/systemd/system/config-agent.service | grep -E "MQTT|GATEWAY"
+# GATEWAY_ID=farm01
+# MQTT_SERVER=mqtt://172.30.1.42:1883
+# MQTT_USERNAME=smartfarm
+# MQTT_PASSWORD=...
+
+# 환경변수 수정 후 재시작
+sudo systemctl daemon-reload
+sudo systemctl restart config-agent
 ```
 
 ### Config Agent 미동작

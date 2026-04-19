@@ -7,6 +7,8 @@ const ConfigManager = require('./config-manager');
 // ---- 환경 변수 ----
 const GATEWAY_ID = process.env.GATEWAY_ID;
 const MQTT_SERVER = process.env.MQTT_SERVER;
+const MQTT_USERNAME = process.env.MQTT_USERNAME;
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD;
 const Z2M_CONFIG_PATH = process.env.Z2M_CONFIG_PATH || '/opt/zigbee2mqtt/data/configuration.yaml';
 const AGENT_VERSION = '1.0.0';
 
@@ -17,6 +19,7 @@ if (!GATEWAY_ID || !MQTT_SERVER) {
 
 const TOPIC_REQUEST = `farm/${GATEWAY_ID}/config/request`;
 const TOPIC_RESPONSE = `farm/${GATEWAY_ID}/config/response`;
+const TOPIC_AGENT_STATUS = `farm/${GATEWAY_ID}/agent/status`;
 
 const configManager = new ConfigManager(Z2M_CONFIG_PATH);
 let client;
@@ -30,6 +33,8 @@ function connect() {
     clientId: `config-agent-${GATEWAY_ID}-${Date.now()}`,
     clean: true,
     reconnectPeriod: 5000,
+    ...(MQTT_USERNAME && { username: MQTT_USERNAME }),
+    ...(MQTT_PASSWORD && { password: MQTT_PASSWORD }),
   });
 
   client.on('connect', () => {
@@ -49,6 +54,13 @@ function connect() {
         console.log(`[CONFIG-AGENT] 구독: ${TOPIC_REQUEST}`);
       }
     });
+
+    // 온라인 상태 즉시 발행
+    publishAgentStatus('online');
+    // 60초마다 하트비트
+    if (!client._heartbeatTimer) {
+      client._heartbeatTimer = setInterval(() => publishAgentStatus('online'), 60_000);
+    }
   });
 
   client.on('message', (topic, payload) => {
@@ -191,6 +203,13 @@ function sendResponse(requestId, action, success, extra = {}) {
     });
   } else {
     console.warn('[CONFIG-AGENT] MQTT 미연결 - 응답 전송 불가');
+  }
+}
+
+// ---- Agent 상태 발행 ----
+function publishAgentStatus(status) {
+  if (client && client.connected) {
+    client.publish(TOPIC_AGENT_STATUS, JSON.stringify({ status, timestamp: new Date().toISOString() }), { qos: 1 });
   }
 }
 

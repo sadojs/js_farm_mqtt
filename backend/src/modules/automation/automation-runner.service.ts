@@ -5,10 +5,8 @@ import { DataSource, Repository } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { AutomationLog } from './entities/automation-log.entity';
 import { Device } from '../devices/entities/device.entity';
-import { TuyaProject } from '../users/entities/tuya-project.entity';
-import { TuyaService } from '../integrations/tuya/tuya.service';
 import { EventsGateway } from '../gateway/events.gateway';
-import { decryptTuyaSecret } from '../../common/utils/crypto.util';
+import { DevicesService } from '../devices/devices.service';
 
 type LogicOp = 'AND' | 'OR';
 
@@ -26,10 +24,8 @@ export class AutomationRunnerService {
     private readonly logsRepo: Repository<AutomationLog>,
     @InjectRepository(Device)
     private readonly devicesRepo: Repository<Device>,
-    @InjectRepository(TuyaProject)
-    private readonly tuyaRepo: Repository<TuyaProject>,
-    private readonly tuyaService: TuyaService,
     private readonly eventsGateway: EventsGateway,
+    private readonly devicesService: DevicesService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -59,7 +55,7 @@ export class AutomationRunnerService {
         actionResults.push(executed);
       }
 
-      this.eventsGateway.broadcastAutomationExecuted({
+      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
         ruleId: rule.id,
         ruleName: rule.name,
         success: true,
@@ -132,7 +128,7 @@ export class AutomationRunnerService {
         await this.markOnceConditionsExecuted(rule, conditionResult.onceConditionHits, evaluatedAt);
       }
 
-      this.eventsGateway.broadcastAutomationExecuted({
+      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
         ruleId: rule.id,
         ruleName: rule.name,
         success: true,
@@ -142,7 +138,7 @@ export class AutomationRunnerService {
       success = false;
       errorMessage = err?.message || '자동 제어 액션 실행 실패';
       this.logger.error(`Rule ${rule.id} execution failed: ${errorMessage}`);
-      this.eventsGateway.broadcastAutomationExecuted({
+      this.eventsGateway.broadcastAutomationExecuted(rule.userId, {
         ruleId: rule.id,
         ruleName: rule.name,
         success: false,
@@ -515,14 +511,6 @@ export class AutomationRunnerService {
   }
 
   private async executeAction(rule: AutomationRule, action: any) {
-    const credentials = await this.tuyaRepo.findOne({
-      where: { userId: rule.userId, enabled: true },
-    });
-    if (!credentials) {
-      throw new Error('활성화된 Tuya 프로젝트 설정이 없습니다.');
-    }
-
-    // targetDeviceId(단일) 또는 targetDeviceIds(배열)가 있으면 특정 장비를 사용
     let candidateDevices: Device[];
     const targetIds = action?.targetDeviceId
       ? [action.targetDeviceId]
@@ -541,7 +529,7 @@ export class AutomationRunnerService {
       throw new Error(`제어 가능한 장비를 찾을 수 없습니다.`);
     }
 
-    const commands = this.buildCommandCandidates(action);
+    const commands = this.buildCommands(action);
     if (commands.length === 0) {
       throw new Error(`지원하지 않는 명령입니다. command=${action?.command || 'unknown'}`);
     }
@@ -549,46 +537,13 @@ export class AutomationRunnerService {
     const results: any[] = [];
     for (const device of candidateDevices) {
       this.logger.log(
-        `자동 제어 명령 전송: rule=${rule.name}, device=${device.name}(${device.tuyaDeviceId}), command=${JSON.stringify(commands[0])}`,
+        `자동 제어 명령 전송: rule=${rule.name}, device=${device.name}(${device.id}), command=${JSON.stringify(commands)}`,
       );
-      let sent = false;
-      let lastError = '';
-      for (const commandSet of commands) {
-        try {
-          const res = await this.tuyaService.sendDeviceCommand(
-            {
-              accessId: credentials.accessId,
-              accessSecret: decryptTuyaSecret(credentials.accessSecretEncrypted),
-              endpoint: credentials.endpoint,
-            },
-            device.tuyaDeviceId,
-            commandSet,
-          );
-          if (res?.success) {
-            sent = true;
-            results.push({
-              deviceId: device.id,
-              deviceName: device.name,
-              tuyaDeviceId: device.tuyaDeviceId,
-              success: true,
-              commands: commandSet,
-            });
-            break;
-          }
-          lastError = res?.msg || 'Tuya command failed';
-        } catch (err: any) {
-          lastError = err?.response?.data?.msg || err?.message || 'Tuya command failed';
-        }
-      }
-
-      if (!sent) {
-        results.push({
-          deviceId: device.id,
-          deviceName: device.name,
-          tuyaDeviceId: device.tuyaDeviceId,
-          success: false,
-          error: lastError || 'Unknown error',
-        });
+      try {
+        await this.devicesService.controlDevice(device.id, rule.userId, commands);
+        results.push({ deviceId: device.id, deviceName: device.name, success: true, commands });
+      } catch (err: any) {
+        results.push({ deviceId: device.id, deviceName: device.name, success: false, error: err?.message });
       }
     }
 
@@ -597,10 +552,7 @@ export class AutomationRunnerService {
       throw new Error(`일부 장비 명령 전송 실패: ${JSON.stringify(results)}`);
     }
 
-    return {
-      action,
-      devices: results,
-    };
+    return { action, devices: results };
   }
 
   private async findTargetDevices(rule: AutomationRule, deviceType?: string) {
@@ -639,56 +591,10 @@ export class AutomationRunnerService {
     return false;
   }
 
-  private buildCommandCandidates(action: any): { code: string; value: any }[][] {
+  private buildCommands(action: any): { code: string; value: any }[] {
     const command = action?.command;
-    const deviceType = action?.deviceType;
-    const params = action?.parameters || {};
-
-    // 새로운 형식: targetDeviceIds/targetDeviceId + on/off 명령
-    if (action?.targetDeviceId || (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds.length > 0)) {
-      const isOn = command !== 'off';
-      return [
-        [{ code: 'switch_1', value: isOn }],
-        [{ code: 'switch', value: isOn }],
-      ];
-    }
-
-    if (deviceType === 'roof_actuator') {
-      const isOpen = command === 'open';
-      const percentage = Number(params.percentage ?? (isOpen ? 100 : 0));
-      return [
-        [{ code: 'switch', value: isOpen }],
-        [{ code: 'switch_1', value: isOpen }],
-        [{ code: 'percent_control', value: Math.max(0, Math.min(100, percentage)) }],
-      ];
-    }
-
-    if (deviceType === 'ventilation_fan') {
-      const isOn = command === 'on';
-      const speedMap: Record<string, string> = { low: 'low', mid: 'middle', high: 'high' };
-      const speed = speedMap[params.speed] || 'middle';
-      if (!isOn) {
-        return [
-          [{ code: 'switch', value: false }],
-          [{ code: 'switch_1', value: false }],
-        ];
-      }
-      return [
-        [{ code: 'switch', value: true }, { code: 'fan_speed_enum', value: speed }],
-        [{ code: 'switch_1', value: true }, { code: 'fan_speed_enum', value: speed }],
-        [{ code: 'switch', value: true }],
-      ];
-    }
-
-    if (deviceType === 'irrigation') {
-      return [
-        [{ code: 'switch', value: true }],
-        [{ code: 'switch_1', value: true }],
-        [{ code: 'start', value: true }],
-      ];
-    }
-
-    return [];
+    const isOn = command !== 'off';
+    return [{ code: 'state', value: isOn ? 'ON' : 'OFF' }];
   }
 
   private async markOnceConditionsExecuted(rule: AutomationRule, hits: string[], executedAt: Date) {

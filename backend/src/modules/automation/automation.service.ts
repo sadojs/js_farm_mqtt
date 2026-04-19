@@ -8,9 +8,6 @@ import { AutomationRunnerService } from './automation-runner.service';
 import { IrrigationSchedulerService } from './irrigation-scheduler.service';
 import { DevicesService } from '../devices/devices.service';
 import { Device } from '../devices/entities/device.entity';
-import { TuyaProject } from '../users/entities/tuya-project.entity';
-import { TuyaService } from '../integrations/tuya/tuya.service';
-import { decryptTuyaSecret } from '../../common/utils/crypto.util';
 
 @Injectable()
 export class AutomationService {
@@ -20,11 +17,9 @@ export class AutomationService {
     @InjectRepository(AutomationRule) private rulesRepo: Repository<AutomationRule>,
     @InjectRepository(AutomationLog) private logsRepo: Repository<AutomationLog>,
     @InjectRepository(Device) private devicesRepo: Repository<Device>,
-    @InjectRepository(TuyaProject) private tuyaRepo: Repository<TuyaProject>,
     private readonly runnerService: AutomationRunnerService,
     private readonly irrigationScheduler: IrrigationSchedulerService,
     private readonly devicesService: DevicesService,
-    private readonly tuyaService: TuyaService,
   ) {}
 
   async findAll(userId: string) {
@@ -307,14 +302,14 @@ export class AutomationService {
       try {
         const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
         if (!device) continue;
-        const activeInfo = this.irrigationScheduler.getActiveByDevice(device.tuyaDeviceId);
+        const activeInfo = this.irrigationScheduler.getActiveByDevice(device.friendlyName);
         const groupId = devRules[0]?.groupId || null;
         result.push({
           deviceId,
           deviceName: device.name,
           groupId,
           groupName: groupId ? groupNameCache.get(groupId) || null : null,
-          tuyaDeviceId: device.tuyaDeviceId,
+          friendlyName: device.friendlyName,
           enabledRuleCount: devRules.filter(r => r.enabled).length,
           totalRuleCount: devRules.length,
           isRunning: !!activeInfo,
@@ -365,7 +360,7 @@ export class AutomationService {
     let stoppedIrrigation = false;
     try {
       const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
-      if (device) stoppedIrrigation = await this.irrigationScheduler.stopByDevice(device.tuyaDeviceId);
+      if (device) stoppedIrrigation = await this.irrigationScheduler.stopByDevice(device.friendlyName);
     } catch {
       // 장비 못 찾으면 무시
     }
