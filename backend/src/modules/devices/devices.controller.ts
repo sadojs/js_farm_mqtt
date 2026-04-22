@@ -79,6 +79,22 @@ export class DevicesController {
     return result;
   }
 
+  @Patch(':id/name')
+  async renameDevice(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { name: string },
+  ) {
+    const result = await this.devicesService.updateByUser(id, this.getEffectiveUserId(user), { name: body.name?.trim() });
+    this.activityLog.log({
+      userId: user.id, userName: user.name || user.username,
+      action: 'device.rename', targetType: 'device', targetId: id,
+      targetName: result.name,
+      details: { menu: '장치 관리', newName: result.name },
+    });
+    return { id: result.id, name: result.name };
+  }
+
   @Patch(':id/channel-mapping')
   updateChannelMapping(
     @Param('id') id: string,

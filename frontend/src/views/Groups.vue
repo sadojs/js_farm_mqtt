@@ -27,8 +27,28 @@
         <!-- 그룹 헤더 -->
         <div class="group-header">
           <div class="group-title">
-            <h3>{{ group.name }}</h3>
-            <p v-if="group.description" class="group-desc">{{ group.description }}</p>
+            <template v-if="renamingGroupId === group.id">
+              <input
+                ref="renameGroupInput"
+                v-model="renameGroupValue"
+                class="rename-group-input"
+                maxlength="50"
+                @keyup.enter="submitRenameGroup(group)"
+                @keyup.esc="cancelRenameGroup"
+                @blur="cancelRenameGroup"
+              />
+              <button class="btn-rename-ok" @mousedown.prevent="submitRenameGroup(group)">✓</button>
+            </template>
+            <template v-else>
+              <h3>{{ group.name }}</h3>
+              <button
+                v-if="!isFarmUser"
+                class="btn-rename-group"
+                @click="startRenameGroup(group.id, group.name)"
+                title="이름 변경"
+              >✎</button>
+            </template>
+            <p v-if="group.description && renamingGroupId !== group.id" class="group-desc">{{ group.description }}</p>
           </div>
           <div class="group-header-actions">
             <span class="device-count-badge">{{ getGroupSensors(group).length + getGroupActuators(group).length + getGroupOpenerGroups(group).length }}개 장치</span>
@@ -214,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
@@ -247,6 +267,36 @@ const { isFarmUser } = authStore
 const { confirm } = useConfirm()
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
+
+// 구역명 인라인 편집
+const renamingGroupId = ref<string | null>(null)
+const renameGroupValue = ref('')
+const renameGroupInput = ref<HTMLInputElement | null>(null)
+
+function startRenameGroup(groupId: string, currentName: string) {
+  renamingGroupId.value = groupId
+  renameGroupValue.value = currentName
+  nextTick(() => renameGroupInput.value?.focus())
+}
+
+function cancelRenameGroup() {
+  renamingGroupId.value = null
+  renameGroupValue.value = ''
+}
+
+async function submitRenameGroup(group: HouseGroup) {
+  const trimmed = renameGroupValue.value.trim()
+  if (!trimmed) { cancelRenameGroup(); return }
+  try {
+    await groupApi.updateGroup(group.id, { name: trimmed })
+    await groupStore.fetchGroups()
+    notify.success('이름 변경 완료', `구역 이름이 "${trimmed}"으로 변경되었습니다`)
+  } catch {
+    notify.error('이름 변경 실패', '저장에 실패했습니다')
+  } finally {
+    cancelRenameGroup()
+  }
+}
 
 // 삭제 차단 모달 상태
 const blockingModal = ref<{
@@ -615,7 +665,7 @@ const toggleRule = async (ruleId: string) => {
       // 설정 토글 후 장치 상태 + 관주 상태 갱신
       await Promise.all([
         automationStore.fetchIrrigationStatus(),
-        deviceStore.fetchAllActuatorStatuses(),
+        deviceStore.fetchDevices(),
       ])
     }
   } catch (err) {
@@ -732,7 +782,7 @@ function startStatusPolling() {
   statusPollTimer = setInterval(async () => {
     await Promise.all([
       automationStore.fetchIrrigationStatus(),
-      deviceStore.fetchAllActuatorStatuses(),
+      deviceStore.fetchDevices(),
     ])
   }, 15000)
 }
@@ -832,6 +882,27 @@ onBeforeUnmount(() => {
   font-size: calc(18px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
+  display: inline;
+}
+
+.btn-rename-group {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 14px; cursor: pointer; padding: 0 4px;
+  vertical-align: middle; opacity: 0.6;
+}
+.btn-rename-group:hover { opacity: 1; color: var(--accent, #4caf50); }
+
+.rename-group-input {
+  padding: 3px 8px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 4px; font-size: calc(18px * var(--content-scale, 1));
+  font-weight: 600; background: var(--bg-primary); color: var(--text-primary);
+  outline: none; width: 180px;
+}
+
+.btn-rename-ok {
+  padding: 3px 8px; border: none;
+  background: var(--accent, #4caf50); color: #fff;
+  border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px;
 }
 
 .group-desc {

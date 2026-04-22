@@ -135,7 +135,27 @@
             {{ device.deviceType === 'sensor' ? '측정기' : '장치' }}
           </span>
           <div class="card-title">
-            <h4>{{ device.name }}</h4>
+            <template v-if="renamingDeviceId === device.id">
+              <input
+                ref="renameInput"
+                v-model="renameValue"
+                class="rename-input"
+                maxlength="50"
+                @keyup.enter="submitRename(device.id)"
+                @keyup.esc="cancelRename"
+                @blur="cancelRename"
+              />
+              <button class="btn-rename-ok" @mousedown.prevent="submitRename(device.id)">✓</button>
+            </template>
+            <template v-else>
+              <h4>{{ device.name }}</h4>
+              <button
+                v-if="authStore.isAdmin || authStore.isFarmAdmin"
+                class="btn-rename"
+                @click="startRename(device.id, device.name)"
+                title="이름 변경"
+              >✎</button>
+            </template>
             <span class="card-category">{{ getCategoryLabel(device.category) }}</span>
           </div>
         </div>
@@ -199,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import DeviceRegistration from '@/components/devices/DeviceRegistration.vue'
 import IrrigationChannelMappingPanel from '@/components/devices/IrrigationChannelMappingPanel.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
@@ -222,6 +242,37 @@ const { confirm } = useConfirm()
 const showRegistrationModal = ref(false)
 const searchQuery = ref('')
 const activeTab = ref<'all' | 'actuator' | 'sensor'>('all')
+
+// 장치명 인라인 편집
+const renamingDeviceId = ref<string | null>(null)
+const renameValue = ref('')
+const renameInput = ref<HTMLInputElement | null>(null)
+
+function startRename(deviceId: string, currentName: string) {
+  renamingDeviceId.value = deviceId
+  renameValue.value = currentName
+  nextTick(() => renameInput.value?.focus())
+}
+
+function cancelRename() {
+  renamingDeviceId.value = null
+  renameValue.value = ''
+}
+
+async function submitRename(deviceId: string) {
+  const trimmed = renameValue.value.trim()
+  if (!trimmed) { cancelRename(); return }
+  try {
+    const { data } = await deviceApi.rename(deviceId, trimmed)
+    const device = deviceStore.devices.find(d => d.id === deviceId)
+    if (device) device.name = data.name
+    notify.success('이름 변경 완료', `장치 이름이 "${data.name}"으로 변경되었습니다`)
+  } catch {
+    notify.error('이름 변경 실패', '저장에 실패했습니다')
+  } finally {
+    cancelRename()
+  }
+}
 
 // 삭제 차단 모달 상태
 const blockingModal = ref<{
@@ -786,6 +837,32 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: inline;
+}
+
+.btn-rename {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 13px; cursor: pointer; padding: 0 4px;
+  vertical-align: middle; opacity: 0.6;
+}
+.btn-rename:hover { opacity: 1; color: var(--accent, #4caf50); }
+
+.rename-input {
+  width: calc(100% - 32px);
+  padding: 2px 6px;
+  border: 1px solid var(--accent, #4caf50);
+  border-radius: 4px;
+  font-size: calc(16px * var(--content-scale, 1));
+  font-weight: 600;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.btn-rename-ok {
+  padding: 2px 6px; border: none;
+  background: var(--accent, #4caf50); color: #fff;
+  border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px;
 }
 
 .card-category {

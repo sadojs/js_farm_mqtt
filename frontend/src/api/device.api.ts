@@ -29,6 +29,9 @@ export const deviceApi = {
   removeOpenerPair: (id: string) =>
     apiClient.delete<{ message: string; deletedIds: string[] }>(`/devices/${id}/opener-pair`),
 
+  rename: (id: string, name: string) =>
+    apiClient.patch<{ id: string; name: string }>(`/devices/${id}/name`, { name }),
+
   updateChannelMapping: (id: string, mapping: ChannelMapping) =>
     apiClient.patch(`/devices/${id}/channel-mapping`, { mapping }),
 }
