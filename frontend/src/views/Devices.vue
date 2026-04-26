@@ -55,9 +55,33 @@
     <!-- 개폐기 그룹 -->
     <div v-if="openerGroups.length > 0 && (activeTab === 'all' || activeTab === 'actuator')" class="opener-groups">
       <div v-for="group in openerGroups" :key="group.groupName" class="opener-group-card">
-        <div class="opener-header">
-          <div class="opener-title">{{ group.groupName }}</div>
+        <div class="card-top" style="margin-bottom: 16px;">
+          <span :class="['status-dot', (group.openDevice.online || group.closeDevice.online) ? 'online' : 'offline']"></span>
           <span class="type-badge actuator">장치</span>
+          <div class="card-title">
+            <template v-if="renamingDeviceId === group.openDevice.id">
+              <input
+                ref="renameInput"
+                v-model="renameValue"
+                class="rename-input"
+                maxlength="50"
+                @keyup.enter="submitRename(group.openDevice.id)"
+                @keyup.esc="cancelRename"
+                @blur="cancelRename"
+              />
+              <button class="btn-rename-ok" @mousedown.prevent="submitRename(group.openDevice.id)">✓</button>
+            </template>
+            <template v-else>
+              <h4>{{ group.groupName }}</h4>
+              <button
+                v-if="authStore.isAdmin || authStore.isFarmAdmin"
+                class="btn-rename"
+                @click="startRename(group.openDevice.id, group.groupName)"
+                title="이름 변경"
+              >✎</button>
+            </template>
+            <span class="card-category">개폐기</span>
+          </div>
           <button class="btn-icon-delete" @click="handleRemoveOpenerGroup(group)" title="장치 삭제" aria-label="삭제">삭제</button>
         </div>
         <div class="opener-controls">
@@ -88,10 +112,34 @@
     <!-- 관수 장치 그룹 -->
     <div v-if="irrigationDevices.length > 0 && (activeTab === 'all' || activeTab === 'actuator')" class="irrigation-groups">
       <div v-for="device in irrigationDevices" :key="device.id" class="irrigation-group-card">
-        <div class="irrigation-header">
-          <div class="irrigation-title">{{ device.name }}</div>
-          <button class="btn-status" @click="openIrrigationStatusModal(device)">상태</button>
+        <div class="card-top" style="margin-bottom: 16px;">
+          <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
           <span class="type-badge actuator">장치</span>
+          <div class="card-title">
+            <template v-if="renamingDeviceId === device.id">
+              <input
+                ref="renameInput"
+                v-model="renameValue"
+                class="rename-input"
+                maxlength="50"
+                @keyup.enter="submitRename(device.id)"
+                @keyup.esc="cancelRename"
+                @blur="cancelRename"
+              />
+              <button class="btn-rename-ok" @mousedown.prevent="submitRename(device.id)">✓</button>
+            </template>
+            <template v-else>
+              <h4>{{ device.name }}</h4>
+              <button
+                v-if="authStore.isAdmin || authStore.isFarmAdmin"
+                class="btn-rename"
+                @click="startRename(device.id, device.name)"
+                title="이름 변경"
+              >✎</button>
+            </template>
+            <span class="card-category">관수장치</span>
+          </div>
+          <button class="btn-status" @click="openIrrigationStatusModal(device)">상태</button>
           <button class="btn-icon-delete" @click="handleRemoveDevice(device.id)" title="장치 삭제" aria-label="삭제">삭제</button>
         </div>
         <div class="irrigation-controls">
@@ -231,6 +279,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useNotificationStore } from '@/stores/notification.store'
 import { useAutomationStore } from '@/stores/automation.store'
 import { deviceApi } from '@/api/device.api'
+import { sensorApi } from '@/api/sensor.api'
 import type { Device, DependencyRule, ChannelMapping } from '@/types/device.types'
 import { FUNCTION_LABELS } from '@/types/device.types'
 
@@ -538,6 +587,7 @@ const formatLastSeen = (lastSeen?: string) => {
 }
 
 onMounted(async () => {
+  sensorApi.refresh().catch(() => {}) // 페이지 진입 시 즉시 갱신 (실패 무시)
   await deviceStore.fetchDevices()
   automationStore.fetchIrrigationStatus()
 })
@@ -1010,19 +1060,6 @@ input:checked + .toggle-slider:before {
   box-shadow: var(--shadow-card);
 }
 
-.opener-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.opener-title {
-  font-size: calc(16px * var(--content-scale, 1));
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
 .opener-controls {
   display: flex;
   flex-direction: column;
@@ -1085,20 +1122,6 @@ input:checked + .toggle-slider:before {
   border-radius: 14px;
   padding: 20px;
   box-shadow: var(--shadow-card);
-}
-
-.irrigation-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.irrigation-title {
-  flex: 1;
-  font-size: calc(16px * var(--content-scale, 1));
-  font-weight: 700;
-  color: var(--text-primary);
 }
 
 .irrigation-controls {
@@ -1166,8 +1189,7 @@ input:checked + .toggle-slider:before {
   .device-card { padding: 14px; gap: 10px; border-radius: 12px; }
   .opener-group-card { padding: 14px; border-radius: 12px; }
   .irrigation-group-card { padding: 14px; border-radius: 12px; }
-  .opener-header { margin-bottom: 10px; }
-  .irrigation-header { margin-bottom: 10px; }
+
   .card-top { gap: 8px; }
   .btn-icon-delete { padding: 0 18px; line-height: 1.8; }
   .btn-status { padding: 0 18px; line-height: 1.8; }

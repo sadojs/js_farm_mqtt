@@ -7,4 +7,7 @@ export const sensorApi = {
 
   getLatest: (params?: { deviceId?: string; groupId?: string }) =>
     apiClient.get<LatestSensorData>('/sensor-data/latest', { params }),
+
+  refresh: () =>
+    apiClient.post<{ ok: boolean }>('/sensor-data/refresh'),
 }

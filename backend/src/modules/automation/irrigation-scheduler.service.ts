@@ -166,8 +166,8 @@ export class IrrigationSchedulerService {
       estimatedEndAt: active.estimatedEndAt,
     });
 
-    // 관수 시작 로그 기록
-    const enabledZones = conditions.zones.filter((z: any) => z.enabled);
+    // 관수 시작 로그 기록 (mapping에 실제 존재하는 구역만 집계)
+    const enabledZones = conditions.zones.filter((z: any) => z.enabled && mapping[ZONE_FUNCTION_KEY[z.zone]]);
     const totalIrrigationMin = enabledZones.reduce((sum: number, z: any) => sum + (z.duration || 0), 0);
     const fertilizerMin = conditions.fertilizer?.enabled ? (conditions.fertilizer.duration || 0) : 0;
     const groupName = await this.fetchGroupName(rule.groupId);
@@ -245,9 +245,9 @@ export class IrrigationSchedulerService {
               startTime: conditions.startTime,
               deviceName: device.name,
               groupName: await this.fetchGroupName(rule.groupId),
-              enabledZones: conditions.zones.filter((z: any) => z.enabled).length,
+              enabledZones: conditions.zones.filter((z: any) => z.enabled && mapping[ZONE_FUNCTION_KEY[z.zone]]).length,
               totalZones: conditions.zones.length,
-              irrigationMin: conditions.zones.filter((z: any) => z.enabled).reduce((s: number, z: any) => s + (z.duration || 0), 0),
+              irrigationMin: conditions.zones.filter((z: any) => z.enabled && mapping[ZONE_FUNCTION_KEY[z.zone]]).reduce((s: number, z: any) => s + (z.duration || 0), 0),
               fertilizerMin: conditions.fertilizer?.enabled ? (conditions.fertilizer.duration || 0) : 0,
             },
             actionsExecuted: { timeline: timeline.map(a => a.label), estimatedDurationMin: Math.round(totalDurationMs / 60000) },

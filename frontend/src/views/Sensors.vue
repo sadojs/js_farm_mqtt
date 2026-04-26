@@ -80,6 +80,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGroupStore } from '@/stores/group.store'
 import { useDeviceStore } from '@/stores/device.store'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { sensorApi } from '@/api/sensor.api'
 import { envConfigApi } from '@/api/env-config.api'
 import type { ResolvedValue } from '@/api/env-config.api'
 import ResolvedEnvPanel from '@/components/dashboard/ResolvedEnvPanel.vue'
@@ -230,6 +231,7 @@ function handleSensorUpdate() {
 }
 
 onMounted(async () => {
+  sensorApi.refresh().catch(() => {}) // 페이지 진입 시 즉시 갱신 (실패 무시)
   try {
     await Promise.all([
       groupStore.fetchGroups(),

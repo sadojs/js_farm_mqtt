@@ -1,11 +1,13 @@
 <template>
   <div class="page-container">
     <header class="page-header">
-      <div>
-        <h2>생육관리</h2>
-        <p class="page-description">적산온도 기반 생육 단계 추적 및 수확 예측</p>
+      <div class="crop-header-inner">
+        <div>
+          <h2>생육관리</h2>
+          <p class="page-description">적산온도 기반 생육 단계 추적 및 수확 예측</p>
+        </div>
+        <button class="btn-add" @click="openModal()">+ 파종 등록</button>
       </div>
-      <button class="btn-add" @click="openModal()">+ 파종 등록</button>
     </header>
 
     <!-- 탭 -->
@@ -231,15 +233,6 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 
 <style scoped>
 /* ── 헤더 레이아웃 ── */
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .page-header h2 {
   font-size: var(--font-size-display, 22px);
   font-weight: 700;
@@ -253,19 +246,28 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   margin-top: 4px;
 }
 
-/* ── 헤더 버튼 (사이트 공통 btn-primary 스타일 준수) ── */
+.crop-header-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── 헤더 버튼 ── */
 .btn-add {
-  padding: 10px 20px;
+  padding: 8px 14px !important;
   background: var(--primary-color, #4caf50);
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: var(--font-size-body, 14px);
+  font-size: 13px !important;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.2s;
+  margin-top: 2px;
 }
 
 .btn-add:hover {
