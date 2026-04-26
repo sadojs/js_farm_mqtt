@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { deviceApi } from '../api/device.api'
+import { sensorApi } from '../api/sensor.api'
 import type { Device, ChannelMapping } from '../types/device.types'
 import { DEFAULT_CHANNEL_MAPPING } from '../types/device.types'
 
@@ -25,6 +26,7 @@ export const useDeviceStore = defineStore('device', () => {
     try {
       const { data } = await deviceApi.getAll()
       devices.value = data
+      await loadLatestSensorData()
     } finally {
       loading.value = false
     }
@@ -59,6 +61,19 @@ export const useDeviceStore = defineStore('device', () => {
     if (device) {
       if (!device.sensorData) device.sensorData = {}
       device.sensorData[sensorType] = value
+    }
+  }
+
+  /** 페이지 로드 시 최신 센서값을 API에서 일괄 로드 */
+  async function loadLatestSensorData() {
+    try {
+      const { data } = await sensorApi.getLatest() as any
+      const rows: { device_id: string; sensor_type: string; value: number }[] = Array.isArray(data) ? data : (data?.data ?? [])
+      for (const row of rows) {
+        updateSensorData(row.device_id, row.sensor_type, Number(row.value))
+      }
+    } catch {
+      // 실패 시 무시 — WebSocket 이벤트로 이후 보완됨
     }
   }
 
@@ -110,6 +125,7 @@ export const useDeviceStore = defineStore('device', () => {
     controlDevice,
     updateDeviceStatus,
     updateSensorData,
+    loadLatestSensorData,
     fetchDeviceStatus,
     verifyDeviceStatus,
     getEffectiveMapping,

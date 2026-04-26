@@ -84,6 +84,9 @@ export function useWebSocket() {
     socket.on('sensor:update', (data) => {
       const sensorStore = useSensorStore()
       sensorStore.updateSensorRealtimeData(data.deviceId, data)
+
+      const deviceStore = useDeviceStore()
+      deviceStore.updateSensorData(data.deviceId, data.sensorType, data.value)
     })
 
     // 장치 온라인 상태 변경
