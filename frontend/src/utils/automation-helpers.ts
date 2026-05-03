@@ -87,6 +87,9 @@ export function formatCondition(c: Condition): string {
   }
 
   if (c.field === 'hour') {
+    if (c.timeSlots && c.timeSlots.length > 1) {
+      return c.timeSlots.map(s => `${String(s.start).padStart(2, '0')}:00~${String(s.end).padStart(2, '0')}:00`).join(', ')
+    }
     if (c.operator === 'between' && Array.isArray(c.value)) {
       return `${String(c.value[0]).padStart(2, '0')}:00 ~ ${String(c.value[1]).padStart(2, '0')}:00`
     }
@@ -110,12 +113,16 @@ const DAY_LABELS_SHORT: Record<number, string> = {
 }
 
 export function formatIrrigationSchedule(cond: IrrigationConditions): string {
-  const days = cond.schedule.days
-    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-    .map(d => DAY_LABELS_SHORT[d] || d)
-    .join(',')
-  const repeat = cond.schedule.repeat ? '매주 반복' : '1회'
-  return `${cond.startTime} | ${days} | ${repeat}`
+  const list = (cond.schedules && cond.schedules.length > 0)
+    ? cond.schedules
+    : [{ startTime: cond.startTime, days: cond.schedule.days, repeat: cond.schedule.repeat }]
+  return list.map(s => {
+    const days = [...s.days]
+      .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+      .map(d => DAY_LABELS_SHORT[d] || d)
+      .join(',')
+    return `${s.startTime} | ${days}`
+  }).join(' / ')
 }
 
 export function formatIrrigationZones(cond: IrrigationConditions): string {

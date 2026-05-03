@@ -102,15 +102,22 @@
       </div>
     </div>
 
-    <!-- 위저드 모달 -->
+    </template>
+    <!-- //규칙 목록 탭 -->
+
+    <!-- 위저드 모달 (수정: V1, 신규: V2) -->
     <RuleWizardModal
       :visible="wizardOpen"
       :editRule="editingRule"
       @close="wizardOpen = false"
       @saved="onRuleSaved"
     />
-    </template>
-    <!-- //규칙 목록 탭 -->
+    <IntentWizardModal
+      v-if="showIntentWizard"
+      @close="showIntentWizard = false"
+      @switch-to-legacy="handleSwitchToLegacy"
+      @saved="onRuleSaved"
+    />
 
     <!-- 실행 기록 탭 → 작업 내역 페이지 안내 -->
     <div v-if="mainTab === 'logs'" class="log-redirect">
@@ -130,6 +137,7 @@ import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
 import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
+import IntentWizardModal from '../components/automation/v2/IntentWizardModal.vue'
 import EmptyState from '../components/common/EmptyState.vue'
 // AutomationLogTimeline → 작업 내역 페이지로 이전됨
 
@@ -149,6 +157,7 @@ const activeTab = ref<TabType>('all')
 const mainTab = ref<'rules' | 'logs'>('rules')
 
 const wizardOpen = ref(false)
+const showIntentWizard = ref(false)
 const editingRule = ref<AutomationRule | null>(null)
 
 const rules = computed(() => automationStore.rules)
@@ -230,6 +239,16 @@ function targetLabel(rule: AutomationRule) {
 
 function openWizard(rule?: AutomationRule) {
   editingRule.value = rule || null
+  if (!rule) {
+    showIntentWizard.value = true
+  } else {
+    wizardOpen.value = true
+  }
+}
+
+function handleSwitchToLegacy() {
+  showIntentWizard.value = false
+  editingRule.value = null
   wizardOpen.value = true
 }
 

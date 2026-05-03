@@ -3,12 +3,36 @@
     <h3 class="step-title">관주 작동 조건</h3>
     <p class="step-desc">관주 일정과 구역별 설정을 입력하세요.</p>
 
-    <!-- 1. 시작시간 설정 -->
+    <!-- 1. 시작시간 설정 (다중) -->
     <div class="section">
       <label class="section-label">시작시간</label>
-      <button class="time-display" @click="openTimePicker">
-        {{ form.startTime || '00:00' }}
-      </button>
+
+      <div v-for="(sched, idx) in localSchedules" :key="idx" class="sched-row">
+        <div class="sched-row-header">
+          <span class="sched-row-label">시간 {{ idx + 1 }}</span>
+          <button v-if="localSchedules.length > 1" class="btn-remove-sched" @click="removeSchedule(idx)">삭제</button>
+        </div>
+        <div class="sched-row-body">
+          <button class="time-display" @click="openTimePicker(idx)">
+            {{ sched.startTime || '00:00' }}
+          </button>
+          <div class="day-selector sched-days">
+            <button
+              v-for="d in DAYS"
+              :key="d.value"
+              class="day-btn"
+              :class="{ active: sched.days.includes(d.value) }"
+              @click="toggleSchedDay(idx, d.value)"
+            >{{ d.label }}</button>
+          </div>
+          <label class="repeat-toggle">
+            <input type="checkbox" :checked="sched.repeat" @change="toggleSchedRepeat(idx)" />
+            매주 반복
+          </label>
+        </div>
+      </div>
+
+      <button class="btn-add-sched" @click="addSchedule">＋ 시간 추가</button>
     </div>
 
     <!-- Time Picker Modal -->
@@ -178,23 +202,6 @@
       </div>
     </div>
 
-    <!-- 4. 반복 설정 -->
-    <div class="section">
-      <label class="section-label">반복 설정</label>
-      <div class="day-selector">
-        <button
-          v-for="d in DAYS"
-          :key="d.value"
-          class="day-btn"
-          :class="{ active: form.schedule.days.includes(d.value) }"
-          @click="toggleDay(d.value)"
-        >{{ d.label }}</button>
-      </div>
-      <label class="repeat-toggle">
-        <input type="checkbox" v-model="form.schedule.repeat" />
-        매주 반복
-      </label>
-    </div>
   </div>
 </template>
 
@@ -218,6 +225,7 @@ export interface IrrigationFormData {
   mixer: { enabled: boolean }
   fertilizer: { enabled: boolean; duration: number; preStopWait: number }
   schedule: { days: number[]; repeat: boolean }
+  schedules?: Array<{ startTime: string; days: number[]; repeat: boolean }>
 }
 
 const props = defineProps<{
@@ -296,21 +304,63 @@ const DAYS = [
 ]
 
 const raw = JSON.parse(JSON.stringify(props.modelValue))
-// 기존 룰 호환: fertilizer.enabled 기본값 (duration > 0이면 enabled)
 if (raw.fertilizer && raw.fertilizer.enabled === undefined) {
   raw.fertilizer.enabled = raw.fertilizer.duration > 0
 }
 const form = reactive<IrrigationFormData>(raw)
 
+// 다중 스케줄 관리
+type ScheduleEntry = { startTime: string; days: number[]; repeat: boolean }
+function initSchedules(): ScheduleEntry[] {
+  if (form.schedules && form.schedules.length > 0) return form.schedules.map(s => ({ ...s }))
+  return [{ startTime: form.startTime || '08:00', days: [...(form.schedule?.days ?? [1,2,3,4,5])], repeat: form.schedule?.repeat ?? true }]
+}
+const localSchedules = ref<ScheduleEntry[]>(initSchedules())
+
+function syncSchedulesToForm() {
+  const scheds = localSchedules.value
+  form.schedules = scheds.map(s => ({ ...s }))
+  if (scheds.length > 0) {
+    form.startTime = scheds[0].startTime
+    form.schedule = { days: [...scheds[0].days], repeat: scheds[0].repeat }
+  }
+}
+
+function addSchedule() {
+  const last = localSchedules.value[localSchedules.value.length - 1]
+  localSchedules.value.push({ startTime: '14:00', days: [...(last?.days ?? [1,2,3,4,5])], repeat: last?.repeat ?? true })
+  syncSchedulesToForm()
+}
+
+function removeSchedule(idx: number) {
+  localSchedules.value.splice(idx, 1)
+  syncSchedulesToForm()
+}
+
+function toggleSchedDay(schedIdx: number, day: number) {
+  const days = localSchedules.value[schedIdx].days
+  const i = days.indexOf(day)
+  if (i >= 0) days.splice(i, 1)
+  else days.push(day)
+  syncSchedulesToForm()
+}
+
+function toggleSchedRepeat(schedIdx: number) {
+  localSchedules.value[schedIdx].repeat = !localSchedules.value[schedIdx].repeat
+  syncSchedulesToForm()
+}
+
 /* ── Time Picker ── */
 const showTimePicker = ref(false)
+const activeSchedIdx = ref(0)
 const hourCol = ref<HTMLElement | null>(null)
 const minCol = ref<HTMLElement | null>(null)
 const ITEM_H = 40
 
-function openTimePicker() {
+function openTimePicker(schedIdx: number) {
+  activeSchedIdx.value = schedIdx
   showTimePicker.value = true
-  const [h, m] = (form.startTime || '00:00').split(':').map(Number)
+  const [h, m] = (localSchedules.value[schedIdx]?.startTime || '00:00').split(':').map(Number)
   nextTick(() => {
     setTimeout(() => {
       if (hourCol.value) hourCol.value.scrollTop = (h || 0) * ITEM_H
@@ -327,7 +377,8 @@ function scrollTo(col: HTMLElement | null, index: number) {
 function confirmTime() {
   const h = Math.max(0, Math.min(23, Math.round((hourCol.value?.scrollTop || 0) / ITEM_H)))
   const m = Math.max(0, Math.min(59, Math.round((minCol.value?.scrollTop || 0) / ITEM_H)))
-  form.startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  localSchedules.value[activeSchedIdx.value].startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  syncSchedulesToForm()
   showTimePicker.value = false
 }
 
@@ -338,6 +389,7 @@ watch(() => props.modelValue, (val) => {
   if (JSON.stringify(next) === JSON.stringify(form)) return
   ignoreFormWatch = true
   Object.assign(form, next)
+  localSchedules.value = initSchedules()
   nextTick(() => { ignoreFormWatch = false })
 }, { deep: true })
 
@@ -345,12 +397,6 @@ watch(form, () => {
   if (ignoreFormWatch) return
   emit('update:modelValue', JSON.parse(JSON.stringify(form)))
 }, { deep: true })
-
-function toggleDay(day: number) {
-  const idx = form.schedule.days.indexOf(day)
-  if (idx >= 0) form.schedule.days.splice(idx, 1)
-  else form.schedule.days.push(day)
-}
 </script>
 
 <style scoped>
@@ -376,6 +422,26 @@ function toggleDay(day: number) {
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border-light);
 }
+
+/* 다중 스케줄 */
+.sched-row {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; background: var(--bg-secondary); border-radius: 10px;
+}
+.sched-row-header { display: flex; align-items: center; justify-content: space-between; }
+.sched-row-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.sched-row-body { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sched-days { gap: 4px; }
+.btn-remove-sched {
+  background: none; border: none; color: #ef5350; font-size: 12px; cursor: pointer; padding: 2px 6px;
+}
+.btn-add-sched {
+  display: inline-flex; align-items: center;
+  padding: 8px 14px; border: 1.5px dashed var(--border-input);
+  border-radius: 8px; background: none; color: var(--text-muted);
+  font-size: 13px; cursor: pointer;
+}
+.btn-add-sched:hover { border-color: var(--accent, #4caf50); color: var(--accent, #4caf50); }
 
 /* 시간 표시 버튼 */
 .time-display {

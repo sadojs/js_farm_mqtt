@@ -75,18 +75,15 @@ export class IrrigationSchedulerService {
   }
 
   private shouldStartNow(conditions: any, now: Date): boolean {
-    const { startTime, schedule } = conditions;
-    if (!startTime || !schedule) return false;
+    const scheduleList = (conditions.schedules && conditions.schedules.length > 0)
+      ? conditions.schedules
+      : [{ startTime: conditions.startTime, days: conditions.schedule?.days ?? [], repeat: conditions.schedule?.repeat ?? true }];
 
-    // 요일 체크 (0=일, 1=월 ... 6=토)
-    const currentDay = now.getDay();
-    if (!schedule.days.includes(currentDay)) return false;
-
-    // 시간 체크 (HH:mm)
-    const [h, m] = startTime.split(':').map(Number);
-    if (now.getHours() !== h || now.getMinutes() !== m) return false;
-
-    return true;
+    return scheduleList.some((sched: any) => {
+      if (!sched.startTime || !sched.days?.includes(now.getDay())) return false;
+      const [h, m] = sched.startTime.split(':').map(Number);
+      return now.getHours() === h && now.getMinutes() === m;
+    });
   }
 
   private async startIrrigation(rule: AutomationRule, conditions: any) {

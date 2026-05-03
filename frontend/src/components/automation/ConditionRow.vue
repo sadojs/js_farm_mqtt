@@ -22,13 +22,19 @@
       </select>
 
       <template v-if="condition.operator === 'between'">
-        <select class="form-select hour-select" :value="String(rangeStart)" @change="onTimeRangeStart($event)">
-          <option v-for="h in hourOptions" :key="`start-${h}`" :value="h">{{ hourLabel(h) }}</option>
-        </select>
-        <span class="sep">~</span>
-        <select class="form-select hour-select" :value="String(rangeEnd)" @change="onTimeRangeEnd($event)">
-          <option v-for="h in hourOptions" :key="`end-${h}`" :value="h">{{ hourLabel(h) }}</option>
-        </select>
+        <div class="hour-slots">
+          <div v-for="(slot, sIdx) in hourSlots" :key="sIdx" class="hour-slot-row">
+            <select class="form-select hour-select" :value="String(slot.start)" @change="onSlotStart(sIdx, $event)">
+              <option v-for="h in hourOptions" :key="`start-${h}`" :value="h">{{ hourLabel(h) }}</option>
+            </select>
+            <span class="sep">~</span>
+            <select class="form-select hour-select" :value="String(slot.end)" @change="onSlotEnd(sIdx, $event)">
+              <option v-for="h in hourOptions" :key="`end-${h}`" :value="h">{{ hourLabel(h) }}</option>
+            </select>
+            <button v-if="hourSlots.length > 1" type="button" class="btn-del slot-del" @click="removeSlot(sIdx)">✕</button>
+          </div>
+          <button type="button" class="btn-add-slot" @click="addSlot">＋</button>
+        </div>
       </template>
       <template v-else>
         <select class="form-select hour-select" :value="String(condition.value)" @change="onSingleValue($event)">
@@ -100,6 +106,42 @@ const isRepeat = computed(() => condition.value.scheduleType !== 'once')
 const rangeStart = computed(() => Array.isArray(condition.value.value) ? condition.value.value[0] : 0)
 const rangeEnd = computed(() => Array.isArray(condition.value.value) ? condition.value.value[1] : 0)
 const hourOptions = Array.from({ length: 24 }, (_, i) => i)
+
+const hourSlots = computed<{ start: number; end: number }[]>(() => {
+  const ts = condition.value.timeSlots
+  if (ts && ts.length > 0) return ts
+  return [{ start: rangeStart.value, end: rangeEnd.value }]
+})
+
+function emitSlots(slots: { start: number; end: number }[]) {
+  const first = slots[0] ?? { start: 8, end: 18 }
+  if (slots.length === 1) {
+    update({ value: [first.start, first.end] as [number, number], timeSlots: undefined })
+  } else {
+    update({ value: [first.start, first.end] as [number, number], timeSlots: slots })
+  }
+}
+
+function onSlotStart(idx: number, e: Event) {
+  const v = Number((e.target as HTMLSelectElement).value)
+  const slots = hourSlots.value.map((s, i) => i === idx ? { ...s, start: v } : s)
+  emitSlots(slots)
+}
+
+function onSlotEnd(idx: number, e: Event) {
+  const v = Number((e.target as HTMLSelectElement).value)
+  const slots = hourSlots.value.map((s, i) => i === idx ? { ...s, end: v } : s)
+  emitSlots(slots)
+}
+
+function addSlot() {
+  const last = hourSlots.value[hourSlots.value.length - 1]
+  emitSlots([...hourSlots.value, { start: (last?.end ?? 18), end: Math.min(23, (last?.end ?? 18) + 4) }])
+}
+
+function removeSlot(idx: number) {
+  emitSlots(hourSlots.value.filter((_, i) => i !== idx))
+}
 const weekdayOptions = [
   { value: 1, label: '월' },
   { value: 2, label: '화' },
@@ -150,16 +192,6 @@ function onOperatorChange(e: Event) {
 function onSingleValue(e: Event) {
   const v = Number((e.target as HTMLInputElement | HTMLSelectElement).value)
   update({ value: v })
-}
-
-function onTimeRangeStart(e: Event) {
-  const v = Number((e.target as HTMLInputElement | HTMLSelectElement).value)
-  update({ value: [v, rangeEnd.value] })
-}
-
-function onTimeRangeEnd(e: Event) {
-  const v = Number((e.target as HTMLInputElement | HTMLSelectElement).value)
-  update({ value: [rangeStart.value, v] })
 }
 
 function onRangeStart(e: Event) {
@@ -214,6 +246,16 @@ function toggleWeekday(day: number) {
   font-size: 13px; color: var(--text-primary);
 }
 .val-input { width: 70px; }
+
+.hour-slots { display: flex; flex-direction: column; gap: 4px; }
+.hour-slot-row { display: flex; align-items: center; gap: 4px; }
+.btn-add-slot {
+  background: none; border: 1px dashed var(--border-input);
+  border-radius: 6px; color: var(--text-muted); font-size: 13px;
+  padding: 3px 10px; cursor: pointer; align-self: flex-start;
+}
+.btn-add-slot:hover { color: var(--accent, #4caf50); border-color: var(--accent, #4caf50); }
+.slot-del { font-size: 11px; padding: 2px 4px; }
 
 .sep { color: var(--text-muted); font-size: 14px; }
 .unit-label { font-size: 13px; color: #888; white-space: nowrap; }

@@ -59,6 +59,7 @@ export interface IrrigationConditions {
   mixer: { enabled: boolean }
   fertilizer: { enabled: boolean; duration: number; preStopWait: number }
   schedule: { days: number[]; repeat: boolean }
+  schedules?: Array<{ startTime: string; days: number[]; repeat: boolean }>
 }
 
 // === 위저드 폼 데이터 (5단계) ===
