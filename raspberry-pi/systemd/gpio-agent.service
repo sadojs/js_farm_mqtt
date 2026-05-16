@@ -1,0 +1,19 @@
+[Unit]
+Description=Smart Farm GPIO Relay Agent
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/gpio-agent
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/smartfarm/gpio-agent.env
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gpio-agent
+
+[Install]
+WantedBy=multi-user.target

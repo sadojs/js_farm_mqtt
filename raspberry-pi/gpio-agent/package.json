@@ -1,0 +1,16 @@
+{
+  "name": "gpio-agent",
+  "version": "1.0.0",
+  "description": "Smart Farm GPIO relay agent for Raspberry Pi",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.0.0",
+    "onoff": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

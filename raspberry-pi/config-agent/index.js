@@ -20,6 +20,7 @@ if (!GATEWAY_ID || !MQTT_SERVER) {
 const TOPIC_REQUEST = `farm/${GATEWAY_ID}/config/request`;
 const TOPIC_RESPONSE = `farm/${GATEWAY_ID}/config/response`;
 const TOPIC_AGENT_STATUS = `farm/${GATEWAY_ID}/agent/status`;
+const TOPIC_TUNNEL_STATUS = `farm/${GATEWAY_ID}/tunnel/status`;
 
 const configManager = new ConfigManager(Z2M_CONFIG_PATH);
 let client;
@@ -57,9 +58,14 @@ function connect() {
 
     // 온라인 상태 즉시 발행
     publishAgentStatus('online');
-    // 60초마다 하트비트
+    // 터널 상태 즉시 보고
+    publishTunnelStatus();
+    // 60초마다 하트비트 + 터널 상태
     if (!client._heartbeatTimer) {
-      client._heartbeatTimer = setInterval(() => publishAgentStatus('online'), 60_000);
+      client._heartbeatTimer = setInterval(() => {
+        publishAgentStatus('online');
+        publishTunnelStatus();
+      }, 60_000);
     }
   });
 
@@ -210,6 +216,19 @@ function sendResponse(requestId, action, success, extra = {}) {
 function publishAgentStatus(status) {
   if (client && client.connected) {
     client.publish(TOPIC_AGENT_STATUS, JSON.stringify({ status, timestamp: new Date().toISOString() }), { qos: 1 });
+  }
+}
+
+// ---- 터널 상태 감지 및 발행 ----
+function publishTunnelStatus() {
+  if (!client || !client.connected) return;
+  try {
+    // reverse-ssh-tunnel 서비스 active 여부 확인
+    const result = execSync('systemctl is-active reverse-ssh-tunnel.service 2>/dev/null || echo inactive').toString().trim();
+    const status = result === 'active' ? 'connected' : 'disconnected';
+    client.publish(TOPIC_TUNNEL_STATUS, JSON.stringify({ status, timestamp: new Date().toISOString() }), { qos: 1 });
+  } catch {
+    client.publish(TOPIC_TUNNEL_STATUS, JSON.stringify({ status: 'disconnected', timestamp: new Date().toISOString() }), { qos: 1 });
   }
 }
 
