@@ -1,8 +1,32 @@
 {
-  "sessionCount": 5,
+  "sessionCount": 42,
+  "currentFeature": "gateway-management-redesign",
+  "currentPhase": "check",
+  "matchRate": 94,
+  "iterationCount": 0,
   "lastSession": {
-    "startedAt": "2026-04-03T10:27:17.632Z",
+    "startedAt": "2026-05-15T09:00:00.000Z",
     "platform": "claude",
     "level": "Enterprise"
-  }
+  },
+  "recentlyCompleted": [
+    {
+      "feature": "opener-actuator-label-i18n",
+      "phase": "report",
+      "completedAt": "2026-05-15T08:30:00.000Z",
+      "matchRate": 100
+    },
+    {
+      "feature": "rain-sensor-opener-override",
+      "phase": "report",
+      "completedAt": "2026-05-15T07:05:00.000Z",
+      "matchRate": 100
+    },
+    {
+      "feature": "sensor-reading-selection",
+      "phase": "report",
+      "completedAt": "2026-05-14T07:05:00.000Z",
+      "matchRate": 100
+    }
+  ]
 }

@@ -2,12 +2,12 @@
   "version": "1.0",
   "enabled": false,
   "teamName": "",
-  "feature": "report-comparison",
+  "feature": "gpio-relay-manager",
   "pdcaPhase": "check",
   "orchestrationPattern": "leader",
   "ctoAgent": "opus",
-  "startedAt": "2026-04-02T10:46:50.722Z",
-  "lastUpdated": "2026-04-02T11:43:48.352Z",
+  "startedAt": "2026-05-15T20:29:13.446Z",
+  "lastUpdated": "2026-05-15T20:32:57.794Z",
   "teammates": [],
   "progress": {
     "totalTasks": 0,
@@ -17,5 +17,5 @@
     "pendingTasks": 0
   },
   "recentMessages": [],
-  "sessionId": "edcd39cd-070a-450d-8320-460c845a1488"
+  "sessionId": "b2678e17-7eb1-403e-8de8-4820364c3313"
 }
