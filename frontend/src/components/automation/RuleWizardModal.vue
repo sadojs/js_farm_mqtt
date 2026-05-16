@@ -21,35 +21,28 @@
             v-if="currentStep === 1"
             v-model="formData.groupId"
           />
-          <StepSensorSelect
-            v-if="currentStep === 2"
-            v-model="formData.sensorDeviceIds"
-            :groupId="formData.groupId"
-            :noSensor="noSensor"
-            @update:noSensor="noSensor = $event"
-          />
           <StepActuatorSelect
-            v-if="currentStep === 3"
+            v-if="currentStep === 2"
             v-model:selectedIds="formData.actuatorDeviceIds"
             :groupId="formData.groupId"
-            :noSensor="noSensor"
+            :include-opener="true"
           />
           <StepIrrigationCondition
-            v-if="currentStep === 4 && isIrrigation"
+            v-if="currentStep === 3 && isIrrigation"
             v-model="irrigationForm"
             :channelMapping="localChannelMapping"
             :editableMapping="canEditMapping"
             @update:channelMapping="handleMappingUpdate"
           />
           <StepConditionBuilder
-            v-if="currentStep === 4 && !isIrrigation"
+            v-if="currentStep === 3 && !isIrrigation"
             v-model="formData.conditions"
-            :timeOnly="noSensor"
+            :timeOnly="false"
             :equipmentType="selectedEquipmentType"
             :groupId="formData.groupId"
           />
           <StepReview
-            v-if="currentStep === 5"
+            v-if="currentStep === 4"
             :formData="formData"
             :irrigationConditions="isIrrigation ? irrigationForm : undefined"
             @update:name="formData.name = $event"
@@ -61,7 +54,7 @@
         <div class="modal-footer">
           <button v-if="currentStep > 1" class="btn-secondary" @click="currentStep--">이전</button>
           <div class="spacer" />
-          <button v-if="currentStep < 5" class="btn-primary" :disabled="!canNext" @click="currentStep++">다음</button>
+          <button v-if="currentStep < 4" class="btn-primary" :disabled="!canNext" @click="currentStep++">다음</button>
           <button v-else class="btn-primary" :disabled="!canSave || saving" @click="handleSave">
             {{ saving ? '저장 중...' : '저장' }}
           </button>
@@ -80,7 +73,6 @@ import { useDeviceStore } from '../../stores/device.store'
 import { useAuthStore } from '../../stores/auth.store'
 import type { ChannelMapping } from '../../types/device.types'
 import StepTargetSelect from './StepTargetSelect.vue'
-import StepSensorSelect from './StepSensorSelect.vue'
 import StepActuatorSelect from './StepActuatorSelect.vue'
 import StepConditionBuilder from './StepConditionBuilder.vue'
 import StepIrrigationCondition from './StepIrrigationCondition.vue'
@@ -95,16 +87,14 @@ const deviceStore = useDeviceStore()
 const { isAdmin, isFarmAdmin } = useAuthStore()
 const currentStep = ref(1)
 const saving = ref(false)
-const noSensor = ref(false)
 const formData = ref<WizardFormData>(createEmptyWizardForm())
 const irrigationForm = ref<IrrigationConditions>(createDefaultIrrigationConditions())
 
 const stepList = [
   { num: 1, label: '구역' },
-  { num: 2, label: '측정기' },
-  { num: 3, label: '장치' },
-  { num: 4, label: '조건' },
-  { num: 5, label: '확인' },
+  { num: 2, label: '장치' },
+  { num: 3, label: '조건' },
+  { num: 4, label: '확인' },
 ]
 
 watch(() => props.visible, (open) => {
@@ -119,6 +109,9 @@ watch(() => props.visible, (open) => {
     const deviceIds = actions.targetDeviceIds?.length
       ? actions.targetDeviceIds
       : actions.targetDeviceId ? [actions.targetDeviceId] : []
+    // 레거시 룰: description에 JSON 메타데이터가 저장된 경우 사용자에게 노출하지 않음
+    const rawDesc = rule.description || ''
+    const isJsonMeta = /^\s*\{.*"(originalV2State|hysteresisOffAt)"/.test(rawDesc)
     formData.value = {
       groupId: rule.groupId,
       sensorDeviceIds: sensorIds,
@@ -127,7 +120,7 @@ watch(() => props.visible, (open) => {
         ? rule.conditions
         : createEmptyWizardForm().conditions,
       name: rule.name,
-      description: rule.description || '',
+      description: isJsonMeta ? '' : rawDesc,
       priority: rule.priority,
     }
     // 관수 조건 복원
@@ -136,19 +129,21 @@ watch(() => props.visible, (open) => {
     } else {
       irrigationForm.value = createDefaultIrrigationConditions()
     }
-    noSensor.value = sensorIds.length === 0 && (rule.ruleType === 'time' || (rule.conditions as any)?.type === 'irrigation')
   } else {
     formData.value = createEmptyWizardForm()
     irrigationForm.value = createDefaultIrrigationConditions()
-    noSensor.value = false
   }
 })
 
 // 선택된 장치의 equipmentType (첫 번째 선택 장치 기준)
 const selectedEquipmentType = computed(() => {
-  if (formData.value.actuatorDeviceIds.length === 0 || !formData.value.groupId) return undefined
-  const group = groupStore.groups.find(g => g.id === formData.value.groupId)
-  const device = group?.devices?.find((d: any) => d.id === formData.value.actuatorDeviceIds[0])
+  if (formData.value.actuatorDeviceIds.length === 0) return undefined
+  const deviceId = formData.value.actuatorDeviceIds[0]
+  const group = formData.value.groupId
+    ? groupStore.groups.find(g => g.id === formData.value.groupId)
+    : undefined
+  const device = group?.devices?.find((d: any) => d.id === deviceId)
+    ?? deviceStore.devices.find(d => d.id === deviceId)
   return (device as any)?.equipmentType as string | undefined
 })
 
@@ -191,9 +186,8 @@ async function handleMappingUpdate(mapping: ChannelMapping) {
 
 const canNext = computed(() => {
   if (currentStep.value === 1) return !!formData.value.groupId
-  if (currentStep.value === 2) return formData.value.sensorDeviceIds.length > 0 || noSensor.value
-  if (currentStep.value === 3) return formData.value.actuatorDeviceIds.length > 0
-  if (currentStep.value === 4) {
+  if (currentStep.value === 2) return formData.value.actuatorDeviceIds.length > 0
+  if (currentStep.value === 3) {
     if (isIrrigation.value) {
       // 관수: 시작시간과 활성 구역 최소 1개
       const baseValid = !!irrigationForm.value.startTime &&
@@ -230,6 +224,15 @@ async function handleSave() {
   if (saving.value) return
   saving.value = true
   try {
+    // sensorDeviceIds는 더 이상 별도 단계로 받지 않고 conditions의 sensor_device_id에서 자동 파생
+    // (활동 로그/표시 목적; 비어 있어도 정상)
+    const derivedSensorIds = isIrrigation.value
+      ? []
+      : Array.from(new Set(
+          formData.value.conditions.groups.flatMap(g =>
+            (g.conditions || []).map((c: any) => c?.sensor_device_id).filter(Boolean)
+          )
+        ))
     const payload: CreateRuleRequest = {
       name: formData.value.name.trim(),
       description: formData.value.description || undefined,
@@ -240,7 +243,7 @@ async function handleSave() {
       actions: {
         targetDeviceId: formData.value.actuatorDeviceIds[0],
         targetDeviceIds: formData.value.actuatorDeviceIds,
-        sensorDeviceIds: formData.value.sensorDeviceIds,
+        sensorDeviceIds: derivedSensorIds,
       } as any,
       priority: formData.value.priority,
     }

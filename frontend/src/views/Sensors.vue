@@ -22,7 +22,7 @@
       title="측정 데이터가 없습니다"
       description="아직 측정기가 등록된 구역이 없습니다.&#10;① 장치 관리에서 측정기를 등록하세요&#10;② 구역 관리에서 구역을 만들고 배치하세요&#10;③ 이곳에서 실시간 데이터를 확인하세요"
     >
-      <router-link to="/devices" class="btn-cta" style="margin-top: 8px;">장치 관리로 이동</router-link>
+      <router-link to="/gateways" class="btn-cta" style="margin-top: 8px;">게이트웨이 관리로 이동</router-link>
     </EmptyState>
 
     <!-- 그룹별 센서 목록 -->

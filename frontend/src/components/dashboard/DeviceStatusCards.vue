@@ -13,7 +13,7 @@
         <div class="detail-list">
           <div v-if="actuatorDevices.length === 0" class="detail-empty">
             등록된 장치가 없습니다
-            <router-link to="/devices" class="empty-inline-link">설정하기</router-link>
+            <router-link to="/gateways" class="empty-inline-link">설정하기</router-link>
           </div>
           <div
             v-for="device in actuatorDevices"
@@ -54,7 +54,7 @@
         <div class="detail-list">
           <div v-if="sensorDevices.length === 0" class="detail-empty">
             등록된 측정기가 없습니다
-            <router-link to="/devices" class="empty-inline-link">설정하기</router-link>
+            <router-link to="/gateways" class="empty-inline-link">설정하기</router-link>
           </div>
           <div
             v-for="device in sensorDevices"

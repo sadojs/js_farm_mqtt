@@ -1,10 +1,10 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { groupApi } from '../api/group.api'
-import type { HouseGroup, House, CreateGroupRequest, CreateHouseRequest } from '../types/group.types'
+import type { HouseGroupWithOwner, House, CreateGroupRequest, CreateHouseRequest } from '../types/group.types'
 
 export const useGroupStore = defineStore('group', () => {
-  const groups = ref<HouseGroup[]>([])
+  const groups = ref<HouseGroupWithOwner[]>([])
   const houses = ref<House[]>([])
   const loading = ref(false)
 

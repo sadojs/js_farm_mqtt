@@ -55,6 +55,7 @@ interface ControllerInfo {
 
 const props = defineProps<{
   groupId: string
+  farmUserId?: string | null
   modelValue: string | null
 }>()
 
@@ -94,7 +95,11 @@ const controllers = computed<ControllerInfo[]>(() => {
     return acc
   }, [])
 
-  return candidates
+  const byFarm = props.farmUserId
+    ? candidates.filter((d: any) => !d.userId || d.userId === props.farmUserId)
+    : candidates
+
+  return byFarm
     .filter(d => d.deviceType === 'actuator' && d.equipmentType === 'irrigation')
     .map(d => {
       const ch = getChannelCount(d)

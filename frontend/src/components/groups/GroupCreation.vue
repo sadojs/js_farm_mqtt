@@ -7,7 +7,7 @@
       </div>
 
       <div class="modal-body">
-        <!-- 그룹 정보 입력 -->
+        <!-- 구역 정보 입력 -->
         <div class="form-section">
           <h3>구역 정보</h3>
           <div class="form-group">
@@ -15,11 +15,10 @@
             <input
               v-model="groupData.name"
               type="text"
-              placeholder="예: 우용리 하우스 구역"
+              placeholder="예: 1동 하우스"
               class="form-input"
             />
           </div>
-
           <div class="form-group">
             <label>설명</label>
             <textarea
@@ -29,7 +28,6 @@
               rows="2"
             />
           </div>
-
           <div class="form-group">
             <label>관리자</label>
             <input
@@ -41,98 +39,39 @@
           </div>
         </div>
 
-        <!-- 장치 선택 -->
+        <!-- 라즈베리파이 할당 -->
         <div class="form-section">
-          <h3>장치 할당</h3>
-          <p class="section-desc">이 구역에 포함할 측정기와 장치를 선택하세요.</p>
+          <h3>라즈베리파이 할당</h3>
+          <p class="section-desc">이 구역에서 사용할 라즈베리파이(게이트웨이)를 선택하세요. 게이트웨이의 환경 설정에서 활성화된 장치가 이 구역에 자동으로 표시됩니다.</p>
 
-          <div v-if="availableDevices.length === 0" class="empty-devices">
-            <p>등록된 장치가 없습니다. 먼저 장치를 등록하세요.</p>
+          <div v-if="loadingGateways" class="empty-devices"><p>게이트웨이 목록 불러오는 중...</p></div>
+          <div v-else-if="availableGateways.length === 0" class="empty-devices">
+            <p>할당 가능한 게이트웨이가 없습니다. 먼저 게이트웨이를 등록하세요.</p>
           </div>
 
-          <template v-else>
-            <div class="search-box">
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="장치 검색..."
-                class="search-input"
-              />
-            </div>
-
-            <!-- 센서 목록 -->
-            <div v-if="filteredSensors.length > 0" class="device-type-section">
-              <div class="type-label sensor">측정기 ({{ filteredSensors.length }})</div>
-              <div class="devices-list">
-                <div
-                  v-for="device in filteredSensors"
-                  :key="device.id"
-                  class="device-item"
-                  :class="{ selected: selectedDeviceIds.includes(device.id) }"
-                  @click="toggleDevice(device.id)"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="selectedDeviceIds.includes(device.id)"
-                    @click.stop
-                    @change="toggleDevice(device.id)"
-                  />
-                  <div class="device-icon">{{ getCategoryIcon(device.category) }}</div>
-                  <div class="device-info">
-                    <h4>{{ device.name }}</h4>
-                    <p class="device-meta">{{ device.category }}</p>
-                  </div>
-                  <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 장치(액추에이터) 목록 -->
-            <div v-if="filteredActuators.length > 0" class="device-type-section">
-              <div class="type-label actuator">장치 ({{ filteredActuators.length }})</div>
-              <div class="devices-list">
-                <div
-                  v-for="device in filteredActuators"
-                  :key="device.id"
-                  class="device-item"
-                  :class="{ selected: selectedDeviceIds.includes(device.id) }"
-                  @click="toggleDevice(device.id)"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="selectedDeviceIds.includes(device.id)"
-                    @click.stop
-                    @change="toggleDevice(device.id)"
-                  />
-                  <div class="device-icon">{{ getCategoryIcon(device.category) }}</div>
-                  <div class="device-info">
-                    <h4>{{ device.name }}</h4>
-                    <p class="device-meta">{{ device.category }}</p>
-                  </div>
-                  <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <!-- 선택된 장치 미리보기 -->
-        <div v-if="selectedDeviceIds.length > 0" class="form-section">
-          <h3>선택된 장치 ({{ selectedDeviceIds.length }})</h3>
-          <div class="selected-devices">
+          <div v-else class="gateways-list">
             <div
-              v-for="deviceId in selectedDeviceIds"
-              :key="deviceId"
-              class="device-chip"
-              :class="getDeviceById(deviceId)?.deviceType === 'sensor' ? 'sensor' : 'actuator'"
+              v-for="gw in availableGateways"
+              :key="gw.id"
+              class="gateway-item"
+              :class="{ selected: selectedGatewayIds.includes(gw.id) }"
+              @click="toggleGateway(gw.id)"
             >
-              <span>{{ getCategoryIcon(getDeviceById(deviceId)?.category || '') }}</span>
-              <span>{{ getDeviceById(deviceId)?.name }}</span>
-              <button @click="removeDevice(deviceId)">✕</button>
+              <input
+                type="checkbox"
+                :checked="selectedGatewayIds.includes(gw.id)"
+                @click.stop
+                @change="toggleGateway(gw.id)"
+              />
+              <div class="gw-icon">🍓</div>
+              <div class="gw-info">
+                <div class="gw-name">{{ gw.name }}</div>
+                <div class="gw-meta">{{ gw.gatewayId }}<span v-if="gw.location"> · {{ gw.location }}</span></div>
+              </div>
+              <span :class="['status-dot', gw.agentStatus === 'online' || gw.status === 'online' ? 'online' : 'offline']"></span>
             </div>
           </div>
         </div>
-
       </div>
 
       <div class="modal-footer">
@@ -152,8 +91,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useDeviceStore } from '../../stores/device.store'
 import { useGroupStore } from '../../stores/group.store'
+import { gatewayApi } from '@/api/gateway.api'
+import { gatewayEnvApi } from '@/api/gateway-env.api'
+import type { Gateway } from '@/types/device.types'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{
@@ -161,94 +102,76 @@ const emit = defineEmits<{
   created: []
 }>()
 
-const deviceStore = useDeviceStore()
 const groupStore = useGroupStore()
 
-const searchQuery = ref('')
-const selectedDeviceIds = ref<string[]>([])
 const creating = ref(false)
+const loadingGateways = ref(false)
+const availableGateways = ref<Gateway[]>([])
+const selectedGatewayIds = ref<string[]>([])
 
-const groupData = ref({
-  name: '',
-  description: '',
-  manager: '',
-})
+function toggleGateway(id: string) {
+  const idx = selectedGatewayIds.value.indexOf(id)
+  if (idx === -1) selectedGatewayIds.value.push(id)
+  else selectedGatewayIds.value.splice(idx, 1)
+}
 
-watch(() => props.show, (open) => {
+const groupData = ref({ name: '', description: '', manager: '' })
+
+watch(() => props.show, async (open) => {
   if (open) {
-    deviceStore.fetchDevices()
+    loadingGateways.value = true
+    try {
+      const res = await gatewayApi.getAll()
+      availableGateways.value = res.data as unknown as Gateway[]
+    } catch {
+      availableGateways.value = []
+    } finally {
+      loadingGateways.value = false
+    }
   }
-})
-
-const availableDevices = computed(() => deviceStore.devices)
-
-const filteredSensors = computed(() => {
-  const sensors = availableDevices.value.filter(d => d.deviceType === 'sensor')
-  if (!searchQuery.value) return sensors
-  const q = searchQuery.value.toLowerCase()
-  return sensors.filter(d => d.name.toLowerCase().includes(q) || d.category.toLowerCase().includes(q))
-})
-
-const filteredActuators = computed(() => {
-  const actuators = availableDevices.value.filter(d => d.deviceType === 'actuator')
-  if (!searchQuery.value) return actuators
-  const q = searchQuery.value.toLowerCase()
-  return actuators.filter(d => d.name.toLowerCase().includes(q) || d.category.toLowerCase().includes(q))
 })
 
 const isValid = computed(() => groupData.value.name.trim() !== '')
 
-const getDeviceById = (id: string) => availableDevices.value.find(d => d.id === id)
-
-const getCategoryIcon = (category: string) => {
-  const icons: Record<string, string> = {
-    'wk': '💨', 'fs': '💨',
-    'cl': '🚪', 'mc': '🚪',
-    'dj': '💡', 'dd': '💡',
-    'bh': '💦', 'sfkzq': '💦',
-    'wsdcg': '🌡️',
-    'co2bj': '🌫️',
-    'ldcg': '🌱',
-  }
-  return icons[category] || '📦'
-}
-
-const toggleDevice = (deviceId: string) => {
-  const index = selectedDeviceIds.value.indexOf(deviceId)
-  if (index === -1) {
-    selectedDeviceIds.value.push(deviceId)
-  } else {
-    selectedDeviceIds.value.splice(index, 1)
-  }
-}
-
-const removeDevice = (deviceId: string) => {
-  const index = selectedDeviceIds.value.indexOf(deviceId)
-  if (index !== -1) {
-    selectedDeviceIds.value.splice(index, 1)
-  }
-}
-
 const handleCreate = async () => {
   if (!isValid.value) return
   creating.value = true
-
   try {
     const group = await groupStore.createGroup({
       name: groupData.value.name,
       description: groupData.value.description,
       manager: groupData.value.manager,
     })
-
-    if (selectedDeviceIds.value.length > 0 && group?.id) {
-      await groupStore.assignDevices(group.id, selectedDeviceIds.value)
+    if (selectedGatewayIds.value.length > 0 && group?.id) {
+      const failedGateways: string[] = []
+      for (const gwId of selectedGatewayIds.value) {
+        try {
+          await gatewayApi.assignZone(gwId, group.id)
+          // trigger onboard device sync so zone management shows activated devices
+          gatewayEnvApi.getOnboard(gwId).catch(() => {})
+        } catch (gwErr: any) {
+          const msg = gwErr?.response?.data?.message || '할당 실패'
+          const gw = availableGateways.value.find(g => g.id === gwId)
+          failedGateways.push(`${gw?.name || gwId}: ${msg}`)
+        }
+      }
+      if (failedGateways.length > 0) {
+        alert(`구역은 생성되었으나 일부 게이트웨이 할당에 실패했습니다:\n\n${failedGateways.join('\n')}`)
+      }
     }
-
     emit('created')
     closeModal()
-  } catch (err) {
+  } catch (err: any) {
     console.error('구역 생성 실패:', err)
-    alert('구역 생성에 실패했습니다.')
+    const status = err?.response?.status
+    const serverMsg = err?.response?.data?.message
+    if (status === 409) {
+      alert(`게이트웨이 할당 실패\n\n${serverMsg || '이 게이트웨이는 이미 다른 구역에 할당되어 있습니다.'}`)
+    } else if (status === 403) {
+      alert('접근 권한이 없습니다.')
+    } else {
+      alert('구역 생성에 실패했습니다.')
+    }
   } finally {
     creating.value = false
   }
@@ -257,13 +180,8 @@ const handleCreate = async () => {
 const closeModal = () => {
   emit('close')
   setTimeout(() => {
-    groupData.value = {
-      name: '',
-      description: '',
-      manager: '',
-    }
-    selectedDeviceIds.value = []
-    searchQuery.value = ''
+    groupData.value = { name: '', description: '', manager: '' }
+    selectedGatewayIds.value = []
   }, 300)
 }
 </script>
@@ -286,7 +204,7 @@ const closeModal = () => {
   background: var(--bg-card);
   border-radius: 16px;
   width: 100%;
-  max-width: 700px;
+  max-width: 560px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -302,326 +220,81 @@ const closeModal = () => {
   border-bottom: 1px solid var(--border-input);
 }
 
-.modal-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
+.modal-header h2 { font-size: 22px; font-weight: 700; margin: 0; }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: none; border: none; font-size: 20px;
+  color: var(--text-muted); cursor: pointer; padding: 4px;
   border-radius: 4px;
 }
+.close-btn:hover { background: var(--bg-hover); }
 
-.close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
+.modal-body { flex: 1; overflow-y: auto; padding: 24px; }
 
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
+.form-section { margin-bottom: 28px; }
+.form-section:last-child { margin-bottom: 0; }
+.form-section h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
 
-.form-section {
-  margin-bottom: 28px;
-}
+.section-desc { font-size: 13px; color: var(--text-secondary); margin: -4px 0 14px; }
 
-.form-section:last-child {
-  margin-bottom: 0;
-}
-
-.form-section h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-.section-desc {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: -4px 0 16px 0;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-group label {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 2px solid var(--border-input);
-  border-radius: 8px;
-  font-size: 16px;
-  transition: all 0.2s;
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.form-input, .form-textarea {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 8px; font-size: 14px;
+  background: var(--bg-input); color: var(--text-primary);
   font-family: inherit;
-  background: var(--bg-input);
-  color: var(--text-primary);
 }
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #4caf50;
+.form-input:focus, .form-textarea:focus {
+  outline: none; border-color: #4caf50;
   box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
-
-.form-textarea {
-  resize: vertical;
-  min-height: 60px;
-}
-
-.search-box {
-  margin-bottom: 12px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 2px solid var(--border-input);
-  border-radius: 8px;
-  font-size: 16px;
-  background: var(--bg-input);
-  color: var(--text-primary);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+.form-textarea { resize: vertical; min-height: 56px; }
 
 .empty-devices {
-  padding: 32px 20px;
-  text-align: center;
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: 24px; text-align: center;
+  background: var(--bg-secondary); border-radius: 8px;
 }
+.empty-devices p { color: var(--text-secondary); font-size: 14px; margin: 0; }
 
-.empty-devices p {
-  color: var(--text-secondary);
-  font-size: 15px;
-  margin: 0;
-}
+.gateways-list { display: flex; flex-direction: column; gap: 8px; }
 
-.device-type-section {
-  margin-bottom: 12px;
-}
-
-.type-label {
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 6px 6px 0 0;
-}
-
-.type-label.sensor {
-  background: var(--sensor-bg);
-  color: var(--sensor-accent);
-}
-
-.type-label.actuator {
-  background: var(--automation-bg);
-  color: var(--automation-text);
-}
-
-.devices-list {
-  border: 1px solid var(--border-input);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.device-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.gateway-item {
+  display: flex; align-items: center; gap: 12px;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border-light);
-  cursor: pointer;
+  border: 1.5px solid var(--border-input);
+  border-radius: 10px; cursor: pointer;
   transition: all 0.15s;
 }
-
-.device-item:last-child {
-  border-bottom: none;
+.gateway-item:hover { background: var(--bg-hover); }
+.gateway-item.selected {
+  border-color: #4caf50;
+  background: rgba(76, 175, 80, 0.06);
 }
 
-.device-item:hover {
-  background: var(--bg-hover);
-}
-
-.device-item.selected {
-  background: var(--accent-bg);
-}
-
-.device-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.device-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-}
-
-.device-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.device-info h4 {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.device-meta {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 2px 0 0 0;
-}
+.gw-icon { font-size: 22px; }
+.gw-info { flex: 1; }
+.gw-name { font-size: 15px; font-weight: 600; }
+.gw-meta { font-size: 12px; color: var(--text-secondary); font-family: monospace; margin-top: 2px; }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }
-
-.status-dot.online {
-  background: #4caf50;
-}
-
-.status-dot.offline {
-  background: #f44336;
-}
-
-.selected-devices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.device-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 16px;
-  font-size: 13px;
-}
-
-.device-chip.sensor {
-  background: var(--sensor-bg);
-  border: 1px solid var(--sensor-accent);
-  color: var(--sensor-accent);
-}
-
-.device-chip.actuator {
-  background: var(--automation-bg);
-  border: 1px solid var(--warning);
-  color: var(--automation-text);
-}
-
-.device-chip button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  font-size: 14px;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: inherit;
-}
-
-.device-chip button:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
+.status-dot.online { background: #4caf50; }
+.status-dot.offline { background: #d1d5db; }
 
 .modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  border-top: 1px solid var(--border-input);
+  display: flex; justify-content: flex-end; gap: 12px;
+  padding: 20px 24px; border-top: 1px solid var(--border-input);
 }
-
-.btn-primary,
-.btn-secondary {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
+.btn-primary, .btn-secondary {
+  padding: 10px 22px; border: none; border-radius: 10px;
+  font-weight: 600; font-size: 15px; cursor: pointer;
 }
-
-.btn-primary {
-  background: #4caf50;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #45a049;
-}
-
-.btn-primary:disabled {
-  background: var(--text-muted);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-  background: var(--bg-hover);
-}
-
-@media (max-width: 768px) {
-  .modal-container {
-    max-width: 100%;
-    max-height: 100vh;
-    border-radius: 0;
-  }
-}
+.btn-primary { background: #4caf50; color: white; }
+.btn-primary:hover:not(:disabled) { background: #45a049; }
+.btn-primary:disabled { background: var(--text-muted); cursor: not-allowed; opacity: 0.6; }
+.btn-secondary { background: var(--bg-secondary); color: var(--text-primary); }
+.btn-secondary:hover { background: var(--bg-hover); }
 </style>

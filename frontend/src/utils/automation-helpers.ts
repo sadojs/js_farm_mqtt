@@ -23,6 +23,7 @@ export const ENV_ROLE_FIELD_CONFIG: Record<string, {
 
 export const FIELD_LABELS: Record<string, string> = {
   hour: '시간',
+  time: '시간',
   once_at: '실행 시각',
   temperature: '온도',
   humidity: '습도',
@@ -78,6 +79,21 @@ export const OPERATOR_LABELS_KR: Record<string, string> = {
 
 // === 포맷 함수 ===
 
+/** minutes-from-midnight (0~1439)을 HH:MM 형식으로 변환 */
+function minutesToHHMM(mins: number): string {
+  const m = Math.max(0, Math.min(1439, Math.round(mins)))
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  return `${String(h).padStart(2, '0')}:${String(r).padStart(2, '0')}`
+}
+
+/** time/hour 조건 값을 HH:MM으로 정규화 (값이 minutes(>=60)이면 그대로, hour(0~23)이면 시 단위로 변환) */
+function formatTimeValue(v: number): string {
+  // 0~23: hour 단위 (legacy), 24 이상: minutes 단위 (v2)
+  if (v >= 0 && v < 24) return `${String(v).padStart(2, '0')}:00`
+  return minutesToHHMM(v)
+}
+
 export function formatCondition(c: Condition): string {
   const fieldLabel = FIELD_LABELS[c.field] || c.field
   const unit = FIELD_UNITS[c.field] || c.unit || ''
@@ -86,14 +102,15 @@ export function formatCondition(c: Condition): string {
     return `비 ${c.value ? '예' : '아니오'}`
   }
 
-  if (c.field === 'hour') {
+  // 시간 조건: field 'hour' (legacy, hour 단위) 또는 'time' (v2, minutes 단위)
+  if (c.field === 'hour' || c.field === 'time' || c.type === 'time') {
     if (c.timeSlots && c.timeSlots.length > 1) {
-      return c.timeSlots.map(s => `${String(s.start).padStart(2, '0')}:00~${String(s.end).padStart(2, '0')}:00`).join(', ')
+      return c.timeSlots.map(s => `${formatTimeValue(s.start)}~${formatTimeValue(s.end)}`).join(', ')
     }
     if (c.operator === 'between' && Array.isArray(c.value)) {
-      return `${String(c.value[0]).padStart(2, '0')}:00 ~ ${String(c.value[1]).padStart(2, '0')}:00`
+      return `${formatTimeValue(c.value[0] as number)} ~ ${formatTimeValue(c.value[1] as number)}`
     }
-    return `${String(c.value).padStart(2, '0')}:00`
+    return formatTimeValue(c.value as number)
   }
 
   if (c.operator === 'between' && Array.isArray(c.value)) {
@@ -285,12 +302,12 @@ export const SENSOR_CONDITION_FIELDS = [
     icon: '💦',
   },
   {
-    value: 'hour',
+    value: 'time',
     label: '시간',
     type: 'time' as const,
-    operators: ['eq', 'between'],
+    operators: ['between', 'eq'],
     unit: '',
-    defaultValue: 9,
+    defaultValue: 9 * 60,
     icon: '🕐',
   },
 ]

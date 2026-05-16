@@ -40,12 +40,6 @@ const router = createRouter({
       meta: { title: '구역 관리', requiresAuth: true }
     },
     {
-      path: '/devices',
-      name: 'devices',
-      component: () => import('../views/Devices.vue'),
-      meta: { title: '장치 관리', requiresAuth: true, denyFarmUser: true }
-    },
-    {
       path: '/users',
       name: 'users',
       component: () => import('../views/UserManagement.vue'),
@@ -76,10 +70,28 @@ const router = createRouter({
       meta: { title: '설정 배포', requiresAuth: true, requiresAdmin: true }
     },
     {
+      path: '/gateways',
+      name: 'gateways',
+      component: () => import('../views/GatewayManagement.vue'),
+      meta: { title: '게이트웨이 관리', requiresAuth: true, denyFarmUser: true }
+    },
+    {
       path: '/crop-management',
       name: 'crop-management',
       component: () => import('../modules/crop-management/CropManagementView.vue'),
       meta: { title: '생육관리', requiresAuth: true }
+    },
+    {
+      path: '/gateways/:id/env',
+      name: 'gateway-env',
+      component: () => import('../views/GatewayEnvSettings.vue'),
+      meta: { title: '게이트웨이 환경 설정', requiresAuth: true, denyFarmUser: true }
+    },
+    {
+      path: '/admin/farms',
+      name: 'admin-farms',
+      component: () => import('../views/AdminFarmManagement.vue'),
+      meta: { title: '농장 관리', requiresAuth: true, requiresAdmin: true }
     },
   ]
 })

@@ -13,7 +13,7 @@ async function bootstrap() {
   await useAuthStore().initAuth()
 
   app.use(router)
-  app.mount('#app')
+  app.mount('#vue-root')
 }
 
 bootstrap()

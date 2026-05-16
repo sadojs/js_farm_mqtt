@@ -430,7 +430,7 @@ watch(() => messages.value.length, () => {
   height: 40px;
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 50%;
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   font-size: 18px;
   cursor: pointer;
   flex-shrink: 0;

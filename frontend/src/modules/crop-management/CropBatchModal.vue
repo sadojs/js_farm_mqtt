@@ -250,7 +250,7 @@ async function handleSubmit() {
 }
 
 .modal-content {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   border-radius: 16px;
   width: 100%;
   max-width: 480px;
@@ -267,7 +267,7 @@ async function handleSubmit() {
   border-bottom: 1px solid var(--border-color, #eee);
   position: sticky;
   top: 0;
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   z-index: 1;
 }
 
@@ -317,7 +317,7 @@ async function handleSubmit() {
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
   font-size: 14px;
-  background: var(--input-bg, #fff);
+  background: var(--bg-input, #fff);
   color: var(--text-primary, #333);
 }
 
@@ -378,7 +378,7 @@ async function handleSubmit() {
 
 .offset-suggestions {
   padding: 10px 12px;
-  background: var(--input-bg, #f5f5f5);
+  background: var(--bg-input, #f5f5f5);
   border-radius: 8px;
   font-size: 13px;
 }
@@ -442,6 +442,6 @@ async function handleSubmit() {
 /* 다크모드 */
 #app.theme-dark .modal-content,
 #app.theme-dark .modal-header {
-  background: var(--card-bg);
+  background: var(--bg-card);
 }
 </style>

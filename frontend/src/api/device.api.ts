@@ -23,6 +23,11 @@ export const deviceApi = {
   getStatus: (id: string) =>
     apiClient.get(`/devices/${id}/status`),
 
+  getSensorChannels: (id: string) =>
+    apiClient.get<Array<{ field: string; lastValue: number | null; unit: string; updatedAt: string }>>(
+      `/devices/${id}/sensor-channels`,
+    ),
+
   getDependencies: (id: string) =>
     apiClient.get<DeviceDependenciesResponse>(`/devices/${id}/dependencies`),
 

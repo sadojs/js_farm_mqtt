@@ -82,7 +82,7 @@ function milestoneTypeLabel(type: string) {
 }
 
 .batch-section {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -119,7 +119,7 @@ function milestoneTypeLabel(type: string) {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--input-bg, #f8f9fa);
+  background: var(--bg-input, #f8f9fa);
 }
 
 .milestone-item.done {

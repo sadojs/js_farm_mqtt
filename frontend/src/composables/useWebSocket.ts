@@ -13,6 +13,14 @@ const _connected = ref(false)
 const _reconnecting = ref(false)
 const _reconnectAttempts = ref(0)
 
+type GpioStatusHandler = (data: { gatewayId: string; slot: string; pin: number; state: boolean; auto?: boolean }) => void
+const gpioStatusHandlers = new Set<GpioStatusHandler>()
+
+export function onGpioStatus(fn: GpioStatusHandler) {
+  gpioStatusHandlers.add(fn)
+  return () => gpioStatusHandlers.delete(fn)
+}
+
 export const socketStatus = readonly({
   connected: _connected,
   reconnecting: _reconnecting,
@@ -131,6 +139,11 @@ export function useWebSocket() {
         status.isRunning = false
         status.runningRule = undefined
       }
+    })
+
+    // GPIO 핀 상태 (admin 핀 테스트 피드백)
+    socket.on('gpio:status', (data: { gatewayId: string; slot: string; pin: number; state: boolean; auto?: boolean }) => {
+      gpioStatusHandlers.forEach(fn => fn(data))
     })
 
     // 일반 알림

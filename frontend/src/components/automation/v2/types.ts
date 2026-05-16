@@ -1,10 +1,10 @@
 export type WizardIntent = 'irrigation' | 'opener' | 'fan' | 'advanced'
 
 export type WizardStep =
-  | 'farm'
+  | 'farm-admin'      // 플렛폼 관리자: 농장(farm_admin) 선택
+  | 'zone'            // 구역(house_group) 선택
   | 'intent'
   | 'irrigation-device'
-  | 'irrigation-valve'
   | 'device-by-intent'
   | 'timing'
   | 'review'
@@ -64,12 +64,16 @@ export interface IrrigationState {
   schedule: IrrigationSchedule[]
 }
 
+export type SensorReadingField = 'temperature' | 'humidity'
+
 export interface OpenerFanState {
   deviceIds: string[]
   triggerType: 'time' | 'temperature'
   timeRange?: TimeRange
   timeRanges?: TimeRange[]
   temperature?: TemperatureTrigger
+  sensorDeviceId?: string         // 측정 디바이스 ID
+  sensorField?: SensorReadingField // 측정 채널 (온도/습도) — triggerType==='temperature'일 때 필수
   extraConditions: SensorCondition[]
   relayEnabled: boolean       // 동작대기 ON/OFF
   relayOnMin: number          // 동작대기 ON 분
@@ -77,6 +81,7 @@ export interface OpenerFanState {
 }
 
 export interface WizardStateV2 {
+  farmUserId: string | null  // admin이 선택한 farm_admin userId
   groupId: string | null
   intent: WizardIntent | null
   irrigation?: IrrigationState

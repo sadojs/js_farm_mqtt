@@ -68,10 +68,10 @@ const visibleCards = computed<CardDef[]>(() => {
     ]
   }
   return [
-    { value: String(actuatorCount.value + sensorCount.value), label: '전체 장치', iconClass: 'equip', iconComponent: IconDevice, route: '/devices', linkable: true },
+    { value: String(actuatorCount.value + sensorCount.value), label: '전체 장치', iconClass: 'equip', iconComponent: IconDevice, route: '/gateways', linkable: true },
     { value: String(groupCount.value), label: '활성 구역', iconClass: 'group', iconComponent: IconGroup, route: '/groups', linkable: true },
     { value: `${ruleActive.value} / ${ruleCount.value}`, label: '자동 제어 설정', iconClass: 'auto', iconComponent: IconAuto, route: '/automation', linkable: true },
-    { value: String(onlineTotal.value), label: '온라인 기기', iconClass: 'online', iconComponent: IconOnline, route: '/devices', linkable: true },
+    { value: String(onlineTotal.value), label: '온라인 기기', iconClass: 'online', iconComponent: IconOnline, route: '/gateways', linkable: true },
   ]
 })
 

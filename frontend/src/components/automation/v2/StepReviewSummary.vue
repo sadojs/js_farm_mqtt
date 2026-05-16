@@ -7,8 +7,8 @@
       <!-- 농장 -->
       <div class="summary-section clickable" role="button" tabindex="0"
         aria-label="농장 수정하기"
-        @click="emit('jump-to', 'farm')"
-        @keydown.enter="emit('jump-to', 'farm')">
+        @click="emit('jump-to', 'zone')"
+        @keydown.enter="emit('jump-to', 'zone')">
         <span class="section-icon">📌</span>
         <span class="section-text">{{ groupName }}</span>
         <span class="edit-hint">수정</span>
@@ -117,7 +117,7 @@ const intentIcon = computed(() => {
 })
 
 const deviceStep = computed((): WizardStep => {
-  return props.state.intent === 'irrigation' ? 'irrigation-valve' : 'device-by-intent'
+  return props.state.intent === 'irrigation' ? 'irrigation-device' : 'device-by-intent'
 })
 
 const deviceSectionTitle = computed(() => {

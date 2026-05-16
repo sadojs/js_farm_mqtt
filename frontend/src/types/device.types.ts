@@ -47,6 +47,7 @@ export const DEFAULT_CHANNEL_MAPPING = DEFAULT_CHANNEL_MAPPING_8CH
 
 export const FUNCTION_LABELS: Record<string, string> = {
   remote_control:       '원격제어 ON/OFF',
+  fertilizer_b_contact: '액비/교반기 B접점',
   zone_1:               '1구역 관주',
   zone_2:               '2구역 관주',
   zone_3:               '3구역 관주',
@@ -55,7 +56,10 @@ export const FUNCTION_LABELS: Record<string, string> = {
   zone_6:               '6구역 관주',
   zone_7:               '7구역 관주',
   zone_8:               '8구역 관주',
-  fertilizer_b_contact: '액비/교반기 B접점',
+  zone_9:               '9구역 관주',
+  zone_10:              '10구역 관주',
+  zone_11:              '11구역 관주',
+  zone_12:              '12구역 관주',
   mixer:                '교반기',
   fertilizer_motor:     '액비모터',
 }
@@ -75,7 +79,11 @@ export const AVAILABLE_SWITCH_CODES_12CH = [
 export const AVAILABLE_SWITCH_CODES = AVAILABLE_SWITCH_CODES_8CH
 
 export function detectChannelCount(switchCodes: string[]): 8 | 12 {
-  return switchCodes.some(c => /^switch_(7|8|9|10|11|12)$/.test(c)) ? 12 : 8
+  // Zigbee: switch_7..12 → 12ch
+  if (switchCodes.some(c => /^switch_(7|8|9|10|11|12)$/.test(c))) return 12
+  // Onboard: relay_zone_5 이상 존재하면 12ch (8ch는 zone_1..4까지)
+  if (switchCodes.some(c => /^relay_zone_([5-9]|[1-9]\d+)$/.test(c))) return 12
+  return 8
 }
 
 export function getDefaultMappingByCount(count: 8 | 12): ChannelMapping {
@@ -104,6 +112,7 @@ export interface Device {
   equipmentType?: EquipmentType
   icon?: string
   online: boolean
+  enabled?: boolean
   switchState?: boolean | null
   switchStates?: Record<string, boolean>
   channelMapping?: ChannelMapping | null
@@ -113,6 +122,8 @@ export interface Device {
   updatedAt: string
   pairedDeviceId?: string
   openerGroupName?: string
+  deviceSettings?: Record<string, any> | null
+  source?: 'zigbee' | 'onboard'
 }
 
 export interface RegisterDeviceRequest {
@@ -161,7 +172,9 @@ export interface Gateway {
   name: string
   location?: string
   rpiIp?: string
+  houseId?: string | null
   status: string
+  agentStatus?: string
   lastSeen?: string
   createdAt: string
   updatedAt: string

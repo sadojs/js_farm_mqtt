@@ -166,11 +166,11 @@ const handleLogin = async () => {
 
 .form-input {
   padding: 12px 16px;
-  border: 2px solid #d0d0d0;
+  border: 2px solid var(--border-input);
   border-radius: 8px;
   font-size: 15px;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--bg-input);
+  color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -244,6 +244,12 @@ const handleLogin = async () => {
   border-radius: 8px;
   font-size: 14px;
   text-align: center;
+}
+
+/* 다크모드: 에러 메시지 */
+#app.theme-dark .error-message {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ef9a9a;
 }
 
 .login-footer {

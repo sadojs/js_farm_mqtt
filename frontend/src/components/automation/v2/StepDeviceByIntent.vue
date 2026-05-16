@@ -29,7 +29,9 @@
         />
         <div class="device-info">
           <span class="device-name">{{ d.name }}</span>
-          <span v-if="intent === 'opener' && d.openerGroupName" class="device-meta">{{ d.openerGroupName }}</span>
+          <span class="device-meta">
+            {{ getEquipmentLabel(d, { openerPaired: false }) }}<template v-if="intent === 'opener' && d.openerGroupName"> · {{ d.openerGroupName }}</template>
+          </span>
         </div>
         <span v-if="modelValue.includes(d.id)" class="check-icon" aria-hidden="true">✓</span>
       </label>
@@ -55,10 +57,12 @@ import { useDeviceStore } from '@/stores/device.store'
 import { useGroupStore } from '@/stores/group.store'
 import EmptyState from '@/components/common/EmptyState.vue'
 import type { WizardIntent } from './types'
+import { getEquipmentLabel } from '@/utils/device-labels'
 
 const props = defineProps<{
   intent: Extract<WizardIntent, 'opener' | 'fan'>
   groupId: string
+  farmUserId?: string | null
   modelValue: string[]
 }>()
 
@@ -83,10 +87,14 @@ const devices = computed(() => {
     return acc
   }, [])
 
+  const byFarm = props.farmUserId
+    ? candidates.filter((d: any) => !d.userId || d.userId === props.farmUserId)
+    : candidates
+
   if (props.intent === 'opener') {
-    return candidates.filter(d => d.equipmentType === 'opener_open')
+    return byFarm.filter(d => d.equipmentType === 'opener_open')
   }
-  return candidates.filter(d => d.equipmentType === 'fan')
+  return byFarm.filter(d => d.equipmentType === 'fan')
 })
 
 function toggle(id: string) {

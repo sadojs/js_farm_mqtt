@@ -3,10 +3,38 @@
     <h3 class="step-title">장치 선택</h3>
     <p class="step-desc">조건에 맞으면 제어할 장치를 선택하세요</p>
 
-    <div v-if="actuators.length === 0" class="empty">
+    <div v-if="actuators.length === 0 && openers.length === 0" class="empty">
       선택한 구역에 제어 가능한 장치가 없습니다.
     </div>
     <template v-else>
+      <!-- 개폐기 (단일 선택, opener_open이 대표 ID) -->
+      <div v-if="openers.length > 0" class="device-section">
+        <div class="section-label">개폐기</div>
+        <div class="device-list">
+          <div
+            v-for="device in openers"
+            :key="device.id"
+            class="device-card"
+            :class="{ selected: selectedIds.includes(device.id) }"
+            @click="selectOther(device.id)"
+          >
+            <div class="device-icon">🚪</div>
+            <div class="device-info">
+              <div class="device-name">{{ openerDisplayName(device) }}</div>
+              <div class="device-meta">
+                <span class="category">{{ getEquipmentLabel(device, { openerPaired: false }) }}</span>
+                <span class="status" :class="{ online: device.online }">
+                  {{ device.online ? '온라인' : '오프라인' }}
+                </span>
+              </div>
+            </div>
+            <div class="radio-mark" :class="{ checked: selectedIds.includes(device.id) }">
+              <span v-if="selectedIds.includes(device.id)">●</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 휀 그룹 (멀티 선택) -->
       <div v-if="fans.length > 0" class="device-section">
         <div class="section-label">휀 <span class="multi-badge">복수 선택 가능</span></div>
@@ -22,7 +50,7 @@
             <div class="device-info">
               <div class="device-name">{{ device.name }}</div>
               <div class="device-meta">
-                <span class="category">{{ device.category }}</span>
+                <span class="category">{{ getEquipmentLabel(device, { openerPaired: false }) }}</span>
                 <span class="status" :class="{ online: device.online }">
                   {{ device.online ? '온라인' : '오프라인' }}
                 </span>
@@ -50,7 +78,7 @@
             <div class="device-info">
               <div class="device-name">{{ device.name }}</div>
               <div class="device-meta">
-                <span class="category">{{ device.category }}</span>
+                <span class="category">{{ getEquipmentLabel(device, { openerPaired: false }) }}</span>
                 <span class="status" :class="{ online: device.online }">
                   {{ device.online ? '온라인' : '오프라인' }}
                 </span>
@@ -69,11 +97,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGroupStore } from '../../stores/group.store'
+import { getEquipmentLabel } from '@/utils/device-labels'
 
 const props = defineProps<{
   selectedIds: string[]
   groupId?: string
   hideIrrigation?: boolean
+  includeOpener?: boolean
 }>()
 const emit = defineEmits<{
   'update:selectedIds': [value: string[]]
@@ -81,20 +111,37 @@ const emit = defineEmits<{
 
 const groupStore = useGroupStore()
 
-const actuators = computed(() => {
+const allDevices = computed(() => {
   if (!props.groupId) return []
   const group = groupStore.groups.find(g => g.id === props.groupId)
   if (!group) return []
-  return (group.devices || []).filter((d: any) =>
+  return (group.devices || []) as any[]
+})
+
+const actuators = computed(() =>
+  allDevices.value.filter((d: any) =>
     d.deviceType === 'actuator' &&
     d.equipmentType !== 'opener_open' &&
     d.equipmentType !== 'opener_close' &&
     !(props.hideIrrigation && d.equipmentType === 'irrigation')
   )
-})
+)
+
+const openers = computed(() =>
+  props.includeOpener
+    ? allDevices.value.filter((d: any) => d.deviceType === 'actuator' && d.equipmentType === 'opener_open')
+    : []
+)
 
 const fans = computed(() => actuators.value.filter((d: any) => d.equipmentType === 'fan'))
 const others = computed(() => actuators.value.filter((d: any) => d.equipmentType !== 'fan'))
+
+function openerDisplayName(device: any): string {
+  // "○○ 열기" → "○○" (페어 대표명 단순화)
+  const name = device.name as string | undefined
+  if (!name) return device.id
+  return name.replace(/\s*열기\s*$/, '').trim() || name
+}
 
 function toggleFan(deviceId: string) {
   const current = props.selectedIds.filter(id => fans.value.some((f: any) => f.id === id))

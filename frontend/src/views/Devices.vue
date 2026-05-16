@@ -6,8 +6,7 @@
         <p class="page-description">농장 장치와 측정기를 관리합니다</p>
       </div>
       <div class="header-actions">
-        <!-- MQTT에서는 실시간 동기화됨 -->
-        <button v-if="!authStore.isFarmUser" class="btn-primary" @click="showRegistrationModal = true">+ 장치 추가</button>
+        <span class="device-add-hint">장치는 구역 관리 → 게이트웨이 환경 설정에서 추가합니다</span>
       </div>
     </header>
 
@@ -47,9 +46,7 @@
         ? '<circle cx=\'11\' cy=\'11\' r=\'8\'/><line x1=\'21\' y1=\'21\' x2=\'16.65\' y2=\'16.65\'/>'
         : '<path d=\'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9\'/><path d=\'M13.73 21a2 2 0 0 1-3.46 0\'/>'"
       :title="searchQuery ? '검색 결과가 없습니다' : '아직 등록된 장치가 없습니다'"
-      :description="searchQuery ? '다른 검색어를 입력해보세요.' : '측정기 동기화를 통해 장치를 가져와 등록하세요.'"
-      :action-label="!searchQuery && !authStore.isFarmUser ? '+ 장치 등록하기' : undefined"
-      :action-fn="!searchQuery && !authStore.isFarmUser ? () => { showRegistrationModal = true } : undefined"
+      :description="searchQuery ? '다른 검색어를 입력해보세요.' : '구역 관리 → 게이트웨이 환경 설정에서 장치를 추가하세요.'"
     />
 
     <!-- 개폐기 그룹 -->
@@ -734,6 +731,11 @@ const handleRemoveOpenerGroup = async (group: OpenerGroup) => {
 .header-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
+}
+.device-add-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #9ca3af);
 }
 
 .btn-primary {

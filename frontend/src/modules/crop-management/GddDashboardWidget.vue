@@ -170,7 +170,7 @@ function formatDate(dateStr: string) {
 
 <style scoped>
 .gdd-dashboard-widget {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -432,7 +432,7 @@ function formatDate(dateStr: string) {
   display: block;
   text-align: center;
   padding: 8px;
-  background: var(--input-bg, #f5f5f5);
+  background: var(--bg-input, #f5f5f5);
   border-radius: 8px;
   font-size: 12px;
   color: var(--primary-color, #4caf50);
@@ -442,6 +442,6 @@ function formatDate(dateStr: string) {
 
 /* 다크모드 */
 #app.theme-dark .gdd-dashboard-widget {
-  background: var(--card-bg);
+  background: var(--bg-card);
 }
 </style>

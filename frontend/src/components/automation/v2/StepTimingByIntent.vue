@@ -49,7 +49,7 @@
         <button class="trigger-tab" role="tab"
           :class="{ active: tab === 'temperature' }"
           :aria-selected="tab === 'temperature'"
-          @click="setTab('temperature')">🌡️ 온도로</button>
+          @click="setTab('temperature')">🌡️ 온습도로</button>
       </div>
 
       <!-- 시간 탭 -->
@@ -119,35 +119,54 @@
         </div>
       </div>
 
-      <!-- 온도 탭 -->
+      <!-- 온습도 탭 -->
       <div v-show="tab === 'temperature'" class="tab-panel">
+        <!-- 측정 채널 선택: (device, field) 평탄화 리스트 -->
+        <div class="field-section">
+          <label class="field-label">📡 측정값</label>
+          <select
+            class="form-select"
+            :value="channelKey"
+            @change="onChannelChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="" disabled>측정값을 선택하세요</option>
+            <option v-for="opt in channelOptions" :key="opt.key" :value="opt.key">
+              {{ opt.label }}
+            </option>
+          </select>
+          <p v-if="channelOptions.length === 0 && !loadingChannels" class="field-hint">
+            이 구역에 등록된 센서가 없거나 24시간 내 측정 기록이 없습니다.
+          </p>
+          <p v-else-if="loadingChannels" class="field-hint">측정값 목록을 불러오는 중…</p>
+        </div>
+
         <div class="field-row">
-          <label class="field-label">🌡️ 기준 온도</label>
+          <label class="field-label">{{ baseLabel }}</label>
           <div class="input-unit-row">
-            <input type="number" class="num-input" min="-20" max="60" step="0.5"
-              placeholder="예: 28"
+            <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
+              :placeholder="basePlaceholder"
               :value="localTemp.base ?? ''"
               @input="updateTemp('base', +($event.target as HTMLInputElement).value)" />
-            <span class="unit-label">°C</span>
+            <span class="unit-label">{{ unitSymbol }}</span>
           </div>
         </div>
 
         <div class="field-row">
           <label class="field-label">↕️ 편차 (허용 범위)</label>
           <div class="input-unit-row">
-            <input type="number" class="num-input" min="0.5" max="10" step="0.5"
+            <input type="number" class="num-input" min="0.5" max="20" step="0.5"
               :value="localTemp.hysteresis"
               @input="updateTemp('hysteresis', +($event.target as HTMLInputElement).value)" />
-            <span class="unit-label">°C</span>
+            <span class="unit-label">{{ unitSymbol }}</span>
           </div>
         </div>
         <p class="field-hint">잦은 ON/OFF 방지를 위한 여유값이에요</p>
 
         <div v-if="tempPreview" class="preview-box">
           <span class="preview-label">✨ 미리보기</span>
-          <p class="preview-line green">🟢 {{ onAt.toFixed(1) }}°C 이상이면 → {{ intent === 'opener' ? '열림' : '켜짐' }}</p>
-          <p class="preview-line red">🔴 {{ offAt.toFixed(1) }}°C 이하면 → {{ intent === 'opener' ? '닫힘' : '꺼짐' }}</p>
-          <p class="preview-line gray">⚪ {{ offAt.toFixed(1) }}~{{ onAt.toFixed(1) }}°C 사이 → 현재 상태 유지</p>
+          <p class="preview-line green">🟢 {{ onAt.toFixed(1) }}{{ unitSymbol }} 이상이면 → {{ intent === 'opener' ? '열림' : '켜짐' }}</p>
+          <p class="preview-line red">🔴 {{ offAt.toFixed(1) }}{{ unitSymbol }} 이하면 → {{ intent === 'opener' ? '닫힘' : '꺼짐' }}</p>
+          <p class="preview-line gray">⚪ {{ offAt.toFixed(1) }}~{{ onAt.toFixed(1) }}{{ unitSymbol }} 사이 → 현재 상태 유지</p>
         </div>
 
         <!-- 추가 조건 (습도/CO2 등) -->
@@ -200,18 +219,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
-import type { WizardIntent, IrrigationSchedule, TimeRange, TemperatureTrigger, SensorCondition } from './types'
+import { ref, computed, reactive, watch, onMounted } from 'vue'
+import type { WizardIntent, IrrigationSchedule, TimeRange, TemperatureTrigger, SensorCondition, SensorReadingField } from './types'
+import { useGroupStore } from '@/stores/group.store'
+import { deviceApi } from '@/api/device.api'
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토']
 
 const props = defineProps<{
   intent: WizardIntent
+  groupId?: string | null
   schedule: IrrigationSchedule[]
   triggerType: 'time' | 'temperature'
   timeRange: TimeRange | undefined
   timeRanges: TimeRange[] | undefined
   temperature: TemperatureTrigger | undefined
+  sensorDeviceId: string | undefined
+  sensorField: SensorReadingField | undefined
   extraConditions: SensorCondition[]
   relayEnabled: boolean
   relayOnMin: number
@@ -224,11 +248,118 @@ const emit = defineEmits<{
   'update:timeRange': [v: TimeRange]
   'update:timeRanges': [v: TimeRange[]]
   'update:temperature': [v: TemperatureTrigger]
+  'update:sensorDeviceId': [v: string | undefined]
+  'update:sensorField': [v: SensorReadingField | undefined]
   'update:extraConditions': [v: SensorCondition[]]
   'update:relayEnabled': [v: boolean]
   'update:relayOnMin': [v: number]
   'update:relayOffMin': [v: number]
 }>()
+
+const groupStore = useGroupStore()
+
+// ── 측정 채널 평탄화 ────────────────────────────────────────────
+interface ChannelOption {
+  key: string   // `${deviceId}::${field}`
+  deviceId: string
+  field: SensorReadingField
+  label: string // "온습도센서1 — 온도 (24.2°C)"
+  unit: string
+  lastValue: number | null
+}
+
+const FIELD_LABEL: Record<SensorReadingField, string> = {
+  temperature: '온도',
+  humidity: '습도',
+}
+
+const channelCache = ref<Map<string, { field: string; lastValue: number | null; unit: string }[]>>(new Map())
+const loadingChannels = ref(false)
+
+const availableSensors = computed(() => {
+  if (!props.groupId) return []
+  const group = groupStore.groups.find(g => g.id === props.groupId)
+  if (!group) return []
+  return (group.devices || []).filter((d: any) => d.deviceType === 'sensor') as any[]
+})
+
+const channelOptions = computed<ChannelOption[]>(() => {
+  const opts: ChannelOption[] = []
+  for (const dev of availableSensors.value) {
+    const channels = channelCache.value.get(dev.id) || []
+    for (const ch of channels) {
+      if (ch.field !== 'temperature' && ch.field !== 'humidity') continue
+      const f = ch.field as SensorReadingField
+      const valStr = ch.lastValue == null ? '값 없음' : `${ch.lastValue.toFixed(1)}${ch.unit}`
+      opts.push({
+        key: `${dev.id}::${f}`,
+        deviceId: dev.id,
+        field: f,
+        unit: ch.unit,
+        lastValue: ch.lastValue,
+        label: `${dev.name} — ${FIELD_LABEL[f]} (${valStr})`,
+      })
+    }
+  }
+  return opts
+})
+
+const channelKey = computed(() => {
+  if (props.sensorDeviceId && props.sensorField) {
+    return `${props.sensorDeviceId}::${props.sensorField}`
+  }
+  return ''
+})
+
+function onChannelChange(key: string) {
+  const opt = channelOptions.value.find(o => o.key === key)
+  if (!opt) return
+  emit('update:sensorDeviceId', opt.deviceId)
+  emit('update:sensorField', opt.field)
+}
+
+async function loadChannelsForSensors() {
+  if (availableSensors.value.length === 0) return
+  loadingChannels.value = true
+  try {
+    const results = await Promise.all(
+      availableSensors.value.map(async (s) => {
+        if (channelCache.value.has(s.id)) return null
+        try {
+          const { data } = await deviceApi.getSensorChannels(s.id)
+          return { id: s.id, channels: data }
+        } catch {
+          return { id: s.id, channels: [] }
+        }
+      }),
+    )
+    const next = new Map(channelCache.value)
+    for (const r of results) {
+      if (r) next.set(r.id, r.channels)
+    }
+    channelCache.value = next
+  } finally {
+    loadingChannels.value = false
+  }
+}
+
+onMounted(loadChannelsForSensors)
+watch(() => props.groupId, loadChannelsForSensors)
+watch(() => availableSensors.value.length, loadChannelsForSensors)
+
+// 현재 채널에 따른 단위 표기 + 라벨
+const unitSymbol = computed(() => {
+  const opt = channelOptions.value.find(o => o.key === channelKey.value)
+  if (opt) return opt.unit
+  return props.sensorField === 'humidity' ? '%' : '°C'
+})
+const baseLabel = computed(() => {
+  if (props.sensorField === 'humidity') return '💧 기준 습도'
+  return '🌡️ 기준 온도'
+})
+const baseMin = computed(() => (props.sensorField === 'humidity' ? 0 : -20))
+const baseMax = computed(() => (props.sensorField === 'humidity' ? 100 : 60))
+const basePlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 70' : '예: 28'))
 
 // 탭 상태 (v-show 사용 → DOM 항상 존재해 사라짐 방지)
 const tab = ref<'time' | 'temperature'>(props.triggerType)
@@ -467,6 +598,12 @@ if (props.intent !== 'irrigation') {
 }
 .extra-conds { display: flex; flex-direction: column; gap: 8px; }
 .extra-cond-row { display: flex; gap: 6px; align-items: center; }
+.form-select {
+  padding: 10px 12px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm, 6px); background: var(--bg-card); color: var(--text-primary);
+  font-size: calc(14px * var(--content-scale, 1));
+  width: 100%;
+}
 .form-select-sm, .num-input-sm {
   padding: 6px 8px; border: 1px solid var(--border-color);
   border-radius: var(--radius-sm, 6px); background: var(--bg-card); color: var(--text-primary);

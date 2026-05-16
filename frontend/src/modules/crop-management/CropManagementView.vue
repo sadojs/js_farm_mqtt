@@ -132,6 +132,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { cropManagementApi } from './api/crop-management.api'
+import { groupApi } from '@/api/group.api'
 import CropBatchModal from './CropBatchModal.vue'
 import { CROP_LABELS, SEEDLING_LABELS } from './types/crop-management.types'
 import type { CropBatch } from './types/crop-management.types'
@@ -186,11 +187,7 @@ onMounted(async () => {
 
 async function fetchGroups() {
   try {
-    const res = await fetch('/api/groups', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const { data } = await groupApi.getGroups()
     return (data as any[]).map((g: any) => ({ id: g.id, name: g.name }))
   } catch {
     return []
@@ -356,7 +353,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 .zone-batch-count {
   font-size: 12px;
   color: var(--text-secondary, #888);
-  background: var(--input-bg, #f5f5f5);
+  background: var(--bg-input, #f5f5f5);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -385,7 +382,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 .batch-card {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);

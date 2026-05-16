@@ -161,7 +161,7 @@ onMounted(async () => {
 }
 
 .btn-timeline-toggle:hover {
-  background: var(--input-bg, #f5f5f5);
+  background: var(--bg-input, #f5f5f5);
 }
 
 .offset-notice {

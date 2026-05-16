@@ -27,25 +27,39 @@
         <!-- 그룹 헤더 -->
         <div class="group-header">
           <div class="group-title">
+            <span v-if="isAdmin && group.ownerName" class="farm-owner-badge">🏠 {{ group.ownerName }}</span>
             <template v-if="renamingGroupId === group.id">
-              <input
-                ref="renameGroupInput"
-                v-model="renameGroupValue"
-                class="rename-group-input"
-                maxlength="50"
-                @keyup.enter="submitRenameGroup(group)"
-                @keyup.esc="cancelRenameGroup"
-                @blur="cancelRenameGroup"
-              />
-              <button class="btn-rename-ok" @mousedown.prevent="submitRenameGroup(group)">✓</button>
+              <div class="rename-form">
+                <input
+                  ref="renameGroupInput"
+                  v-model="renameGroupValue"
+                  class="rename-group-input"
+                  maxlength="50"
+                  placeholder="구역명"
+                  @keyup.enter="submitRenameGroup(group)"
+                  @keyup.esc="cancelRenameGroup"
+                />
+                <input
+                  v-model="renameDescValue"
+                  class="rename-desc-input"
+                  maxlength="100"
+                  placeholder="설명 (선택)"
+                  @keyup.enter="submitRenameGroup(group)"
+                  @keyup.esc="cancelRenameGroup"
+                />
+                <div class="rename-actions">
+                  <button class="btn-rename-ok" @mousedown.prevent="submitRenameGroup(group)">저장</button>
+                  <button class="btn-rename-cancel" @mousedown.prevent="cancelRenameGroup">취소</button>
+                </div>
+              </div>
             </template>
             <template v-else>
               <h3>{{ group.name }}</h3>
               <button
                 v-if="!isFarmUser"
                 class="btn-rename-group"
-                @click="startRenameGroup(group.id, group.name)"
-                title="이름 변경"
+                @click="startRenameGroup(group.id, group.name, group.description)"
+                title="이름/설명 변경"
               >✎</button>
             </template>
             <p v-if="group.description && renamingGroupId !== group.id" class="group-desc">{{ group.description }}</p>
@@ -53,8 +67,7 @@
           <div class="group-header-actions">
             <span class="device-count-badge">{{ getGroupSensors(group).length + getGroupActuators(group).length + getGroupOpenerGroups(group).length }}개 장치</span>
             <button v-if="!isFarmUser" class="btn-icon" @click="openEnvConfig(group)" title="환경설정" aria-label="환경설정">⚙</button>
-            <button v-if="!isFarmUser" class="btn-icon" @click="openAddDeviceModal(group)" title="장치 추가" aria-label="장치 추가">+</button>
-            <button v-if="!isFarmUser && hasAssignedDevices(group)" class="btn-icon" @click="openRemoveDeviceModal(group)" title="장치 제거" aria-label="장치 제거">−</button>
+            <button v-if="!isFarmUser" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
             <button v-if="!isFarmUser" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
             <button class="btn-icon" @click="toggleCollapse(group.id)" :title="collapsedGroups.has(group.id) ? '펼치기' : '접기'" :aria-label="collapsedGroups.has(group.id) ? '펼치기' : '접기'">
               {{ collapsedGroups.has(group.id) ? '▶' : '▼' }}
@@ -66,8 +79,8 @@
         <div v-if="!collapsedGroups.has(group.id)" class="group-body">
           <!-- 장치 없음 -->
           <div v-if="!group.devices || group.devices.length === 0" class="no-devices">
-            <p>할당된 장치가 없습니다</p>
-            <button v-if="!isFarmUser" class="btn-sm" @click="openAddDeviceModal(group)">+ 장치 추가</button>
+            <p>활성화된 장치가 없습니다</p>
+            <p v-if="!isFarmUser" class="no-devices-hint">게이트웨이 환경 설정에서 장치를 활성화하세요</p>
           </div>
 
           <!-- 센서 목록 -->
@@ -77,15 +90,41 @@
               <div v-for="device in getGroupSensors(group)" :key="device.id" class="sub-card sensor">
                 <div class="sub-card-top">
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-                  <span class="sub-card-name">{{ device.name }}</span>
+                  <template v-if="renamingDeviceId === device.id">
+                    <input
+                      v-model="renameDeviceValue"
+                      class="rename-input-inline"
+                      maxlength="50"
+                      @keyup.enter="submitDeviceRename(device.id)"
+                      @keyup.esc="cancelDeviceRename"
+                      @blur="cancelDeviceRename"
+                      @click.stop
+                    />
+                    <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
+                  </template>
+                  <template v-else>
+                    <span class="sub-card-name">{{ device.name }}</span>
+                    <button
+                      v-if="!isFarmUser"
+                      class="btn-rename-mini"
+                      @click.stop="startDeviceRename(device.id, device.name)"
+                      title="이름 변경"
+                    >✎</button>
+                  </template>
                   <span class="type-tag sensor">측정기</span>
                 </div>
-                <div v-if="device.sensorData && Object.keys(device.sensorData).length > 0" class="sub-card-sensor-chips">
+                <div v-if="device.sensorData && Object.keys(getTopSensorData(device.sensorData)).length > 0" class="sub-card-sensor-chips">
                   <span v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-chip">
                     {{ SENSOR_LABELS[key as string] || key }} <b>{{ formatSensorVal(key as string, val as number) }}{{ getSensorUnit(key as string) }}</b>
                   </span>
                 </div>
-                <div v-else class="sub-card-value muted">{{ device.online ? '로딩 중...' : '오프라인' }}</div>
+                <!-- 배터리형 이벤트 센서(TS0207 등): 데이터 없어도 "정상" 표시 -->
+                <div v-else-if="device.online && isEventSensor(device)" class="sub-card-sensor-chips">
+                  <span class="sensor-chip">
+                    {{ SENSOR_LABELS[eventSensorField(device)] }} <b>{{ formatSensorVal(eventSensorField(device), 0) }}</b>
+                  </span>
+                </div>
+                <div v-else class="sub-card-value muted">{{ device.online ? '신호 대기' : '오프라인' }}</div>
               </div>
             </div>
           </template>
@@ -98,7 +137,27 @@
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName" class="sub-card actuator">
                 <div class="sub-card-top">
                   <span :class="['status-dot', og.openDevice.online || og.closeDevice.online ? 'online' : 'offline']"></span>
-                  <span class="sub-card-name">{{ og.groupName }}</span>
+                  <template v-if="renamingOpenerGroup === og.groupName">
+                    <input
+                      v-model="renameDeviceValue"
+                      class="rename-input-inline"
+                      maxlength="50"
+                      @keyup.enter="submitOpenerGroupRename(og)"
+                      @keyup.esc="cancelDeviceRename"
+                      @blur="cancelDeviceRename"
+                      @click.stop
+                    />
+                    <button class="btn-rename-ok" @mousedown.prevent="submitOpenerGroupRename(og)">✓</button>
+                  </template>
+                  <template v-else>
+                    <span class="sub-card-name">{{ og.groupName }}</span>
+                    <button
+                      v-if="!isFarmUser"
+                      class="btn-rename-mini"
+                      @click.stop="startOpenerGroupRename(og)"
+                      title="이름 변경"
+                    >✎</button>
+                  </template>
                   <span class="type-tag actuator">개폐기</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
@@ -120,7 +179,27 @@
               <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-                  <span class="sub-card-name">{{ device.name }}</span>
+                  <template v-if="renamingDeviceId === device.id">
+                    <input
+                      v-model="renameDeviceValue"
+                      class="rename-input-inline"
+                      maxlength="50"
+                      @keyup.enter="submitDeviceRename(device.id)"
+                      @keyup.esc="cancelDeviceRename"
+                      @blur="cancelDeviceRename"
+                      @click.stop
+                    />
+                    <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
+                  </template>
+                  <template v-else>
+                    <span class="sub-card-name">{{ device.name }}</span>
+                    <button
+                      v-if="!isFarmUser"
+                      class="btn-rename-mini"
+                      @click.stop="startDeviceRename(device.id, device.name)"
+                      title="이름 변경"
+                    >✎</button>
+                  </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
                   <span class="type-tag actuator">관주</span>
                 </div>
@@ -138,14 +217,32 @@
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
-                <!-- 구역 매핑 설정 패널 (admin/farm_admin 전용) -->
-                <IrrigationChannelMappingPanel :device="device" />
               </div>
               <!-- 일반 장치 카드 -->
               <div v-for="device in getGroupActuators(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
-                  <span class="sub-card-name">{{ device.name }}</span>
+                  <template v-if="renamingDeviceId === device.id">
+                    <input
+                      v-model="renameDeviceValue"
+                      class="rename-input-inline"
+                      maxlength="50"
+                      @keyup.enter="submitDeviceRename(device.id)"
+                      @keyup.esc="cancelDeviceRename"
+                      @blur="cancelDeviceRename"
+                      @click.stop
+                    />
+                    <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
+                  </template>
+                  <template v-else>
+                    <span class="sub-card-name">{{ device.name }}</span>
+                    <button
+                      v-if="!isFarmUser"
+                      class="btn-rename-mini"
+                      @click.stop="startDeviceRename(device.id, device.name)"
+                      title="이름 변경"
+                    >✎</button>
+                  </template>
                   <span class="type-tag actuator">장치</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
@@ -230,19 +327,50 @@
       :rules="blockingModal.rules"
       @close="blockingModal.show = false"
     />
+
+    <!-- 게이트웨이 추가 모달 -->
+    <div v-if="addGwModalGroup" class="modal-overlay" @click.self="closeAddGwModal">
+      <div class="modal-sm">
+        <div class="modal-sm-header">
+          <h3>라즈베리파이 추가</h3>
+          <button class="btn-icon" @click="closeAddGwModal">✕</button>
+        </div>
+        <p class="modal-sm-desc">{{ addGwModalGroup.name }} 구역에 추가할 라즈베리파이를 선택하세요.</p>
+        <div v-if="addGwAvailable.length === 0" class="modal-empty">할당 가능한 게이트웨이가 없습니다.</div>
+        <div v-else class="gw-pick-list">
+          <div
+            v-for="gw in addGwAvailable"
+            :key="gw.id"
+            class="gw-pick-item"
+            :class="{ selected: addGwSelectedIds.includes(gw.id) }"
+            @click="toggleAddGw(gw.id)"
+          >
+            <input type="checkbox" :checked="addGwSelectedIds.includes(gw.id)" @click.stop @change="toggleAddGw(gw.id)" />
+            <span class="gw-pick-name">{{ gw.name }}</span>
+            <span class="gw-pick-id">{{ gw.gatewayId }}</span>
+            <span :class="['status-dot-sm', gw.agentStatus === 'online' || gw.status === 'online' ? 'online' : 'offline']"></span>
+          </div>
+        </div>
+        <div class="modal-sm-footer">
+          <button class="btn-secondary btn-sm" @click="closeAddGwModal">취소</button>
+          <button class="btn-primary btn-sm" :disabled="addGwSelectedIds.length === 0 || addGwLoading" @click="confirmAddGateways">
+            {{ addGwLoading ? '추가 중...' : `추가 (${addGwSelectedIds.length})` }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
 import { useAutomationStore } from '../stores/automation.store'
 import { useAuthStore } from '../stores/auth.store'
 import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
-import IrrigationChannelMappingPanel from '@/components/devices/IrrigationChannelMappingPanel.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
@@ -252,49 +380,117 @@ import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
+import { deviceApi } from '../api/device.api'
+import { gatewayApi } from '@/api/gateway.api'
 import type { HouseGroup } from '../types/group.types'
+import type { Gateway } from '../types/device.types'
 import type { Device, DependencyRule, ChannelMapping } from '../types/device.types'
 import { FUNCTION_LABELS } from '../types/device.types'
 import type { AutomationRule } from '../types/automation.types'
 import { formatConditionGroup } from '../utils/automation-helpers'
 
 const route = useRoute()
+useRouter()
 const groupStore = useGroupStore()
 const deviceStore = useDeviceStore()
 const automationStore = useAutomationStore()
 const authStore = useAuthStore()
-const { isFarmUser } = authStore
+const { isFarmUser, isAdmin } = authStore
 const { confirm } = useConfirm()
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
 
-// 구역명 인라인 편집
+// 구역명/설명 인라인 편집
 const renamingGroupId = ref<string | null>(null)
 const renameGroupValue = ref('')
+const renameDescValue = ref('')
 const renameGroupInput = ref<HTMLInputElement | null>(null)
 
-function startRenameGroup(groupId: string, currentName: string) {
+function startRenameGroup(groupId: string, currentName: string, currentDesc?: string) {
   renamingGroupId.value = groupId
   renameGroupValue.value = currentName
+  renameDescValue.value = currentDesc ?? ''
   nextTick(() => renameGroupInput.value?.focus())
 }
 
 function cancelRenameGroup() {
   renamingGroupId.value = null
   renameGroupValue.value = ''
+  renameDescValue.value = ''
 }
 
 async function submitRenameGroup(group: HouseGroup) {
   const trimmed = renameGroupValue.value.trim()
   if (!trimmed) { cancelRenameGroup(); return }
   try {
-    await groupApi.updateGroup(group.id, { name: trimmed })
+    await groupApi.updateGroup(group.id, { name: trimmed, description: renameDescValue.value.trim() || undefined })
     await groupStore.fetchGroups()
-    notify.success('이름 변경 완료', `구역 이름이 "${trimmed}"으로 변경되었습니다`)
+    notify.success('수정 완료', `구역 정보가 저장되었습니다`)
+  } catch {
+    notify.error('수정 실패', '저장에 실패했습니다')
+  } finally {
+    cancelRenameGroup()
+  }
+}
+
+// 장치명 인라인 편집 (sub-card 안)
+const renamingDeviceId = ref<string | null>(null)
+const renameDeviceValue = ref('')
+const renamingOpenerGroup = ref<string | null>(null)
+
+function startDeviceRename(deviceId: string, currentName: string) {
+  renamingDeviceId.value = deviceId
+  renameDeviceValue.value = currentName
+}
+
+function startOpenerGroupRename(og: { groupName: string; openDevice: Device; closeDevice: Device }) {
+  renamingOpenerGroup.value = og.groupName
+  renameDeviceValue.value = og.groupName
+}
+
+function cancelDeviceRename() {
+  // blur 이벤트와 클릭 충돌 방지를 위해 약간 지연
+  setTimeout(() => {
+    renamingDeviceId.value = null
+    renamingOpenerGroup.value = null
+    renameDeviceValue.value = ''
+  }, 150)
+}
+
+async function submitDeviceRename(deviceId: string) {
+  const trimmed = renameDeviceValue.value.trim()
+  if (!trimmed) { cancelDeviceRename(); return }
+  try {
+    const { data } = await deviceApi.rename(deviceId, trimmed)
+    const device = deviceStore.devices.find(d => d.id === deviceId)
+    if (device) device.name = data.name
+    await groupStore.fetchGroups()
+    notify.success('이름 변경 완료', `"${data.name}"으로 변경되었습니다`)
   } catch {
     notify.error('이름 변경 실패', '저장에 실패했습니다')
   } finally {
-    cancelRenameGroup()
+    renamingDeviceId.value = null
+    renameDeviceValue.value = ''
+  }
+}
+
+async function submitOpenerGroupRename(og: { groupName: string; openDevice: Device; closeDevice: Device }) {
+  const trimmed = renameDeviceValue.value.trim()
+  if (!trimmed) { cancelDeviceRename(); return }
+  try {
+    // 개폐기는 열림/닫힘 두 device의 openerGroupName이 함께 이름이므로
+    // openDevice를 새 이름으로 + 두 device의 이름도 업데이트
+    await Promise.all([
+      deviceApi.rename(og.openDevice.id, `${trimmed} 열기`),
+      deviceApi.rename(og.closeDevice.id, `${trimmed} 닫기`),
+    ])
+    await groupStore.fetchGroups()
+    notify.success('이름 변경 완료', `"${trimmed}"으로 변경되었습니다`)
+  } catch {
+    notify.error('이름 변경 실패', '저장에 실패했습니다')
+  } finally {
+    renamingOpenerGroup.value = null
+    renameDeviceValue.value = ''
   }
 }
 
@@ -319,11 +515,75 @@ const collapsedGroups = ref(new Set<string>())
 const showAddDeviceModal = ref(false)
 const addDeviceTargetGroup = ref<HouseGroup | null>(null)
 
+// 게이트웨이 목록
+const gateways = ref<Gateway[]>([])
+
+async function loadGateways() {
+  try {
+    const res = await gatewayApi.getAll()
+    gateways.value = res.data as unknown as Gateway[]
+  } catch { /* ignore */ }
+}
+
+function getGroupGateways(group: HouseGroup): Gateway[] {
+  const houseIds = new Set(group.houses.map(h => h.id))
+  return gateways.value.filter(gw => gw.houseId && houseIds.has(gw.houseId))
+}
+
+// 게이트웨이 추가 모달
+const addGwModalGroup = ref<HouseGroup | null>(null)
+const addGwSelectedIds = ref<string[]>([])
+const addGwLoading = ref(false)
+
+function openAddGatewayModal(group: HouseGroup) {
+  addGwModalGroup.value = group
+  addGwSelectedIds.value = []
+}
+
+function closeAddGwModal() {
+  addGwModalGroup.value = null
+  addGwSelectedIds.value = []
+}
+
+function toggleAddGw(id: string) {
+  const idx = addGwSelectedIds.value.indexOf(id)
+  if (idx === -1) addGwSelectedIds.value.push(id)
+  else addGwSelectedIds.value.splice(idx, 1)
+}
+
+// 이미 이 구역에 할당된 게이트웨이는 목록에서 제외
+const addGwAvailable = computed(() => {
+  if (!addGwModalGroup.value) return []
+  const assignedIds = new Set(getGroupGateways(addGwModalGroup.value).map(g => g.id))
+  return gateways.value.filter(g => !assignedIds.has(g.id))
+})
+
+async function confirmAddGateways() {
+  if (!addGwModalGroup.value || addGwSelectedIds.value.length === 0) return
+  addGwLoading.value = true
+  try {
+    for (const gwId of addGwSelectedIds.value) {
+      await gatewayApi.assignZone(gwId, addGwModalGroup.value.id)
+    }
+    await loadGateways()
+    await groupStore.fetchGroups()
+    notify.success('추가 완료', `게이트웨이 ${addGwSelectedIds.value.length}개가 추가되었습니다.`)
+    closeAddGwModal()
+  } catch (e: any) {
+    const status = e?.response?.status
+    const msg = e?.response?.data?.message || '게이트웨이 추가에 실패했습니다.'
+    notify.error(status === 409 ? '이미 할당된 게이트웨이' : '오류', msg)
+  } finally {
+    addGwLoading.value = false
+  }
+}
+
 onMounted(async () => {
   await Promise.all([
     groupStore.fetchGroups(),
     deviceStore.fetchDevices(),
     automationStore.fetchRules(),
+    loadGateways(),
   ])
   automationStore.fetchIrrigationStatus()
   const envConfigGroupId = route.query.envConfig as string | undefined
@@ -495,9 +755,22 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
 const SENSOR_LABELS: Record<string, string> = {
   temperature: '온도', humidity: '습도', co2: 'CO2',
   rainfall: '강우량', uv: 'UV', dew_point: '이슬점',
+  rain_detection: '비 감지', pressure: '기압',
 }
 
-const ALLOWED_SENSOR_FIELDS = new Set(['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point'])
+// 배터리형 이벤트 센서 모델 → 기본 channel 매핑 (sensor_data 이력이 없어도 안정 상태 표시)
+const EVENT_SENSOR_MODEL_FIELD: Record<string, string> = {
+  TS0207: 'rain_detection',
+}
+
+function isEventSensor(device: any): boolean {
+  return !!EVENT_SENSOR_MODEL_FIELD[device?.zigbeeModel]
+}
+function eventSensorField(device: any): string {
+  return EVENT_SENSOR_MODEL_FIELD[device?.zigbeeModel] || ''
+}
+
+const ALLOWED_SENSOR_FIELDS = new Set(['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point', 'rain_detection', 'pressure'])
 
 function getTopSensorData(sensorData: Record<string, number | null | undefined>): Record<string, number> {
   const entries = Object.entries(sensorData).filter(([k, v]) => v != null && ALLOWED_SENSOR_FIELDS.has(k)) as [string, number][]
@@ -506,6 +779,7 @@ function getTopSensorData(sensorData: Record<string, number | null | undefined>)
 
 const formatSensorVal = (field: string, value: number): string => {
   if (value == null) return '-'
+  if (field === 'rain_detection') return value > 0 ? '🌧 감지' : '☀ 정상'
   if (['temperature', 'dew_point', 'ph', 'ec', 'rainfall'].includes(field)) return value.toFixed(1)
   if (['co2', 'light'].includes(field)) return Math.round(value).toLocaleString()
   return Math.round(value).toString()
@@ -516,6 +790,7 @@ const getSensorUnit = (field: string): string => {
     temperature: '°C', humidity: '%', co2: 'ppm', rainfall: 'mm',
     uv: '', dew_point: '°C', light: 'lux',
     soil_moisture: '%', ph: '', ec: 'mS/cm',
+    rain_detection: '', pressure: 'hPa',
   }
   return units[field] || ''
 }
@@ -523,6 +798,9 @@ const getSensorUnit = (field: string): string => {
 // 장치 제어
 const controllingId = ref<string | null>(null)
 const openerInterlocking = ref(false)
+// 개폐기 자동 OFF 타이머 추적 (인터록에서 OFF 명령 취소용)
+const openerAutoOffTimers = new Map<string, ReturnType<typeof setTimeout>>()
+// (직접 제어 시에는 자동 OFF 없음 — 자동제어 룰에서만 동작/대기 시간 적용됨)
 
 async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'close') {
   if (openerInterlocking.value) return
@@ -532,8 +810,12 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   openerInterlocking.value = true
   const loadingId = notify.add('info', '적용 중...', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'} 명령 전송 중`, 0)
   try {
-    // 이미 ON이면 OFF만
+    // 이미 ON이면 OFF만 (자동 타이머도 취소)
     if (targetDevice.switchState) {
+      if (openerAutoOffTimers.has(targetDevice.id)) {
+        clearTimeout(openerAutoOffTimers.get(targetDevice.id))
+        openerAutoOffTimers.delete(targetDevice.id)
+      }
       const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: false }])
       if (!result.success) {
         notify.remove(loadingId)
@@ -552,7 +834,7 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
       }
       return
     }
-    // 반대쪽이 ON이면: 먼저 OFF → 1초 대기 (릴레이 접점 아크 소멸)
+    // 반대쪽이 ON이면: 먼저 OFF → 3초 대기 (릴레이 접점 아크 소멸 + 안전 간격)
     if (oppositeDevice.switchState) {
       const offResult = await deviceStore.controlDevice(oppositeDevice.id, [{ code: 'switch_1', value: false }])
       if (!offResult.success) {
@@ -562,7 +844,7 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
       }
       const storeOpposite = deviceStore.devices.find(d => d.id === oppositeDevice.id)
       if (storeOpposite) storeOpposite.switchState = false
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
     // 타겟 ON
     const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: true }])
@@ -577,6 +859,8 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
     notify.remove(loadingId)
     if (v.verified) {
       notify.success('적용 완료', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'}`)
+      // 직접 제어 시 자동 OFF 없음 — 자동제어 룰에서만 동작/대기 시간 적용
+      // (개폐기 본체에 리밋이 있어 안전, 사용자는 수동으로 OFF 가능)
     } else if (v.actualValue !== undefined) {
       notify.warning('상태 미변경', '명령은 전달되었으나 장치 상태가 변경되지 않았습니다')
       if (storeTarget) storeTarget.switchState = v.actualValue
@@ -735,13 +1019,7 @@ const deleteGroup = async (group: HouseGroup) => {
 const showRemoveDeviceModal = ref(false)
 const removeTargetGroup = ref<HouseGroup | null>(null)
 
-const hasAssignedDevices = (group: HouseGroup) =>
-  (group.devices || []).length > 0
 
-const openRemoveDeviceModal = (group: HouseGroup) => {
-  removeTargetGroup.value = group
-  showRemoveDeviceModal.value = true
-}
 
 const removeModalSensors = computed(() =>
   removeTargetGroup.value ? getGroupSensors(removeTargetGroup.value) : []
@@ -756,10 +1034,6 @@ const removeModalActuators = computed(() =>
   removeTargetGroup.value ? getGroupActuators(removeTargetGroup.value) : []
 )
 
-const openAddDeviceModal = (group: HouseGroup) => {
-  addDeviceTargetGroup.value = group
-  showAddDeviceModal.value = true
-}
 
 // ── 환경설정 ──
 const showEnvConfigModal = ref(false)
@@ -801,6 +1075,9 @@ watch(() => automationStore.irrigationStatus, (statuses) => {
 onBeforeUnmount(() => {
   document.body.style.overflow = ''
   stopStatusPolling()
+  // 남은 개폐기 자동 OFF 타이머 모두 취소
+  for (const timerId of openerAutoOffTimers.values()) clearTimeout(timerId)
+  openerAutoOffTimers.clear()
 })
 </script>
 
@@ -878,6 +1155,18 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.farm-owner-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 10px;
+  padding: 2px 10px;
+  margin-bottom: 4px;
+}
+
 .group-title h3 {
   font-size: calc(18px * var(--content-scale, 1));
   font-weight: 600;
@@ -892,17 +1181,54 @@ onBeforeUnmount(() => {
 }
 .btn-rename-group:hover { opacity: 1; color: var(--accent, #4caf50); }
 
-.rename-group-input {
-  padding: 3px 8px; border: 1px solid var(--accent, #4caf50);
-  border-radius: 4px; font-size: calc(18px * var(--content-scale, 1));
-  font-weight: 600; background: var(--bg-primary); color: var(--text-primary);
-  outline: none; width: 180px;
+/* sub-card 안 미니 이름 편집 버튼 */
+.btn-rename-mini {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 12px; cursor: pointer; padding: 0 4px;
+  opacity: 0.5; vertical-align: middle;
+}
+.btn-rename-mini:hover { opacity: 1; color: var(--accent, #4caf50); }
+.btn-rename-ok {
+  background: var(--accent, #4caf50); color: #fff; border: none;
+  border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer;
+  margin-left: 4px;
+}
+.rename-input-inline {
+  padding: 2px 6px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 4px; font-size: 13px; font-weight: 600;
+  background: var(--bg-input); color: var(--text-primary);
+  outline: none; flex: 1; min-width: 100px;
 }
 
+.rename-form {
+  display: flex; flex-direction: column; gap: 6px; min-width: 240px;
+}
+.rename-actions { display: flex; gap: 6px; }
+
+.rename-group-input {
+  padding: 5px 10px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 6px; font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 600; background: var(--bg-primary); color: var(--text-primary);
+  outline: none; width: 100%;
+}
+
+.rename-desc-input {
+  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px; font-size: calc(13px * var(--content-scale, 1));
+  background: var(--bg-primary); color: var(--text-secondary);
+  outline: none; width: 100%;
+}
+.rename-desc-input:focus { border-color: var(--accent, #4caf50); }
+
 .btn-rename-ok {
-  padding: 3px 8px; border: none;
+  padding: 4px 12px; border: none;
   background: var(--accent, #4caf50); color: #fff;
-  border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px;
+  border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.btn-rename-cancel {
+  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
+  background: transparent; color: var(--text-secondary);
+  border-radius: 6px; font-size: 12px; cursor: pointer;
 }
 
 .group-desc {
@@ -965,6 +1291,7 @@ onBeforeUnmount(() => {
 .section-label.sensor { background: var(--sensor-bg); color: var(--sensor-accent); }
 .section-label.actuator { background: var(--accent-bg); color: var(--accent); }
 .section-label.automation { background: var(--automation-bg); color: var(--automation-text); }
+.section-label.gateway { background: #e0f2fe; color: #0369a1; }
 
 .device-sub-grid {
   display: grid;
@@ -1174,7 +1501,14 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   transition: background 0.2s;
 }
 .btn-sm:hover { background: var(--border-color); }
-
+.btn-env {
+  background: transparent;
+  border: 1px solid var(--border-color, #d1d5db);
+  color: var(--text-secondary, #555);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-env:hover { background: var(--bg-hover, #f3f4f6); }
 
 /* 관수 상태 버튼 (소형) */
 .btn-status-sm {
@@ -1193,6 +1527,53 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   border-color: var(--accent);
   background: var(--accent-bg);
 }
+
+/* Gateway section */
+.gateway-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.btn-add-gw {
+  background: #e0f2fe; border: none; color: #0369a1; border-radius: 6px;
+  cursor: pointer; font-size: 12px; padding: 3px 10px;
+}
+.btn-add-gw:hover { background: #bae6fd; }
+.gw-card { display: flex; flex-direction: column; gap: 6px; }
+.gw-card-meta { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
+.gw-id-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.gw-empty-hint {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; font-size: 13px;
+  color: var(--text-secondary); background: var(--bg-hover);
+  border-radius: 8px;
+}
+
+/* Gateway add modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-sm {
+  background: var(--bg-card); border-radius: 14px; padding: 24px;
+  width: 440px; max-width: 92vw; max-height: 80vh;
+  display: flex; flex-direction: column; gap: 14px;
+  border: 1px solid var(--border-color);
+}
+.modal-sm-header { display: flex; justify-content: space-between; align-items: center; }
+.modal-sm-header h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.modal-sm-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.modal-empty { font-size: 13px; color: var(--text-muted); padding: 16px; text-align: center; background: var(--bg-secondary); border-radius: 8px; }
+.gw-pick-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 260px; }
+.gw-pick-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1.5px solid var(--border-input);
+  border-radius: 8px; cursor: pointer;
+}
+.gw-pick-item:hover { background: var(--bg-hover); }
+.gw-pick-item.selected { border-color: #3b82f6; background: rgba(59,130,246,.05); }
+.gw-pick-name { flex: 1; font-size: 14px; font-weight: 600; }
+.gw-pick-id { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
+.status-dot-sm { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-dot-sm.online { background: #22c55e; }
+.status-dot-sm.offline { background: #d1d5db; }
+.modal-sm-footer { display: flex; gap: 8px; justify-content: flex-end; }
 
 @media (max-width: 768px) {
   .page-container { padding: 16px; }

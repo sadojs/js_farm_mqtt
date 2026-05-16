@@ -29,7 +29,7 @@
         <h3>활성 측정기가 없습니다</h3>
         <p v-if="standbySensors.length > 0">대기 목록에서 측정기를 활성화하세요.</p>
         <p v-else>장치를 등록하고 측정기를 활성화하세요.</p>
-        <router-link to="/devices" class="empty-cta-link">장치 관리</router-link>
+        <router-link to="/gateways" class="empty-cta-link">게이트웨이 관리</router-link>
       </div>
       <div v-else class="sensor-grid">
         <div v-for="s in activeSensors" :key="s.deviceId + s.sensorType" class="sensor-card">

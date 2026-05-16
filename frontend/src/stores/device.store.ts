@@ -104,7 +104,16 @@ export const useDeviceStore = defineStore('device', () => {
       await new Promise(resolve => setTimeout(resolve, 1000))
       const status = await fetchDeviceStatus(deviceId)
       if (!status) return { verified: false }
-      const actualValue = status[switchCode] ?? status.state === 'ON'
+      // onboard 장치는 단방향 GPIO 제어 — 백엔드가 핀 상태를 알 수 없으므로
+      // control API 성공 = 신뢰 (자동 OFF로 표시되는 문제 방지)
+      if (status.source === 'onboard') {
+        return { verified: true, actualValue: expectedValue }
+      }
+      // switchStates 우선, 없으면 직접 키, 마지막에 state ON/OFF
+      const fromSwitchStates = status.switchStates?.[switchCode]
+      const actualValue = fromSwitchStates !== undefined
+        ? !!fromSwitchStates
+        : (status[switchCode] ?? status.state === 'ON')
       return { verified: actualValue === expectedValue, actualValue }
     } catch {
       return { verified: false }

@@ -21,13 +21,15 @@ function buildIrrigation(state: WizardStateV2): CreateRuleRequest {
     : DEFAULT_CHANNEL_MAPPING_8CH
 
   // 8CH → 4구역(zone_1~4), 12CH → 8구역(zone_1~8)
+  // valveZones가 비어 있으면 (채널매핑 스텝 제거로 인해) 모든 구역 활성화
   const zoneCount = irrigation.controllerChannels === 12 ? 8 : 4
+  const allZones = irrigation.valveZones.length === 0
   const zones = Array.from({ length: zoneCount }, (_, i) => ({
     zone: i + 1,
     name: `${i + 1}번 밸브`,
-    duration: irrigation.valveZones.includes(i + 1) ? irrigation.durationMin : 0,
-    waitTime: irrigation.valveZones.includes(i + 1) ? irrigation.waitTimeBetweenZones : 0,
-    enabled: irrigation.valveZones.includes(i + 1),
+    duration: (allZones || irrigation.valveZones.includes(i + 1)) ? irrigation.durationMin : 0,
+    waitTime: (allZones || irrigation.valveZones.includes(i + 1)) ? irrigation.waitTimeBetweenZones : 0,
+    enabled: allZones || irrigation.valveZones.includes(i + 1),
   }))
 
   const conditions: IrrigationConditions = {
@@ -64,6 +66,10 @@ function buildOpenerFan(state: WizardStateV2): CreateRuleRequest {
   const trigger = intent === 'opener' ? state.opener : state.fan
   if (!trigger) throw new Error('trigger state missing')
 
+  // 개폐기 온도 룰은 항상 30s ON / 60s OFF 모니터링 사이클 적용
+  // (물리 리미트 스위치가 있어 ON 중에도 안전하게 계속 펄스 가능)
+  const isOpenerTemp = intent === 'opener' && trigger.triggerType === 'temperature'
+
   let conditions: ConditionGroup
 
   if (trigger.triggerType === 'time') {
@@ -93,19 +99,29 @@ function buildOpenerFan(state: WizardStateV2): CreateRuleRequest {
     }
   } else if (trigger.triggerType === 'temperature' && trigger.temperature) {
     const { base, hysteresis } = trigger.temperature
-    const onAt = base + hysteresis
+    const sensorField = trigger.sensorField ?? 'temperature'
+    const unit = sensorField === 'humidity' ? '%' : '°C'
+    // 런타임 평가는 condition.value를 midpoint(base)로 사용하고 deviation을 더해 onThreshold,
+    // 빼서 offThreshold를 계산하므로 base를 그대로 저장해야 한다.
     const mainCond: any = {
       type: 'sensor' as const,
-      field: 'temperature',
+      field: sensorField,
       operator: 'gte' as const,
-      value: onAt,
-      unit: '°C',
+      value: base,
+      unit,
       deviation: hysteresis,
+      sensor_device_id: trigger.sensorDeviceId ?? null,
     }
     if (trigger.relayEnabled) {
       mainCond.relay = true
       mainCond.relayOnMinutes = trigger.relayOnMin
       mainCond.relayOffMinutes = trigger.relayOffMin
+    }
+    // 개폐기 온도 룰: 30초 펄스 / 60초 대기 자동 부착 (사용자 설정 없이도 적용)
+    if (isOpenerTemp) {
+      mainCond.relay = true
+      mainCond.relayOnSeconds = 30
+      mainCond.relayOffSeconds = 60
     }
     const extraConds = trigger.extraConditions.map(ec => ({
       type: 'sensor' as const,
@@ -121,10 +137,8 @@ function buildOpenerFan(state: WizardStateV2): CreateRuleRequest {
     throw new Error('invalid trigger state')
   }
 
-  const hysteresisOffAt = trigger.triggerType === 'temperature' && trigger.temperature
-    ? trigger.temperature.base - trigger.temperature.hysteresis
-    : undefined
-
+  // 이전엔 hysteresisOffAt / originalV2State 메타데이터를 description에 JSON으로 저장했으나
+  // 현재 value=base 시맨틱 정정 이후 value/deviation/sensor_device_id 만으로 모든 정보 복원 가능 → 제거.
   return {
     name: ruleName,
     groupId: groupId ?? undefined,
@@ -132,12 +146,9 @@ function buildOpenerFan(state: WizardStateV2): CreateRuleRequest {
     actions: {
       targetDeviceId: trigger.deviceIds[0],
       targetDeviceIds: trigger.deviceIds,
-      sensorDeviceIds: [],
+      sensorDeviceIds: trigger.sensorDeviceId ? [trigger.sensorDeviceId] : [],
     } as any,
     priority: 1,
-    ...(hysteresisOffAt != null
-      ? { description: JSON.stringify({ hysteresisOffAt, originalV2State: { temperature: trigger.temperature } }) }
-      : {}),
   }
 }
 

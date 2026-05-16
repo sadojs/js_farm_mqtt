@@ -1,14 +1,14 @@
 <template>
   <div class="step-farm">
-    <h3 class="step-title">어느 농장에서 사용할까요?</h3>
+    <h3 class="step-title">어느 구역에서 사용할까요?</h3>
 
-    <div v-if="groupStore.loading" class="loading-msg">농장 목록을 불러오는 중...</div>
+    <div v-if="groupStore.loading" class="loading-msg">구역 목록을 불러오는 중...</div>
 
     <div v-else-if="sortedGroups.length === 0" class="empty-msg">
-      등록된 농장이 없습니다.
+      {{ farmUserId ? '이 농장에 등록된 구역이 없습니다.' : '등록된 구역이 없습니다.' }}
     </div>
 
-    <div v-else class="group-list" role="radiogroup" aria-label="농장 선택">
+    <div v-else class="group-list" role="radiogroup" aria-label="구역 선택">
       <label
         v-for="group in sortedGroups"
         :key="group.id"
@@ -36,7 +36,10 @@
 import { computed, onMounted } from 'vue'
 import { useGroupStore } from '@/stores/group.store'
 
-defineProps<{ modelValue: string | null }>()
+const props = defineProps<{
+  modelValue: string | null
+  farmUserId?: string | null
+}>()
 const emit = defineEmits<{
   'update:modelValue': [v: string]
   proceed: []
@@ -45,7 +48,11 @@ const emit = defineEmits<{
 const groupStore = useGroupStore()
 
 const sortedGroups = computed(() => {
-  return [...groupStore.groups].sort((a, b) => a.name.localeCompare(b.name))
+  const all = groupStore.groups
+  const filtered = props.farmUserId
+    ? all.filter(g => (g as any).userId === props.farmUserId)
+    : all
+  return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
 })
 
 function handleSelect(id: string) {

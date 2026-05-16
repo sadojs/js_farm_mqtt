@@ -395,6 +395,6 @@ function daysUntil(targetGdd: number): number {
 
 /* 다크모드 */
 #app.theme-dark .tl-dot {
-  border-color: var(--card-bg);
+  border-color: var(--bg-card);
 }
 </style>

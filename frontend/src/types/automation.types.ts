@@ -19,6 +19,7 @@ export interface Condition {
   relay?: boolean
   relayOnMinutes?: number
   relayOffMinutes?: number
+  sensor_device_id?: string | null
 }
 
 export interface ConditionSet {

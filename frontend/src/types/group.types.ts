@@ -45,3 +45,15 @@ export interface GroupDependenciesResponse {
   canDelete: boolean
   automationRules: { id: string; name: string; enabled: boolean }[]
 }
+
+export interface HouseGroupWithOwner extends HouseGroup {
+  ownerName?: string
+  ownerUsername?: string
+}
+
+export interface FarmAdmin {
+  id: string
+  username: string
+  name: string
+  status: string
+}

@@ -8,7 +8,7 @@ export const gatewayApi = {
   create: (data: { gatewayId: string; name: string; location?: string; rpiIp?: string; userId?: string }) =>
     apiClient.post<Gateway>('/gateways', data),
 
-  update: (id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string }) =>
+  update: (id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null }) =>
     apiClient.put<Gateway>(`/gateways/${id}`, data),
 
   remove: (id: string) =>
@@ -21,4 +21,16 @@ export const gatewayApi = {
   /** 페어링 모드 ON/OFF */
   permitJoin: (id: string, enable: boolean) =>
     apiClient.post(`/gateways/${id}/permit-join`, { enable }),
+
+  /** 터널 포트 조회/채번 */
+  getTunnelPort: (gatewayId: string) =>
+    apiClient.get<{ gatewayId: string; port: number }>(`/gateways/${gatewayId}/tunnel-port`),
+
+  /** Pi 공개키 등록 */
+  registerTunnelKey: (gatewayId: string, publicKey: string) =>
+    apiClient.post<{ port: number; serverUser: string }>(`/gateways/${gatewayId}/tunnel-key`, { publicKey }),
+
+  /** 게이트웨이 구역 할당 / 해제 */
+  assignZone: (id: string, groupId: string | null) =>
+    apiClient.patch(`/gateways/${id}/zone`, { groupId }),
 }

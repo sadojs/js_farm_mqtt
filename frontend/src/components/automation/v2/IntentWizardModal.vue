@@ -26,9 +26,17 @@
 
         <!-- 본문 -->
         <div class="iwm-body">
+          <StepFarmAdminSelect
+            v-if="wizard.currentStep.value === 'farm-admin'"
+            :modelValue="wizard.state.value.farmUserId"
+            @update:modelValue="v => { wizard.state.value.farmUserId = v; wizard.state.value.groupId = null }"
+            @proceed="wizard.next()"
+          />
+
           <StepFarmSelect
-            v-if="wizard.currentStep.value === 'farm'"
+            v-else-if="wizard.currentStep.value === 'zone'"
             :modelValue="wizard.state.value.groupId"
+            :farmUserId="wizard.state.value.farmUserId"
             @update:modelValue="wizard.state.value.groupId = $event"
             @proceed="wizard.next()"
           />
@@ -44,34 +52,18 @@
           <StepIrrigationDevice
             v-else-if="wizard.currentStep.value === 'irrigation-device'"
             :groupId="wizard.state.value.groupId ?? ''"
+            :farmUserId="wizard.state.value.farmUserId"
             :modelValue="wizard.state.value.irrigation?.controllerDeviceId ?? null"
             @update:modelValue="setIrrigationController"
             @select="applyControllerInfo"
             @proceed="wizard.next()"
           />
 
-          <StepIrrigationValve
-            v-else-if="wizard.currentStep.value === 'irrigation-valve'"
-            :controllerChannels="wizard.state.value.irrigation?.controllerChannels ?? 8"
-            :modelValue="wizard.state.value.irrigation?.valveZones ?? []"
-            :durationMin="wizard.state.value.irrigation?.durationMin ?? 15"
-            :waitTimeBetweenZones="wizard.state.value.irrigation?.waitTimeBetweenZones ?? 0"
-            :mixerEnabled="wizard.state.value.irrigation?.mixerEnabled ?? false"
-            :useFertilizer="wizard.state.value.irrigation?.useFertilizer ?? false"
-            :fertilizer="wizard.state.value.irrigation?.fertilizer ?? defaultFert"
-            @update:modelValue="v => setIrrigationField('valveZones', v)"
-            @update:durationMin="v => setIrrigationField('durationMin', v)"
-            @update:waitTimeBetweenZones="v => setIrrigationField('waitTimeBetweenZones', v)"
-            @update:mixerEnabled="v => setIrrigationField('mixerEnabled', v)"
-            @update:useFertilizer="v => setIrrigationField('useFertilizer', v)"
-            @update:fertilizer="v => setIrrigationField('fertilizer', v)"
-            @go-back="wizard.goTo('irrigation-device')"
-          />
-
           <StepDeviceByIntent
             v-else-if="wizard.currentStep.value === 'device-by-intent'"
             :intent="wizard.state.value.intent as 'opener' | 'fan'"
             :groupId="wizard.state.value.groupId ?? ''"
+            :farmUserId="wizard.state.value.farmUserId"
             :modelValue="currentTrigger?.deviceIds ?? []"
             @update:modelValue="v => setTriggerField('deviceIds', v)"
           />
@@ -79,11 +71,14 @@
           <StepTimingByIntent
             v-else-if="wizard.currentStep.value === 'timing'"
             :intent="wizard.state.value.intent ?? 'fan'"
+            :groupId="wizard.state.value.groupId"
             :schedule="wizard.state.value.irrigation?.schedule ?? []"
             :triggerType="currentTrigger?.triggerType ?? 'time'"
             :timeRange="currentTrigger?.timeRange"
             :timeRanges="currentTrigger?.timeRanges"
             :temperature="currentTrigger?.temperature"
+            :sensorDeviceId="currentTrigger?.sensorDeviceId"
+            :sensorField="currentTrigger?.sensorField"
             :extraConditions="currentTrigger?.extraConditions ?? []"
             :relayEnabled="currentTrigger?.relayEnabled ?? false"
             :relayOnMin="currentTrigger?.relayOnMin ?? 50"
@@ -93,6 +88,8 @@
             @update:timeRange="v => setTriggerField('timeRange', v)"
             @update:timeRanges="v => setTriggerField('timeRanges', v)"
             @update:temperature="v => setTriggerField('temperature', v)"
+            @update:sensorDeviceId="v => setTriggerField('sensorDeviceId', v)"
+            @update:sensorField="v => setTriggerField('sensorField', v)"
             @update:extraConditions="v => setTriggerField('extraConditions', v)"
             @update:relayEnabled="v => setTriggerField('relayEnabled', v)"
             @update:relayOnMin="v => setTriggerField('relayOnMin', v)"
@@ -146,13 +143,14 @@ import { useAutomationStore } from '@/stores/automation.store'
 import { useGroupStore } from '@/stores/group.store'
 import { useDeviceStore } from '@/stores/device.store'
 import { useNotificationStore } from '@/stores/notification.store'
+import { useAuthStore } from '@/stores/auth.store'
 import { transformV2ToLegacy } from './transformV2ToLegacy'
 import { generateRuleName } from '@/utils/ruleNameGenerator'
-import type { WizardStep, FertilizerConfig } from './types'
+import type { WizardStep } from './types'
+import StepFarmAdminSelect from './StepFarmAdminSelect.vue'
 import StepFarmSelect from './StepFarmSelect.vue'
 import StepIntentSelect from './StepIntentSelect.vue'
 import StepIrrigationDevice from './StepIrrigationDevice.vue'
-import StepIrrigationValve from './StepIrrigationValve.vue'
 import StepDeviceByIntent from './StepDeviceByIntent.vue'
 import StepTimingByIntent from './StepTimingByIntent.vue'
 import StepReviewSummary from './StepReviewSummary.vue'
@@ -163,14 +161,15 @@ const emit = defineEmits<{
   saved: [ruleName: string]
 }>()
 
-const wizard = useRuleWizardV2()
+const authStore = useAuthStore()
+const wizard = useRuleWizardV2(authStore.isAdmin)
 const automationStore = useAutomationStore()
 const groupStore = useGroupStore()
 const deviceStore = useDeviceStore()
 const notify = useNotificationStore()
 const saving = ref(false)
 
-const defaultFert: FertilizerConfig = { enabled: false, duration: 10, preStopWait: 2 }
+
 
 const currentTrigger = computed(() => {
   const { intent, opener, fan } = wizard.state.value
@@ -178,8 +177,8 @@ const currentTrigger = computed(() => {
 })
 
 // 스텝 표시 조건
-const STEPS_WITH_PREV = new Set<WizardStep>(['irrigation-valve', 'device-by-intent', 'timing', 'review'])
-const STEPS_WITH_NEXT = new Set<WizardStep>(['irrigation-valve', 'device-by-intent', 'timing', 'review'])
+const STEPS_WITH_PREV = new Set<WizardStep>(['zone', 'device-by-intent', 'timing', 'review'])
+const STEPS_WITH_NEXT = new Set<WizardStep>(['device-by-intent', 'timing', 'review'])
 
 const showPrev = computed(() => STEPS_WITH_PREV.has(wizard.currentStep.value))
 const showNext = computed(() => STEPS_WITH_NEXT.has(wizard.currentStep.value))
@@ -194,7 +193,7 @@ const nextLabel = computed(() => {
 
 const canProceedHint = computed(() => {
   const step = wizard.currentStep.value
-  if (step === 'irrigation-valve') return '밸브를 하나 이상 선택해주세요'
+  if (step === 'irrigation-device') return '관수 장치를 선택해주세요'
   if (step === 'device-by-intent') return '장치를 하나 이상 선택해주세요'
   if (step === 'timing') return '시간/온도 조건을 설정해주세요'
   if (step === 'review') return '룰 이름을 입력해주세요'
@@ -221,7 +220,7 @@ function setIrrigationField<K extends keyof NonNullable<typeof wizard.state.valu
   ;(wizard.state.value.irrigation as any)[key] = val
 }
 
-function setTriggerField<K extends 'deviceIds' | 'triggerType' | 'timeRange' | 'timeRanges' | 'temperature' | 'extraConditions' | 'relayEnabled' | 'relayOnMin' | 'relayOffMin'>(
+function setTriggerField<K extends 'deviceIds' | 'triggerType' | 'timeRange' | 'timeRanges' | 'temperature' | 'sensorDeviceId' | 'sensorField' | 'extraConditions' | 'relayEnabled' | 'relayOnMin' | 'relayOffMin'>(
   key: K, val: any
 ) {
   const { intent } = wizard.state.value
@@ -250,7 +249,10 @@ async function handleSave() {
   if (saving.value) return
   saving.value = true
   try {
-    const dto = transformV2ToLegacy(wizard.state.value)
+    const dto: any = transformV2ToLegacy(wizard.state.value)
+    if (authStore.isAdmin && wizard.state.value.farmUserId) {
+      dto.targetUserId = wizard.state.value.farmUserId
+    }
     const result = await automationStore.createRule(dto)
     if (!wizard.state.value.activateNow && result?.id) {
       await automationStore.toggleRule(result.id)

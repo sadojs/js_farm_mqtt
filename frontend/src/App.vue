@@ -12,14 +12,43 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav">
+      <!-- 관리자 메뉴 -->
+      <nav v-if="isAdmin" class="sidebar-nav">
+        <router-link to="/users" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <span>사용자 관리</span>
+        </router-link>
+        <router-link to="/admin/farms" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          <span>농장 관리</span>
+        </router-link>
+        <router-link to="/gateways" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+          <span>게이트웨이</span>
+        </router-link>
+        <router-link to="/groups" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span>구역 관리</span>
+        </router-link>
+        <router-link to="/automation" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span>자동 제어 설정</span>
+        </router-link>
+        <router-link to="/config-deploy" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
+          <span>설정 배포</span>
+        </router-link>
         <router-link to="/dashboard" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
           <span>우리 농장</span>
         </router-link>
-        <router-link v-if="!isFarmUser" to="/devices" class="sidebar-link">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-          <span>장치 관리</span>
+      </nav>
+
+      <!-- 일반 사용자 메뉴 -->
+      <nav v-else class="sidebar-nav">
+        <router-link to="/dashboard" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span>우리 농장</span>
         </router-link>
         <router-link to="/groups" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -41,21 +70,13 @@
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M8 12a4 4 0 0 1 8 0"/><path d="M12 12V2"/></svg></span>
           <span>생육관리</span>
         </router-link>
-<router-link to="/alerts" class="sidebar-link">
+        <router-link to="/alerts" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
           <span>이상 알림</span>
         </router-link>
         <router-link to="/activity-log" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           <span>작업 내역</span>
-        </router-link>
-        <router-link v-if="isAdmin" to="/config-deploy" class="sidebar-link">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
-          <span>설정 배포</span>
-        </router-link>
-        <router-link v-if="isAdmin" to="/users" class="sidebar-link">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-          <span>사용자 관리</span>
         </router-link>
       </nav>
 
@@ -130,14 +151,43 @@
         <button class="drawer-close" @click="isDrawerOpen = false" aria-label="메뉴 닫기">✕</button>
       </div>
 
-      <nav class="sidebar-nav">
+      <!-- 관리자 메뉴 (모바일) -->
+      <nav v-if="isAdmin" class="sidebar-nav">
+        <router-link to="/users" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <span>사용자 관리</span>
+        </router-link>
+        <router-link to="/admin/farms" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          <span>농장 관리</span>
+        </router-link>
+        <router-link to="/gateways" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+          <span>게이트웨이</span>
+        </router-link>
+        <router-link to="/groups" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span>구역 관리</span>
+        </router-link>
+        <router-link to="/automation" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span>자동 제어 설정</span>
+        </router-link>
+        <router-link to="/config-deploy" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
+          <span>설정 배포</span>
+        </router-link>
         <router-link to="/dashboard" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
           <span>우리 농장</span>
         </router-link>
-        <router-link v-if="!isFarmUser" to="/devices" class="sidebar-link" @click="isDrawerOpen = false">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-          <span>장치 관리</span>
+      </nav>
+
+      <!-- 일반 사용자 메뉴 (모바일) -->
+      <nav v-else class="sidebar-nav">
+        <router-link to="/dashboard" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span>우리 농장</span>
         </router-link>
         <router-link to="/groups" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -166,14 +216,6 @@
         <router-link to="/activity-log" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           <span>작업 내역</span>
-        </router-link>
-        <router-link v-if="isAdmin" to="/config-deploy" class="sidebar-link" @click="isDrawerOpen = false">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span>
-          <span>설정 배포</span>
-        </router-link>
-        <router-link v-if="isAdmin" to="/users" class="sidebar-link" @click="isDrawerOpen = false">
-          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-          <span>사용자 관리</span>
         </router-link>
       </nav>
 
@@ -454,6 +496,63 @@ body {
   --toggle-off: #555555;
   --toggle-on: #4caf50;
   --overlay: rgba(0, 0, 0, 0.7);
+}
+
+/* ========== 다크모드 글로벌 오버라이드 ========== */
+/* 토글 스위치의 흰색 thumb를 다크모드에서 어두운 베이지로 변환 */
+#app.theme-dark .toggle-slider::before,
+#app.theme-dark .toggle span:not(.toggle-slider),
+#app.theme-dark label.toggle span[style*="background"] {
+  background: #d4d4d4 !important;
+}
+
+/* 라이트모드용 밝은 배지(상태/역할) — 다크모드 반투명 오버라이드 */
+#app.theme-dark .role-badge.admin,
+#app.theme-dark .badge-online,
+#app.theme-dark .log-status.started,
+#app.theme-dark .chip.menu {
+  background: rgba(33, 150, 243, 0.18);
+  color: #90caf9;
+}
+#app.theme-dark .role-badge.farm_admin,
+#app.theme-dark .log-status.cancelled,
+#app.theme-dark .log-status.update,
+#app.theme-dark .status-badge.warning {
+  background: rgba(255, 152, 0, 0.18);
+  color: #ffb74d;
+}
+#app.theme-dark .role-badge.farm_user,
+#app.theme-dark .gateway-tag,
+#app.theme-dark .project-badge,
+#app.theme-dark .status-badge.active,
+#app.theme-dark .log-status.success,
+#app.theme-dark .log-status.create {
+  background: rgba(76, 175, 80, 0.18);
+  color: #81c784;
+}
+#app.theme-dark .gateway-tag.offline,
+#app.theme-dark .status-badge.inactive,
+#app.theme-dark .log-status.fail,
+#app.theme-dark .log-status.delete,
+#app.theme-dark .chip.error {
+  background: rgba(244, 67, 54, 0.18);
+  color: #ef9a9a;
+}
+#app.theme-dark .badge-offline {
+  background: rgba(120, 120, 120, 0.25);
+  color: #b0b0b0;
+}
+
+/* hover 시 밝은 빨강 → 다크모드 반투명 */
+#app.theme-dark .btn-icon.danger:hover,
+#app.theme-dark .btn-gw-detach:hover,
+#app.theme-dark .btn-danger:hover {
+  background: rgba(244, 67, 54, 0.15) !important;
+}
+
+/* 오프라인/비활성 dot */
+#app.theme-dark .dot-off {
+  background: var(--border-color) !important;
 }
 
 /* ========== 본문(우측 콘텐츠) 폰트 크기 조절 시스템 ========== */
@@ -825,6 +924,14 @@ body {
   line-height: 1.55;
   background: var(--bg-primary);
   color: var(--text-primary);
+  /* 페이지 헤더/콘텐츠가 사이드바와 너무 가까이 붙지 않도록 좌우 패딩 + 상단 여유 */
+  padding: 24px 28px 32px 28px;
+  box-sizing: border-box;
+}
+
+/* 모바일에서는 사이드바가 collapse되므로 패딩 축소 */
+@media (max-width: 768px) {
+  .main-content { padding: 16px 16px 24px 16px; }
 }
 
 /* 본문 공통 가독성 보정 */

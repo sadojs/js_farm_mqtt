@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { HouseGroup, House, CreateGroupRequest, CreateHouseRequest, GroupDependenciesResponse } from '../types/group.types'
+import type { HouseGroup, House, CreateGroupRequest, CreateHouseRequest, GroupDependenciesResponse, HouseGroupWithOwner, FarmAdmin } from '../types/group.types'
 
 export const groupApi = {
   getGroups: () =>
@@ -29,6 +29,9 @@ export const groupApi = {
   removeHouse: (id: string) =>
     apiClient.delete(`/groups/houses/${id}`),
 
+  assignGateway: (groupId: string, gatewayId: string) =>
+    apiClient.post<HouseGroup>(`/groups/${groupId}/gateway`, { gatewayId }),
+
   assignDevices: (groupId: string, deviceIds: string[]) =>
     apiClient.post<HouseGroup>(`/groups/${groupId}/devices`, { deviceIds }),
 
@@ -37,4 +40,23 @@ export const groupApi = {
 
   getDependencies: (id: string) =>
     apiClient.get<GroupDependenciesResponse>(`/groups/${id}/dependencies`),
+
+  // admin 전용
+  adminGetAllGroups: () =>
+    apiClient.get<HouseGroupWithOwner[]>('/groups'),
+
+  adminCreateGroup: (data: { name: string; targetUserId: string; description?: string }) =>
+    apiClient.post<HouseGroup>('/groups', data),
+
+  adminCreateHouse: (data: { name: string; groupId: string; targetUserId: string; location?: string }) =>
+    apiClient.post<House>('/groups/houses', data),
+
+  adminRemoveHouse: (id: string) =>
+    apiClient.delete(`/groups/houses/${id}`),
+
+  adminUpdateHouse: (id: string, data: Partial<CreateHouseRequest>) =>
+    apiClient.put<House>(`/groups/houses/${id}`, data),
+
+  getFarmAdmins: () =>
+    apiClient.get<FarmAdmin[]>('/users/farm-admins'),
 }

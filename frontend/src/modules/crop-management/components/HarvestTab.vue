@@ -167,7 +167,7 @@ function sourceNote(source: string) {
 }
 
 .harvest-card {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card, #fff);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);

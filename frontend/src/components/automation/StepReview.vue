@@ -99,11 +99,19 @@ const selectedGroup = computed(() =>
 const groupName = computed(() => selectedGroup.value?.name || '-')
 
 const sensorNames = computed(() => {
-  if (props.formData.sensorDeviceIds.length === 0) return '미선택 (시간 설정)'
+  // 조건의 sensor_device_id에서 자동 파생 (Step 2 측정기 단계 제거 이후)
+  const condIds = new Set<string>()
+  const conds = (props.formData.conditions?.groups || []).flatMap((g: any) => g.conditions || [])
+  for (const c of conds) {
+    if ((c as any).sensor_device_id) condIds.add((c as any).sensor_device_id)
+  }
+  // 레거시 호환: 조건에 sensor_device_id 없으면 actions.sensorDeviceIds 사용
+  const ids = condIds.size > 0
+    ? Array.from(condIds)
+    : (props.formData.sensorDeviceIds || [])
+  if (ids.length === 0) return '시간 조건 (센서 미사용)'
   const devices = selectedGroup.value?.devices || []
-  return props.formData.sensorDeviceIds
-    .map(id => devices.find(d => d.id === id)?.name || id)
-    .join(', ') || '-'
+  return ids.map(id => devices.find(d => d.id === id)?.name || id).join(', ')
 })
 
 const actuatorName = computed(() => {
