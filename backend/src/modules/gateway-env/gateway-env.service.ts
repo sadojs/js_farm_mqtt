@@ -1,0 +1,590 @@
+import {
+  ConflictException, ForbiddenException, Injectable, Logger, NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { GatewayOnboardDevice, SlotType } from './entities/gateway-onboard-device.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { Device } from '../devices/entities/device.entity';
+import { UpdateOnboardDeviceDto } from './dto/update-onboard-device.dto';
+import { CreateOnboardDeviceDto } from './dto/create-onboard-device.dto';
+import { AddZigbeeDeviceDto, UpdateZigbeeDeviceDto } from './dto/add-zigbee-device.dto';
+import { MqttService } from '../mqtt/mqtt.service';
+import {
+  AVAILABLE_SWITCH_CODES_8CH,
+  AVAILABLE_SWITCH_CODES_12CH,
+  detectChannelCount,
+} from '../devices/channel-mapping.constants';
+
+/**
+ * 기본 슬롯 12개: 팬4 + 관주 8채널(원격제어·B접점·구역4·교반기·액비)
+ * 8채널 = 원격제어 + B접점 + 구역 4개 + 교반기 + 액비
+ * 12채널은 장치 추가 시 buildIrrigationSlots(channels=12)로 동적 생성
+ */
+const DEFAULT_SLOTS: Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt' | 'updatedAt' | 'operationTime' | 'standbyTime'>[] = [
+  { slotKey: 'fan_1',              slotType: 'fan',                pairKey: null, name: '유동팬 1번',       enabled: true, sortOrder: 1,  gpioPin: null },
+  { slotKey: 'fan_2',              slotType: 'fan',                pairKey: null, name: '유동팬 2번',       enabled: true, sortOrder: 2,  gpioPin: null },
+  { slotKey: 'fan_3',              slotType: 'fan',                pairKey: null, name: '유동팬 3번',       enabled: true, sortOrder: 3,  gpioPin: null },
+  { slotKey: 'fan_4',              slotType: 'fan',                pairKey: null, name: '유동팬 4번',       enabled: true, sortOrder: 4,  gpioPin: null },
+  { slotKey: 'remote_control',     slotType: 'remote_control',     pairKey: null, name: '원격제어 ON/OFF',  enabled: true, sortOrder: 5,  gpioPin: null },
+  { slotKey: 'fertilizer_contact', slotType: 'fertilizer_contact', pairKey: null, name: '액비/교반기 B접점', enabled: true, sortOrder: 6,  gpioPin: null },
+  { slotKey: 'zone_1',             slotType: 'irrigation_zone',    pairKey: null, name: '1구역 관주',       enabled: true, sortOrder: 7,  gpioPin: null },
+  { slotKey: 'zone_2',             slotType: 'irrigation_zone',    pairKey: null, name: '2구역 관주',       enabled: true, sortOrder: 8,  gpioPin: null },
+  { slotKey: 'zone_3',             slotType: 'irrigation_zone',    pairKey: null, name: '3구역 관주',       enabled: true, sortOrder: 9,  gpioPin: null },
+  { slotKey: 'zone_4',             slotType: 'irrigation_zone',    pairKey: null, name: '4구역 관주',       enabled: true, sortOrder: 10, gpioPin: null },
+  { slotKey: 'mixer',              slotType: 'mixer',              pairKey: null, name: '교반기',           enabled: true, sortOrder: 11, gpioPin: null },
+  { slotKey: 'fertilizer_motor',   slotType: 'fertilizer_motor',   pairKey: null, name: '액비',             enabled: true, sortOrder: 12, gpioPin: null },
+];
+
+/** 구버전에서 제거된 슬롯 키 (opener_* 는 지그비로만 추가) */
+const LEGACY_SLOT_KEYS = ['opener_1_open','opener_1_close','opener_2_open','opener_2_close','opener_3_open','opener_3_close'];
+
+type SlotDef = Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt' | 'updatedAt' | 'operationTime' | 'standbyTime'>;
+
+function buildVentSlots(uuid: string, short: string, groupName: string, baseSort: number): SlotDef[] {
+  let sort = baseSort;
+  const s = (slotKey: string, slotType: SlotType, name: string): SlotDef => ({
+    slotKey, slotType, pairKey: uuid, name, enabled: true, sortOrder: ++sort, gpioPin: null,
+  });
+  return [
+    s(`vent_hdr_${short}`, 'vent_group', groupName),
+    s(`vent_open_${short}`, 'opener_open', '열기'),
+    s(`vent_close_${short}`, 'opener_close', '닫기'),
+  ];
+}
+
+function buildIrrigationSlots(uuid: string, short: string, groupName: string, channels: 8 | 12, baseSort: number): SlotDef[] {
+  let sort = baseSort;
+  const s = (slotKey: string, slotType: SlotType, name: string): SlotDef => ({
+    slotKey, slotType, pairKey: uuid, name, enabled: true, sortOrder: ++sort, gpioPin: null,
+  });
+  const zones = channels === 12
+    ? [1,2,3,4,5,6,7,8].map(n => s(`irrig_z${n}_${short}`, 'irrigation_zone', `${n}구역 관주`))
+    : [1,2,3,4].map(n => s(`irrig_z${n}_${short}`, 'irrigation_zone', `${n}구역 관주`));
+  return [
+    s(`irrig_hdr_${short}`, 'irrigation_group', groupName),
+    s(`irrig_rc_${short}`, 'remote_control', '원격제어 ON/OFF'),
+    s(`irrig_fc_${short}`, 'fertilizer_contact', '액비/교반기 B접점'),
+    ...zones,
+    s(`irrig_mx_${short}`, 'mixer', '교반기'),
+    s(`irrig_fm_${short}`, 'fertilizer_motor', '액비'),
+  ];
+}
+
+@Injectable()
+export class GatewayEnvService {
+  private readonly logger = new Logger(GatewayEnvService.name);
+
+  constructor(
+    @InjectRepository(GatewayOnboardDevice)
+    private readonly onboardRepo: Repository<GatewayOnboardDevice>,
+    @InjectRepository(Gateway)
+    private readonly gatewayRepo: Repository<Gateway>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
+    private readonly mqttService: MqttService,
+  ) {}
+
+  // ── 게이트웨이 권한 확인 ──────────────────────────────────────
+  private async assertGatewayOwner(gatewayId: string, userId: string, role: string): Promise<Gateway> {
+    const gw = await this.gatewayRepo.findOne({ where: { id: gatewayId } });
+    if (!gw) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
+    if (role !== 'admin' && gw.userId !== userId) throw new ForbiddenException('권한이 없습니다.');
+    return gw;
+  }
+
+  // ── Onboard: 초기화 (첫 호출만 DEFAULT_SLOTS 생성, 이후엔 자동 복구 안 함) ────────
+  // 이전 동작: 매번 누락된 DEFAULT_SLOTS를 자동 복구 → 사용자가 삭제해도 다시 생성되는 버그
+  // 새 동작: 게이트웨이의 모든 onboard 슬롯이 비어있을 때만 DEFAULT_SLOTS 생성
+  async ensureOnboardDevices(gatewayId: string): Promise<GatewayOnboardDevice[]> {
+    const all = await this.onboardRepo.find({ where: { gatewayId }, order: { sortOrder: 'ASC' } });
+
+    // 구버전 opener 슬롯은 항상 제거 (마이그레이션)
+    const legacy = all.filter(e => LEGACY_SLOT_KEYS.includes(e.slotKey));
+    if (legacy.length > 0) {
+      await this.onboardRepo.remove(legacy);
+      this.logger.log(`게이트웨이 ${gatewayId}: 구버전 opener 슬롯 ${legacy.length}개 제거`);
+    }
+
+    const afterLegacy = all.filter(e => !LEGACY_SLOT_KEYS.includes(e.slotKey));
+
+    // 슬롯이 하나도 없을 때만 DEFAULT_SLOTS 생성 (새 게이트웨이 초기 세팅)
+    // 슬롯이 1개라도 있으면 사용자가 명시적으로 삭제한 것이므로 자동 복구 금지
+    if (afterLegacy.length === 0) {
+      const toInsert = DEFAULT_SLOTS.map(s => this.onboardRepo.create({ ...s, gatewayId }));
+      await this.onboardRepo.save(toInsert);
+      this.logger.log(`게이트웨이 ${gatewayId}: 초기 onboard ${toInsert.length}개 생성`);
+    }
+    const result = await this.onboardRepo.find({ where: { gatewayId }, order: { sortOrder: 'ASC' } });
+
+    // devices 테이블에 온보드 장치 동기화
+    const gw = await this.gatewayRepo.findOne({ where: { id: gatewayId } });
+    if (gw) await this.syncOnboardToDevices(gw, result).catch(e =>
+      this.logger.warn(`온보드 동기화 실패: ${e.message}`)
+    );
+
+    return result;
+  }
+
+  // ── Onboard: 목록 조회 ────────────────────────────────────────
+  async getOnboardDevices(gatewayId: string, userId: string, role: string): Promise<GatewayOnboardDevice[]> {
+    await this.assertGatewayOwner(gatewayId, userId, role);
+    return this.ensureOnboardDevices(gatewayId);
+  }
+
+  // ── Onboard: 수정 (이름 / 활성화) ────────────────────────────
+  async updateOnboardDevice(
+    gatewayId: string,
+    id: string,
+    dto: UpdateOnboardDeviceDto,
+    userId: string,
+    role: string,
+  ): Promise<GatewayOnboardDevice> {
+    await this.assertGatewayOwner(gatewayId, userId, role);
+    const device = await this.onboardRepo.findOne({ where: { id, gatewayId } });
+    if (!device) throw new NotFoundException('온보드 장치를 찾을 수 없습니다.');
+
+    if (dto.name !== undefined) device.name = dto.name;
+    if (dto.operationTime !== undefined) device.operationTime = dto.operationTime;
+    if (dto.standbyTime !== undefined) device.standbyTime = dto.standbyTime;
+    if ('gpioPin' in dto) device.gpioPin = dto.gpioPin ?? null;
+    if (dto.enabled !== undefined) {
+      device.enabled = dto.enabled;
+    }
+    const saved = await this.onboardRepo.save(device);
+
+    // enabled 상태가 변경된 경우 devices 테이블 동기화
+    if (dto.enabled !== undefined) {
+      const gw = await this.gatewayRepo.findOne({ where: { id: gatewayId } });
+      if (gw) {
+        const allOnboard = await this.onboardRepo.find({ where: { gatewayId }, order: { sortOrder: 'ASC' } });
+        await this.syncOnboardToDevices(gw, allOnboard).catch(e =>
+          this.logger.warn(`온보드 동기화 실패: ${e.message}`)
+        );
+      }
+    }
+
+    return saved;
+  }
+
+  // ── Onboard: 동적 장치 추가 ───────────────────────────────
+  async createOnboardDevice(
+    gatewayId: string,
+    dto: CreateOnboardDeviceDto,
+    userId: string,
+    role: string,
+  ): Promise<GatewayOnboardDevice[]> {
+    await this.assertGatewayOwner(gatewayId, userId, role);
+
+    const maxSort = (await this.onboardRepo
+      .createQueryBuilder('d')
+      .select('MAX(d.sortOrder)', 'max')
+      .where('d.gatewayId = :gatewayId', { gatewayId })
+      .getRawOne<{ max: number }>())?.max ?? 0;
+
+    const uuid = crypto.randomUUID();
+    const short = uuid.replace(/-/g, '').slice(0, 8);
+    let slots: Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt' | 'updatedAt' | 'operationTime' | 'standbyTime'>[];
+
+    if (dto.type === 'fan') {
+      slots = [{
+        slotKey: `fan_dyn_${short}`,
+        slotType: 'fan',
+        pairKey: uuid,
+        name: dto.name,
+        enabled: true,
+        sortOrder: maxSort + 1,
+        gpioPin: null,
+      }];
+    } else if (dto.type === 'vent') {
+      slots = buildVentSlots(uuid, short, dto.name, maxSort);
+    } else {
+      const channels = dto.channels ?? 8;
+      slots = buildIrrigationSlots(uuid, short, dto.name, channels, maxSort);
+    }
+
+    const entities = slots.map(s => this.onboardRepo.create({ ...s, gatewayId }));
+    return this.onboardRepo.save(entities);
+  }
+
+  // ── Onboard: 장치 삭제 (레거시 포함) ─────────────────────
+  async deleteOnboardDevice(
+    gatewayId: string,
+    id: string,
+    userId: string,
+    role: string,
+  ): Promise<void> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const device = await this.onboardRepo.findOne({ where: { id, gatewayId } });
+    if (!device) throw new NotFoundException('온보드 장치를 찾을 수 없습니다.');
+
+    if (device.pairKey) {
+      // 동적 그룹: 같은 pairKey를 가진 모든 슬롯 삭제
+      const group = await this.onboardRepo.find({ where: { gatewayId, pairKey: device.pairKey } });
+      await this.onboardRepo.remove(group);
+    } else if (device.slotType === 'fan') {
+      // 레거시 팬: 단일 슬롯만 삭제
+      await this.onboardRepo.remove(device);
+    } else {
+      // 레거시 관수 그룹: pairKey=null인 팬 제외 모든 슬롯 삭제
+      const legacyAll = await this.onboardRepo.find({ where: { gatewayId, pairKey: IsNull() } });
+      const toDelete = legacyAll.filter(s => s.slotType !== 'fan');
+      if (toDelete.length > 0) await this.onboardRepo.remove(toDelete);
+    }
+
+    // devices 테이블 동기화: 남은 슬롯 기반으로 actuator 정리
+    // (이전에는 syncOnboardToDevices가 호출되지 않아 devices 테이블에 관주/팬 actuator가 남아 그룹 페이지에서 계속 보임)
+    const remaining = await this.onboardRepo.find({ where: { gatewayId } });
+    await this.syncOnboardToDevices(gw, remaining).catch((e) =>
+      this.logger.warn(`syncOnboardToDevices after delete failed for ${gatewayId}: ${e.message}`),
+    );
+  }
+
+  // ── 온보드 장치 → devices 테이블 동기화 ────────────────────
+  private async syncOnboardToDevices(gw: Gateway, onboardDevices: GatewayOnboardDevice[]): Promise<void> {
+    // 게이트웨이 online 상태 = 모든 온보드 actuator의 online 상태
+    const gwOnline = gw.status === 'online' || gw.agentStatus === 'online';
+
+    // 0. 고아(orphan) device 정리: onboardDeviceId가 가리키는 슬롯이 더 이상 존재하지 않으면 삭제
+    //    (슬롯 삭제 후 잔존하던 device를 청소)
+    const validSlotIds = new Set(onboardDevices.map(s => s.id));
+    const allOnboardDevices = await this.deviceRepo.find({
+      where: { gatewayId: gw.id, source: 'onboard' } as any,
+    });
+    const orphans = allOnboardDevices.filter(d => d.onboardDeviceId && !validSlotIds.has(d.onboardDeviceId));
+    if (orphans.length > 0) {
+      await this.deviceRepo.remove(orphans);
+      this.logger.log(`게이트웨이 ${gw.gatewayId}: 고아 device ${orphans.length}개 정리`);
+    }
+
+    // 1. 팬 슬롯: 활성화된 것마다 개별 Device 레코드
+    const fanSlots = onboardDevices.filter(s => s.slotType === 'fan');
+    for (const slot of fanSlots) {
+      const existing = await this.deviceRepo.findOne({ where: { onboardDeviceId: slot.id } });
+      if (slot.enabled) {
+        if (existing) {
+          existing.name = slot.name;
+          existing.online = gwOnline;  // 게이트웨이 상태 반영
+          await this.deviceRepo.save(existing);
+        } else {
+          await this.deviceRepo.save(this.deviceRepo.create({
+            userId: gw.userId,
+            gatewayId: gw.id,
+            name: slot.name,
+            category: 'fan',
+            deviceType: 'actuator',
+            equipmentType: 'fan',
+            source: 'onboard',
+            onboardDeviceId: slot.id,
+            friendlyName: slot.slotKey,
+            online: gwOnline,
+          }));
+        }
+      } else if (existing) {
+        await this.deviceRepo.remove(existing);
+      }
+    }
+
+    // 1-b. 개폐기(vent_group + opener_open + opener_close): 그룹 단위로 device 등록
+    // pairKey 가 같은 vent_group 3개(header, open, close)가 한 페어
+    const ventGroupHeaders = onboardDevices.filter(s => s.slotType === 'vent_group' && s.enabled);
+    for (const header of ventGroupHeaders) {
+      const pairKey = header.pairKey;
+      if (!pairKey) continue;
+      const openSlot = onboardDevices.find(s => s.slotType === 'opener_open' && s.pairKey === pairKey);
+      const closeSlot = onboardDevices.find(s => s.slotType === 'opener_close' && s.pairKey === pairKey);
+      if (!openSlot || !closeSlot) continue;
+
+      // [열기] device
+      let openDev = await this.deviceRepo.findOne({ where: { onboardDeviceId: openSlot.id } });
+      let closeDev = await this.deviceRepo.findOne({ where: { onboardDeviceId: closeSlot.id } });
+      if (!openDev) {
+        openDev = await this.deviceRepo.save(this.deviceRepo.create({
+          userId: gw.userId, gatewayId: gw.id,
+          name: `${header.name} 열기`, category: 'opener', deviceType: 'actuator',
+          equipmentType: 'opener_open', source: 'onboard',
+          onboardDeviceId: openSlot.id, friendlyName: openSlot.slotKey,
+          openerGroupName: header.name,
+          online: gwOnline,
+        }));
+      } else {
+        openDev.name = `${header.name} 열기`;
+        openDev.openerGroupName = header.name;
+        openDev.online = gwOnline;
+        await this.deviceRepo.save(openDev);
+      }
+      if (!closeDev) {
+        closeDev = await this.deviceRepo.save(this.deviceRepo.create({
+          userId: gw.userId, gatewayId: gw.id,
+          name: `${header.name} 닫기`, category: 'opener', deviceType: 'actuator',
+          equipmentType: 'opener_close', source: 'onboard',
+          onboardDeviceId: closeSlot.id, friendlyName: closeSlot.slotKey,
+          openerGroupName: header.name,
+          online: gwOnline,
+        }));
+      } else {
+        closeDev.name = `${header.name} 닫기`;
+        closeDev.openerGroupName = header.name;
+        closeDev.online = gwOnline;
+        await this.deviceRepo.save(closeDev);
+      }
+      // 페어링 정보 업데이트 (인터록용)
+      if (openDev.pairedDeviceId !== closeDev.id || closeDev.pairedDeviceId !== openDev.id) {
+        openDev.pairedDeviceId = closeDev.id;
+        closeDev.pairedDeviceId = openDev.id;
+        await this.deviceRepo.save([openDev, closeDev]);
+      }
+    }
+
+    // 1-c. 비활성화된 vent_group: 해당 device 삭제
+    const inactivePairs = new Set(
+      onboardDevices.filter(s => s.slotType === 'vent_group' && !s.enabled && s.pairKey).map(s => s.pairKey)
+    );
+    for (const pairKey of inactivePairs) {
+      const slots = onboardDevices.filter(s => (s.slotType === 'opener_open' || s.slotType === 'opener_close') && s.pairKey === pairKey);
+      for (const slot of slots) {
+        const dev = await this.deviceRepo.findOne({ where: { onboardDeviceId: slot.id } });
+        if (dev) await this.deviceRepo.remove(dev);
+      }
+    }
+
+    // 2. 관주 슬롯: 활성화된 것들 → 게이트웨이당 관주 Device 1개
+    //    vent/opener 슬롯은 관주 장치에 포함하지 않음
+    const IRRIGATION_SLOT_TYPES = new Set([
+      'remote_control', 'fertilizer_contact', 'irrigation_zone', 'mixer', 'fertilizer_motor',
+    ]);
+    const irrigSlots = onboardDevices.filter(s => IRRIGATION_SLOT_TYPES.has(s.slotType));
+    const enabledIrrig = irrigSlots.filter(s => s.enabled)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const existingIrrig = await this.deviceRepo.findOne({
+      where: { gatewayId: gw.id, source: 'onboard', equipmentType: 'irrigation' },
+    });
+
+    if (enabledIrrig.length > 0) {
+      const channelMapping: Record<string, string> = {};
+      let dynZoneIdx = 0;
+      for (const slot of enabledIrrig) {
+        let mapKey: string;
+        if (slot.slotType === 'remote_control') mapKey = 'remote_control';
+        else if (slot.slotType === 'fertilizer_contact') mapKey = 'fertilizer_b_contact';
+        else if (slot.slotType === 'mixer') mapKey = 'mixer';
+        else if (slot.slotType === 'fertilizer_motor') mapKey = 'fertilizer_motor';
+        else if (slot.slotType === 'irrigation_zone') {
+          // 레거시 슬롯: zone_1..12 → zone_1..12
+          const legacy = slot.slotKey.match(/^zone_(\d+)$/);
+          if (legacy) { mapKey = `zone_${legacy[1]}`; }
+          else {
+            // 동적 슬롯: irrig_z{N}_{short} → zone_{N}
+            const dyn = slot.slotKey.match(/^irrig_z(\d+)_/);
+            mapKey = dyn ? `zone_${dyn[1]}` : `zone_${++dynZoneIdx}`;
+          }
+        } else { mapKey = slot.slotKey; }
+        channelMapping[mapKey] = `relay_${slot.slotKey}`;
+      }
+      if (existingIrrig) {
+        existingIrrig.channelMapping = channelMapping;
+        existingIrrig.online = gwOnline;
+        await this.deviceRepo.save(existingIrrig);
+      } else {
+        await this.deviceRepo.save(this.deviceRepo.create({
+          userId: gw.userId,
+          gatewayId: gw.id,
+          name: '관주 컨트롤러',
+          category: 'irrigation',
+          deviceType: 'actuator',
+          equipmentType: 'irrigation',
+          source: 'onboard',
+          friendlyName: 'onboard_irrigation',
+          channelMapping,
+          online: gwOnline,
+        }));
+      }
+    } else if (existingIrrig) {
+      await this.deviceRepo.remove(existingIrrig);
+    }
+  }
+
+  // ── Zigbee: 목록 ─────────────────────────────────────────────
+  async getZigbeeDevices(gatewayId: string, userId: string, role: string): Promise<Device[]> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    return this.deviceRepo.find({
+      where: { gatewayId, userId: gw.userId, source: 'zigbee' } as any,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // ── Zigbee: 추가 ─────────────────────────────────────────────
+  async addZigbeeDevice(
+    gatewayId: string,
+    dto: AddZigbeeDeviceDto,
+    userId: string,
+    role: string,
+  ): Promise<Device | Device[]> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+
+    // 중복 체크: 동일 게이트웨이 + friendlyName
+    const byName = await this.deviceRepo.findOne({ where: { gatewayId, friendlyName: dto.friendlyName } });
+    if (byName) throw new ConflictException(`이미 등록된 장치입니다 (friendlyName: ${dto.friendlyName})`);
+
+    // 중복 체크: 동일 사용자 + IEEE 주소
+    if (dto.zigbeeIeee) {
+      const byIeee = await this.deviceRepo.findOne({ where: { userId: gw.userId, zigbeeIeee: dto.zigbeeIeee } });
+      if (byIeee) throw new ConflictException(`이미 등록된 Zigbee 장치입니다 (IEEE: ${dto.zigbeeIeee})`);
+    }
+
+    const save = (data: Partial<Device>) => this.deviceRepo.save(
+      this.deviceRepo.create({ ...data, userId: gw.userId, gatewayId })
+    );
+
+    const base = {
+      zigbeeIeee: dto.zigbeeIeee,
+      friendlyName: dto.friendlyName,
+      zigbeeModel: dto.zigbeeModel,
+      name: dto.name,
+      category: dto.category,
+      deviceType: dto.deviceType as any,
+      equipmentType: dto.equipmentType as any,
+      icon: dto.icon,
+      houseId: dto.houseId ?? gw.houseId ?? undefined,
+      online: dto.online ?? false,
+      source: 'zigbee' as const,
+    };
+
+    const saved = await save(base);
+
+    // 저장 전 이미 availability 메시지를 받았다면 online 상태 즉시 반영
+    const cachedOnline = dto.friendlyName
+      ? this.mqttService.getCachedAvailability(gw.gatewayId, dto.friendlyName)
+      : undefined;
+    if (cachedOnline !== undefined && cachedOnline !== saved.online) {
+      await this.deviceRepo.update(saved.id, { online: cachedOnline, lastSeen: new Date() });
+      saved.online = cachedOnline;
+    }
+
+    // 개폐기 페어링
+    if (dto.pairedDeviceId) {
+      const partner = await this.deviceRepo.findOne({ where: { id: dto.pairedDeviceId } });
+      if (partner) {
+        saved.pairedDeviceId = partner.id;
+        partner.pairedDeviceId = saved.id;
+        if (dto.openerGroupName) {
+          saved.openerGroupName = dto.openerGroupName;
+          partner.openerGroupName = dto.openerGroupName;
+        }
+        await this.deviceRepo.save([saved, partner]);
+      }
+    }
+
+    return saved;
+  }
+
+  // ── Zigbee: 수정 (이름 / 채널매핑 / 구역) ────────────────────
+  async updateZigbeeDevice(
+    gatewayId: string,
+    id: string,
+    dto: UpdateZigbeeDeviceDto,
+    userId: string,
+    role: string,
+  ): Promise<Device> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const device = await this.deviceRepo.findOne({ where: { id, userId: gw.userId, gatewayId } });
+    if (!device) throw new NotFoundException('장치를 찾을 수 없습니다.');
+
+    if (dto.name !== undefined) device.name = dto.name;
+    if (dto.houseId !== undefined) device.houseId = dto.houseId;
+    if (dto.channelMapping !== undefined) {
+      const count = detectChannelCount(Object.values(dto.channelMapping));
+      const allowed = count === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH;
+      const invalid = Object.values(dto.channelMapping).filter(v => v && !allowed.includes(v));
+      if (invalid.length) throw new NotFoundException(`유효하지 않은 채널: ${invalid.join(', ')}`);
+      device.channelMapping = dto.channelMapping;
+    }
+    if (dto.deviceSettings !== undefined) {
+      device.deviceSettings = { ...(device.deviceSettings ?? {}), ...dto.deviceSettings };
+    }
+    if (dto.enabled !== undefined) device.enabled = dto.enabled;
+    return this.deviceRepo.save(device);
+  }
+
+  // ── Zigbee: 삭제 ─────────────────────────────────────────────
+  async removeZigbeeDevice(gatewayId: string, id: string, userId: string, role: string): Promise<void> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const device = await this.deviceRepo.findOne({ where: { id, userId: gw.userId, gatewayId } });
+    if (!device) throw new NotFoundException('장치를 찾을 수 없습니다.');
+
+    // 페어링 해제
+    if (device.pairedDeviceId) {
+      await this.deviceRepo.update(device.pairedDeviceId, { pairedDeviceId: null as any, openerGroupName: null as any });
+    }
+    await this.deviceRepo.remove(device);
+  }
+
+  // ── Zigbee: 스캔 목록 (bridge/devices 캐시) ──────────────────
+  async scanZigbeeDevices(gatewayId: string, userId: string, role: string): Promise<any[]> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    return this.mqttService.requestZigbeeDevices(gw.gatewayId);
+  }
+
+  // ── 통합 조회 (온보드 + 지그비 + 관주 대표 장치) ────────────
+  async getAllDevices(gatewayId: string, userId: string, role: string): Promise<{ onboard: GatewayOnboardDevice[]; zigbee: Device[]; irrigationDevice: Device | null }> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const [onboard, zigbee] = await Promise.all([
+      this.ensureOnboardDevices(gatewayId),
+      this.deviceRepo.find({ where: { gatewayId, userId: gw.userId, source: 'zigbee' } as any, order: { createdAt: 'DESC' } }),
+    ]);
+    const irrigationDevice = await this.deviceRepo.findOne({
+      where: { gatewayId, userId: gw.userId, source: 'onboard', equipmentType: 'irrigation' } as any,
+    }) ?? null;
+    return { onboard, zigbee, irrigationDevice };
+  }
+
+  // ── 온보드 관주 대표 이름 수정 ─────────────────────────────
+  async updateIrrigationDeviceName(gatewayId: string, name: string, userId: string, role: string): Promise<Device> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const device = await this.deviceRepo.findOne({
+      where: { gatewayId, userId: gw.userId, source: 'onboard', equipmentType: 'irrigation' } as any,
+    });
+    if (!device) throw new NotFoundException('관주 컨트롤러 장치를 찾을 수 없습니다.');
+    device.name = name;
+    return this.deviceRepo.save(device);
+  }
+
+  // ── 핀 테스트: 온보드 GPIO ────────────────────────────────────
+  async testGpioPin(
+    gatewayId: string,
+    pin: number,
+    state: boolean,
+    durationMs: number | undefined,
+    userId: string,
+    role: string,
+  ): Promise<void> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    await this.mqttService.publishGpioRelay(gw.gatewayId, {
+      slot: `test_pin_${pin}`,
+      pin,
+      state,
+      durationMs,
+    });
+  }
+
+  // ── 핀 테스트: Zigbee 채널 ────────────────────────────────────
+  async testZigbeeChannel(
+    gatewayId: string,
+    friendlyName: string,
+    switchCode: string,
+    state: boolean,
+    durationMs: number | undefined,
+    userId: string,
+    role: string,
+  ): Promise<void> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    const command: Record<string, string> = { [switchCode]: state ? 'ON' : 'OFF' };
+    await this.mqttService.controlDevice(gw.gatewayId, friendlyName, command);
+    // 자동 해제
+    if (durationMs && state) {
+      setTimeout(async () => {
+        await this.mqttService.controlDevice(gw.gatewayId, friendlyName, { [switchCode]: 'OFF' });
+      }, durationMs);
+    }
+  }
+}

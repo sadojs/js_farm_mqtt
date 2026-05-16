@@ -10,7 +10,7 @@ export class HouseGroup {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id'  })
   userId: string;
 
   @Column()

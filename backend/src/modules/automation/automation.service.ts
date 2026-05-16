@@ -22,12 +22,21 @@ export class AutomationService {
     private readonly devicesService: DevicesService,
   ) {}
 
-  async findAll(userId: string) {
+  async findAll(userId: string | null) {
     const rules = await this.rulesRepo.find({
-      where: { userId },
+      where: userId ? { userId } : {},
       order: { priority: 'DESC', createdAt: 'DESC' },
     });
     return rules.map((rule) => this.withTarget(rule));
+  }
+
+  /** groupId로 owner user_id 추론 (admin이 룰 생성 시 사용) */
+  async resolveGroupOwner(groupId: string): Promise<string | null> {
+    const row = await this.rulesRepo.manager.query(
+      `SELECT user_id FROM house_groups WHERE id = $1::uuid LIMIT 1`,
+      [groupId],
+    );
+    return row?.[0]?.user_id ?? null;
   }
 
   async create(userId: string, dto: CreateRuleDto) {
@@ -48,8 +57,8 @@ export class AutomationService {
     return this.withTarget(saved);
   }
 
-  async update(id: string, userId: string, dto: UpdateRuleDto) {
-    const rule = await this.rulesRepo.findOne({ where: { id, userId } });
+  async update(id: string, userId: string | null, dto: UpdateRuleDto) {
+    const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
 
     if (dto.name !== undefined) rule.name = dto.name;
@@ -70,8 +79,8 @@ export class AutomationService {
     return this.withTarget(saved);
   }
 
-  async toggle(id: string, userId: string, options?: { autoEnableRemote?: boolean }) {
-    const rule = await this.rulesRepo.findOne({ where: { id, userId } });
+  async toggle(id: string, userId: string | null, options?: { autoEnableRemote?: boolean }) {
+    const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
     rule.enabled = !rule.enabled;
     const saved = await this.rulesRepo.save(rule);
@@ -89,15 +98,15 @@ export class AutomationService {
     return { ...saved, remoteControlEnabled };
   }
 
-  async remove(id: string, userId: string) {
-    const rule = await this.rulesRepo.findOne({ where: { id, userId } });
+  async remove(id: string, userId: string | null) {
+    const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
     await this.rulesRepo.remove(rule);
     return { message: '삭제되었습니다.' };
   }
 
   async getLogs(
-    userId: string,
+    userId: string | null,
     params: { ruleId?: string; page?: number; limit?: number; type?: string },
   ) {
     const page = Math.max(1, Number(params.page || 1));
@@ -105,10 +114,11 @@ export class AutomationService {
 
     const qb = this.logsRepo
       .createQueryBuilder('l')
-      .where('l.user_id = :userId', { userId })
       .orderBy('l.executed_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
+
+    if (userId) qb.where('l.user_id = :userId', { userId });
 
     if (params.ruleId) {
       qb.andWhere('l.rule_id = :ruleId', { ruleId: params.ruleId });
@@ -138,48 +148,50 @@ export class AutomationService {
     };
   }
 
-  async getLogStats(userId: string) {
+  async getLogStats(userId: string | null) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // todayCount: 완료/취소만 카운트 (started 제외 — 시작+완료가 각각 1건으로 중복 집계되는 문제 방지)
-    const todayCount = await this.logsRepo
+    const todayQb = this.logsRepo
       .createQueryBuilder('l')
-      .where('l.user_id = :userId', { userId })
       .andWhere('l.executed_at >= :today', { today })
       .andWhere("l.conditions_met->>'type' IN (:...types)", {
         types: ['irrigation', 'irrigation_cancelled'],
       })
-      .getCount()
+    if (userId) todayQb.where('l.user_id = :userId', { userId })
+    const todayCount = await todayQb.getCount()
 
+    const userWhere = userId ? { userId } : {}
     const [successCount, totalCount] = await Promise.all([
-      this.logsRepo.count({ where: { userId, success: true } }),
-      this.logsRepo.count({ where: { userId } }),
+      this.logsRepo.count({ where: { ...userWhere, success: true } }),
+      this.logsRepo.count({ where: userWhere }),
     ])
 
     const successRate = totalCount > 0 ? Math.round((successCount / totalCount) * 100) : 0
 
-    const mostActiveRow = await this.logsRepo
+    const mostActiveQb = this.logsRepo
       .createQueryBuilder('l')
       .select('l.rule_id', 'ruleId')
       .addSelect('COUNT(*)', 'cnt')
-      .where('l.user_id = :userId', { userId })
       .groupBy('l.rule_id')
       .orderBy('cnt', 'DESC')
       .limit(1)
-      .getRawOne()
+    if (userId) mostActiveQb.where('l.user_id = :userId', { userId })
+    const mostActiveRow = await mostActiveQb.getRawOne()
 
     let mostActiveRule: string | null = null
     if (mostActiveRow?.ruleId) {
-      const rule = await this.rulesRepo.findOne({ where: { id: mostActiveRow.ruleId, userId } })
+      const rule = await this.rulesRepo.findOne({
+        where: userId ? { id: mostActiveRow.ruleId, userId } : { id: mostActiveRow.ruleId },
+      })
       mostActiveRule = rule?.name || null
     }
 
     return { todayCount, successRate, mostActiveRule }
   }
 
-  async runRuleNow(id: string, userId: string) {
-    const rule = await this.rulesRepo.findOne({ where: { id, userId } });
+  async runRuleNow(id: string, userId: string | null) {
+    const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
     return this.runnerService.forceExecuteRule(rule);
   }
@@ -271,8 +283,8 @@ export class AutomationService {
   }
 
   /** 관수 장비별 자동화 상태 조회 */
-  async getIrrigationStatus(userId: string) {
-    const rules = await this.rulesRepo.find({ where: { userId } });
+  async getIrrigationStatus(userId: string | null) {
+    const rules = await this.rulesRepo.find({ where: userId ? { userId } : {} });
     const irrigationRules = rules.filter(r => (r.conditions as any)?.type === 'irrigation');
 
     // 장비별 그룹핑
@@ -340,8 +352,8 @@ export class AutomationService {
   }
 
   /** 특정 장비의 관수 룰 일괄 비활성화 (FR-04) */
-  async bulkDisableByDevice(userId: string, deviceId: string) {
-    const rules = await this.rulesRepo.find({ where: { userId } });
+  async bulkDisableByDevice(userId: string | null, deviceId: string) {
+    const rules = await this.rulesRepo.find({ where: userId ? { userId } : {} });
     const targetRules = rules.filter(r => {
       if ((r.conditions as any)?.type !== 'irrigation') return false;
       return this.extractDeviceIds(r.actions).includes(deviceId);

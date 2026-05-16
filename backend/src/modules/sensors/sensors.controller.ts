@@ -36,6 +36,10 @@ export class SensorsController {
 
   @Get('latest')
   getLatest(@CurrentUser() user: any) {
+    // 플랫폼 관리자(admin)는 모든 사용자 센서 데이터 조회 가능 (user_id 필터링 없이)
+    if (user.role === 'admin') {
+      return this.sensorsService.getLatest(null);
+    }
     const userId = user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
     return this.sensorsService.getLatest(userId);
   }

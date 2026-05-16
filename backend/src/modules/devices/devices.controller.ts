@@ -8,7 +8,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Controller('devices')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'farm_admin')
+@Roles('admin', 'farm_admin', 'farm_user')
 export class DevicesController {
   constructor(
     private devicesService: DevicesService,
@@ -21,7 +21,7 @@ export class DevicesController {
 
   @Get()
   findAll(@CurrentUser() user: any) {
-    return this.devicesService.findAllByUser(this.getEffectiveUserId(user));
+    return this.devicesService.findAllByUser(this.getEffectiveUserId(user), user.role);
   }
 
   @Post('register')
@@ -51,7 +51,7 @@ export class DevicesController {
     @CurrentUser() user: any,
     @Body() body: Partial<{ name: string; category: string; equipmentType: string; icon: string }>,
   ) {
-    return this.devicesService.updateByUser(id, this.getEffectiveUserId(user), body);
+    return this.devicesService.updateByUser(id, this.getEffectiveUserId(user), body, user.role);
   }
 
   @Get(':id/status')
@@ -59,7 +59,15 @@ export class DevicesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ) {
-    return this.devicesService.getDeviceStatus(id, this.getEffectiveUserId(user));
+    return this.devicesService.getDeviceStatus(id, this.getEffectiveUserId(user), user.role);
+  }
+
+  @Get(':id/sensor-channels')
+  getSensorChannels(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.devicesService.getSensorChannels(id, this.getEffectiveUserId(user), user.role);
   }
 
   @Post(':id/control')
@@ -68,7 +76,7 @@ export class DevicesController {
     @CurrentUser() user: any,
     @Body() body: { commands: { code: string; value: any }[] },
   ) {
-    const result = await this.devicesService.controlDevice(id, this.getEffectiveUserId(user), body.commands);
+    const result = await this.devicesService.controlDevice(id, this.getEffectiveUserId(user), body.commands, user.role);
     const cmdSummary = body.commands.map(c => `${c.code}=${c.value}`).join(', ');
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
@@ -85,7 +93,7 @@ export class DevicesController {
     @CurrentUser() user: any,
     @Body() body: { name: string },
   ) {
-    const result = await this.devicesService.updateByUser(id, this.getEffectiveUserId(user), { name: body.name?.trim() });
+    const result = await this.devicesService.updateByUser(id, this.getEffectiveUserId(user), { name: body.name?.trim() }, user.role);
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
       action: 'device.rename', targetType: 'device', targetId: id,

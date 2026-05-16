@@ -44,9 +44,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       const payload = this.jwtService.verify(token);
       (client as any).userId = payload.sub;
+      (client as any).role = payload.role;
       // 사용자별 전용 room 자동 입장
       client.join(`user:${payload.sub}`);
-      this.logger.log(`Client connected: ${payload.sub}`);
+      // 플랫폼 관리자(admin)는 별도 'admins' 룸에 입장 — 모든 사용자 데이터 수신
+      if (payload.role === 'admin') {
+        client.join('admins');
+      }
+      this.logger.log(`Client connected: ${payload.sub} (role=${payload.role})`);
     } catch {
       client.disconnect();
     }
@@ -113,7 +118,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.leave(data.channel);
   }
 
-  // 센서 데이터 — 해당 사용자 room + house room으로만 전송
+  // 센서 데이터 — 해당 사용자 room + house room + admins 룸으로 전송
   broadcastSensorUpdate(
     userId: string,
     data: {
@@ -130,11 +135,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (data.houseId) {
       this.server.to(`house:${data.houseId}`).emit('sensor:update', data);
     }
+    // 플랫폼 관리자도 모든 센서 업데이트 수신
+    this.server.to('admins').emit('sensor:update', data);
   }
 
-  // 장비 상태 — 해당 사용자 room으로만 전송
+  // 장비 상태 — 해당 사용자 room + admins 룸으로 전송
   broadcastDeviceStatus(userId: string, deviceId: string, online: boolean) {
     this.server.to(`user:${userId}`).emit('device:status', { deviceId, online });
+    this.server.to('admins').emit('device:status', { deviceId, online });
   }
 
   // 자동화 실행 알림 — 해당 사용자 room으로만 전송
@@ -170,6 +178,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('irrigation:stopped', data);
   }
 
+  // 게이트웨이 상태 변경 알림
+  broadcastGatewayStatus(userId: string, gatewayId: string, status: string, agentStatus: string) {
+    this.server.to(`user:${userId}`).emit('gateway:status', { gatewayId, status, agentStatus });
+  }
+
+  // GPIO 핀 상태 브로드캐스트 (admin 핀 테스트 실시간 피드백)
+  broadcastGpioStatus(gatewayId: string, data: { slot: string; pin: number; state: boolean; auto?: boolean }) {
+    this.server.emit('gpio:status', { gatewayId, ...data });
+  }
+
   // 일반 알림 — 사용자 room 기반으로 전송 (소켓 순회 제거)
   sendNotification(userId: string, notification: {
     type: string;
@@ -177,5 +195,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     message: string;
   }) {
     this.server.to(`user:${userId}`).emit('notification:new', notification);
+  }
+
+  // 비 감지 우회 상태 브로드캐스트 (구역 단위)
+  broadcastRainOverride(payload: { groupId: string; rainDetected: boolean; userOverride: boolean }) {
+    this.server.emit('rain:override', payload);
   }
 }

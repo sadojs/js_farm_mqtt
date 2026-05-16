@@ -12,6 +12,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { DevicesModule } from '../devices/devices.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { RainOverrideModule } from '../rain-override/rain-override.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
     GatewayModule,
     DevicesModule,
     ActivityLogModule,
+    RainOverrideModule,
   ],
   controllers: [AutomationController],
   providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService],

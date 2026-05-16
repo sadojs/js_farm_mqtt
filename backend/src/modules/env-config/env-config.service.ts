@@ -10,6 +10,7 @@ import { HouseGroup } from '../groups/entities/house-group.entity';
 const SENSOR_TYPE_LABELS: Record<string, string> = {
   temperature: '온도', humidity: '습도', co2: 'CO2',
   rainfall: '강우량', uv: 'UV 지수', dew_point: '이슬점',
+  rain_detection: '비 감지', pressure: '기압',
 };
 
 const WEATHER_FIELD_LABELS: Record<string, { label: string; unit: string }> = {
@@ -22,6 +23,12 @@ const WEATHER_FIELD_LABELS: Record<string, { label: string; unit: string }> = {
 const SENSOR_UNITS: Record<string, string> = {
   temperature: '°C', humidity: '%', co2: 'ppm',
   rainfall: 'mm', uv: '', dew_point: '°C',
+  rain_detection: '', pressure: 'hPa',
+};
+
+/** Zigbee 모델 → 지원 센서 채널 매핑 (sensor_data 이력이 없어도 노출용) */
+const ZIGBEE_MODEL_SENSOR_TYPES: Record<string, string[]> = {
+  TS0207: ['rain_detection'],  // Tuya 우적/누수 센서 (water_leak → rain_detection)
 };
 
 /** Tuya 장비 카테고리 → 지원하는 센서 타입 매핑 */
@@ -52,14 +59,38 @@ export class EnvConfigService {
     return this.roleRepo.find({ order: { sortOrder: 'ASC' } });
   }
 
-  async getSources(userId: string, groupId: string) {
-    const group = await this.groupRepo.findOne({
-      where: { id: groupId, userId },
-      relations: ['devices'],
-    });
+  async getSources(userId: string | null, groupId: string) {
+    const where = userId ? { id: groupId, userId } : { id: groupId };
+    const group = await this.groupRepo.findOne({ where, relations: ['devices', 'houses'] });
     if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
 
-    const sensorDevices = group.devices.filter(d => d.deviceType === 'sensor');
+    // group_devices 매핑 + 게이트웨이→하우스→그룹 경로의 모든 device 합산
+    // (구역관리 페이지와 동일한 로직)
+    const sensorDevices: Device[] = group.devices.filter(d => d.deviceType === 'sensor');
+    const houseIds = (group.houses || []).map(h => h.id);
+    if (houseIds.length > 0) {
+      // 동일 그룹 내 모든 게이트웨이의 sensor 장치 추가
+      // (devices.gateway_id 는 varchar, gateways.id 는 uuid → cast 필요)
+      const extra = await this.dataSource.query(`
+        SELECT DISTINCT d.* FROM devices d
+        JOIN gateways g ON g.id::text = d.gateway_id
+        WHERE g.house_id = ANY($1::uuid[])
+          AND d.device_type = 'sensor'
+      `, [houseIds]);
+      const existingIds = new Set(sensorDevices.map(d => d.id));
+      for (const d of extra) {
+        if (!existingIds.has(d.id)) {
+          // raw query 결과 → entity 형태 매핑
+          sensorDevices.push({
+            id: d.id, userId: d.user_id, houseId: d.house_id, gatewayId: d.gateway_id,
+            name: d.name, category: d.category, deviceType: d.device_type,
+            equipmentType: d.equipment_type, source: d.source,
+            zigbeeModel: d.zigbee_model,
+          } as any);
+          existingIds.add(d.id);
+        }
+      }
+    }
     const deviceIds = sensorDevices.map(d => d.id);
 
 
@@ -102,8 +133,11 @@ export class EnvConfigService {
       // 카테고리 매핑에서 예상 센서 타입 가져오기
       const expectedTypes = CATEGORY_SENSOR_TYPES[device.category] || [];
 
-      // 실측 + 예상 타입 합산 (중복 제거)
-      const allTypes = new Set([...reportedTypes, ...expectedTypes]);
+      // Zigbee 모델 기반 예상 타입 (TS0207 우적센서 등 — sensor_data 이력이 없어도 매핑 가능)
+      const modelTypes = ZIGBEE_MODEL_SENSOR_TYPES[(device as any).zigbeeModel] || [];
+
+      // 실측 + 예상 + 모델 타입 합산 (중복 제거)
+      const allTypes = new Set([...reportedTypes, ...expectedTypes, ...modelTypes]);
 
       // 매핑이 없고 실측도 없으면 카테고리 자체를 센서 타입으로 표시
       if (allTypes.size === 0) {
@@ -123,10 +157,10 @@ export class EnvConfigService {
       }
     }
 
-    const weatherRow = await this.weatherRepo.findOne({
+    const weatherRow = userId ? await this.weatherRepo.findOne({
       where: { userId },
       order: { time: 'DESC' },
-    });
+    }) : null;
 
     const weatherSources = Object.entries(WEATHER_FIELD_LABELS).map(([field, meta]) => {
       const camelField = field === 'wind_speed' ? 'windSpeed' : field;
@@ -141,8 +175,9 @@ export class EnvConfigService {
     return { sensors: sensorSources, weather: weatherSources };
   }
 
-  async getMappings(userId: string, groupId: string): Promise<EnvMapping[]> {
-    const group = await this.groupRepo.findOne({ where: { id: groupId, userId } });
+  async getMappings(userId: string | null, groupId: string): Promise<EnvMapping[]> {
+    const where = userId ? { id: groupId, userId } : { id: groupId };
+    const group = await this.groupRepo.findOne({ where });
     if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
 
     return this.mappingRepo.find({
@@ -152,7 +187,7 @@ export class EnvConfigService {
   }
 
   async saveMappings(
-    userId: string,
+    userId: string | null,
     groupId: string,
     mappings: Array<{
       roleKey: string;
@@ -162,7 +197,8 @@ export class EnvConfigService {
       weatherField?: string;
     }>,
   ): Promise<EnvMapping[]> {
-    const group = await this.groupRepo.findOne({ where: { id: groupId, userId } });
+    const where2 = userId ? { id: groupId, userId } : { id: groupId };
+    const group = await this.groupRepo.findOne({ where: where2 });
     if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
 
     await this.mappingRepo.delete({ groupId });
@@ -181,8 +217,9 @@ export class EnvConfigService {
     return this.mappingRepo.save(entities);
   }
 
-  async getResolved(userId: string, groupId: string) {
-    const group = await this.groupRepo.findOne({ where: { id: groupId, userId } });
+  async getResolved(userId: string | null, groupId: string) {
+    const where = userId ? { id: groupId, userId } : { id: groupId };
+    const group = await this.groupRepo.findOne({ where });
     if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
 
     const mappings = await this.mappingRepo.find({ where: { groupId } });
@@ -210,8 +247,9 @@ export class EnvConfigService {
       }
     }
 
+    const effectiveUserId = userId ?? group.userId;
     const weatherRow = await this.weatherRepo.findOne({
-      where: { userId },
+      where: { userId: effectiveUserId },
       order: { time: 'DESC' },
     });
 

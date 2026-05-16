@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/auth/auth.module';
@@ -23,12 +24,17 @@ import { HealthModule } from './modules/health/health.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { CropManagementModule } from './modules/crop-management/crop-management.module';
+import { SshProxyModule } from './modules/ssh-proxy/ssh-proxy.module';
+import { GatewayEnvModule } from './modules/gateway-env/gateway-env.module';
+import { GpioModule } from './modules/gpio/gpio.module';
+import { RainOverrideModule } from './modules/rain-override/rain-override.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../.env'] }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -60,6 +66,10 @@ import { RetentionService } from './common/retention.service';
     ActivityLogModule,
     VoiceModule,
     CropManagementModule,
+    SshProxyModule,
+    GatewayEnvModule,
+    GpioModule,
+    RainOverrideModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

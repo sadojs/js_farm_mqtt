@@ -8,10 +8,10 @@ export class AutomationLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'rule_id' })
+  @Column({ name: 'rule_id'  })
   ruleId: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id'  })
   userId: string;
 
   @CreateDateColumn({ name: 'executed_at' })

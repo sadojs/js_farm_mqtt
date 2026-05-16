@@ -99,7 +99,17 @@ export class SensorsService {
     return this.sensorRepo.save(entity);
   }
 
-  async getLatest(userId: string) {
+  async getLatest(userId: string | null) {
+    // userId가 null이면 모든 사용자 데이터 조회 (admin 전용)
+    if (userId === null) {
+      const query = `
+        SELECT DISTINCT ON (device_id, sensor_type)
+          device_id, sensor_type, value, unit, status, time
+        FROM sensor_data
+        ORDER BY device_id, sensor_type, time DESC
+      `;
+      return this.dataSource.query(query);
+    }
     const query = `
       SELECT DISTINCT ON (device_id, sensor_type)
         device_id, sensor_type, value, unit, status, time

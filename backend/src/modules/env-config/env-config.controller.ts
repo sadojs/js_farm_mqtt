@@ -7,11 +7,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('env-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'farm_admin')
+@Roles('admin', 'farm_admin', 'farm_user')
 export class EnvConfigController {
   constructor(private envConfigService: EnvConfigService) {}
 
-  private getEffectiveUserId(user: any): string {
+  private getEffectiveUserId(user: any): string | null {
+    if (user.role === 'admin') return null;
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
   }
 

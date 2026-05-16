@@ -334,20 +334,8 @@ ${logInfo}
     }
 
     const value = command === 'on' || command === 'open';
+    const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
     try {
-      // 개폐기 인터록: ON 시 반대쪽을 먼저 OFF
-      const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
-      if (isOpener && value && device.pairedDeviceId) {
-        const pairedDevice = devices.find((d) => d.id === device.pairedDeviceId);
-        if (pairedDevice && pairedDevice.online) {
-          await this.devicesService.controlDevice(pairedDevice.id, effectiveUserId, [
-            { code: 'switch_1', value: false },
-          ]);
-          this.logger.log(`개폐기 인터록: ${pairedDevice.name} OFF → 1초 대기`);
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
-
       await this.devicesService.controlDevice(device.id, effectiveUserId, [
         { code: 'switch_1', value },
       ]);
@@ -570,16 +558,6 @@ ${logInfo}
         }
 
         try {
-          // 개폐기 인터록
-          const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
-          if (isOpener && value && device.pairedDeviceId) {
-            const paired = devices.find((d) => d.id === device.pairedDeviceId);
-            if (paired?.online) {
-              await this.devicesService.controlDevice(paired.id, effectiveUserId, [{ code: 'switch_1', value: false }]);
-              await new Promise((r) => setTimeout(r, 1000));
-            }
-          }
-
           await this.devicesService.controlDevice(device.id, effectiveUserId, [{ code: 'switch_1', value }]);
           successCount++;
         } catch {

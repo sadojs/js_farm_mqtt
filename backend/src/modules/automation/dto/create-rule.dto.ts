@@ -27,6 +27,10 @@ export class CreateRuleDto {
   @Min(0)
   @Max(10)
   priority?: number;
+
+  @IsOptional()
+  @IsString()
+  targetUserId?: string;
 }
 
 export class UpdateRuleDto {

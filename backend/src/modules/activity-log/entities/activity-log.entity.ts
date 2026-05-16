@@ -7,13 +7,13 @@ export class ActivityLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id'  })
   userId: string;
 
   @Column({ name: 'user_name' })
   userName: string;
 
-  @Column({ name: 'group_id', nullable: true })
+  @Column({ name: 'group_id', nullable: true   })
   groupId: string;
 
   @Column({ name: 'group_name', nullable: true })

@@ -1,20 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import * as yaml from 'js-yaml';
 import { GatewayManagerService } from '../gateway-manager/gateway-manager.service';
+import { SshProxyService } from '../ssh-proxy/ssh-proxy.service';
 import { removeProtectedFields, PROTECTED_FIELDS } from './protected-fields';
 import {
-  ConfigRequest,
-  ConfigResponse,
   CommonConfig,
   DeployResult,
   PreviewResult,
   ConfigDiffItem,
-  PendingRequest,
 } from './config-deploy.types';
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const Z2M_CONFIG_PATH = '/opt/zigbee2mqtt/data/configuration.yaml';
+const Z2M_CONFIG_BACKUP = '/opt/zigbee2mqtt/data/configuration.yaml.bak';
 
-/** 기본 공통 설정 템플릿 */
 const DEFAULT_TEMPLATE: CommonConfig = {
   homeassistant: false,
   frontend: { port: 8080, host: '0.0.0.0' },
@@ -38,20 +36,12 @@ const DEFAULT_TEMPLATE: CommonConfig = {
 @Injectable()
 export class ConfigDeployService {
   private readonly logger = new Logger(ConfigDeployService.name);
-  private pendingRequests = new Map<string, PendingRequest>();
   private template: CommonConfig = { ...DEFAULT_TEMPLATE };
-
-  /** MQTT publish 함수 (MqttService에서 주입) */
-  private publishFn: ((gatewayId: string, request: ConfigRequest) => void) | null = null;
 
   constructor(
     private gatewayService: GatewayManagerService,
+    private sshService: SshProxyService,
   ) {}
-
-  /** MqttService에서 publish 함수 설정 */
-  setPublishFunction(fn: (gatewayId: string, request: ConfigRequest) => void) {
-    this.publishFn = fn;
-  }
 
   // ---- 템플릿 관리 ----
 
@@ -64,14 +54,16 @@ export class ConfigDeployService {
     return this.template;
   }
 
-  // ---- 게이트웨이 설정 조회 ----
+  // ---- 게이트웨이 설정 조회 (SSH) ----
 
   async getGatewayConfig(gatewayId: string): Promise<Record<string, any>> {
-    const response = await this.sendRequest(gatewayId, 'get_config');
-    if (!response.success) {
-      throw new Error(response.error || '설정 조회 실패');
-    }
-    return response.currentConfig || {};
+    const port = await this.sshService.getTunnelPort(gatewayId);
+    const { stdout, code } = await this.sshService.exec(
+      port,
+      `cat ${Z2M_CONFIG_PATH}`,
+    );
+    if (code !== 0) throw new Error('설정 파일 읽기 실패');
+    return (yaml.load(stdout) as Record<string, any>) ?? {};
   }
 
   // ---- 미리보기 ----
@@ -109,7 +101,7 @@ export class ConfigDeployService {
     return results;
   }
 
-  // ---- 배포 실행 ----
+  // ---- 배포 실행 (SSH) ----
 
   async deployConfig(
     gatewayIds: string[],
@@ -118,21 +110,69 @@ export class ConfigDeployService {
     const safeConfig = removeProtectedFields(config);
     const results: DeployResult[] = [];
 
-    // 순차 배포 (동시 부하 방지)
     for (const gatewayId of gatewayIds) {
       const gateway = await this.gatewayService.findByGatewayId(gatewayId);
       const start = Date.now();
 
       try {
-        const response = await this.sendRequest(gatewayId, 'update_config', safeConfig);
+        const port = await this.sshService.getTunnelPort(gatewayId);
+
+        // 현재 설정 읽기
+        const { stdout: currentYaml, code: readCode } = await this.sshService.exec(
+          port,
+          `cat ${Z2M_CONFIG_PATH}`,
+        );
+        if (readCode !== 0) throw new Error('설정 파일 읽기 실패');
+
+        const currentConfig = (yaml.load(currentYaml) as Record<string, any>) ?? {};
+        const diff = this.computeDiff(currentConfig, safeConfig);
+
+        if (diff.length === 0) {
+          results.push({
+            gatewayId,
+            gatewayName: gateway?.name || gatewayId,
+            success: true,
+            changedFields: [],
+            serviceRestarted: false,
+            duration: Date.now() - start,
+          });
+          continue;
+        }
+
+        // 보호 필드는 현재 값 유지, 나머지만 머지
+        const merged = { ...currentConfig, ...safeConfig };
+        const newYaml = yaml.dump(merged, { lineWidth: -1 });
+
+        // 임시 파일로 업로드
+        const tmpPath = `/tmp/z2m-deploy-${Date.now()}.yaml`;
+        await this.sshService.putFile(port, tmpPath, newYaml);
+
+        // 백업 → 교체 → 재시작 → 상태 확인
+        const { code, stderr } = await this.sshService.exec(
+          port,
+          `sudo cp ${Z2M_CONFIG_PATH} ${Z2M_CONFIG_BACKUP} && \
+           sudo cp ${tmpPath} ${Z2M_CONFIG_PATH} && \
+           rm -f ${tmpPath} && \
+           sudo systemctl restart zigbee2mqtt && \
+           sleep 5 && \
+           systemctl is-active zigbee2mqtt`,
+        );
+
+        if (code !== 0) {
+          // 재시작 실패 시 백업 복원
+          await this.sshService.exec(
+            port,
+            `sudo cp ${Z2M_CONFIG_BACKUP} ${Z2M_CONFIG_PATH} && sudo systemctl restart zigbee2mqtt`,
+          ).catch(() => {});
+          throw new Error(`Zigbee2MQTT 재시작 실패: ${stderr.trim()}`);
+        }
 
         results.push({
           gatewayId,
           gatewayName: gateway?.name || gatewayId,
-          success: response.success,
-          error: response.error,
-          changedFields: response.changedFields,
-          serviceRestarted: response.serviceRestarted,
+          success: true,
+          changedFields: diff.map(d => d.field),
+          serviceRestarted: true,
           duration: Date.now() - start,
         });
       } catch (err) {
@@ -153,57 +193,7 @@ export class ConfigDeployService {
     return results;
   }
 
-  // ---- MQTT 응답 핸들러 ----
-
-  handleConfigResponse(gatewayId: string, payload: Buffer) {
-    let response: ConfigResponse;
-    try {
-      response = JSON.parse(payload.toString());
-    } catch {
-      this.logger.error(`잘못된 config 응답: ${gatewayId}`);
-      return;
-    }
-
-    const pending = this.pendingRequests.get(response.requestId);
-    if (pending) {
-      clearTimeout(pending.timeout);
-      this.pendingRequests.delete(response.requestId);
-      pending.resolve(response);
-      this.logger.log(
-        `Config 응답: ${gatewayId} → ${response.action} ${response.success ? '성공' : '실패'}`,
-      );
-    }
-  }
-
   // ---- Private ----
-
-  private sendRequest(
-    gatewayId: string,
-    action: 'get_config' | 'update_config',
-    config?: Record<string, any>,
-  ): Promise<ConfigResponse> {
-    if (!this.publishFn) {
-      return Promise.reject(new Error('MQTT 미연결'));
-    }
-
-    const requestId = randomUUID();
-    const request: ConfigRequest = {
-      requestId,
-      action,
-      timestamp: new Date().toISOString(),
-      ...(config && { config }),
-    };
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(requestId);
-        reject(new Error('응답 타임아웃 (Config Agent 미응답)'));
-      }, REQUEST_TIMEOUT_MS);
-
-      this.pendingRequests.set(requestId, { resolve, reject, timeout });
-      this.publishFn!(gatewayId, request);
-    });
-  }
 
   private computeDiff(
     current: Record<string, any>,
@@ -211,11 +201,8 @@ export class ConfigDeployService {
     prefix = '',
   ): ConfigDiffItem[] {
     const diffs: ConfigDiffItem[] = [];
-    const allKeys = new Set([
-      ...Object.keys(requested),
-    ]);
 
-    for (const key of allKeys) {
+    for (const key of Object.keys(requested)) {
       const path = prefix ? `${prefix}.${key}` : key;
       const isProtected = PROTECTED_FIELDS.some(
         f => path === f || path.startsWith(f + '.'),

@@ -9,21 +9,33 @@ import { EventsGateway } from '../gateway/events.gateway';
 export class MqttDeviceHandler {
   private readonly logger = new Logger(MqttDeviceHandler.name);
 
+  /** 최근 수신된 availability 상태 캐시: `${gatewayId}::${deviceName}` → online */
+  private availabilityCache = new Map<string, boolean>();
+
   constructor(
     @InjectRepository(Device) private devicesRepo: Repository<Device>,
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private eventsGateway: EventsGateway,
   ) {}
 
+  /** 특정 장치의 마지막 availability 상태 조회 (MQTT gateway ID 기준) */
+  getCachedAvailability(mqttGatewayId: string, friendlyName: string): boolean | undefined {
+    return this.availabilityCache.get(`${mqttGatewayId}::${friendlyName}`);
+  }
+
   async handleAvailability(gatewayId: string, deviceName: string, payload: Buffer) {
-    let data: { state: string };
+    const raw = payload.toString().trim();
+    let online: boolean;
     try {
-      data = JSON.parse(payload.toString());
+      const parsed = JSON.parse(raw);
+      online = typeof parsed === 'string' ? parsed === 'online' : parsed?.state === 'online';
     } catch {
-      return;
+      online = raw === 'online';
     }
 
-    const online = data.state === 'online';
+    // 캐시 갱신 (DB 장치 유무와 무관하게 저장)
+    this.availabilityCache.set(`${gatewayId}::${deviceName}`, online);
+
     const gateway = await this.gatewayRepo.findOne({ where: { gatewayId } });
     const device = await this.devicesRepo.findOne({
       where: {

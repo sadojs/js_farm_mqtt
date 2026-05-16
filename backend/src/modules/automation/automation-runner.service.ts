@@ -7,6 +7,7 @@ import { AutomationLog } from './entities/automation-log.entity';
 import { Device } from '../devices/entities/device.entity';
 import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
+import { RainOverrideService } from '../rain-override/rain-override.service';
 
 type LogicOp = 'AND' | 'OR';
 
@@ -14,8 +15,8 @@ type LogicOp = 'AND' | 'OR';
 export class AutomationRunnerService {
   private readonly logger = new Logger(AutomationRunnerService.name);
 
-  // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase }
-  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean }>();
+  // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase, hysteresisAction }
+  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold' }>();
 
   constructor(
     @InjectRepository(AutomationRule)
@@ -26,6 +27,7 @@ export class AutomationRunnerService {
     private readonly devicesRepo: Repository<Device>,
     private readonly eventsGateway: EventsGateway,
     private readonly devicesService: DevicesService,
+    private readonly rainOverride: RainOverrideService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -37,8 +39,35 @@ export class AutomationRunnerService {
     });
 
     for (const rule of rules) {
+      // 초 단위 사이클은 별도 cron이 처리 — 분 단위 cron에서 중복 실행 방지
+      if (this.hasSubMinuteRelay(rule)) continue;
       await this.executeRule(rule);
     }
+  }
+
+  // 개폐기 등 초 단위 ON/OFF 사이클을 위한 10초 주기 실행기
+  @Cron('*/10 * * * * *')
+  async runSubMinuteRelayRules() {
+    const rules = await this.rulesRepo.find({
+      where: { enabled: true },
+      order: { priority: 'DESC', createdAt: 'ASC' },
+    });
+
+    for (const rule of rules) {
+      if (!this.hasSubMinuteRelay(rule)) continue;
+      await this.executeRule(rule);
+    }
+  }
+
+  private hasSubMinuteRelay(rule: AutomationRule): boolean {
+    const groups = (rule.conditions as any)?.groups;
+    if (!Array.isArray(groups)) return false;
+    for (const g of groups) {
+      for (const cond of (g.conditions || [])) {
+        if (cond.relay && (cond.relayOnSeconds || cond.relayOffSeconds)) return true;
+      }
+    }
+    return false;
   }
 
   /** 조건 무시, 액션만 즉시 실행 (음성 명령 등에서 사용) */
@@ -87,6 +116,13 @@ export class AutomationRunnerService {
 
   async executeRule(rule: AutomationRule) {
     const evaluatedAt = new Date();
+
+    // 비 감지 우회: 개폐기 룰이고 해당 구역에 비 감지 우회 활성 시 즉시 skip
+    if (this.rainOverride.isOpenerRainOverridden(rule.groupId) && await this.isOpenerRule(rule)) {
+      this.lastState.delete(rule.id);
+      return { executed: false, reason: 'rain_override_active' };
+    }
+
     const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
 
     if (!conditionResult.matched) {
@@ -97,13 +133,18 @@ export class AutomationRunnerService {
     // 릴레이 모드 체크: 조건이 매칭된 시간 범위 내에서 ON/OFF 사이클 실행
     const relayResult = this.checkRelayCycle(rule, evaluatedAt);
     if (relayResult) {
+      // 히스테리시스 결과를 추출 — 개폐기에서 어느 페어(open/close) 장치를 펄스할지 결정
+      const hysteresisAction = this.extractHysteresisAction(conditionResult.details);
       // 릴레이 상태 변경 시에만 실행 (ON→OFF 또는 OFF→ON)
+      // hysteresis 방향이 바뀐 경우(예: 열기 사이클 → 닫기 사이클)도 무조건 즉시 반영
       const prev = this.lastState.get(rule.id);
-      if (prev?.matched && prev.relayOnPhase === relayResult.isOnPhase) {
+      const phaseChanged = prev?.relayOnPhase !== relayResult.isOnPhase;
+      const directionChanged = prev?.hysteresisAction !== hysteresisAction;
+      if (prev?.matched && !phaseChanged && !directionChanged) {
         return { executed: false, reason: 'relay_state_unchanged' };
       }
-      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase });
-      return this.executeRelayAction(rule, relayResult);
+      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction });
+      return this.executeRelayAction(rule, relayResult, hysteresisAction);
     }
 
     // 일반 자동화: 이미 조건 충족 중이면 중복 실행 방지
@@ -186,6 +227,14 @@ export class AutomationRunnerService {
 
     const targetHouseId = this.getRuleHouseId(rule);
     const sensorMap = await this.getLatestSensorMap(rule.userId, rule.groupId, targetHouseId);
+
+    // 조건별 특정 디바이스 센서값 사전 수집
+    const allConditions = conditions.groups.flatMap((g: any) => g.conditions || []);
+    const deviceIds = [...new Set(
+      allConditions.map((c: any) => c.sensor_device_id).filter(Boolean),
+    )] as string[];
+    const deviceSensorOverrides = await this.getDeviceSensorValues(deviceIds);
+
     const groupLogic: LogicOp = conditions.logic === 'OR' ? 'OR' : 'AND';
     const groupResults: boolean[] = [];
     const details: any[] = [];
@@ -199,7 +248,10 @@ export class AutomationRunnerService {
 
       for (let ci = 0; ci < (group.conditions || []).length; ci++) {
         const condition = group.conditions[ci];
-        const result = this.evaluateSingleCondition(condition, sensorMap, now);
+        const effectiveSensorMap = condition.sensor_device_id && deviceSensorOverrides.has(condition.sensor_device_id)
+          ? { ...sensorMap, ...deviceSensorOverrides.get(condition.sensor_device_id) }
+          : sensorMap;
+        const result = this.evaluateSingleCondition(condition, effectiveSensorMap, now);
         if (result.isOnceMatched) {
           const suffix = result.onceDateKey ? `:${result.onceDateKey}` : '';
           onceConditionHits.push(`${gi}:${ci}${suffix}`);
@@ -211,6 +263,7 @@ export class AutomationRunnerService {
           expected: condition.value,
           actual: result.actual,
           matched: result.matched,
+          hysteresisAction: (result as any).hysteresisAction,
         });
       }
 
@@ -244,13 +297,17 @@ export class AutomationRunnerService {
   }
 
   private evaluateSingleCondition(condition: any, sensorMap: Record<string, number | boolean>, now: Date) {
-    if (condition.field === 'hour') {
+    // v2 위저드: field 'time' (분 단위 0~1439). 레거시: field 'hour' (시 단위 0~23)
+    if (condition.field === 'hour' || condition.field === 'time') {
+      const isMinuteBased = condition.field === 'time';
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const currentHour = now.getHours();
+      const currentValue = isMinuteBased ? currentMinutes : currentHour;
       const weekdayMatched = this.isWeekdayMatched(condition, now);
       if (!weekdayMatched) {
-        return { matched: false, actual: currentHour, isOnceMatched: false, onceDateKey: undefined };
+        return { matched: false, actual: currentValue, isOnceMatched: false, onceDateKey: undefined };
       }
-      const hourMatched = this.evaluateTimeHour(condition.operator, condition.value, currentHour);
+      const hourMatched = this.evaluateTimeHour(condition.operator, condition.value, currentValue);
       const onceSchedule = condition.scheduleType === 'once';
       if (!onceSchedule) {
         return { matched: hourMatched, actual: currentHour, isOnceMatched: false, onceDateKey: undefined };
@@ -332,21 +389,27 @@ export class AutomationRunnerService {
 
     // 시간대 스케줄러 (FR-03): timeSlots가 있는 경우
     if (Array.isArray(condition.timeSlots) && condition.timeSlots.length > 0) {
-      const currentHour = now.getHours();
+      // slot.start/end는 분(>=24) 또는 시(<24) 단위. 분으로 정규화하여 평가.
+      const slotsMin = condition.timeSlots.map((s: any) => ({
+        start: Number(s.start) < 24 ? Number(s.start) * 60 : Number(s.start),
+        end: Number(s.end) < 24 ? Number(s.end) * 60 : Number(s.end),
+      }));
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const weekdayMatched = this.isWeekdayMatched(condition, now);
       if (!weekdayMatched) {
-        return { matched: false, actual: currentHour, isOnceMatched: false, onceDateKey: undefined };
+        return { matched: false, actual: currentMinutes, isOnceMatched: false, onceDateKey: undefined };
       }
-      for (const slot of condition.timeSlots) {
-        if (currentHour === slot.start) {
-          return { matched: true, actual: currentHour, isOnceMatched: false, onceDateKey: undefined, timeAction: 'on' };
+      // 시작 시각 정확히 일치 → ON 발화 (1분 윈도우)
+      for (const slot of slotsMin) {
+        if (currentMinutes === slot.start) {
+          return { matched: true, actual: currentMinutes, isOnceMatched: false, onceDateKey: undefined, timeAction: 'on' };
         }
-        if (currentHour === slot.end) {
-          return { matched: true, actual: currentHour, isOnceMatched: false, onceDateKey: undefined, timeAction: 'off' };
+        if (currentMinutes === slot.end) {
+          return { matched: true, actual: currentMinutes, isOnceMatched: false, onceDateKey: undefined, timeAction: 'off' };
         }
       }
-      const inActiveSlot = condition.timeSlots.some((s: any) => currentHour >= s.start && currentHour < s.end);
-      return { matched: false, actual: currentHour, isOnceMatched: false, onceDateKey: undefined, inActiveSlot };
+      const inActiveSlot = slotsMin.some((s: any) => currentMinutes >= s.start && currentMinutes < s.end);
+      return { matched: false, actual: currentMinutes, isOnceMatched: false, onceDateKey: undefined, inActiveSlot };
     }
 
     return {
@@ -407,17 +470,20 @@ export class AutomationRunnerService {
     let groupFilter = '';
     let houseFilter = '';
 
+    // 스키마: sensor_data.user_id=uuid, sensor_data.device_id=uuid,
+    //         devices.user_id=varchar, devices.house_id=varchar, devices.id=uuid,
+    //         houses.id=uuid, houses.group_id=uuid, group_devices.group_id=uuid, group_devices.device_id=uuid
     if (groupId) {
       params.push(groupId);
-      // group_devices 또는 houses.group_id 둘 다 확인 (센서가 하우스 없이 그룹에 직접 연결된 경우 포함)
       groupFilter = `AND (
-        d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = $2)
-        OR h.group_id = $2
+        d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = $2::uuid)
+        OR h.group_id = $2::uuid
       )`;
     }
 
     if (houseId) {
       params.push(houseId);
+      // devices.house_id는 varchar이므로 cast 없이 직접 비교
       houseFilter = `AND d.house_id = $${params.length}`;
     }
 
@@ -428,8 +494,8 @@ export class AutomationRunnerService {
         sd.value
       FROM sensor_data sd
       JOIN devices d ON d.id = sd.device_id
-      LEFT JOIN houses h ON h.id = d.house_id
-      WHERE sd.user_id = $1
+      LEFT JOIN houses h ON h.id::text = d.house_id
+      WHERE sd.user_id = $1::uuid
       ${groupFilter}
       ${houseFilter}
       ORDER BY sd.sensor_type, sd.time DESC
@@ -451,6 +517,35 @@ export class AutomationRunnerService {
     }
 
     return map;
+  }
+
+  private async getDeviceSensorValues(
+    deviceIds: string[],
+  ): Promise<Map<string, Record<string, number | boolean>>> {
+    const result = new Map<string, Record<string, number | boolean>>();
+    if (!deviceIds.length) return result;
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT DISTINCT ON (device_id, sensor_type)
+        device_id,
+        sensor_type,
+        value
+      FROM sensor_data
+      WHERE device_id = ANY($1)
+      ORDER BY device_id, sensor_type, time DESC
+      `,
+      [deviceIds],
+    );
+
+    for (const row of rows) {
+      if (!result.has(row.device_id)) result.set(row.device_id, {});
+      const numeric = Number(row.value);
+      result.get(row.device_id)![row.sensor_type] = Number.isNaN(numeric)
+        ? this.toBoolean(row.value)
+        : numeric;
+    }
+    return result;
   }
 
   /**
@@ -517,10 +612,10 @@ export class AutomationRunnerService {
       : (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds.length > 0 ? action.targetDeviceIds : null);
 
     if (targetIds) {
+      // 명시적 targetIds는 user_id 검사 없이 조회 (admin이 다른 사용자 그룹의 룰을 만든 경우 호환)
       candidateDevices = await this.devicesRepo
         .createQueryBuilder('d')
-        .where('d.user_id = :userId', { userId: rule.userId })
-        .andWhere('d.id IN (:...ids)', { ids: targetIds })
+        .where('d.id IN (:...ids)', { ids: targetIds })
         .getMany();
     } else {
       candidateDevices = await this.findTargetDevices(rule, action?.deviceType);
@@ -540,7 +635,7 @@ export class AutomationRunnerService {
         `자동 제어 명령 전송: rule=${rule.name}, device=${device.name}(${device.id}), command=${JSON.stringify(commands)}`,
       );
       try {
-        await this.devicesService.controlDevice(device.id, rule.userId, commands);
+        await this.devicesService.controlDevice(device.id, rule.userId, commands, undefined, 'automation');
         results.push({ deviceId: device.id, deviceName: device.name, success: true, commands });
       } catch (err: any) {
         results.push({ deviceId: device.id, deviceName: device.name, success: false, error: err?.message });
@@ -557,14 +652,16 @@ export class AutomationRunnerService {
 
   private async findTargetDevices(rule: AutomationRule, deviceType?: string) {
     const targetHouseId = this.getRuleHouseId(rule);
+    // 스키마 혼재: devices.user_id/house_id는 varchar, houses.group_id는 uuid
+    // 따라서 group_id 비교만 uuid CAST 필요
     const qb = this.devicesRepo
       .createQueryBuilder('d')
-      .leftJoin('houses', 'h', 'h.id = d.house_id')
+      .leftJoin('houses', 'h', 'h.id::text = d.house_id')
       .where('d.user_id = :userId', { userId: rule.userId })
       .andWhere('d.device_type = :deviceType', { deviceType: 'actuator' });
 
     if (rule.groupId) {
-      qb.andWhere('h.group_id = :groupId', { groupId: rule.groupId });
+      qb.andWhere('h.group_id = CAST(:groupId AS uuid)', { groupId: rule.groupId });
     }
     if (targetHouseId) {
       qb.andWhere('d.house_id = :houseId', { houseId: targetHouseId });
@@ -651,39 +748,105 @@ export class AutomationRunnerService {
     await this.rulesRepo.save(rule);
   }
 
-  // 릴레이 사이클 체크: 조건에 relay=true가 있으면 시간 범위 시작부터 경과 분 기반 ON/OFF 결정
+  // 릴레이 사이클 체크: 조건에 relay=true가 있으면 ON/OFF 사이클 위상 계산
+  // - relayOnSeconds/relayOffSeconds 가 있으면 초 단위 사이클 (epoch 기준)
+  // - 그 외엔 기존 분 단위 사이클 (시간 범위 시작점 기준)
   private checkRelayCycle(rule: AutomationRule, now: Date): { isOnPhase: boolean; condition: any } | null {
     const conditions = rule.conditions;
     if (!conditions?.groups?.length) return null;
 
     for (const group of conditions.groups) {
       for (const cond of group.conditions || []) {
-        if (cond.relay) {
-          const onMinutes = cond.relayOnMinutes || 50;
-          const offMinutes = cond.relayOffMinutes || 10;
-          const cycleLength = onMinutes + offMinutes;
+        if (!cond.relay) continue;
 
-          // 시간 범위 시작점부터 경과된 총 분을 기준으로 사이클 위치 계산
-          let startHour = 0;
-          if (cond.field === 'hour' && Array.isArray(cond.value)) {
-            startHour = Number(cond.value[0]);
-          }
-          const currentHour = now.getHours();
-          const currentMinute = now.getMinutes();
-          const elapsedMinutes = (currentHour - startHour) * 60 + currentMinute;
-
-          const cyclePosition = ((elapsedMinutes % cycleLength) + cycleLength) % cycleLength;
-          const isOnPhase = cyclePosition < onMinutes;
+        // 초 단위 (개폐기 30/60s 등)
+        if (cond.relayOnSeconds || cond.relayOffSeconds) {
+          const onSec = Number(cond.relayOnSeconds) || 30;
+          const offSec = Number(cond.relayOffSeconds) || 60;
+          const cycleSec = onSec + offSec;
+          // epoch 기준 사이클 위상 — 룰 별 anchor 없이도 일관됨
+          const elapsedSec = Math.floor(now.getTime() / 1000);
+          const cyclePos = ((elapsedSec % cycleSec) + cycleSec) % cycleSec;
+          const isOnPhase = cyclePos < onSec;
           return { isOnPhase, condition: cond };
         }
+
+        // 분 단위 (기존)
+        const onMinutes = cond.relayOnMinutes || 50;
+        const offMinutes = cond.relayOffMinutes || 10;
+        const cycleLength = onMinutes + offMinutes;
+
+        let startHour = 0;
+        if (cond.field === 'hour' && Array.isArray(cond.value)) {
+          startHour = Number(cond.value[0]);
+        }
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const elapsedMinutes = (currentHour - startHour) * 60 + currentMinute;
+
+        const cyclePosition = ((elapsedMinutes % cycleLength) + cycleLength) % cycleLength;
+        const isOnPhase = cyclePosition < onMinutes;
+        return { isOnPhase, condition: cond };
       }
     }
     return null;
   }
 
-  private async executeRelayAction(rule: AutomationRule, relay: { isOnPhase: boolean; condition: any }) {
+  /** 룰의 대상 장치가 개폐기인지 (opener_open/opener_close).
+   * action에 equipmentType이 명시되면 그것을 우선 사용, 없으면 targetDeviceId로 DB 조회.
+   */
+  private async isOpenerRule(rule: AutomationRule): Promise<boolean> {
+    const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
+    const eq = action?.equipmentType;
+    if (eq === 'opener_open' || eq === 'opener_close') return true;
+    const targetId = action?.targetDeviceId || (Array.isArray(action?.targetDeviceIds) ? action.targetDeviceIds[0] : null);
+    if (!targetId) return false;
+    const dev = await this.devicesRepo.findOne({ where: { id: targetId } });
+    return dev?.equipmentType === 'opener_open' || dev?.equipmentType === 'opener_close';
+  }
+
+  private extractHysteresisAction(details: any): 'on' | 'off' | 'hold' | undefined {
+    if (!details?.groups) return undefined;
+    for (const g of details.groups) {
+      for (const c of (g.conditions || [])) {
+        if (c.hysteresisAction === 'on' || c.hysteresisAction === 'off') return c.hysteresisAction;
+      }
+    }
+    return undefined;
+  }
+
+  // 개폐기 페어(opener_open/opener_close)에서 hysteresisAction에 맞는 대상 장치를 선택
+  private async resolveOpenerTargets(action: any, hysteresisAction?: 'on' | 'off' | 'hold'): Promise<string[] | null> {
+    if (!hysteresisAction || hysteresisAction === 'hold') return null;
+    const targetId = action?.targetDeviceId
+      ?? (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds[0]);
+    if (!targetId) return null;
+    const device = await this.devicesRepo.findOne({ where: { id: targetId } });
+    if (!device) return null;
+    const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+    if (!isOpener) return null;
+    // 'on' (온도 ≥ ON 임계값) → 열림 장치, 'off' (온도 ≤ OFF 임계값) → 닫힘 장치
+    const wantOpen = hysteresisAction === 'on';
+    if ((wantOpen && device.equipmentType === 'opener_open')
+      || (!wantOpen && device.equipmentType === 'opener_close')) {
+      return [device.id];
+    }
+    // 반대편 장치로 스위칭
+    if (device.pairedDeviceId) return [device.pairedDeviceId];
+    return [device.id];
+  }
+
+  private async executeRelayAction(
+    rule: AutomationRule,
+    relay: { isOnPhase: boolean; condition: any },
+    hysteresisAction?: 'on' | 'off' | 'hold',
+  ) {
     const action = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
-    const actionOverride = { ...action, command: relay.isOnPhase ? 'on' : 'off' };
+    // 개폐기 페어 라우팅: hysteresis 방향에 따라 open/close 장치 선택
+    const openerTargets = await this.resolveOpenerTargets(action, hysteresisAction);
+    const actionOverride = openerTargets
+      ? { ...action, targetDeviceId: openerTargets[0], targetDeviceIds: openerTargets, command: relay.isOnPhase ? 'on' : 'off' }
+      : { ...action, command: relay.isOnPhase ? 'on' : 'off' };
 
     let success = true;
     let errorMessage: string | undefined;
@@ -713,6 +876,9 @@ export class AutomationRunnerService {
           isOnPhase: relay.isOnPhase,
           relayOnMinutes: relay.condition.relayOnMinutes,
           relayOffMinutes: relay.condition.relayOffMinutes,
+          relayOnSeconds: relay.condition.relayOnSeconds,
+          relayOffSeconds: relay.condition.relayOffSeconds,
+          hysteresisAction: hysteresisAction || null,
           field: relay.condition.field,
           equipmentType: action?.equipmentType || null,
         },

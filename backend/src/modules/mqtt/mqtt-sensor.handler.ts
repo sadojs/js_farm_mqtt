@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Device } from '../devices/entities/device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { SensorsService } from '../sensors/sensors.service';
@@ -8,7 +9,7 @@ import { EventsGateway } from '../gateway/events.gateway';
 import { SensorPayload } from './mqtt.types';
 
 /** Zigbee2MQTT 페이로드 키 → 내부 센서 타입 매핑 */
-const SENSOR_MAP: Record<string, { field: string; unit: string }> = {
+const SENSOR_MAP: Record<string, { field: string; unit: string; isBoolean?: boolean }> = {
   temperature:     { field: 'temperature', unit: '°C' },
   humidity:        { field: 'humidity', unit: '%' },
   co2:             { field: 'co2', unit: 'ppm' },
@@ -16,6 +17,8 @@ const SENSOR_MAP: Record<string, { field: string; unit: string }> = {
   illuminance:     { field: 'illuminance', unit: 'lux' },
   soil_moisture:   { field: 'soil_moisture', unit: '%' },
   pressure:        { field: 'pressure', unit: 'hPa' },
+  // Tuya TS0207 우적/누수 센서 → rain_detection 채널로 정규화 (1/0)
+  water_leak:      { field: 'rain_detection', unit: '', isBoolean: true },
 };
 
 @Injectable()
@@ -27,6 +30,7 @@ export class MqttSensorHandler {
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private sensorsService: SensorsService,
     private eventsGateway: EventsGateway,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async handleSensorData(gatewayId: string, deviceName: string, payload: Buffer) {
@@ -42,7 +46,6 @@ export class MqttSensorHandler {
     const device = await this.devicesRepo.findOne({
       where: {
         friendlyName: deviceName,
-        deviceType: 'sensor',
         ...(gateway && { gatewayId: gateway.id }),
       },
     });
@@ -50,16 +53,27 @@ export class MqttSensorHandler {
 
     for (const [key, mapping] of Object.entries(SENSOR_MAP)) {
       if (data[key] == null) continue;
-      const value = Number(data[key]);
+      // boolean 채널은 true/false를 1/0으로 변환
+      const value = mapping.isBoolean
+        ? (data[key] === true || data[key] === 'true' ? 1 : 0)
+        : Number(data[key]);
       if (isNaN(value)) continue;
 
-      await this.sensorsService.storeSensorData({
-        deviceId: device.id,
-        userId: device.userId,
-        sensorType: mapping.field,
-        value,
-        unit: mapping.unit,
-      });
+      // DB 저장 실패가 프로세스를 죽이지 않도록 try/catch (PK 중복 등)
+      try {
+        await this.sensorsService.storeSensorData({
+          deviceId: device.id,
+          userId: device.userId,
+          sensorType: mapping.field,
+          value,
+          unit: mapping.unit,
+        });
+      } catch (err: any) {
+        // 같은 ms 타임스탬프로 두 메시지 도착 시 PK 충돌 — 무시하고 계속
+        if (err?.code !== '23505') {
+          this.logger.warn(`sensor_data insert failed for ${deviceName}/${mapping.field}: ${err?.message || err}`);
+        }
+      }
 
       this.eventsGateway.broadcastSensorUpdate(device.userId, {
         deviceId: device.id,
@@ -70,9 +84,21 @@ export class MqttSensorHandler {
         status: 'normal',
         time: new Date().toISOString(),
       });
+
+      // 우적 감지 → EventEmitter로 rain-override에 전달 (순환 의존 방지)
+      if (mapping.field === 'rain_detection') {
+        this.eventEmitter.emit('sensor.rain_detected', {
+          deviceId: device.id,
+          rainDetected: value === 1,
+        });
+      }
     }
 
-    // 장비 lastSeen 업데이트
-    await this.devicesRepo.update(device.id, { online: true, lastSeen: new Date() });
+    // 장비 lastSeen 업데이트 (실패해도 핸들러는 계속)
+    try {
+      await this.devicesRepo.update(device.id, { online: true, lastSeen: new Date() });
+    } catch (err: any) {
+      this.logger.warn(`device update failed for ${device.id}: ${err?.message || err}`);
+    }
   }
 }

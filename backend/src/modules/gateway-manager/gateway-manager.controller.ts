@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { GatewayManagerService } from './gateway-manager.service';
 import { MqttService } from '../mqtt/mqtt.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -8,7 +8,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('gateways')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'farm_admin')
+@Roles('admin', 'farm_admin', 'farm_user')
 export class GatewayManagerController {
   constructor(
     private gatewayService: GatewayManagerService,
@@ -29,6 +29,7 @@ export class GatewayManagerController {
   }
 
   @Post()
+  @Roles('admin', 'farm_admin')
   create(
     @CurrentUser() user: any,
     @Body() body: { gatewayId: string; name: string; location?: string; userId?: string },
@@ -39,10 +40,11 @@ export class GatewayManagerController {
   }
 
   @Put(':id')
+  @Roles('admin', 'farm_admin')
   update(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() body: { name?: string; location?: string; userId?: string },
+    @Body() body: { name?: string; location?: string; userId?: string; houseId?: string | null },
   ) {
     // admin은 모든 게이트웨이 수정 가능 (소유자 변경 포함)
     if (user.role === 'admin') {
@@ -52,11 +54,23 @@ export class GatewayManagerController {
   }
 
   @Delete(':id')
+  @Roles('admin', 'farm_admin')
   remove(@CurrentUser() user: any, @Param('id') id: string) {
     if (user.role === 'admin') {
       return this.gatewayService.removeByAdmin(id);
     }
     return this.gatewayService.remove(id, this.getEffectiveUserId(user));
+  }
+
+  /** 게이트웨이 구역 할당 / 해제 */
+  @Patch(':id/zone')
+  @Roles('admin', 'farm_admin')
+  assignZone(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { groupId: string | null },
+  ) {
+    return this.gatewayService.assignZone(id, this.getEffectiveUserId(user), user.role, body.groupId ?? null);
   }
 
   /** 특정 게이트웨이에 페어링된 Zigbee 장비 목록 */
@@ -71,13 +85,16 @@ export class GatewayManagerController {
 
   /** 페어링 모드 ON/OFF */
   @Post(':id/permit-join')
+  @Roles('admin', 'farm_admin')
   async permitJoin(
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: { enable: boolean },
   ) {
-    const gw = await this.gatewayService.findOne(id, this.getEffectiveUserId(user));
+    // admin은 모든 게이트웨이 접근 가능, farm_admin은 자신 소유만
+    const gw = await this.gatewayService.findOneByRole(id, this.getEffectiveUserId(user), user.role);
     await this.mqttService.permitJoin(gw.gatewayId, body.enable);
     return { success: true, gatewayId: gw.gatewayId, permitJoin: body.enable };
   }
+
 }

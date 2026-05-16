@@ -8,17 +8,17 @@ export class Device {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id'  })
   userId: string;
 
-  @Column({ name: 'house_id', nullable: true })
+  @Column({ name: 'house_id', nullable: true   })
   houseId: string;
 
-  @Column({ name: 'gateway_id', nullable: true })
+  @Column({ name: 'gateway_id', nullable: true   })
   gatewayId: string;
 
-  @Column({ name: 'zigbee_ieee' })
-  zigbeeIeee: string;
+  @Column({ name: 'zigbee_ieee', nullable: true, type: 'varchar' })
+  zigbeeIeee: string | null;
 
   @Column({ name: 'friendly_name', nullable: true })
   friendlyName: string;
@@ -41,7 +41,7 @@ export class Device {
   @Column({ nullable: true })
   icon: string;
 
-  @Column({ name: 'paired_device_id', nullable: true })
+  @Column({ name: 'paired_device_id', nullable: true   })
   pairedDeviceId: string;
 
   @Column({ name: 'opener_group_name', nullable: true })
@@ -50,8 +50,20 @@ export class Device {
   @Column({ default: false })
   online: boolean;
 
+  @Column({ default: true })
+  enabled: boolean;
+
   @Column({ name: 'channel_mapping', type: 'jsonb', nullable: true })
   channelMapping: Record<string, string> | null;
+
+  @Column({ default: 'zigbee' })
+  source: 'zigbee' | 'onboard';
+
+  @Column({ name: 'onboard_device_id', nullable: true, type: 'uuid' })
+  onboardDeviceId: string | null;
+
+  @Column({ name: 'device_settings', type: 'jsonb', nullable: true })
+  deviceSettings: Record<string, any> | null;
 
   @Column({ name: 'last_seen', nullable: true })
   lastSeen: Date;

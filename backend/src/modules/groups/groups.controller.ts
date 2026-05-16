@@ -21,17 +21,20 @@ export class GroupsController {
 
   @Get()
   findAllGroups(@CurrentUser() user: any) {
-    return this.groupsService.findAllGroups(this.getEffectiveUserId(user));
+    return this.groupsService.findAllGroups(this.getEffectiveUserId(user), user.role);
   }
 
   @Get(':id/dependencies')
   getDependencies(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.groupsService.getDependencies(id, this.getEffectiveUserId(user));
+    return this.groupsService.getDependencies(id, this.getEffectiveUserId(user), user.role);
   }
 
   @Post()
   async createGroup(@CurrentUser() user: any, @Body() body: any) {
-    const result = await this.groupsService.createGroup(this.getEffectiveUserId(user), body);
+    const effectiveUserId = (user.role === 'admin' && body.targetUserId)
+      ? body.targetUserId
+      : this.getEffectiveUserId(user);
+    const result = await this.groupsService.createGroup(effectiveUserId, body);
     if (result) {
       this.activityLog.log({
         userId: user.id, userName: user.name || user.username,
@@ -46,7 +49,7 @@ export class GroupsController {
 
   @Put(':id')
   async updateGroup(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
-    const result = await this.groupsService.updateGroup(id, this.getEffectiveUserId(user), body);
+    const result = await this.groupsService.updateGroup(id, this.getEffectiveUserId(user), body, user.role);
     if (result) {
       this.activityLog.log({
         userId: user.id, userName: user.name || user.username,
@@ -61,7 +64,7 @@ export class GroupsController {
 
   @Delete(':id')
   removeGroup(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.groupsService.removeGroup(id, this.getEffectiveUserId(user));
+    return this.groupsService.removeGroup(id, this.getEffectiveUserId(user), user.role);
   }
 
   @Get('houses')
@@ -71,17 +74,20 @@ export class GroupsController {
 
   @Post('houses')
   createHouse(@CurrentUser() user: any, @Body() body: any) {
-    return this.groupsService.createHouse(this.getEffectiveUserId(user), body);
+    const effectiveUserId = (user.role === 'admin' && body.targetUserId)
+      ? body.targetUserId
+      : this.getEffectiveUserId(user);
+    return this.groupsService.createHouse(effectiveUserId, body);
   }
 
   @Put('houses/:id')
   updateHouse(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
-    return this.groupsService.updateHouse(id, this.getEffectiveUserId(user), body);
+    return this.groupsService.updateHouse(id, this.getEffectiveUserId(user), body, user.role);
   }
 
   @Delete('houses/:id')
   removeHouse(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.groupsService.removeHouse(id, this.getEffectiveUserId(user));
+    return this.groupsService.removeHouse(id, this.getEffectiveUserId(user), user.role);
   }
 
   @Post(':id/control')
@@ -91,6 +97,15 @@ export class GroupsController {
     @Body() body: { commands: { code: string; value: any }[] },
   ) {
     return this.groupsService.controlGroup(id, this.getEffectiveUserId(user), body.commands);
+  }
+
+  @Post(':id/gateway')
+  assignGateway(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { gatewayId: string },
+  ) {
+    return this.groupsService.assignGatewayToGroup(id, this.getEffectiveUserId(user), body.gatewayId);
   }
 
   @Post(':id/devices')

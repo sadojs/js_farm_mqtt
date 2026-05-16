@@ -9,25 +9,44 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Controller('automation')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'farm_admin')
+@Roles('admin', 'farm_admin', 'farm_user')
 export class AutomationController {
   constructor(
     private automationService: AutomationService,
     private activityLog: ActivityLogService,
   ) {}
 
-  private getEffectiveUserId(user: any): string {
+  private getEffectiveUserId(user: any): string | null {
+    if (user.role === 'admin') return null;
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
   }
 
   @Get('rules')
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() user: any, @Query('farmUserId') farmUserId?: string) {
+    if (user.role === 'admin') {
+      return this.automationService.findAll(farmUserId ?? null);
+    }
     return this.automationService.findAll(this.getEffectiveUserId(user));
   }
 
   @Post('rules')
   async create(@CurrentUser() user: any, @Body() dto: CreateRuleDto) {
-    const result = await this.automationService.create(this.getEffectiveUserId(user), dto);
+    // admin이 룰을 만들 때 user_id 결정 우선순위:
+    //   1) targetUserId 명시 → 그 사용자
+    //   2) groupId 기반으로 group owner 추론
+    //   3) admin 자기 자신 (fallback)
+    let userId = (user.role === 'admin' && (dto as any).targetUserId)
+      ? (dto as any).targetUserId
+      : this.getEffectiveUserId(user);
+
+    if (user.role === 'admin' && !userId && dto.groupId) {
+      userId = await this.automationService.resolveGroupOwner(dto.groupId);
+    }
+    if (!userId) {
+      // 최종 fallback: admin 자기 자신 (NOT NULL 제약 위반 방지)
+      userId = user.id;
+    }
+    const result = await this.automationService.create(userId, dto);
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
       groupId: dto.groupId, action: 'rule.create', targetType: 'rule',
