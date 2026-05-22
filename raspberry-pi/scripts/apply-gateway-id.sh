@@ -52,7 +52,8 @@ for svc in /etc/systemd/system/config-agent.service /etc/systemd/system/gpio-age
 done
 
 # 4. /etc/smartfarm/*.env (EnvironmentFile 사용 시)
-for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env; do
+# BUG-01 fix: fallback-engine.env도 포함 — 누락 시 fallback-engine이 옛 gateway_id로 동작
+for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env /etc/smartfarm/fallback-engine.env; do
   if [ -f "$envf" ]; then
     if grep -qE "^GATEWAY_ID=" "$envf"; then
       sed -i.bak -E "s|^GATEWAY_ID=.*|GATEWAY_ID=${NEW}|" "$envf"
@@ -62,12 +63,29 @@ for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env; do
   fi
 done
 
-# 5. 서비스 재시작 (config-agent는 마지막에 — 응답 전송 후 재시작되어야 함)
-# ⚠️ first-boot-init.service(oneshot) 안에서 호출될 수 있으므로 --no-block 필수.
-#    동기 restart 시 systemd가 oneshot 완료를 기다리며 cyclic deadlock 발생.
+# 5. 서비스 재시작
+# ⚠️ first-boot-init.service(oneshot) 안에서 호출 시 cyclic deadlock 위험으로 --no-block 사용.
+#    BUG-02: 그러나 --no-block은 환경변수 reload를 보장 못함 — first-boot-init 종료 후
+#    job 큐가 실제로 실행되어야 reload 됨. 운영자가 외부에서 호출 시(post-first-boot)는
+#    동기 restart가 필요하므로 IS_FIRST_BOOT 플래그로 분기.
 systemctl daemon-reload >&2 || true
-systemctl restart --no-block zigbee2mqtt >&2 || true
-systemctl restart --no-block gpio-agent >&2 || true
+
+# first-boot 단계 감지: marker가 아직 없으면 first-boot 중 → --no-block 사용
+IS_FIRST_BOOT=0
+if [ ! -f /var/lib/smartfarm/.first-boot-done ]; then
+  IS_FIRST_BOOT=1
+fi
+
+if [ "$IS_FIRST_BOOT" = "1" ]; then
+  systemctl restart --no-block zigbee2mqtt >&2 || true
+  systemctl restart --no-block gpio-agent >&2 || true
+  systemctl restart --no-block fallback-engine >&2 || true
+else
+  # 운영 중 호출: 동기 restart (환경변수 reload 보장)
+  timeout 20 systemctl restart zigbee2mqtt >&2 || true
+  timeout 20 systemctl restart gpio-agent >&2 || true
+  timeout 20 systemctl restart fallback-engine >&2 || true
+fi
 # config-agent 재시작은 응답 전송 직후 별도 trigger (handler에서)
 
 emit "{\"ok\":true,\"status\":\"success\",\"detail\":\"gateway-id changed ${OLD}->${NEW}\",\"serviceRestarted\":true}"
