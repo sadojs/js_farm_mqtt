@@ -1,0 +1,6 @@
+wifi-hq:c508ae0e-99ba-4b34-9f62-3fd7c8180e54:802-11-wireless:wlan0
+lo:cfaa8df2-4bfe-4b82-a9d0-5dba69453fe4:loopback:lo
+eth0-static:8bc895a8-84b2-41c0-821c-ba681f98f445:802-3-ethernet:
+netplan-eth0:75a1216a-9d1a-30cd-8aca-ace5526ec021:802-3-ethernet:
+netplan-wlan0-KT_GiGA_5G_5E04:1e5abccb-b5da-3cef-8baf-d1570e4c4042:802-11-wireless:
+---

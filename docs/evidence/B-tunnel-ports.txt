@@ -1,0 +1,2 @@
+sshd-sess 54073 ojeongseog   12u  IPv6 0x6d4c44b69074a8a4      0t0  TCP [::1]:22201 (LISTEN)
+sshd-sess 54073 ojeongseog   14u  IPv4 0x56f425eaaa75a8fb      0t0  TCP 127.0.0.1:22201 (LISTEN)

@@ -1,0 +1,37 @@
+Warning: Permanently added '[localhost]:22200' (ED25519) to the list of known hosts.
+--- nmcli con show ---
+KT_GiGA_5G_5E04:dc779489-cb3c-4f46-92d2-ba9ae016b05e:802-11-wireless:wlan0
+lo:cfaa8df2-4bfe-4b82-a9d0-5dba69453fe4:loopback:lo
+eth0-static:8bc895a8-84b2-41c0-821c-ba681f98f445:802-3-ethernet:
+netplan-eth0:75a1216a-9d1a-30cd-8aca-ace5526ec021:802-3-ethernet:
+netplan-wlan0-KT_GiGA_5G_5E04:1e5abccb-b5da-3cef-8baf-d1570e4c4042:802-11-wireless:
+wifi-hq:c508ae0e-99ba-4b34-9f62-3fd7c8180e54:802-11-wireless:
+
+--- active wifi ---
+ ::79
+ :KT_GiGA_5E04:74
+ :U+NetC661_5G:70
+*:KT_GiGA_5G_5E04:66
+ :U+NetC661:65
+ ::57
+ :U+Net5D30:57
+ :U+Net0221:55
+ :KT_GiGA_2B29:50
+ ::50
+
+--- apply-wifi.sh log ---
+May 22 20:32:15 lgw-default node[6395]: [CONFIG-AGENT] 요청 수신: hostname_update (e863b728-2910-43b8-a3b0-6dc6e7262a5a)
+May 22 20:32:15 lgw-pilot01 node[6395]: [CONFIG-AGENT] 응답 전송: hostname_update 성공 (e863b728-2910-43b8-a3b0-6dc6e7262a5a)
+May 22 20:32:49 lgw-pilot01 node[6395]: [CONFIG-AGENT] 요청 수신: gateway_id_update (f58d6ecb-8d7d-4f2a-905c-9094c786c254)
+May 22 20:32:50 lgw-pilot01 node[6395]: [CONFIG-AGENT] 응답 전송: gateway_id_update 성공 (f58d6ecb-8d7d-4f2a-905c-9094c786c254)
+May 22 20:32:52 lgw-pilot01 systemd[1]: Stopping config-agent.service - Smart Farm Config Agent (lgw-default)...
+May 22 20:32:52 lgw-pilot01 node[6395]: [CONFIG-AGENT] 종료 중...
+May 22 20:32:52 lgw-pilot01 systemd[1]: config-agent.service: Deactivated successfully.
+May 22 20:32:52 lgw-pilot01 systemd[1]: Stopped config-agent.service - Smart Farm Config Agent (lgw-default).
+May 22 20:32:52 lgw-pilot01 systemd[1]: config-agent.service: Consumed 2.659s CPU time.
+May 22 20:32:52 lgw-pilot01 systemd[1]: Started config-agent.service - Smart Farm Config Agent (lgw-default).
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] 연결 중: mqtt://172.30.1.42:1883 (게이트웨이: lgw-pilot01)
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] MQTT Broker 연결 성공
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] 구독: farm/lgw-pilot01/config/request
+May 22 20:37:01 lgw-pilot01 node[6756]: [CONFIG-AGENT] 요청 수신: wifi_update (47229300-8c11-4ed1-b1b0-e87f7f35ef01)
+May 22 20:37:12 lgw-pilot01 node[6756]: [CONFIG-AGENT] 응답 전송: wifi_update 성공 (47229300-8c11-4ed1-b1b0-e87f7f35ef01)

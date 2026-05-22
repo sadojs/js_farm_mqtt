@@ -1,0 +1,23 @@
+Warning: Permanently added '[localhost]:22200' (ED25519) to the list of known hosts.
+--- gateway-id ---
+lgw-pilot01
+--- env files ---
+/etc/smartfarm/fallback-engine.env:GATEWAY_ID=lgw-default-e7874755
+/etc/smartfarm/gpio-agent.env:GATEWAY_ID=lgw-pilot01
+/etc/systemd/system/config-agent.service:Environment=GATEWAY_ID=lgw-pilot01
+
+--- Z2M base_topic ---
+  base_topic: farm/lgw-pilot01/z2m
+
+--- services ---
+config-agent: active
+gpio-agent: active
+fallback-engine: active
+zigbee2mqtt: activating
+
+--- config-agent topic 구독 갱신 ---
+May 22 20:32:52 lgw-pilot01 systemd[1]: config-agent.service: Consumed 2.659s CPU time.
+May 22 20:32:52 lgw-pilot01 systemd[1]: Started config-agent.service - Smart Farm Config Agent (lgw-default).
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] 연결 중: mqtt://172.30.1.42:1883 (게이트웨이: lgw-pilot01)
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] MQTT Broker 연결 성공
+May 22 20:32:53 lgw-pilot01 node[6756]: [CONFIG-AGENT] 구독: farm/lgw-pilot01/config/request

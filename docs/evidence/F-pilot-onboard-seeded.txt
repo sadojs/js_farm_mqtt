@@ -1,0 +1,4 @@
+ slot_key | slot_type | gpio_pin | name 
+----------+-----------+----------+------
+(0 rows)
+

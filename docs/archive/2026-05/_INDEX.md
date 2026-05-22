@@ -11,6 +11,7 @@
 | [rpi-emergency-failover](./rpi-emergency-failover/) | 2026-05-21 | 98% | 1 | plan, design, analysis, report |
 | [rpi-fallback-channel-sync](./rpi-fallback-channel-sync/) | 2026-05-21 | 96% | 1 | plan, design, analysis, report |
 | [rpi-golden-image-system](./rpi-golden-image-system/) | 2026-05-22 | 99% | 2 | plan, design, analysis, report |
+| [rpi-golden-image-mass-production](./rpi-golden-image-mass-production/) | 2026-05-22 | 88% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -57,3 +58,9 @@
 - 위치: `~/Projects/golden-images/` (외부, git 미포함 — 빌드 산출물)
 - 검증: first-boot-init 18초 정상, reverse-ssh-tunnel 자동 활성화, 서버 → PI SSH 접속 정상
 - 핵심 수정: oneshot 데드락 (`apply-gateway-id.sh --no-block`) + PI 계정 lgwadmin 통일
+
+### rpi-golden-image-mass-production (양산 검증 — 9건 BUG 발견 + 5건 fix)
+- [plan](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.plan.md)
+- [design](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.design.md)
+- [analysis](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.analysis.md)
+- [report](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.report.md)

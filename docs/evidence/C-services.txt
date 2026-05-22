@@ -1,0 +1,21 @@
+reverse-ssh-tunnel: active
+config-agent: active
+gpio-agent: active
+zigbee2mqtt: activating
+fallback-engine: active
+
+=== first-boot-init final ===
+● first-boot-init.service - Smart Farm — First Boot Init (SSH host key + tunnel key regeneration)
+     Loaded: loaded (/etc/systemd/system/first-boot-init.service; enabled; preset: enabled)
+     Active: active (exited) since Fri 2026-05-22 20:24:42 KST; 39s ago
+ Invocation: 52b3782498b74d108d79c02c794c3f6f
+    Process: 4791 ExecStart=/usr/bin/env bash /opt/smart-farm/scripts/first-boot-init.sh (code=exited, status=0/SUCCESS)
+
+=== hostname / gateway-id ===
+hostname: lgw-default
+gateway-id: lgw-default-e7874755
+machine-id: e7874755a86640589ef1fc29fe0addd5
+tunnel.env: SERVER_HOST=172.30.1.42
+SERVER_USER=ojeongseog
+SERVER_PORT=22
+REMOTE_PORT=22200

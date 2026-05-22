@@ -1,0 +1,7 @@
+ gateway_id  | event_type  |        occurred_at         |                                                                                                                           payload                                                                                                                           
+-------------+-------------+----------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ lgw-pilot01 | rule_fired  | 2026-05-22 22:07:16.168+09 | {"rule": "rain-override", "active": false}
+ lgw-pilot01 | mode_change | 2026-05-22 22:07:46.173+09 | {"to": "fallback"}
+ lgw-pilot01 | safety_off  | 2026-05-22 22:07:46.177+09 | {"reason": "emergency-stop-no-mapping", "channels": ["zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6", "zone_7", "zone_8", "fertilizer_contact", "mixer", "fertilizer_motor", "fan_1", "fan_2", "fan_3", "fan_4", "opener_open", "opener_close"]}
+(3 rows)
+

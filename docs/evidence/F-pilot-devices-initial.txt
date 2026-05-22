@@ -1,0 +1,4 @@
+ id | friendly_name | name | category | device_type | online 
+----+---------------+------+----------+-------------+--------
+(0 rows)
+

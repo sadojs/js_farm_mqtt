@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-21T21:35:24.000Z",
+  "lastUpdated": "2026-05-22T13:25:29.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -633,6 +633,21 @@
         "SSH_TUNNEL_USER=lgwadmin (PI 계정 통일)"
       ],
       "relatedCommit": "b398844"
+    },
+    "rpi-golden-image-mass-production": {
+      "phase": "archived",
+      "matchRate": 88,
+      "iterationCount": 1,
+      "startedAt": "2026-05-22T11:00:00Z",
+      "archivedAt": "2026-05-22T22:30:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-golden-image-mass-production/",
+      "bugsFoundFixed": "9 found / 5 fixed / 4 deferred",
+      "nextCycles": [
+        "rpi-server-ip-rollover",
+        "rpi-auto-device-provision",
+        "rpi-local-broker-failover",
+        "rpi-activity-log-pk-trace"
+      ]
     }
   },
   "pipeline": {
