@@ -3,6 +3,11 @@
 const mqtt = require('mqtt');
 const { execSync } = require('child_process');
 const ConfigManager = require('./config-manager');
+const { handleWifi } = require('./handlers/wifi');
+const { handleHostname } = require('./handlers/hostname');
+const { handleGatewayId } = require('./handlers/gateway-id');
+const { handleIdentity } = require('./handlers/identity');
+const { handleServerIp } = require('./handlers/server-ip');
 
 // ---- 환경 변수 ----
 const GATEWAY_ID = process.env.GATEWAY_ID;
@@ -114,6 +119,22 @@ async function handleRequest(payload) {
       case 'update_config':
         handleUpdateConfig(requestId, request.config || {});
         break;
+      case 'wifi_update':
+        await runRemoteAction(requestId, action, () => handleWifi(request));
+        break;
+      case 'hostname_update':
+        await runRemoteAction(requestId, action, () => handleHostname(request));
+        break;
+      case 'gateway_id_update':
+        await runRemoteAction(requestId, action, () => handleGatewayId(request));
+        break;
+      case 'identity_update':
+        // rpi-hostname-gateway-id-unify: hostname + gateway-id 통합 변경
+        await runRemoteAction(requestId, action, () => handleIdentity(request));
+        break;
+      case 'server_ip_update':
+        await runRemoteAction(requestId, action, () => handleServerIp(request));
+        break;
       default:
         sendResponse(requestId, action, false, { error: `알 수 없는 action: ${action}` });
     }
@@ -121,6 +142,29 @@ async function handleRequest(payload) {
     console.error(`[CONFIG-AGENT] 처리 오류:`, err.message);
     sendResponse(requestId, action, false, { error: err.message });
   }
+}
+
+/**
+ * rpi-golden-image-system: Pi 측 시스템 설정 변경 공통 실행기.
+ * handler 결과 ({ ok, status, detail, ... }) 를 MQTT response로 변환.
+ */
+async function runRemoteAction(requestId, action, handler) {
+  let result;
+  try {
+    result = await handler();
+  } catch (err) {
+    result = { ok: false, status: 'failed', detail: err.message || String(err) };
+  }
+  const success = !!result.ok;
+  const extra = {
+    status: result.status || (success ? 'success' : 'failed'),
+    detail: result.detail,
+    appliedAt: new Date().toISOString(),
+  };
+  if (result.pingResult) extra.pingResult = result.pingResult;
+  if (result.rebootScheduled) extra.rebootScheduled = result.rebootScheduled;
+  if (result.serviceRestarted) extra.serviceRestarted = result.serviceRestarted;
+  sendResponse(requestId, action, success, extra);
 }
 
 // ---- get_config: 현재 설정 조회 ----

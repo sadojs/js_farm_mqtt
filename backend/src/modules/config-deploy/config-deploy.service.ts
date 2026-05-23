@@ -58,6 +58,7 @@ const TIMEOUTS_MS: Record<ConfigAction, number> = {
   wifi_update: 90_000,
   hostname_update: 30_000,
   gateway_id_update: 60_000,
+  identity_update: 90_000,  // hostname + gateway-id 통합 — gateway_id_update + 여유
   server_ip_update: 120_000,
 };
 
@@ -307,6 +308,37 @@ export class ConfigDeployService implements OnModuleInit {
       { serverIp: newServerIp },
       user,
       { serverIp: newServerIp },
+    );
+  }
+
+  /**
+   * rpi-hostname-gateway-id-unify: hostname + gateway-id 통합 변경.
+   * 양산 시나리오에서 둘은 항상 같은 값. 분리 배포로 인한 mismatch/실수 방지.
+   * PI 측에서는 apply-identity.sh가 apply-hostname + apply-gateway-id 순차 실행.
+   */
+  async requestIdentity(
+    gatewayId: string, name: string,
+    user: { id: string; name: string },
+  ): Promise<RemoteConfigAccepted> {
+    if (name === gatewayId) {
+      throw new BadRequestException('새 이름이 기존과 동일합니다');
+    }
+    // hostname / gateway-id 중복 검증 (자기 자신 제외)
+    const dupHost = await this.gatewayRepo.findOne({ where: { hostname: name } });
+    if (dupHost && dupHost.gatewayId !== gatewayId) {
+      throw new ConflictException('이미 사용 중인 hostname입니다');
+    }
+    const dupId = await this.gatewayRepo.findOne({ where: { gatewayId: name } });
+    if (dupId) {
+      throw new ConflictException('이미 사용 중인 gateway-id입니다');
+    }
+    return this.publishAndTrack(
+      gatewayId,
+      'identity_update',
+      { name },
+      user,
+      { hostname: name },  // applyOnSuccess — hostname 컬럼은 단순 갱신 (cascade는 applyDbChanges가 처리)
+      name,                // gateway_id cascade를 위한 newGatewayId
     );
   }
 
@@ -681,19 +713,22 @@ export class ConfigDeployService implements OnModuleInit {
   }
 
   private async applyDbChanges(gatewayId: string, pending: PendingRequest) {
-    // gateway_id_update — FK cascade가 schema에 명시되어 있다면 raw UPDATE 한 번이면 충분.
+    // gateway_id_update / identity_update — FK cascade가 schema에 명시되어 있다면 raw UPDATE 한 번이면 충분.
     // 안전을 위해 트랜잭션으로 묶고, 결과 검증.
-    if (pending.action === 'gateway_id_update' && pending.newGatewayId) {
+    // identity_update는 hostname도 함께 갱신.
+    if ((pending.action === 'gateway_id_update' || pending.action === 'identity_update') && pending.newGatewayId) {
       const newId = pending.newGatewayId;
+      const isIdentity = pending.action === 'identity_update';
       await this.gatewayRepo.manager.transaction(async (mgr) => {
         const gw = await mgr.findOne(Gateway, { where: { gatewayId } });
         if (!gw) {
-          this.logger.warn(`gateway_id_update: 게이트웨이 미발견 ${gatewayId}`);
+          this.logger.warn(`${pending.action}: 게이트웨이 미발견 ${gatewayId}`);
           return;
         }
-        // 1. PK가 아닌 unique 컬럼 변경이므로 raw UPDATE
+        // 1. PK가 아닌 unique 컬럼 변경이므로 raw UPDATE. identity_update는 hostname도 동기화.
         await mgr.update(Gateway, { id: gw.id }, {
           gatewayId: newId,
+          ...(isIdentity ? { hostname: newId } : {}),
           lastConfigAppliedAt: new Date(),
         });
         // 2. FK 관련 테이블 명시 cascade.
@@ -714,7 +749,7 @@ export class ConfigDeployService implements OnModuleInit {
           });
         }
       });
-      this.logger.log(`gateway_id cascade 완료: ${gatewayId} -> ${newId}`);
+      this.logger.log(`${pending.action} cascade 완료: ${gatewayId} -> ${newId}`);
       return;
     }
 
