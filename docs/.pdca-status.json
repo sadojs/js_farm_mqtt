@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-22T21:17:50.000Z",
+  "lastUpdated": "2026-05-23T12:02:16.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -650,12 +650,12 @@
       ]
     },
     "rpi-hostname-gateway-id-unify": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
+      "phase": "archived",
+      "matchRate": 96,
+      "iterationCount": 1,
       "startedAt": "2026-05-23T00:00:00Z",
-      "description": "hostname/gateway-id 자동 일치",
-      "planDoc": "docs/01-plan/features/rpi-hostname-gateway-id-unify.plan.md"
+      "archivedAt": "2026-05-23T22:00:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-hostname-gateway-id-unify/"
     },
     "rpi-server-ip-rollover": {
       "phase": "plan",

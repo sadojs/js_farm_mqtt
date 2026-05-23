@@ -12,6 +12,7 @@
 | [rpi-fallback-channel-sync](./rpi-fallback-channel-sync/) | 2026-05-21 | 96% | 1 | plan, design, analysis, report |
 | [rpi-golden-image-system](./rpi-golden-image-system/) | 2026-05-22 | 99% | 2 | plan, design, analysis, report |
 | [rpi-golden-image-mass-production](./rpi-golden-image-mass-production/) | 2026-05-22 | 88% | 1 | plan, design, analysis, report |
+| [rpi-hostname-gateway-id-unify](./rpi-hostname-gateway-id-unify/) | 2026-05-23 | 96% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -64,3 +65,9 @@
 - [design](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.design.md)
 - [analysis](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.analysis.md)
 - [report](./rpi-golden-image-mass-production/rpi-golden-image-mass-production.report.md)
+
+### rpi-hostname-gateway-id-unify (hostname+gateway-id 통합 배포)
+- [plan](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.plan.md)
+- [design](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.design.md)
+- [analysis](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.analysis.md)
+- [report](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.report.md)
