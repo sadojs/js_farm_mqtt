@@ -1,0 +1,15 @@
+Job for mosquitto.service failed because the control process exited with error code.
+See "systemctl status mosquitto.service" and "journalctl -xeu mosquitto.service" for details.
+failed
+--- listen ports ---
+--- mosquitto log ---
+1779568423: mosquitto version 2.0.21 starting
+1779568423: Config loaded from /etc/mosquitto/mosquitto.conf.
+1779568423: Starting in local only mode. Connections will only be possible from clients running on this machine.
+1779568423: Create a configuration file which defines a listener to allow remote access.
+1779568423: For more details see https://mosquitto.org/documentation/authentication-methods/
+1779568423: Opening ipv4 listen socket on port 1883.
+1779568423: Opening ipv6 listen socket on port 1883.
+1779568423: mosquitto version 2.0.21 running
+1779568434: mosquitto version 2.0.21 terminating
+1779568434: Saving in-memory database to /var/lib/mosquitto//mosquitto.db.

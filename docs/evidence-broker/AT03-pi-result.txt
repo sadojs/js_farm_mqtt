@@ -1,0 +1,3 @@
+Warning: Permanently added '172.30.1.89' (ED25519) to the list of known hosts.
+hostname=lgw-test02
+gateway-id=lgw-test02

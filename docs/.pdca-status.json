@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-23T12:02:16.000Z",
+  "lastUpdated": "2026-05-23T20:49:07.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -682,12 +682,19 @@
       "planDoc": "docs/01-plan/features/rpi-activity-log-pk-trace.plan.md"
     },
     "rpi-local-broker-failover": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
+      "phase": "archived",
+      "matchRate": 92,
+      "iterationCount": 1,
+      "phaseScope": "phase-1-only",
       "startedAt": "2026-05-23T00:00:00Z",
-      "description": "BUG-08: PI 로컬 mosquitto broker (페일오버 핵심)",
-      "planDoc": "docs/01-plan/features/rpi-local-broker-failover.plan.md"
+      "archivedAt": "2026-05-24T06:00:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-local-broker-failover/",
+      "deliverables": "lgw-pilot01에 mosquitto+bridge 설치, BUG-08 핵심 해결",
+      "nextCycles": [
+        "rpi-golden-image-v20260524-rebuild",
+        "rpi-auto-device-provision",
+        "rpi-server-ip-rollover"
+      ]
     }
   },
   "pipeline": {

@@ -1,0 +1,21 @@
+[1] 변경 전 env
+/etc/smartfarm/fallback-engine.env:MQTT_SERVER=mqtt://172.30.1.42:1883
+/etc/smartfarm/gpio-agent.env:MQTT_SERVER=mqtt://172.30.1.42:1883
+[2] sed로 broker URL 변경 (172.30.1.42 → 127.0.0.1)
+[3] Z2M config의 mqtt.server
+  server: mqtt://127.0.0.1:1883
+[4] 변경 후 env
+/etc/smartfarm/fallback-engine.env:MQTT_SERVER=mqtt://127.0.0.1:1883
+/etc/smartfarm/gpio-agent.env:MQTT_SERVER=mqtt://127.0.0.1:1883
+[5] 서비스 재시작
+[6] 서비스 상태
+config-agent: active
+gpio-agent: active
+fallback-engine: active
+zigbee2mqtt: active
+mosquitto: active
+[7] 최근 로그 — broker connection
+May 24 05:37:47 lgw-pilot01 node[4074]: [CONFIG-AGENT] 연결 중: mqtt://172.30.1.42:1883 (게이트웨이: lgw-pilot01)
+May 24 05:37:48 lgw-pilot01 fallback-engine[4085]: [FALLBACK] 연결 중: mqtt://127.0.0.1:1883 (gw=lgw-pilot01)
+May 24 05:37:48 lgw-pilot01 node[4074]: [CONFIG-AGENT] MQTT Broker 연결 성공
+May 24 05:37:48 lgw-pilot01 gpio-agent[4084]: [MQTT] 연결 성공: mqtt://127.0.0.1:1883

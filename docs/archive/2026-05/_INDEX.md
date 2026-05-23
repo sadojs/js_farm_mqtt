@@ -13,6 +13,7 @@
 | [rpi-golden-image-system](./rpi-golden-image-system/) | 2026-05-22 | 99% | 2 | plan, design, analysis, report |
 | [rpi-golden-image-mass-production](./rpi-golden-image-mass-production/) | 2026-05-22 | 88% | 1 | plan, design, analysis, report |
 | [rpi-hostname-gateway-id-unify](./rpi-hostname-gateway-id-unify/) | 2026-05-23 | 96% | 1 | plan, design, analysis, report |
+| [rpi-local-broker-failover](./rpi-local-broker-failover/) | 2026-05-24 | 92% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -71,3 +72,9 @@
 - [design](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.design.md)
 - [analysis](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.analysis.md)
 - [report](./rpi-hostname-gateway-id-unify/rpi-hostname-gateway-id-unify.report.md)
+
+### rpi-local-broker-failover (Phase 1 — BUG-08 핵심 해결)
+- [plan](./rpi-local-broker-failover/rpi-local-broker-failover.plan.md)
+- [design](./rpi-local-broker-failover/rpi-local-broker-failover.design.md)
+- [analysis](./rpi-local-broker-failover/rpi-local-broker-failover.analysis.md)
+- [report](./rpi-local-broker-failover/rpi-local-broker-failover.report.md)

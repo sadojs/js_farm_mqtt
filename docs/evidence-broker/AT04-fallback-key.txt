@@ -1,0 +1,30 @@
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 연결 중: mqtt://127.0.0.1:1883 (gw=lgw-test02)
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] fallback-engine started
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] MQTT 연결 성공
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 이벤트 전송: 1건
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/server/heartbeat
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/fallback/rules/sync
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/gpio/relay
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/gpio/emergency-stop
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/gpio/status
+May 24 05:41:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 구독: farm/lgw-test02/z2m/+
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [FALLBACK] 모드 전환: fallback
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [FALLBACK] channelMapping 미동기화 — emergencyStopAll 발행 (safe-off)
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RULE-EVAL] channelMapping 미동기화 — fallback safe-off 발행
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_1 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_2 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_3 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_4 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_5 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_6 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_7 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 zone_8 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fertilizer_contact 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 mixer 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fertilizer_motor 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fan_1 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fan_2 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fan_3 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 fan_4 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 opener_open 매핑 없음 — drop
+May 24 05:42:38 lgw-test02 fallback-engine[1134]: [RELAY-BRIDGE] 채널 opener_close 매핑 없음 — drop
