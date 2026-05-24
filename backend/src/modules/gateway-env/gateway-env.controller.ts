@@ -43,6 +43,18 @@ export class GatewayEnvController {
     return this.svc.createOnboardDevice(gatewayId, dto, user.id, user.role);
   }
 
+  /**
+   * rpi-auto-device-provision
+   * onboard slots → devices 강제 재동기화. syncOnboardToDevices는 onboard CRUD 시
+   * 자동 trigger되지만 race condition / timing 으로 누락된 경우 운영자가 명시적
+   * 재실행할 수 있는 endpoint.
+   */
+  @Post(':gatewayId/onboard/resync')
+  @Roles('admin', 'farm_admin')
+  resyncOnboard(@Param('gatewayId') gatewayId: string, @CurrentUser() user: any) {
+    return this.svc.resyncOnboardDevices(gatewayId, user.id, user.role);
+  }
+
   @Patch(':gatewayId/onboard/:id')
   @Roles('admin', 'farm_admin')
   updateOnboard(

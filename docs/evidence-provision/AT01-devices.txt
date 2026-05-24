@@ -1,0 +1,9 @@
+     name      |  category  | equipment_type |   friendly_name    
+---------------+------------+----------------+--------------------
+ 관주 컨트롤러 | irrigation | irrigation     | onboard_irrigation
+ 유동팬 1번    | fan        | fan            | fan_1
+ 유동팬 2번    | fan        | fan            | fan_2
+ 유동팬 3번    | fan        | fan            | fan_3
+ 유동팬 4번    | fan        | fan            | fan_4
+(5 rows)
+

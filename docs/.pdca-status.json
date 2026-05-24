@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-23T20:49:07.000Z",
+  "lastUpdated": "2026-05-24T11:24:00.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -666,12 +666,13 @@
       "planDoc": "docs/01-plan/features/rpi-server-ip-rollover.plan.md"
     },
     "rpi-auto-device-provision": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
-      "startedAt": "2026-05-23T00:00:00Z",
-      "description": "BUG-06: 신규 게이트웨이 devices 자동 INSERT",
-      "planDoc": "docs/01-plan/features/rpi-auto-device-provision.plan.md"
+      "phase": "archived",
+      "matchRate": 82,
+      "iterationCount": 1,
+      "scopeRedefinition": "BUG-06이 timing issue로 재정의, 명시적 resync endpoint만 추가",
+      "startedAt": "2026-05-24T00:00:00Z",
+      "archivedAt": "2026-05-24T11:00:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-auto-device-provision/"
     },
     "rpi-activity-log-pk-trace": {
       "phase": "plan",

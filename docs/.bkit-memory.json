@@ -1,15 +1,22 @@
 {
-  "sessionCount": 55,
+  "sessionCount": 56,
   "currentFeature": null,
   "currentPhase": null,
   "matchRate": null,
   "iterationCount": 0,
   "lastSession": {
-    "startedAt": "2026-05-23T20:49:07.000Z",
+    "startedAt": "2026-05-24T11:24:00.000Z",
     "platform": "claude",
     "level": "Enterprise"
   },
   "recentlyCompleted": [
+    {
+      "feature": "rpi-auto-device-provision",
+      "phase": "report",
+      "completedAt": "2026-05-24T11:00:00Z",
+      "matchRate": 82,
+      "archivedTo": "docs/archive/2026-05/rpi-auto-device-provision/"
+    },
     {
       "feature": "rpi-local-broker-failover",
       "phase": "report",
@@ -38,17 +45,10 @@
       "completedAt": "2026-05-22T00:00:00Z",
       "matchRate": 99,
       "archivedTo": "docs/archive/2026-05/rpi-golden-image-system/"
-    },
-    {
-      "feature": "opener-actuator-label-i18n",
-      "phase": "report",
-      "completedAt": "2026-05-15T08:30:00.000Z",
-      "matchRate": 100
     }
   ],
   "queuedFeatures": [
     "rpi-server-ip-rollover",
-    "rpi-auto-device-provision",
     "rpi-activity-log-pk-trace"
   ]
 }

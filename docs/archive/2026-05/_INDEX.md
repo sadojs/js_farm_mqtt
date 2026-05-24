@@ -14,6 +14,7 @@
 | [rpi-golden-image-mass-production](./rpi-golden-image-mass-production/) | 2026-05-22 | 88% | 1 | plan, design, analysis, report |
 | [rpi-hostname-gateway-id-unify](./rpi-hostname-gateway-id-unify/) | 2026-05-23 | 96% | 1 | plan, design, analysis, report |
 | [rpi-local-broker-failover](./rpi-local-broker-failover/) | 2026-05-24 | 92% | 1 | plan, design, analysis, report |
+| [rpi-auto-device-provision](./rpi-auto-device-provision/) | 2026-05-24 | 82% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -78,3 +79,9 @@
 - [design](./rpi-local-broker-failover/rpi-local-broker-failover.design.md)
 - [analysis](./rpi-local-broker-failover/rpi-local-broker-failover.analysis.md)
 - [report](./rpi-local-broker-failover/rpi-local-broker-failover.report.md)
+
+### rpi-auto-device-provision (BUG-06 재분석 + resync endpoint)
+- [plan](./rpi-auto-device-provision/rpi-auto-device-provision.plan.md)
+- [design](./rpi-auto-device-provision/rpi-auto-device-provision.design.md)
+- [analysis](./rpi-auto-device-provision/rpi-auto-device-provision.analysis.md)
+- [report](./rpi-auto-device-provision/rpi-auto-device-provision.report.md)

@@ -10,6 +10,7 @@ import { UpdateOnboardDeviceDto } from './dto/update-onboard-device.dto';
 import { CreateOnboardDeviceDto } from './dto/create-onboard-device.dto';
 import { AddZigbeeDeviceDto, UpdateZigbeeDeviceDto } from './dto/add-zigbee-device.dto';
 import { MqttService } from '../mqtt/mqtt.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AVAILABLE_SWITCH_CODES_8CH,
   AVAILABLE_SWITCH_CODES_12CH,
@@ -83,7 +84,27 @@ export class GatewayEnvService {
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
     private readonly mqttService: MqttService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  /**
+   * rpi-fallback-channel-sync: onboard device 변경 시 fallback-config가 자동 sync 하도록 emit.
+   * UUID(gateways.id) → VARCHAR(gateways.gateway_id) 변환 후 emit.
+   * 실패해도 본 흐름은 영향받지 않음 (silent fail).
+   */
+  private async emitDeviceChanged(gatewayUuid: string): Promise<void> {
+    try {
+      const gw = await this.gatewayRepo.findOne({
+        where: { id: gatewayUuid },
+        select: ['gatewayId'],
+      });
+      if (gw?.gatewayId) {
+        this.eventEmitter.emit('device.changed', { gatewayId: gw.gatewayId });
+      }
+    } catch (err: any) {
+      this.logger.warn(`device.changed emit 실패: ${err?.message ?? err}`);
+    }
+  }
 
   // ── 게이트웨이 권한 확인 ──────────────────────────────────────
   private async assertGatewayOwner(gatewayId: string, userId: string, role: string): Promise<Gateway> {
@@ -132,6 +153,35 @@ export class GatewayEnvService {
     return this.ensureOnboardDevices(gatewayId);
   }
 
+  /**
+   * rpi-auto-device-provision
+   * onboard slots → devices 강제 재동기화. ensureOnboardDevices는 onboard slot 1개라도
+   * 있으면 자동 복구 안 함 → 운영자가 명시적으로 재동기화하고 싶을 때 사용.
+   *
+   * 양산 검증 단계 G에서 발견된 BUG-06 (신규 게이트웨이 devices 0건) 재분석 결과,
+   * syncOnboardToDevices는 정상 작동하나 timing/race condition으로 누락된 경우 대비.
+   * 결과 device 개수 + skipped 통계 반환.
+   */
+  async resyncOnboardDevices(
+    gatewayId: string, userId: string, role: string,
+  ): Promise<{ onboardSlots: number; devicesAfter: number; provisioned: number }> {
+    await this.assertGatewayOwner(gatewayId, userId, role);
+    const gw = await this.gatewayRepo.findOne({ where: { id: gatewayId } });
+    if (!gw) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
+
+    const onboard = await this.onboardRepo.find({ where: { gatewayId }, order: { sortOrder: 'ASC' } });
+    const devicesBefore = await this.deviceRepo.count({ where: { gatewayId, source: 'onboard' } as any });
+    await this.syncOnboardToDevices(gw, onboard);
+    const devicesAfter = await this.deviceRepo.count({ where: { gatewayId, source: 'onboard' } as any });
+
+    this.logger.log(`resyncOnboardDevices [${gw.gatewayId}]: onboard=${onboard.length} devices ${devicesBefore}→${devicesAfter}`);
+    return {
+      onboardSlots: onboard.length,
+      devicesAfter,
+      provisioned: Math.max(0, devicesAfter - devicesBefore),
+    };
+  }
+
   // ── Onboard: 수정 (이름 / 활성화) ────────────────────────────
   async updateOnboardDevice(
     gatewayId: string,
@@ -147,11 +197,18 @@ export class GatewayEnvService {
     if (dto.name !== undefined) device.name = dto.name;
     if (dto.operationTime !== undefined) device.operationTime = dto.operationTime;
     if (dto.standbyTime !== undefined) device.standbyTime = dto.standbyTime;
+    const pinChanged = 'gpioPin' in dto && device.gpioPin !== (dto.gpioPin ?? null);
     if ('gpioPin' in dto) device.gpioPin = dto.gpioPin ?? null;
+    const enabledChanged = dto.enabled !== undefined && device.enabled !== dto.enabled;
     if (dto.enabled !== undefined) {
       device.enabled = dto.enabled;
     }
     const saved = await this.onboardRepo.save(device);
+
+    // rpi-fallback-channel-sync: 폴백 동기화에 영향있는 변경 시에만 emit
+    if (pinChanged || enabledChanged) {
+      void this.emitDeviceChanged(gatewayId);
+    }
 
     // enabled 상태가 변경된 경우 devices 테이블 동기화
     if (dto.enabled !== undefined) {
@@ -204,7 +261,11 @@ export class GatewayEnvService {
     }
 
     const entities = slots.map(s => this.onboardRepo.create({ ...s, gatewayId }));
-    return this.onboardRepo.save(entities);
+    const result = await this.onboardRepo.save(entities);
+    // rpi-fallback-channel-sync: 신규 슬롯은 gpioPin=null이라 사실상 sync에서 제외되나,
+    // RPi가 다음 사용자 핀 설정 직후 채워질 것을 대비해 emit (idempotent).
+    void this.emitDeviceChanged(gatewayId);
+    return result;
   }
 
   // ── Onboard: 장치 삭제 (레거시 포함) ─────────────────────
@@ -238,6 +299,9 @@ export class GatewayEnvService {
     await this.syncOnboardToDevices(gw, remaining).catch((e) =>
       this.logger.warn(`syncOnboardToDevices after delete failed for ${gatewayId}: ${e.message}`),
     );
+
+    // rpi-fallback-channel-sync: 삭제 후 폴백 매핑 재동기화
+    void this.emitDeviceChanged(gatewayId);
   }
 
   // ── 온보드 장치 → devices 테이블 동기화 ────────────────────
