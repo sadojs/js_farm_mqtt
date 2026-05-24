@@ -7,6 +7,16 @@
       </div>
     </header>
 
+    <!-- ━━━━━━━━━━━━ 워크플로우 A: N대 일괄 배포 ━━━━━━━━━━━━ -->
+    <div class="workflow-group workflow-a">
+      <header class="workflow-group-header">
+        <h2>📦 Zigbee2MQTT 설정 일괄 배포 <span class="workflow-scope">(N대 동시)</span></h2>
+        <p class="workflow-description">
+          선택한 N개 게이트웨이에 동일한 Zigbee2MQTT 설정을 한 번에 배포합니다.
+          배포 후 MQTT 단절 시 60초 내 자동 롤백. <strong>향후 변경 사항을 모든 PI에 일괄 적용하는 핵심 기능.</strong>
+        </p>
+      </header>
+
     <!-- Step 1: 공통 설정 편집 -->
     <section class="deploy-section">
       <h3>1. 공통 설정 편집</h3>
@@ -156,7 +166,163 @@
       </div>
     </section>
 
-    <!-- 배포 확인 모달 -->
+    </div>
+    <!-- ━━━━━━━━━━━━ 워크플로우 A 끝 ━━━━━━━━━━━━ -->
+
+
+    <!-- ━━━━━━━━━━━━ 워크플로우 B: 게이트웨이별 customization ━━━━━━━━━━━━ -->
+    <div class="workflow-group workflow-b">
+      <header class="workflow-group-header">
+        <h2>🔧 게이트웨이별 시스템 설정 <span class="workflow-scope">(1대씩 customization)</span></h2>
+        <p class="workflow-description">
+          각 라즈베리파이의 <strong>Wi-Fi / Hostname / Gateway ID / Server IP / Identity</strong>를 MQTT 기반으로 원격 변경합니다.
+          양산 출하 시 1대씩 다른 값으로 customization하거나 운영 중 단발성 변경에 사용합니다.
+          Z2M 설정 배포(워크플로우 A)와는 독립된 경로이며 결과는 실시간 WebSocket으로 표시됩니다.
+        </p>
+      </header>
+
+      <section class="deploy-section">
+      <div v-if="gateways.length === 0" class="empty-state">
+        <p>등록된 게이트웨이가 없습니다.</p>
+      </div>
+      <div v-else class="system-config-list">
+        <GatewaySystemConfigCard
+          v-for="gw in gateways"
+          :key="gw.id"
+          :gateway="gw"
+        />
+      </div>
+      </section>
+    </div>
+    <!-- ━━━━━━━━━━━━ 워크플로우 B 끝 ━━━━━━━━━━━━ -->
+
+    <!-- 📚 운영자 안내 (접힘 가능) -->
+    <details class="info-footer">
+      <summary class="info-footer-title">
+        📚 라즈베리파이 컴포넌트 및 배포 워크플로우 안내 <span class="info-footer-hint">(클릭하여 펼치기)</span>
+      </summary>
+    <section class="deploy-section components-section">
+      <h3>라즈베리파이 설치 컴포넌트 및 배포 워크플로우</h3>
+      <p class="section-hint">
+        <code>setup.sh</code> 실행 시 자동 설치되는 컴포넌트와 출하 절차입니다.
+        배포 절차 자체는 기존 그대로이며, <strong>2026-05 업데이트</strong>로 이머전시 페일오버 엔진이 추가되었습니다.
+      </p>
+
+      <div class="component-grid">
+        <div class="component-card">
+          <div class="component-name">
+            <span class="badge-existing">기존</span> Zigbee2MQTT
+          </div>
+          <div class="component-detail">Zigbee 동글 ↔ MQTT 브릿지. 디바이스 페어링 / 센서 데이터 수집.</div>
+          <div class="component-path"><code>/opt/zigbee2mqtt</code></div>
+        </div>
+
+        <div class="component-card">
+          <div class="component-name">
+            <span class="badge-existing">기존</span> Config Agent
+          </div>
+          <div class="component-detail">원격 설정(Wi-Fi / Hostname / Server IP) 적용 + 자동 롤백.</div>
+          <div class="component-path"><code>/opt/smart-farm/config-agent</code></div>
+        </div>
+
+        <div class="component-card">
+          <div class="component-name">
+            <span class="badge-existing">기존</span> GPIO Agent
+          </div>
+          <div class="component-detail">온보드 GPIO 릴레이 제어 (BCM 핀 단위, gpioset).</div>
+          <div class="component-path"><code>/opt/smart-farm/gpio-agent</code></div>
+        </div>
+
+        <div class="component-card highlight">
+          <div class="component-name">
+            <span class="badge-new">NEW</span> Fallback Engine
+          </div>
+          <div class="component-detail">
+            서버 단절 시 자동 안전 동작 (이머전시 페일오버).<br>
+            • 관수 ON 시점부터 30분 후 OFF<br>
+            • 액비 즉시 OFF<br>
+            • 환기팬/유동팬 35°C ON / 28°C OFF (기본 비활성)<br>
+            • 개폐기 월별 스케줄 (4·5·10월 시간 제어, 6~9월 24h OPEN)<br>
+            • 빗물 센서 ACTIVE → 즉시 CLOSE
+          </div>
+          <div class="component-path">
+            <code>/opt/smart-farm/fallback-engine</code> &nbsp;|&nbsp;
+            데이터: <code>/var/lib/smartfarm/fallback/</code> (rules.json + 이벤트 SQLite 큐)
+          </div>
+          <div class="component-actions">
+            <router-link to="/emergency-failover" class="btn-link">
+              이머전시 페일오버 설정 페이지 →
+            </router-link>
+          </div>
+        </div>
+
+        <div class="component-card">
+          <div class="component-name">
+            <span class="badge-existing">선택</span> Reverse SSH Tunnel
+          </div>
+          <div class="component-detail">서버에서 Pi 원격 SSH 접속 (--with-tunnel 옵션 또는 first-boot-init 자동).</div>
+          <div class="component-path"><code>autossh</code> 기반</div>
+        </div>
+      </div>
+
+      <h4 class="workflow-title">📋 라즈베리파이 배포 워크플로우 (변경 없음)</h4>
+      <div class="workflow-box">
+        <div class="workflow-block">
+          <div class="workflow-header">🏗️ 골든 이미지 준비 (1회만)</div>
+          <ol class="workflow-list">
+            <li>마스터 Pi에서 <code>prepare-master.sh</code> 실행</li>
+            <li>마스터 Pi 종료 → SD 추출 → Mac에서 <code>build-golden-image.sh</code></li>
+            <li>결과: <code>golden-lgw-YYYYMMDD.img.xz</code></li>
+          </ol>
+        </div>
+
+        <div class="workflow-block">
+          <div class="workflow-header">🚚 Pi 1대당 출하 절차</div>
+          <div class="workflow-stage"><strong>본부 / 개발서버</strong></div>
+          <ol class="workflow-list" start="1">
+            <li><code>bash clone-sd.sh golden-lgw.img.xz diskN</code></li>
+            <li>SD 장착 → Pi 전원 ON</li>
+            <li>자동: 본부 Wi-Fi 연결 → register → 개발서버 웹UI 자동 출현</li>
+            <li>검증: 디바이스 1~2개 페어링 + 룰 1개 (통신 확인)</li>
+            <li>
+              설정 배포 → 4. 시스템 설정:
+              <ul>
+                <li>5-A. Hostname → <code>lgw-farm01</code> [적용] (Pi 재부팅 1~2분)</li>
+                <li>5-B. Server IP → 프로덕션 IP [적용] (개발서버 웹UI에서 사라짐 = 정상)</li>
+              </ul>
+            </li>
+          </ol>
+          <div class="workflow-stage"><strong>본부 / 프로덕션 서버 웹UI</strong></div>
+          <ol class="workflow-list" start="6">
+            <li>같은 Pi (<code>lgw-farm01</code>) 자동 출현 확인 (디바이스/룰 비어있음 = 정상)</li>
+            <li>설정 배포 → 4. 시스템 설정:
+              <ul>
+                <li>7-A. Wi-Fi → 농장 SSID/PW [적용] (본부 통신 끊김 = 정상)</li>
+              </ul>
+            </li>
+            <li>Pi 전원 OFF → 농장 발송</li>
+          </ol>
+          <div class="workflow-stage"><strong>농장 현장</strong></div>
+          <ol class="workflow-list" start="9">
+            <li>Pi 전원 ON → 농장 Wi-Fi 자동 연결 → 프로덕션 reverse tunnel 자동 복구 → 🟢 online</li>
+            <li>농장 디바이스 페어링 + 자동제어 룰 설정 (현장)</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="notice-box">
+        <strong>💡 2026-05 업데이트 안내</strong>
+        <ul>
+          <li><strong>골든 이미지 재빌드 필요</strong> — Fallback Engine 추가, GPIO Agent payload 호환 (<code>{slot, pin, state, requestId}</code>) 반영</li>
+          <li>현장 출하 후 → <a href="/emergency-failover">이머전시 페일오버 설정 페이지</a>에서 농장별 폴백 룰 편집 (월별 스케줄 / 임계값)</li>
+          <li>온보드 장치 추가/삭제/핀 변경 시 → <strong>RPi에 자동 동기화됨</strong> (별도 설정 배포 불필요)</li>
+          <li>장치 매핑은 서버 <code>gateway_onboard_devices</code> 테이블이 권위. RPi는 MQTT retained 메시지로 자동 수신.</li>
+        </ul>
+      </div>
+    </section>
+    </details>
+    <!-- ━━━━━━━━━━━━ 안내 footer 끝 ━━━━━━━━━━━━ -->
+
     <div v-if="showConfirmModal" class="modal-overlay" @click.self="showConfirmModal = false">
       <div class="modal-content">
         <h3>배포 확인</h3>
@@ -176,6 +342,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { configDeployApi, type CommonConfig, type PreviewResult, type DeployResult } from '../api/config-deploy.api'
 import { gatewayApi } from '../api/gateway.api'
 import type { Gateway } from '../types/device.types'
+import GatewaySystemConfigCard from '../components/config-deploy/GatewaySystemConfigCard.vue'
 
 const gateways = ref<Gateway[]>([])
 const gatewaysLoading = ref(true)
@@ -613,5 +780,161 @@ onMounted(() => {
   padding: 2rem;
   text-align: center;
   color: var(--text-secondary, #6b7280);
+}
+
+/* ───── Section 5: 라즈베리파이 컴포넌트 + 워크플로우 ───── */
+.components-section { margin-top: 2rem; }
+.components-section h4.workflow-title {
+  margin-top: 2rem; margin-bottom: 0.75rem;
+  font-size: 1rem; color: var(--text, #1f2937);
+}
+
+.component-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem; margin-top: 1rem;
+}
+.component-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.component-card.highlight {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
+  border-color: #60a5fa;
+}
+.component-name {
+  font-weight: 600; font-size: 0.95rem;
+  display: flex; align-items: center; gap: 6px;
+}
+.component-detail {
+  font-size: 0.85rem; line-height: 1.5;
+  color: var(--text-secondary, #4b5563);
+}
+.component-path {
+  font-size: 0.75rem; color: var(--text-secondary, #6b7280);
+}
+.component-path code {
+  background: var(--code-bg, #f3f4f6); padding: 1px 6px;
+  border-radius: 3px; font-size: 0.7rem;
+}
+.component-actions { margin-top: 6px; }
+.btn-link {
+  display: inline-block; padding: 4px 8px;
+  background: #3b82f6; color: #fff;
+  border-radius: 4px; font-size: 0.8rem;
+  text-decoration: none;
+}
+.btn-link:hover { background: #2563eb; }
+
+.badge-existing, .badge-new {
+  font-size: 0.65rem; padding: 2px 6px;
+  border-radius: 4px; font-weight: 700;
+}
+.badge-existing { background: #e5e7eb; color: #374151; }
+.badge-new { background: #fef3c7; color: #92400e; }
+
+.workflow-box {
+  display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px; padding: 1rem;
+}
+@media (max-width: 900px) {
+  .workflow-box { grid-template-columns: 1fr; }
+}
+.workflow-block { font-size: 0.85rem; line-height: 1.6; }
+.workflow-header {
+  font-weight: 700; margin-bottom: 0.5rem;
+  color: var(--text, #1f2937);
+}
+.workflow-stage {
+  margin-top: 0.75rem; margin-bottom: 0.25rem;
+  font-size: 0.8rem; color: #4338ca;
+}
+.workflow-list {
+  margin: 0; padding-left: 1.25rem;
+  color: var(--text-secondary, #4b5563);
+}
+.workflow-list li { margin-bottom: 4px; }
+.workflow-list ul { padding-left: 1rem; margin-top: 4px; }
+.workflow-list code, .workflow-block code {
+  background: var(--code-bg, #f3f4f6); padding: 1px 5px;
+  border-radius: 3px; font-size: 0.8em;
+}
+
+.notice-box {
+  margin-top: 1.25rem; padding: 12px 16px;
+  background: #fef3c7; border-left: 4px solid #f59e0b;
+  border-radius: 6px; font-size: 0.85rem; line-height: 1.6;
+}
+.notice-box strong { display: block; margin-bottom: 6px; color: #92400e; }
+.notice-box ul { margin: 0; padding-left: 1.25rem; color: #78350f; }
+.notice-box a { color: #1d4ed8; text-decoration: underline; }
+.notice-box code {
+  background: rgba(0,0,0,0.06); padding: 1px 4px;
+  border-radius: 3px; font-size: 0.85em;
+}
+
+/* ━━━━━━━━━ 워크플로우 그룹 (2026-05-25 ConfigDeploy UX 정리) ━━━━━━━━━ */
+.workflow-group {
+  border: 2px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 24px 0;
+  background: var(--color-bg-secondary, #fafbfc);
+}
+.workflow-group.workflow-a {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.04);
+}
+.workflow-group.workflow-b {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.04);
+}
+.workflow-group-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--color-border, #cbd5e0);
+}
+.workflow-group-header h2 {
+  margin: 0 0 8px; font-size: 18px; color: var(--color-text, #1f2937);
+}
+.workflow-scope {
+  font-size: 13px; color: var(--color-text-secondary, #6b7280);
+  font-weight: 400;
+}
+.workflow-description {
+  margin: 0; font-size: 13px; line-height: 1.6;
+  color: var(--color-text-secondary, #4b5563);
+}
+.workflow-description strong { color: var(--color-text, #1f2937); }
+
+/* 안내 footer (접힘) */
+.info-footer {
+  margin: 32px 0; padding: 16px 20px;
+  background: var(--color-bg-secondary, #f8f9fa);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+}
+.info-footer summary {
+  cursor: pointer; font-size: 14px; font-weight: 600;
+  color: var(--color-text, #1f2937);
+  list-style: none; user-select: none;
+}
+.info-footer summary::-webkit-details-marker { display: none; }
+.info-footer summary::before {
+  content: '▶'; display: inline-block; margin-right: 6px;
+  transition: transform 0.2s; color: var(--color-text-secondary, #6b7280);
+}
+.info-footer[open] summary::before { transform: rotate(90deg); }
+.info-footer-hint {
+  font-size: 11px; color: var(--color-text-secondary, #9ca3af);
+  font-weight: 400; margin-left: 4px;
+}
+.info-footer[open] .info-footer-hint { display: none; }
+.info-footer .components-section {
+  margin-top: 16px; padding: 0; background: transparent;
+  border-top: 1px dashed var(--color-border, #cbd5e0);
 }
 </style>
