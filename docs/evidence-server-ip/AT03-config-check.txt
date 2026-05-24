@@ -1,0 +1,11 @@
+--- server-ip ---
+172.30.1.254
+--- envfile MQTT_SERVER ---
+/etc/smartfarm/fallback-engine.env:MQTT_SERVER=mqtt://172.30.1.254:1883
+/etc/smartfarm/gpio-agent.env:MQTT_SERVER=mqtt://172.30.1.254:1883
+
+--- bridge-cloud.conf address ---
+address 172.30.1.254:1883
+
+--- reverse-ssh-tunnel SERVER_HOST ---
+  -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_HOST}

@@ -1,0 +1,4 @@
+server-ip=172.30.1.42
+/etc/smartfarm/fallback-engine.env:MQTT_SERVER=mqtt://172.30.1.42:1883
+/etc/smartfarm/gpio-agent.env:MQTT_SERVER=mqtt://172.30.1.42:1883
+address 172.30.1.42:1883

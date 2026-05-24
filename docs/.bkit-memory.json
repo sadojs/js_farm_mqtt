@@ -1,15 +1,22 @@
 {
-  "sessionCount": 56,
+  "sessionCount": 57,
   "currentFeature": null,
   "currentPhase": null,
   "matchRate": null,
   "iterationCount": 0,
   "lastSession": {
-    "startedAt": "2026-05-24T11:24:00.000Z",
+    "startedAt": "2026-05-24T11:51:59.000Z",
     "platform": "claude",
     "level": "Enterprise"
   },
   "recentlyCompleted": [
+    {
+      "feature": "rpi-server-ip-rollover",
+      "phase": "report",
+      "completedAt": "2026-05-24T12:00:00Z",
+      "matchRate": 94,
+      "archivedTo": "docs/archive/2026-05/rpi-server-ip-rollover/"
+    },
     {
       "feature": "rpi-auto-device-provision",
       "phase": "report",
@@ -38,17 +45,9 @@
       "completedAt": "2026-05-22T22:30:00Z",
       "matchRate": 88,
       "archivedTo": "docs/archive/2026-05/rpi-golden-image-mass-production/"
-    },
-    {
-      "feature": "rpi-golden-image-system",
-      "phase": "report",
-      "completedAt": "2026-05-22T00:00:00Z",
-      "matchRate": 99,
-      "archivedTo": "docs/archive/2026-05/rpi-golden-image-system/"
     }
   ],
   "queuedFeatures": [
-    "rpi-server-ip-rollover",
     "rpi-activity-log-pk-trace"
   ]
 }

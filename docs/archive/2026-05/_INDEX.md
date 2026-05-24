@@ -15,6 +15,7 @@
 | [rpi-hostname-gateway-id-unify](./rpi-hostname-gateway-id-unify/) | 2026-05-23 | 96% | 1 | plan, design, analysis, report |
 | [rpi-local-broker-failover](./rpi-local-broker-failover/) | 2026-05-24 | 92% | 1 | plan, design, analysis, report |
 | [rpi-auto-device-provision](./rpi-auto-device-provision/) | 2026-05-24 | 82% | 1 | plan, design, analysis, report |
+| [rpi-server-ip-rollover](./rpi-server-ip-rollover/) | 2026-05-24 | 94% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -85,3 +86,9 @@
 - [design](./rpi-auto-device-provision/rpi-auto-device-provision.design.md)
 - [analysis](./rpi-auto-device-provision/rpi-auto-device-provision.analysis.md)
 - [report](./rpi-auto-device-provision/rpi-auto-device-provision.report.md)
+
+### rpi-server-ip-rollover (E-4 미완 + apply-server-ip.sh 4가지 fix)
+- [plan](./rpi-server-ip-rollover/rpi-server-ip-rollover.plan.md)
+- [design](./rpi-server-ip-rollover/rpi-server-ip-rollover.design.md)
+- [analysis](./rpi-server-ip-rollover/rpi-server-ip-rollover.analysis.md)
+- [report](./rpi-server-ip-rollover/rpi-server-ip-rollover.report.md)

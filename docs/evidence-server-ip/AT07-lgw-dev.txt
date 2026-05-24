@@ -1,0 +1,3 @@
+COMMAND     PID       USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+sshd-sess 88071 ojeongseog   12u  IPv6 0x26424cfd0def0dc5      0t0  TCP [::1]:22201 (LISTEN)
+sshd-sess 88071 ojeongseog   14u  IPv4 0xd1452b81d0c033f9      0t0  TCP 127.0.0.1:22201 (LISTEN)

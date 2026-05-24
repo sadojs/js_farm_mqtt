@@ -7,9 +7,11 @@
 # 영향:
 #   - /etc/smartfarm/server-ip
 #   - /opt/zigbee2mqtt/data/configuration.yaml (mqtt.server)
-#   - /etc/smartfarm/config-agent.env / gpio-agent.env (MQTT_SERVER)
+#   - /etc/smartfarm/config-agent.env / gpio-agent.env / fallback-engine.env (MQTT_SERVER)
 #   - /etc/systemd/system/reverse-ssh-tunnel.service (Environment=SERVER_HOST)
-#   - 서비스 재시작: zigbee2mqtt, config-agent, gpio-agent, reverse-ssh-tunnel
+#   - /etc/mosquitto/conf.d/bridge-cloud.conf (rpi-local-broker-failover, address)
+#   - 서비스 재시작: zigbee2mqtt, config-agent, gpio-agent, fallback-engine,
+#     mosquitto(bridge reload), reverse-ssh-tunnel
 #
 # 주의: config-agent 재시작은 응답 전송 직후 handler가 별도 처리
 # ============================================================
@@ -48,7 +50,8 @@ if [ -f "$Z2M_CFG" ]; then
 fi
 
 # 3. /etc/smartfarm/*.env (EnvironmentFile)
-for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env; do
+# rpi-server-ip-rollover: fallback-engine.env 추가 (BUG-01 유사 패턴 회피)
+for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env /etc/smartfarm/fallback-engine.env; do
   if [ -f "$envf" ]; then
     if grep -qE "^MQTT_SERVER=" "$envf"; then
       sed -i.bak -E "s|^MQTT_SERVER=.*|MQTT_SERVER=mqtt://${NEW}:1883|" "$envf"
@@ -57,6 +60,14 @@ for envf in /etc/smartfarm/config-agent.env /etc/smartfarm/gpio-agent.env; do
     fi
   fi
 done
+
+# 3-b. mosquitto bridge-cloud.conf — rpi-local-broker-failover 사이클 산출물.
+# 로컬 broker 사용 PI는 broker URL은 localhost 유지, bridge target만 변경.
+BRIDGE_CFG="/etc/mosquitto/conf.d/bridge-cloud.conf"
+if [ -f "$BRIDGE_CFG" ]; then
+  sed -i.bak -E "s|^address [^:[:space:]]+:1883|address ${NEW}:1883|" "$BRIDGE_CFG"
+  echo "bridge-cloud.conf address → ${NEW}:1883" >&2
+fi
 
 # 4. systemd Environment (인라인 systemd unit에서)
 for svc in /etc/systemd/system/config-agent.service /etc/systemd/system/gpio-agent.service; do
@@ -72,9 +83,12 @@ if [ -f "$TUN_SVC" ]; then
 fi
 
 # 6. daemon-reload + 재시작 (config-agent는 handler에서 별도)
+# rpi-server-ip-rollover: fallback-engine + mosquitto(bridge 갱신) 재시작 추가
 systemctl daemon-reload >&2 || true
 systemctl restart zigbee2mqtt >&2 || true
 systemctl restart gpio-agent >&2 || true
+systemctl restart fallback-engine >&2 || true
+systemctl restart mosquitto >&2 || true
 
 # 7. 새 서버에 tunnel-key 재등록 (개발 → 프로덕션 전환 시나리오)
 #    기존 tunnel_key를 새 서버 authorized_keys에 자동 등록 + 새 tunnel.env 수신

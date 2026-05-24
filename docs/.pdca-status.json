@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-24T11:24:00.000Z",
+  "lastUpdated": "2026-05-24T11:51:59.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -658,12 +658,12 @@
       "archivedTo": "docs/archive/2026-05/rpi-hostname-gateway-id-unify/"
     },
     "rpi-server-ip-rollover": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
-      "startedAt": "2026-05-23T00:00:00Z",
-      "description": "E-4 server-ip 검증 완료",
-      "planDoc": "docs/01-plan/features/rpi-server-ip-rollover.plan.md"
+      "phase": "archived",
+      "matchRate": 94,
+      "iterationCount": 1,
+      "startedAt": "2026-05-24T00:00:00Z",
+      "archivedAt": "2026-05-24T12:00:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-server-ip-rollover/"
     },
     "rpi-auto-device-provision": {
       "phase": "archived",
