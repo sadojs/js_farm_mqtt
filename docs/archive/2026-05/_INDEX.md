@@ -16,6 +16,7 @@
 | [rpi-local-broker-failover](./rpi-local-broker-failover/) | 2026-05-24 | 92% | 1 | plan, design, analysis, report |
 | [rpi-auto-device-provision](./rpi-auto-device-provision/) | 2026-05-24 | 82% | 1 | plan, design, analysis, report |
 | [rpi-server-ip-rollover](./rpi-server-ip-rollover/) | 2026-05-24 | 94% | 1 | plan, design, analysis, report |
+| [rpi-activity-log-pk-trace](./rpi-activity-log-pk-trace/) | 2026-05-24 | 88% | 1 | plan, analysis, report |
 
 ## Quick Links
 
@@ -92,3 +93,8 @@
 - [design](./rpi-server-ip-rollover/rpi-server-ip-rollover.design.md)
 - [analysis](./rpi-server-ip-rollover/rpi-server-ip-rollover.analysis.md)
 - [report](./rpi-server-ip-rollover/rpi-server-ip-rollover.report.md)
+
+### rpi-activity-log-pk-trace (BUG-04 root cause: sensor_data PK + try/catch + process safety net)
+- [plan](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.plan.md)
+- [analysis](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.analysis.md)
+- [report](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.report.md)

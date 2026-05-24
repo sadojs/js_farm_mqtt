@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { SensorData } from './entities/sensor-data.entity';
 
 @Injectable()
 export class SensorsService {
+  private readonly logger = new Logger(SensorsService.name);
+
   constructor(
     @InjectRepository(SensorData) private sensorRepo: Repository<SensorData>,
     private dataSource: DataSource,
@@ -96,7 +98,22 @@ export class SensorsService {
       unit: data.unit,
       status: (data.status as any) || 'normal',
     });
-    return this.sensorRepo.save(entity);
+    // rpi-activity-log-pk-trace (BUG-04): sensor_data PK가 (time)뿐이라
+    // 같은 ms에 들어오는 여러 센서 메시지가 충돌 → unhandledRejection으로
+    // backend abort 발생. try/catch로 흡수 + 1개 손실 허용.
+    // 장기적으로 PK 확장(time, device_id, sensor_type) 마이그레이션 필요.
+    try {
+      return await this.sensorRepo.save(entity);
+    } catch (err: any) {
+      // PostgreSQL unique violation
+      if (err?.code === '23505') {
+        this.logger.warn(
+          `sensor_data PK 충돌 (skip): device=${data.deviceId} type=${data.sensorType} time=${entity.time.toISOString()}`,
+        );
+        return null;
+      }
+      throw err;
+    }
   }
 
   async getLatest(userId: string | null) {

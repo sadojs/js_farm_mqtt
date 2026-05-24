@@ -32,5 +32,14 @@ async function bootstrap() {
   const port = process.env.PORT || 3100;
   await app.listen(port);
   logger.log(`Smart Farm MQTT API running on port ${port}`);
+
+  // rpi-activity-log-pk-trace (BUG-04): MQTT 메시지 핸들러에서 발생한
+  // QueryFailedError 등이 unhandledRejection으로 process abort 야기 → 안전망.
+  process.on('unhandledRejection', (reason: any) => {
+    logger.error(`UnhandledRejection (process kept alive): ${reason?.stack || String(reason)}`);
+  });
+  process.on('uncaughtException', (err) => {
+    logger.error(`UncaughtException (process kept alive): ${err?.stack || String(err)}`);
+  });
 }
 bootstrap();

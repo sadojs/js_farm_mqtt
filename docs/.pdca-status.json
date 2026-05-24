@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-24T11:51:59.000Z",
+  "lastUpdated": "2026-05-24T11:57:49.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -675,12 +675,13 @@
       "archivedTo": "docs/archive/2026-05/rpi-auto-device-provision/"
     },
     "rpi-activity-log-pk-trace": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
-      "startedAt": "2026-05-23T00:00:00Z",
-      "description": "BUG-04: PK 충돌 → backend abort 추적",
-      "planDoc": "docs/01-plan/features/rpi-activity-log-pk-trace.plan.md"
+      "phase": "archived",
+      "matchRate": 88,
+      "iterationCount": 1,
+      "startedAt": "2026-05-24T00:00:00Z",
+      "archivedAt": "2026-05-24T13:00:00Z",
+      "nameCorrection": "activity_logs → sensor_data",
+      "archivedTo": "docs/archive/2026-05/rpi-activity-log-pk-trace/"
     },
     "rpi-local-broker-failover": {
       "phase": "archived",
