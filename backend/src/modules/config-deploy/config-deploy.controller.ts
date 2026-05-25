@@ -1,6 +1,6 @@
 import {
   Controller, Get, Put, Post, Param, Body, UseGuards,
-  HttpCode, HttpStatus, Headers, UnauthorizedException, Req,
+  HttpCode, HttpStatus, Headers, UnauthorizedException, Req, Res, BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConfigDeployService } from './config-deploy.service';
@@ -12,7 +12,12 @@ import { UpdateHostnameDto } from './dto/update-hostname.dto';
 import { UpdateGatewayIdDto } from './dto/update-gateway-id.dto';
 import { UpdateServerIpDto } from './dto/update-server-ip.dto';
 import { UpdateIdentityDto } from './dto/update-identity.dto';
+import { UpdateAgentDto } from './dto/update-agent.dto';
 import { RegisterTunnelKeyDto } from './dto/register-tunnel-key.dto';
+import { spawn } from 'child_process';
+import { join, resolve as resolvePath } from 'path';
+import { existsSync } from 'fs';
+import type { Response } from 'express';
 import {
   CommonConfig, DeployResult, PreviewResult, RemoteConfigAccepted,
 } from './config-deploy.types';
@@ -133,6 +138,59 @@ export class ConfigDeployController {
       gatewayId, dto.name,
       { id: req.user.id, name: req.user.username ?? req.user.name ?? 'unknown' },
     );
+  }
+
+  /**
+   * rpi-agent-version-update
+   * Pi에 agent 코드 업데이트 명령 전송. PI는 위 /agent-archive endpoint로 archive 다운로드.
+   */
+  @Post(':gatewayId/agent-update')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  requestAgentUpdate(
+    @Param('gatewayId') gatewayId: string,
+    @Body() dto: UpdateAgentDto,
+    @Req() req: any,
+  ): Promise<RemoteConfigAccepted> {
+    return this.configDeployService.requestAgentUpdate(
+      gatewayId, dto.agent,
+      { id: req.user.id, name: req.user.username ?? req.user.name ?? 'unknown' },
+    );
+  }
+
+  /**
+   * rpi-agent-version-update
+   * agent 코드(raspberry-pi/{agent}/) 를 tar.gz로 stream.
+   * Pi의 apply-agent-update.sh가 curl로 다운로드. BOOTSTRAP_TOKEN 인증 (PI 사전 주입).
+   */
+  @Get('agent-archive/:agent')
+  agentArchive(
+    @Param('agent') agent: string,
+    @Headers('x-smartfarm-bootstrap-token') token: string | undefined,
+    @Res() res: Response,
+  ): void {
+    const validAgents = ['config-agent', 'gpio-agent', 'fallback-engine'];
+    if (!validAgents.includes(agent)) {
+      throw new BadRequestException(`invalid agent: ${agent}`);
+    }
+    const expected = this.configService.get<string>('BOOTSTRAP_TOKEN');
+    if (!expected || token !== expected) {
+      throw new UnauthorizedException('invalid bootstrap token');
+    }
+    // raspberry-pi/{agent}/ 경로 = backend 프로젝트 루트의 ../raspberry-pi/{agent}
+    const baseDir = resolvePath(process.cwd(), '..', 'raspberry-pi', agent);
+    if (!existsSync(baseDir)) {
+      throw new BadRequestException(`agent dir not found: ${baseDir}`);
+    }
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename=${agent}.tar.gz`);
+    // node_modules 제외하고 tar.gz stream
+    const tar = spawn('tar', ['czf', '-', '--exclude=node_modules', '--exclude=.git', '-C', resolvePath(baseDir, '..'), agent]);
+    tar.stdout.pipe(res);
+    tar.stderr.on('data', (d) => console.error('[agent-archive] tar stderr:', d.toString()));
+    tar.on('error', (e) => { console.error('[agent-archive]', e); if (!res.headersSent) res.status(500).end(); });
+    tar.on('close', (code) => { if (code !== 0 && !res.writableEnded) res.end(); });
   }
 
   @Post(':gatewayId/server-ip')

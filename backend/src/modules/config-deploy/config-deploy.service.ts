@@ -59,6 +59,7 @@ const TIMEOUTS_MS: Record<ConfigAction, number> = {
   hostname_update: 30_000,
   gateway_id_update: 60_000,
   identity_update: 90_000,  // hostname + gateway-id 통합 — gateway_id_update + 여유
+  agent_update: 180_000,    // npm install + restart + verify 시간
   server_ip_update: 120_000,
 };
 
@@ -308,6 +309,25 @@ export class ConfigDeployService implements OnModuleInit {
       { serverIp: newServerIp },
       user,
       { serverIp: newServerIp },
+    );
+  }
+
+  /**
+   * rpi-agent-version-update
+   * Pi의 agent(config-agent / gpio-agent / fallback-engine) 코드 update 요청.
+   * PI 측에서 backend의 /agent-archive endpoint로 tar.gz 다운로드 → 백업 → 교체 → 재시작.
+   */
+  async requestAgentUpdate(
+    gatewayId: string,
+    agent: 'config-agent' | 'gpio-agent' | 'fallback-engine',
+    user: { id: string; name: string },
+  ): Promise<RemoteConfigAccepted> {
+    return this.publishAndTrack(
+      gatewayId,
+      'agent_update',
+      { agent },
+      user,
+      undefined,
     );
   }
 

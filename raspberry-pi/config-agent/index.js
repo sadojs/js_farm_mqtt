@@ -7,6 +7,7 @@ const { handleWifi } = require('./handlers/wifi');
 const { handleHostname } = require('./handlers/hostname');
 const { handleGatewayId } = require('./handlers/gateway-id');
 const { handleIdentity } = require('./handlers/identity');
+const { handleAgentUpdate } = require('./handlers/agent-update');
 const { handleServerIp } = require('./handlers/server-ip');
 
 // ---- 환경 변수 ----
@@ -131,6 +132,10 @@ async function handleRequest(payload) {
       case 'identity_update':
         // rpi-hostname-gateway-id-unify: hostname + gateway-id 통합 변경
         await runRemoteAction(requestId, action, () => handleIdentity(request));
+        break;
+      case 'agent_update':
+        // rpi-agent-version-update: PI agent 코드 update
+        await runRemoteAction(requestId, action, () => handleAgentUpdate(request));
         break;
       case 'server_ip_update':
         await runRemoteAction(requestId, action, () => handleServerIp(request));

@@ -1,0 +1,15 @@
+--- apply-agent-update.log ---
+=== 2026-05-25T12:40:22+09:00 fallback-engine update ===
+/opt/smart-farm/scripts/apply-agent-update.sh: line 52: syntax error near unexpected token `&'
+/opt/smart-farm/scripts/apply-agent-update.sh: line 52: `     "$URL" -o "${TMP}/agent.tar.gz" 2>>&1; then'
+=== 2026-05-25T12:41:53+09:00 fallback-engine update ===
+
+up to date in 4s
+
+--- fallback-engine active ---
+active
+--- config-agent response log ---
+May 25 12:40:22 lgw-pilot01 node[951]: [CONFIG-AGENT] 요청 수신: agent_update (2657bd17-127d-4c19-85c2-cff5fa283d55)
+May 25 12:40:22 lgw-pilot01 node[951]: [CONFIG-AGENT] 응답 전송: agent_update 실패 (2657bd17-127d-4c19-85c2-cff5fa283d55)
+May 25 12:41:53 lgw-pilot01 node[951]: [CONFIG-AGENT] 요청 수신: agent_update (8dac13db-1156-4e30-9c49-4598e277f05f)
+May 25 12:42:05 lgw-pilot01 node[951]: [CONFIG-AGENT] 응답 전송: agent_update 성공 (8dac13db-1156-4e30-9c49-4598e277f05f)

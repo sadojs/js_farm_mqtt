@@ -17,6 +17,7 @@
 | [rpi-auto-device-provision](./rpi-auto-device-provision/) | 2026-05-24 | 82% | 1 | plan, design, analysis, report |
 | [rpi-server-ip-rollover](./rpi-server-ip-rollover/) | 2026-05-24 | 94% | 1 | plan, design, analysis, report |
 | [rpi-activity-log-pk-trace](./rpi-activity-log-pk-trace/) | 2026-05-24 | 88% | 1 | plan, analysis, report |
+| [rpi-agent-version-update](./rpi-agent-version-update/) | 2026-05-25 | 85% | 1 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -98,3 +99,9 @@
 - [plan](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.plan.md)
 - [analysis](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.analysis.md)
 - [report](./rpi-activity-log-pk-trace/rpi-activity-log-pk-trace.report.md)
+
+### rpi-agent-version-update Phase 1 (agent 코드 HTTP archive update)
+- [plan](./rpi-agent-version-update/rpi-agent-version-update.plan.md)
+- [design](./rpi-agent-version-update/rpi-agent-version-update.design.md)
+- [analysis](./rpi-agent-version-update/rpi-agent-version-update.analysis.md)
+- [report](./rpi-agent-version-update/rpi-agent-version-update.report.md)

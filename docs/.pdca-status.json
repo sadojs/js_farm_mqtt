@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-24T21:27:06.000Z",
+  "lastUpdated": "2026-05-25T03:45:18.000Z",
   "activeFeatures": [
     "web-terminal",
     "account-username-login",
@@ -699,13 +699,13 @@
       ]
     },
     "rpi-agent-version-update": {
-      "phase": "plan",
-      "matchRate": null,
-      "iterationCount": 0,
-      "startedAt": "2026-05-24T21:27:06.000Z",
-      "description": "agent 코드 N대 일괄 update (config-agent/gpio-agent/fallback-engine git pull + restart + rollback)",
-      "planDoc": "docs/01-plan/features/rpi-agent-version-update.plan.md",
-      "relatedTo": "configdeploy-ux-workflow-groups"
+      "phase": "archived",
+      "matchRate": 85,
+      "iterationCount": 1,
+      "phaseScope": "phase-1-only",
+      "startedAt": "2026-05-25T00:00:00Z",
+      "archivedAt": "2026-05-25T13:00:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-agent-version-update/"
     }
   },
   "pipeline": {

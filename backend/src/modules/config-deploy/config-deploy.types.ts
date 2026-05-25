@@ -58,6 +58,7 @@ export type ConfigAction =
   | 'hostname_update'    // 신규 — hostname 변경 + reboot 예약
   | 'gateway_id_update'  // 신규 — gateway-id 변경 (DB + Pi)
   | 'identity_update'    // 신규 — hostname + gateway-id 통합 변경 (rpi-hostname-gateway-id-unify)
+  | 'agent_update'       // 신규 — Pi agent 코드 update (rpi-agent-version-update)
   | 'server_ip_update';  // 신규 — MQTT/tunnel 서버 IP 동시 변경
 
 export type ConfigResponseStatus =
@@ -78,6 +79,8 @@ export interface ConfigRequestPayload {
   serverIp?: string;
   /** identity_update: hostname + gateway-id 통합 변경 — 둘 다 동일 값 */
   name?: string;
+  /** agent_update: 업데이트할 agent 종류 */
+  agent?: 'config-agent' | 'gpio-agent' | 'fallback-engine';
 }
 
 export interface ConfigResponsePayload {

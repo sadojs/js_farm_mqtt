@@ -1,15 +1,23 @@
 {
-  "sessionCount": 58,
+  "sessionCount": 59,
   "currentFeature": null,
   "currentPhase": null,
   "matchRate": null,
   "iterationCount": 0,
   "lastSession": {
-    "startedAt": "2026-05-24T21:27:06.000Z",
+    "startedAt": "2026-05-25T03:45:18.000Z",
     "platform": "claude",
     "level": "Enterprise"
   },
   "recentlyCompleted": [
+    {
+      "feature": "rpi-agent-version-update",
+      "phase": "report",
+      "completedAt": "2026-05-25T13:00:00Z",
+      "matchRate": 85,
+      "phaseScope": "phase-1-only",
+      "archivedTo": "docs/archive/2026-05/rpi-agent-version-update/"
+    },
     {
       "feature": "rpi-activity-log-pk-trace",
       "phase": "report",
@@ -38,16 +46,7 @@
       "matchRate": 92,
       "phaseScope": "phase-1-only",
       "archivedTo": "docs/archive/2026-05/rpi-local-broker-failover/"
-    },
-    {
-      "feature": "rpi-hostname-gateway-id-unify",
-      "phase": "report",
-      "completedAt": "2026-05-23T22:00:00Z",
-      "matchRate": 96,
-      "archivedTo": "docs/archive/2026-05/rpi-hostname-gateway-id-unify/"
     }
   ],
-  "queuedFeatures": [
-    "rpi-agent-version-update"
-  ]
+  "queuedFeatures": []
 }
