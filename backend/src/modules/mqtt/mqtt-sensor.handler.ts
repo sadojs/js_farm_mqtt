@@ -17,8 +17,12 @@ const SENSOR_MAP: Record<string, { field: string; unit: string; isBoolean?: bool
   illuminance:     { field: 'illuminance', unit: 'lux' },
   soil_moisture:   { field: 'soil_moisture', unit: '%' },
   pressure:        { field: 'pressure', unit: 'hPa' },
-  // Tuya TS0207 우적/누수 센서 → rain_detection 채널로 정규화 (1/0)
+  // Tuya TS0207 누수 센서 → rain_detection 채널로 정규화 (1/0)
   water_leak:      { field: 'rain_detection', unit: '', isBoolean: true },
+  // Tuya 광학식 우적 센서 (rain detector 변종) — 'rain' boolean + 'rain_intensity' 수치
+  rain:            { field: 'rain_detection', unit: '', isBoolean: true },
+  rain_intensity:  { field: 'rain_intensity', unit: '' },
+  illuminance_raw: { field: 'illuminance', unit: 'lux' },
 };
 
 @Injectable()

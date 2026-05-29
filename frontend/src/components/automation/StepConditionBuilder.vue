@@ -40,7 +40,19 @@
             </div>
 
             <div class="row-fields" :class="{ 'row-fields-time': cond.type === 'time' || cond.field === 'time' || cond.field === 'hour' }">
-              <!-- 필드 선택 (시간 단일 옵션일 때는 라벨로 표시) -->
+              <!-- 특정 센서 디바이스 선택 (왼쪽) — 시간 조건이 아니고 센서 조건일 때만 -->
+              <select
+                v-if="!timeOnly && isSensorCondition(cond) && sensorDevices.length > 0"
+                :value="cond.sensor_device_id || ''"
+                @change="changeSensorDevice(gi, ci, ($event.target as HTMLSelectElement).value)"
+                class="device-select"
+                title="특정 센서 장치 선택 (선택 안하면 그룹 평균 사용)"
+              >
+                <option value="">그룹 평균</option>
+                <option v-for="d in sensorDevices" :key="d.id" :value="d.id">{{ d.name }}</option>
+              </select>
+
+              <!-- 필드(센서값) 선택 (오른쪽) — 시간 단일 옵션일 때는 라벨로 표시 -->
               <span
                 v-if="(cond.type === 'time' || cond.field === 'time' || cond.field === 'hour') && availableFields.length <= 1"
                 class="field-label-static"
@@ -54,18 +66,6 @@
                 <option v-for="f in fieldsForCondition(cond)" :key="f.value" :value="f.value">
                   {{ f.displayLabel }}
                 </option>
-              </select>
-
-              <!-- 특정 센서 디바이스 선택 (선택적) -->
-              <select
-                v-if="!timeOnly && isSensorCondition(cond) && sensorDevices.length > 0"
-                :value="cond.sensor_device_id || ''"
-                @change="changeSensorDevice(gi, ci, ($event.target as HTMLSelectElement).value)"
-                class="device-select"
-                title="특정 센서 장치 선택 (선택 안하면 그룹 평균 사용)"
-              >
-                <option value="">그룹 평균</option>
-                <option v-for="d in sensorDevices" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
 
               <!-- 히스테리시스 UI (FR-02): fan + temperature/humidity 관련 역할 -->
@@ -177,6 +177,24 @@
     </div>
 
     <!-- 시간대 스케줄러 (선택): timeOnly + fan에서만 사용 가능, 사용자가 명시적으로 활성화한 경우에만 노출 -->
+    <!-- 단일 시간 조건일 때도 요일 선택 표시 (사용자 요청 — 수정 페이지 요일 누락 fix) -->
+    <div v-if="hasTimeCondition && !useMultiTimeSlots" class="day-selector-single">
+      <label class="day-selector-label">📅 요일 선택</label>
+      <div class="day-selector">
+        <button
+          v-for="d in DAYS"
+          :key="d.value"
+          class="day-btn"
+          :class="{ active: selectedDays.includes(d.value) }"
+          @click="toggleDay(d.value)"
+        >{{ d.label }}</button>
+      </div>
+      <label class="repeat-toggle">
+        <input type="checkbox" v-model="repeatWeekly" />
+        매주 반복
+      </label>
+    </div>
+
     <div v-if="timeOnly && isFan && useMultiTimeSlots" class="time-scheduler">
       <div class="scheduler-header">
         <h4 class="scheduler-title">시간대 일정 (다중 구간)</h4>
@@ -271,6 +289,17 @@ const emit = defineEmits<{
 }>()
 
 const isFan = computed(() => props.equipmentType === 'fan')
+
+// 시간 조건이 하나라도 존재하면 요일 선택 UI 표시 (단일 시간대 모드)
+const hasTimeCondition = computed(() => {
+  const groups = (props.modelValue as any)?.groups || []
+  for (const g of groups) {
+    for (const c of (g.conditions || [])) {
+      if (c.type === 'time' || c.field === 'time' || c.field === 'hour') return true
+    }
+  }
+  return false
+})
 
 // env roles 및 resolved values
 const envRoles = ref<EnvRole[]>([])
@@ -516,15 +545,30 @@ function toggleDay(day: number) {
 
 // 시간대 스케줄러가 변경되면 조건에 반영 — 사용자가 명시적으로 활성화한 경우에만
 watch([timeSlots, selectedDays, repeatWeekly, useMultiTimeSlots], () => {
-  if (!props.timeOnly || !isFan.value) return
-  if (!useMultiTimeSlots.value) return
-  const next = clone()
-  if (next.groups[0]?.conditions[0]) {
-    next.groups[0].conditions[0].timeSlots = JSON.parse(JSON.stringify(timeSlots.value))
-    next.groups[0].conditions[0].daysOfWeek = [...selectedDays.value]
-    next.groups[0].conditions[0].repeat = repeatWeekly.value
+  // 다중 시간대 (환풍기 + multi-slots) 케이스
+  if (props.timeOnly && isFan.value && useMultiTimeSlots.value) {
+    const next = clone()
+    if (next.groups[0]?.conditions[0]) {
+      next.groups[0].conditions[0].timeSlots = JSON.parse(JSON.stringify(timeSlots.value))
+      next.groups[0].conditions[0].daysOfWeek = [...selectedDays.value]
+      next.groups[0].conditions[0].repeat = repeatWeekly.value
+    }
+    emit('update:modelValue', next)
+    return
   }
-  emit('update:modelValue', next)
+  // 단일 시간대 케이스: 시간 조건이 있으면 daysOfWeek/repeat만 반영 (사용자 요청)
+  if (!useMultiTimeSlots.value && hasTimeCondition.value) {
+    const next = clone()
+    for (const g of (next.groups || [])) {
+      for (const c of (g.conditions || [])) {
+        if (c.type === 'time' || c.field === 'time' || c.field === 'hour') {
+          ;(c as any).daysOfWeek = [...selectedDays.value]
+          ;(c as any).repeat = repeatWeekly.value
+        }
+      }
+    }
+    emit('update:modelValue', next)
+  }
 }, { deep: true })
 
 const TIME_ONLY_FIELDS = SENSOR_CONDITION_FIELDS.filter(f => f.type === 'time')
@@ -894,4 +938,21 @@ function addGroup() {
   font-size: 14px; color: var(--text-secondary); cursor: pointer;
 }
 .repeat-toggle input { width: 18px; height: 18px; cursor: pointer; }
+
+/* 단일 시간 조건일 때의 요일 선택 컨테이너 (수정 페이지 누락 fix) */
+.day-selector-single {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-input, #e5e7eb);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.day-selector-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+}
 </style>

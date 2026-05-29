@@ -97,4 +97,15 @@ export class GatewayManagerController {
     return { success: true, gatewayId: gw.gatewayId, permitJoin: body.enable };
   }
 
+  /** Pi systemd 서비스 재시작 (allowlist 검증) — gpio-agent 무응답 등 복구용 */
+  @Post(':id/restart-service')
+  @Roles('admin', 'farm_admin')
+  async restartService(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { service: string },
+  ) {
+    const gw = await this.gatewayService.findOneByRole(id, this.getEffectiveUserId(user), user.role);
+    return this.gatewayService.restartPiService(gw, body.service);
+  }
 }

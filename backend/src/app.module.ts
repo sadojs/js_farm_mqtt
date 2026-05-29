@@ -28,6 +28,7 @@ import { SshProxyModule } from './modules/ssh-proxy/ssh-proxy.module';
 import { GatewayEnvModule } from './modules/gateway-env/gateway-env.module';
 import { GpioModule } from './modules/gpio/gpio.module';
 import { RainOverrideModule } from './modules/rain-override/rain-override.module';
+import { FallbackConfigModule } from './modules/fallback-config/fallback-config.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
@@ -70,6 +71,7 @@ import { RetentionService } from './common/retention.service';
     GatewayEnvModule,
     GpioModule,
     RainOverrideModule,
+    FallbackConfigModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

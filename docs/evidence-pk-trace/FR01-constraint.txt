@@ -1,0 +1,5 @@
+            conname             | table_name  | contype |         def          
+--------------------------------+-------------+---------+----------------------
+ PK_d153bd1f972e9997ea908097a1d | sensor_data | p       | PRIMARY KEY ("time")
+(1 row)
+

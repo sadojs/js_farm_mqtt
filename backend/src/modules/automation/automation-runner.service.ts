@@ -126,6 +126,13 @@ export class AutomationRunnerService {
     const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
 
     if (!conditionResult.matched) {
+      // 룰 active → inactive 전환: 대상 device의 relayActivePhase 해제 + switchState=false
+      const prev = this.lastState.get(rule.id);
+      if (prev?.matched) {
+        await this.clearRelayActivePhase(rule).catch(err =>
+          this.logger.warn(`relayActivePhase 해제 실패: ${err.message}`)
+        );
+      }
       this.lastState.delete(rule.id);
       return { executed: false, reason: 'conditions_not_met', details: conditionResult.details };
     }
@@ -135,12 +142,29 @@ export class AutomationRunnerService {
     if (relayResult) {
       // 히스테리시스 결과를 추출 — 개폐기에서 어느 페어(open/close) 장치를 펄스할지 결정
       const hysteresisAction = this.extractHysteresisAction(conditionResult.details);
+
+      // 비-페어 device(예: 유동팬)에서 hysteresisAction='off'는 룰 종료로 간주.
+      // (페어 device는 'off' 시 반대 방향으로 라우팅하지만 단일 device는 그냥 stop)
+      if (hysteresisAction === 'off') {
+        const isOpenerRule = await this.isOpenerRule(rule);
+        if (!isOpenerRule) {
+          // 항상 clearRelayActivePhase 호출 — backend 재시작으로 lastState 캐시가 비어있어도
+          // device.deviceSettings.relayActivePhase가 남아있으면 정리 (내부에서 idempotent)
+          await this.clearRelayActivePhase(rule).catch(err =>
+            this.logger.warn(`relayActivePhase 해제 실패: ${err.message}`)
+          );
+          this.lastState.delete(rule.id);
+          return { executed: false, reason: 'hysteresis_off_non_opener' };
+        }
+      }
       // 릴레이 상태 변경 시에만 실행 (ON→OFF 또는 OFF→ON)
       // hysteresis 방향이 바뀐 경우(예: 열기 사이클 → 닫기 사이클)도 무조건 즉시 반영
       const prev = this.lastState.get(rule.id);
       const phaseChanged = prev?.relayOnPhase !== relayResult.isOnPhase;
       const directionChanged = prev?.hysteresisAction !== hysteresisAction;
       if (prev?.matched && !phaseChanged && !directionChanged) {
+        // 상태는 안 바뀌지만 룰이 active이므로 sticky 유지 — relayActiveUntil 갱신 (heartbeat)
+        await this.refreshRelayActiveUntil(rule).catch(() => undefined);
         return { executed: false, reason: 'relay_state_unchanged' };
       }
       this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction });
@@ -836,6 +860,63 @@ export class AutomationRunnerService {
     return [device.id];
   }
 
+  /** 룰이 active 상태인 동안 relayActiveUntil 만료 방지 (매분 heartbeat) */
+  private async refreshRelayActiveUntil(rule: AutomationRule): Promise<void> {
+    const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
+    const ids: string[] = [];
+    if (action?.targetDeviceId) ids.push(action.targetDeviceId);
+    if (Array.isArray(action?.targetDeviceIds)) ids.push(...action.targetDeviceIds);
+    const until = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    for (const id of [...new Set(ids)]) {
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      if (!dev) continue;
+      const settings: any = dev.deviceSettings || {};
+      if (settings.relayActivePhase) {
+        settings.relayActiveUntil = until;
+        dev.deviceSettings = settings;
+        await this.devicesRepo.save(dev);
+      }
+    }
+  }
+
+  /**
+   * 룰이 inactive 전환 시 — 대상 device의 relayActivePhase 해제 + switchState=false.
+   * 펄스 사이클 sticky 상태를 정리하여 UI 토글이 OFF로 돌아가도록.
+   */
+  private async clearRelayActivePhase(rule: AutomationRule): Promise<void> {
+    const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
+    const ids: string[] = [];
+    if (action?.targetDeviceId) ids.push(action.targetDeviceId);
+    if (Array.isArray(action?.targetDeviceIds)) ids.push(...action.targetDeviceIds);
+    for (const id of [...new Set(ids)]) {
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      if (!dev) continue;
+      // 페어 device도 함께 정리 (개폐기 페어)
+      const targets = [dev];
+      if (dev.pairedDeviceId) {
+        const paired = await this.devicesRepo.findOne({ where: { id: dev.pairedDeviceId } });
+        if (paired) targets.push(paired);
+      }
+      for (const t of targets) {
+        const settings: any = t.deviceSettings || {};
+        if (settings.relayActivePhase || settings.switchState) {
+          settings.relayActivePhase = null;
+          settings.relayActiveRuleId = null;
+          settings.relayActiveUntil = null;
+          settings.switchState = false;
+          t.deviceSettings = settings;
+          await this.devicesRepo.save(t);
+          this.eventsGateway.broadcastDeviceSwitchUpdate?.(t.userId, {
+            deviceId: t.id,
+            switchState: false,
+            switchStates: settings.switchStates ?? null,
+            online: t.online,
+          });
+        }
+      }
+    }
+  }
+
   private async executeRelayAction(
     rule: AutomationRule,
     relay: { isOnPhase: boolean; condition: any },
@@ -855,6 +936,55 @@ export class AutomationRunnerService {
     try {
       actionResult = await this.executeAction(rule, actionOverride);
       this.logger.log(`릴레이 ${relay.isOnPhase ? 'ON' : 'OFF'} 실행: rule=${rule.name}`);
+
+      // 개폐기/팬: 펄스 사이클 active 표시 → frontend UI가 sticky ON 표시
+      // (펄스 OFF 구간이어도 룰 동작 중이라 화면은 ON 유지)
+      const targetDevices: any[] = actionResult?.devices || [];
+      for (const td of targetDevices) {
+        if (!td?.deviceId) continue;
+        const dev = await this.devicesRepo.findOne({ where: { id: td.deviceId } });
+        if (!dev) continue;
+
+        // 페어 전환 정리: 이 device가 opener면 페어(반대 방향)의 sticky 해제
+        if ((dev.equipmentType === 'opener_open' || dev.equipmentType === 'opener_close') && dev.pairedDeviceId) {
+          const paired = await this.devicesRepo.findOne({ where: { id: dev.pairedDeviceId } });
+          if (paired?.deviceSettings) {
+            const ps: any = paired.deviceSettings;
+            if (ps.relayActivePhase || ps.switchState) {
+              ps.relayActivePhase = null;
+              ps.relayActiveRuleId = null;
+              ps.relayActiveUntil = null;
+              ps.switchState = false;
+              paired.deviceSettings = ps;
+              await this.devicesRepo.save(paired);
+              this.eventsGateway.broadcastDeviceSwitchUpdate?.(paired.userId, {
+                deviceId: paired.id,
+                switchState: false,
+                switchStates: ps.switchStates ?? null,
+                online: paired.online,
+              });
+            }
+          }
+        }
+
+        const settings: any = dev.deviceSettings || {};
+        const direction = dev.equipmentType === 'opener_open' ? 'open'
+          : dev.equipmentType === 'opener_close' ? 'close'
+          : 'fan';
+        settings.relayActivePhase = direction;
+        settings.relayActiveRuleId = rule.id;
+        settings.relayActiveUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        // 룰 active 동안은 switchState도 true로 sticky 유지
+        settings.switchState = true;
+        dev.deviceSettings = settings;
+        await this.devicesRepo.save(dev);
+        this.eventsGateway.broadcastDeviceSwitchUpdate?.(dev.userId, {
+          deviceId: dev.id,
+          switchState: true,
+          switchStates: settings.switchStates ?? null,
+          online: dev.online,
+        });
+      }
     } catch (err: any) {
       success = false;
       errorMessage = err.message;

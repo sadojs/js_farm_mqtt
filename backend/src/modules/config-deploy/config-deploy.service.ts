@@ -1,5 +1,5 @@
 import {
-  Injectable, Logger, OnModuleInit,
+  Injectable, Logger, OnModuleInit, Inject, forwardRef,
   NotFoundException, ConflictException, ServiceUnavailableException,
   GatewayTimeoutException, BadRequestException,
 } from '@nestjs/common';
@@ -61,6 +61,7 @@ const TIMEOUTS_MS: Record<ConfigAction, number> = {
   identity_update: 90_000,  // hostname + gateway-id 통합 — gateway_id_update + 여유
   agent_update: 180_000,    // npm install + restart + verify 시간
   server_ip_update: 120_000,
+  service_restart: 30_000,  // systemctl restart + is-active 검증
 };
 
 interface PendingRequest {
@@ -87,6 +88,7 @@ export class ConfigDeployService implements OnModuleInit {
   private pending = new Map<string, PendingRequest>(); // requestId → PendingRequest
 
   constructor(
+    @Inject(forwardRef(() => GatewayManagerService))
     private gatewayService: GatewayManagerService,
     private sshService: SshProxyService,
     private mqttService: MqttService,
@@ -246,6 +248,22 @@ export class ConfigDeployService implements OnModuleInit {
   // ============================================================
   // MQTT 기반 원격 설정 배포 (rpi-golden-image-system)
   // ============================================================
+
+  /**
+   * gpio-agent 등 systemd 서비스 안전 재시작 요청 (MQTT → config-agent → systemctl restart).
+   * config-agent는 root로 실행되어 sudo 불필요. SSH 기반 path보다 안전.
+   */
+  async requestServiceRestart(
+    gatewayId: string, service: 'gpio-agent' | 'zigbee2mqtt' | 'fallback-engine' | 'reverse-ssh-tunnel',
+    user: { id: string; name: string },
+  ): Promise<RemoteConfigAccepted> {
+    return this.publishAndTrack(
+      gatewayId,
+      'service_restart',
+      { service },
+      user,
+    );
+  }
 
   async requestWifi(
     gatewayId: string, ssid: string, password: string,
@@ -415,7 +433,9 @@ export class ConfigDeployService implements OnModuleInit {
       gateway = this.gatewayRepo.create({
         userId: ownerUserId,
         gatewayId: newGatewayId,
-        name: `자동 등록 (${params.rpiIp ?? shortMid})`,
+        // 자동 등록 시 name은 gatewayId와 동일하게 (이후 운영자가 의미 있는 이름으로 변경 가능)
+        // 운영자가 gatewayId만 바꾸면 name도 자동 추종 — isDefaultGatewayName() 패턴 매칭으로 처리.
+        name: newGatewayId,
         hostname: params.gatewayId,
         rpiIp: params.rpiIp ?? undefined,
         machineId: params.machineId,
@@ -745,10 +765,17 @@ export class ConfigDeployService implements OnModuleInit {
           this.logger.warn(`${pending.action}: 게이트웨이 미발견 ${gatewayId}`);
           return;
         }
+        // name이 자동 등록 디폴트 패턴이거나 이전 gatewayId와 동일하면 새 gatewayId로 자동 추종.
+        // (운영자가 의미 있는 이름으로 바꾼 경우는 보존)
+        const shouldRenameDefault =
+          gw.name === gw.gatewayId ||
+          gw.name?.startsWith('자동 등록 ') ||
+          gw.name?.startsWith('자동등록 ');
         // 1. PK가 아닌 unique 컬럼 변경이므로 raw UPDATE. identity_update는 hostname도 동기화.
         await mgr.update(Gateway, { id: gw.id }, {
           gatewayId: newId,
           ...(isIdentity ? { hostname: newId } : {}),
+          ...(shouldRenameDefault ? { name: newId } : {}),
           lastConfigAppliedAt: new Date(),
         });
         // 2. FK 관련 테이블 명시 cascade.

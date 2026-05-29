@@ -59,7 +59,8 @@ export type ConfigAction =
   | 'gateway_id_update'  // 신규 — gateway-id 변경 (DB + Pi)
   | 'identity_update'    // 신규 — hostname + gateway-id 통합 변경 (rpi-hostname-gateway-id-unify)
   | 'agent_update'       // 신규 — Pi agent 코드 update (rpi-agent-version-update)
-  | 'server_ip_update';  // 신규 — MQTT/tunnel 서버 IP 동시 변경
+  | 'server_ip_update'   // 신규 — MQTT/tunnel 서버 IP 동시 변경
+  | 'service_restart';   // 신규 — systemd 서비스 안전 재시작 (gpio-agent 무응답 복구)
 
 export type ConfigResponseStatus =
   | 'success'              // hostname / gateway-id 일반 성공
@@ -81,6 +82,8 @@ export interface ConfigRequestPayload {
   name?: string;
   /** agent_update: 업데이트할 agent 종류 */
   agent?: 'config-agent' | 'gpio-agent' | 'fallback-engine';
+  /** service_restart: 재시작할 systemd 서비스명 */
+  service?: 'gpio-agent' | 'zigbee2mqtt' | 'fallback-engine' | 'reverse-ssh-tunnel';
 }
 
 export interface ConfigResponsePayload {

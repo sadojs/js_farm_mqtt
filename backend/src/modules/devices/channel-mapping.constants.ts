@@ -1,4 +1,4 @@
-// 8채널 기본 매핑
+// 8채널 기본 매핑 (onboard 보드 — USB 채널 사용)
 export const DEFAULT_CHANNEL_MAPPING_8CH: Record<string, string> = {
   remote_control:       'switch_1',
   zone_1:               'switch_2',
@@ -8,6 +8,18 @@ export const DEFAULT_CHANNEL_MAPPING_8CH: Record<string, string> = {
   fertilizer_b_contact: 'switch_6',
   mixer:                'switch_usb1',
   fertilizer_motor:     'switch_usb2',
+};
+
+// 8채널 기본 매핑 (zigbee — switch_7/8 사용, USB 없음)
+export const DEFAULT_CHANNEL_MAPPING_8CH_ZIGBEE: Record<string, string> = {
+  remote_control:       'switch_1',
+  zone_1:               'switch_2',
+  zone_2:               'switch_3',
+  zone_3:               'switch_4',
+  zone_4:               'switch_5',
+  fertilizer_b_contact: 'switch_6',
+  mixer:                'switch_7',
+  fertilizer_motor:     'switch_8',
 };
 
 // 12채널 기본 매핑
@@ -44,9 +56,11 @@ export const FUNCTION_LABELS: Record<string, string> = {
   fertilizer_motor:     '액비모터',
 };
 
+// 8CH 옵션 — onboard(switch_usb1/2)와 zigbee(switch_7/8) 둘 다 허용
 export const AVAILABLE_SWITCH_CODES_8CH = [
   'switch_1', 'switch_2', 'switch_3', 'switch_4',
-  'switch_5', 'switch_6', 'switch_usb1', 'switch_usb2',
+  'switch_5', 'switch_6', 'switch_7', 'switch_8',
+  'switch_usb1', 'switch_usb2',
 ];
 
 export const AVAILABLE_SWITCH_CODES_12CH = [
@@ -58,8 +72,33 @@ export const AVAILABLE_SWITCH_CODES_12CH = [
 // 하위 호환용 별칭
 export const AVAILABLE_SWITCH_CODES = AVAILABLE_SWITCH_CODES_8CH;
 
-export function detectChannelCount(switchCodes: string[]): 8 | 12 {
-  return switchCodes.some(c => /^switch_(7|8|9|10|11|12)$/.test(c)) ? 12 : 8;
+/**
+ * 채널 수 감지 — 우선순위:
+ *   1. zigbeeModel '_switch_N' suffix → 명시적 채널 수
+ *   2. switch_usb1/usb2 → onboard 8CH 확정
+ *   3. switch_9~12 사용 → 12CH 확정 (8CH는 1~8까지만)
+ *   4. 기본 8
+ *
+ * 주의: zigbee 8CH 모델(TS0601_switch_8)도 switch_7/switch_8을 사용하므로
+ *       switch_7~8 존재만으로 12CH 판정하면 안 됨. switch_9 이상이 있을 때만 12CH.
+ */
+export function detectChannelCount(switchCodes: string[], zigbeeModel?: string | null): 8 | 12 {
+  if (zigbeeModel) {
+    const m = zigbeeModel.toLowerCase().match(/_switch_(\d+)/);
+    if (m) return Number(m[1]) > 8 ? 12 : 8;
+  }
+  if (switchCodes.some(c => c === 'switch_usb1' || c === 'switch_usb2')) return 8;
+  if (switchCodes.some(c => /^switch_(9|10|11|12)$/.test(c))) return 12;
+  return 8;
+}
+
+/**
+ * device source/모델에 맞는 8CH 기본 매핑 선택.
+ * - onboard: switch_usb1/usb2 사용
+ * - zigbee: switch_7/8 사용
+ */
+export function getDefault8chMapping(source?: string | null): Record<string, string> {
+  return source === 'zigbee' ? DEFAULT_CHANNEL_MAPPING_8CH_ZIGBEE : DEFAULT_CHANNEL_MAPPING_8CH;
 }
 
 export function getDefaultMappingByCount(count: 8 | 12): Record<string, string> {

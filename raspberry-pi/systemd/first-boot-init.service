@@ -1,0 +1,16 @@
+[Unit]
+Description=Smart Farm — First Boot Init (SSH host key + tunnel key regeneration)
+After=network-online.target
+Wants=network-online.target
+Before=reverse-ssh-tunnel.service zigbee2mqtt.service config-agent.service gpio-agent.service
+ConditionPathExists=!/var/lib/smartfarm/.first-boot-done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/env bash /opt/smart-farm/scripts/first-boot-init.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

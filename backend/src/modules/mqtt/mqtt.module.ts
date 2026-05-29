@@ -7,6 +7,7 @@ import { MqttDeviceHandler } from './mqtt-device.handler';
 import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { Device } from '../devices/entities/device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
 import { SensorsModule } from '../sensors/sensors.module';
 import { GatewayManagerModule } from '../gateway-manager/gateway-manager.module';
 import { GatewayModule } from '../gateway/gateway.module';
@@ -14,7 +15,7 @@ import { GatewayModule } from '../gateway/gateway.module';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Device, Gateway]),
+    TypeOrmModule.forFeature([Device, Gateway, GatewayOnboardDevice]),
     SensorsModule,
     forwardRef(() => GatewayManagerModule),
     GatewayModule,

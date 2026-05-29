@@ -25,6 +25,8 @@ interface ActiveIrrigation {
   deviceId: string;
   gatewayId: string;
   friendlyName: string;
+  device: Device;       // setTimeout 시점에 source/매핑 그대로 사용
+  gateway: Gateway;     // onboard 라우팅에 gateway.id (UUID) 필요
   startedAt: number;
   estimatedEndAt: number;
   timers: ReturnType<typeof setTimeout>[];
@@ -147,6 +149,8 @@ export class IrrigationSchedulerService {
       deviceId: deviceIds[0],
       gatewayId: gateway.gatewayId,
       friendlyName: device.friendlyName,
+      device,
+      gateway,
       startedAt: Date.now(),
       estimatedEndAt: Date.now() + totalDurationMs,
       timers,
@@ -191,9 +195,8 @@ export class IrrigationSchedulerService {
       const timer = setTimeout(async () => {
         try {
           this.logger.log(`관수 실행: ${action.label} (${action.switchCode}=${action.value})`);
-          await this.mqttService.controlDevice(active.gatewayId, active.friendlyName, {
-            [action.switchCode]: action.value,
-          });
+          // device.source에 따라 onboard(gpio-agent) / zigbee(z2m) 자동 라우팅
+          await this.devicesService.publishDeviceSwitch(active.device, active.gateway, action.switchCode, action.value);
         } catch (err: any) {
           this.logger.error(`관수 명령 실패: ${action.label} - ${err.message}`);
         }
@@ -306,7 +309,10 @@ export class IrrigationSchedulerService {
       });
 
       // 2) 교반기 ON (관수 시작과 동시, 관수 종료와 동시에 OFF)
-      if (conditions.mixer?.enabled && mapping['mixer']) {
+      //    [정정 2026-05-26]: 액비모터가 활성화되어 있을 때만 교반기 동작.
+      //    교반기의 목적은 액상비료를 물에 잘 녹이는 것이므로 액비가 없으면 동작 불필요.
+      const mixerActive = !!(conditions.mixer?.enabled && fertEnabled && mapping['mixer']);
+      if (mixerActive) {
         actions.push({
           time: offsetMs,
           type: 'mixer_on',
@@ -350,8 +356,8 @@ export class IrrigationSchedulerService {
         label: `${zone.name} OFF`,
       });
 
-      // 5) 교반기 OFF (관수 종료와 동시)
-      if (conditions.mixer?.enabled && mapping['mixer']) {
+      // 5) 교반기 OFF (관수 종료와 동시) — 액비 활성 시에만
+      if (mixerActive) {
         actions.push({
           time: offsetMs + zoneDurationMs,
           type: 'mixer_off',
@@ -399,9 +405,8 @@ export class IrrigationSchedulerService {
             ];
             for (const code of offCodes) {
               try {
-                await this.mqttService.controlDevice(active.gatewayId, active.friendlyName, {
-                  [code]: false,
-                });
+                // source별 라우팅 (onboard → gpio-agent, zigbee → z2m)
+                await this.devicesService.publishDeviceSwitch(active.device, active.gateway, code, false);
               } catch {
                 // 개별 스위치 OFF 실패 시 계속 진행
               }

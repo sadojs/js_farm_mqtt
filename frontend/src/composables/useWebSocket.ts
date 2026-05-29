@@ -21,6 +21,30 @@ export function onGpioStatus(fn: GpioStatusHandler) {
   return () => gpioStatusHandlers.delete(fn)
 }
 
+// rpi-emergency-failover: 폴백 모드 변경 핸들러
+type FallbackModeHandler = (data: {
+  gatewayId: string
+  mode: 'online' | 'fallback' | 'unknown'
+  modeChangedAt: string
+}) => void
+const fallbackModeHandlers = new Set<FallbackModeHandler>()
+export function onFallbackModeChanged(fn: FallbackModeHandler) {
+  fallbackModeHandlers.add(fn)
+  return () => fallbackModeHandlers.delete(fn)
+}
+
+type FallbackEventHandler = (data: {
+  gatewayId: string
+  eventType: string
+  payload: Record<string, unknown>
+  occurredAt: string
+}) => void
+const fallbackEventHandlers = new Set<FallbackEventHandler>()
+export function onFallbackEvent(fn: FallbackEventHandler) {
+  fallbackEventHandlers.add(fn)
+  return () => fallbackEventHandlers.delete(fn)
+}
+
 export const socketStatus = readonly({
   connected: _connected,
   reconnecting: _reconnecting,
@@ -103,6 +127,26 @@ export function useWebSocket() {
       deviceStore.updateDeviceStatus(data.deviceId, data.online)
     })
 
+    // 룰이 발행한 GPIO 토글 → device 카드 실시간 갱신
+    socket.on('device:switch-update', (data: {
+      deviceId: string;
+      switchState: boolean | null;
+      switchStates?: Record<string, boolean> | null;
+      online?: boolean;
+    }) => {
+      const deviceStore = useDeviceStore()
+      const dev = deviceStore.devices.find(d => d.id === data.deviceId)
+      if (dev) {
+        if (data.switchState !== null && data.switchState !== undefined) {
+          (dev as any).switchState = data.switchState
+        }
+        if (data.switchStates) {
+          (dev as any).switchStates = { ...((dev as any).switchStates ?? {}), ...data.switchStates }
+        }
+        if (typeof data.online === 'boolean') (dev as any).online = data.online
+      }
+    })
+
     // 자동화 실행 알림
     socket.on('automation:executed', (data) => {
       const notificationStore = useNotificationStore()
@@ -144,6 +188,14 @@ export function useWebSocket() {
     // GPIO 핀 상태 (admin 핀 테스트 피드백)
     socket.on('gpio:status', (data: { gatewayId: string; slot: string; pin: number; state: boolean; auto?: boolean }) => {
       gpioStatusHandlers.forEach(fn => fn(data))
+    })
+
+    // rpi-emergency-failover: 폴백 모드 변경
+    socket.on('fallback:mode-changed', (data: Parameters<FallbackModeHandler>[0]) => {
+      fallbackModeHandlers.forEach(fn => fn(data))
+    })
+    socket.on('fallback:event', (data: Parameters<FallbackEventHandler>[0]) => {
+      fallbackEventHandlers.forEach(fn => fn(data))
     })
 
     // 일반 알림

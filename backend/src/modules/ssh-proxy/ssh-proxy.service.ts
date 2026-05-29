@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Client } from 'ssh2';
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
@@ -11,7 +11,10 @@ export class SshProxyService {
   private readonly keyPath: string;
   private readonly tunnelUser: string;
 
-  constructor(private gatewayService: GatewayManagerService) {
+  constructor(
+    @Inject(forwardRef(() => GatewayManagerService))
+    private gatewayService: GatewayManagerService,
+  ) {
     this.keyPath = process.env.SSH_TUNNEL_KEY_PATH ?? join(homedir(), '.ssh', 'id_rpi_lgw');
     this.tunnelUser = process.env.SSH_TUNNEL_USER ?? 'lgw-dev';
   }

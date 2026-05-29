@@ -59,6 +59,20 @@
             @proceed="wizard.next()"
           />
 
+          <StepIrrigationValve
+            v-else-if="wizard.currentStep.value === 'irrigation-valve' && wizard.state.value.irrigation"
+            :controllerChannels="wizard.state.value.irrigation.controllerChannels"
+            :valves="wizard.state.value.irrigation.valves"
+            :mixerEnabled="wizard.state.value.irrigation.mixerEnabled"
+            :useFertilizer="wizard.state.value.irrigation.useFertilizer"
+            :fertilizer="wizard.state.value.irrigation.fertilizer"
+            @update:valves="v => setIrrigationField('valves', v)"
+            @update:mixerEnabled="v => setIrrigationField('mixerEnabled', v)"
+            @update:useFertilizer="v => { setIrrigationField('useFertilizer', v); setIrrigationField('fertilizer', { ...wizard.state.value.irrigation!.fertilizer, enabled: v }) }"
+            @update:fertilizer="v => setIrrigationField('fertilizer', v)"
+            @go-back="wizard.goTo('irrigation-device')"
+          />
+
           <StepDeviceByIntent
             v-else-if="wizard.currentStep.value === 'device-by-intent'"
             :intent="wizard.state.value.intent as 'opener' | 'fan'"
@@ -151,6 +165,7 @@ import StepFarmAdminSelect from './StepFarmAdminSelect.vue'
 import StepFarmSelect from './StepFarmSelect.vue'
 import StepIntentSelect from './StepIntentSelect.vue'
 import StepIrrigationDevice from './StepIrrigationDevice.vue'
+import StepIrrigationValve from './StepIrrigationValve.vue'
 import StepDeviceByIntent from './StepDeviceByIntent.vue'
 import StepTimingByIntent from './StepTimingByIntent.vue'
 import StepReviewSummary from './StepReviewSummary.vue'
@@ -177,8 +192,8 @@ const currentTrigger = computed(() => {
 })
 
 // 스텝 표시 조건
-const STEPS_WITH_PREV = new Set<WizardStep>(['zone', 'device-by-intent', 'timing', 'review'])
-const STEPS_WITH_NEXT = new Set<WizardStep>(['device-by-intent', 'timing', 'review'])
+const STEPS_WITH_PREV = new Set<WizardStep>(['zone', 'device-by-intent', 'irrigation-device', 'irrigation-valve', 'timing', 'review'])
+const STEPS_WITH_NEXT = new Set<WizardStep>(['device-by-intent', 'irrigation-valve', 'timing', 'review'])
 
 const showPrev = computed(() => STEPS_WITH_PREV.has(wizard.currentStep.value))
 const showNext = computed(() => STEPS_WITH_NEXT.has(wizard.currentStep.value))
@@ -187,6 +202,7 @@ const nextLabel = computed(() => {
   const step = wizard.currentStep.value
   if (step === 'review') return '✓ 만들기'
   if (step === 'device-by-intent') return '장치 선택 완료'
+  if (step === 'irrigation-valve') return '관수 설정 완료'
   if (step === 'timing') return '설정 완료'
   return '다음'
 })
@@ -194,6 +210,7 @@ const nextLabel = computed(() => {
 const canProceedHint = computed(() => {
   const step = wizard.currentStep.value
   if (step === 'irrigation-device') return '관수 장치를 선택해주세요'
+  if (step === 'irrigation-valve') return '활성화된 밸브의 관주 시간을 1분 이상으로 설정해주세요 (액비 활성 시 투여+종료전대기 ≤ 관주 시간)'
   if (step === 'device-by-intent') return '장치를 하나 이상 선택해주세요'
   if (step === 'timing') return '시간/온도 조건을 설정해주세요'
   if (step === 'review') return '룰 이름을 입력해주세요'
@@ -206,11 +223,20 @@ function setIrrigationController(deviceId: string) {
   wizard.state.value.irrigation.controllerDeviceId = deviceId
 }
 
-function applyControllerInfo(info: { deviceId: string; channelCount: 8 | 12; canMixFertilizer: boolean }) {
+function applyControllerInfo(info: { deviceId: string; channelCount: 8 | 12; canMixFertilizer: boolean; activeZones?: number[] }) {
   if (!wizard.state.value.irrigation) return
-  wizard.state.value.irrigation.controllerDeviceId = info.deviceId
-  wizard.state.value.irrigation.controllerChannels = info.channelCount
-  wizard.state.value.irrigation.valveZones = []
+  const irr = wizard.state.value.irrigation
+  irr.controllerDeviceId = info.deviceId
+  irr.controllerChannels = info.channelCount
+  irr.valveZones = []
+  // 환경 설정에서 활성화된 zone만 valves에 포함.
+  // activeZones가 비어있으면(레거시 device, channelMapping 없음) 채널 수 기준 fallback.
+  const zonesToShow = (info.activeZones && info.activeZones.length > 0)
+    ? info.activeZones
+    : Array.from({ length: info.channelCount === 12 ? 8 : 4 }, (_, i) => i + 1)
+  irr.valves = zonesToShow.map(zone => ({
+    zone, enabled: true, duration: irr.durationMin, waitTime: irr.waitTimeBetweenZones,
+  }))
 }
 
 function setIrrigationField<K extends keyof NonNullable<typeof wizard.state.value.irrigation>>(

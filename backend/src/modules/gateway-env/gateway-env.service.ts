@@ -210,8 +210,8 @@ export class GatewayEnvService {
       void this.emitDeviceChanged(gatewayId);
     }
 
-    // enabled 상태가 변경된 경우 devices 테이블 동기화
-    if (dto.enabled !== undefined) {
+    // enabled 또는 name 변경 시 devices 테이블 동기화 (양방향 일관성)
+    if (dto.enabled !== undefined || dto.name !== undefined) {
       const gw = await this.gatewayRepo.findOne({ where: { id: gatewayId } });
       if (gw) {
         const allOnboard = await this.onboardRepo.find({ where: { gatewayId }, order: { sortOrder: 'ASC' } });
@@ -329,11 +329,16 @@ export class GatewayEnvService {
         if (existing) {
           existing.name = slot.name;
           existing.online = gwOnline;  // 게이트웨이 상태 반영
+          // 게이트웨이 house 매핑이 device에 빠져있으면 보정 (위저드 그룹 필터링용)
+          if (!existing.houseId && gw.houseId) existing.houseId = gw.houseId;
+          // onboard device의 userId는 항상 gateway 소유자와 일치
+          if (existing.userId !== gw.userId) existing.userId = gw.userId;
           await this.deviceRepo.save(existing);
         } else {
           await this.deviceRepo.save(this.deviceRepo.create({
             userId: gw.userId,
             gatewayId: gw.id,
+            houseId: gw.houseId ?? undefined,
             name: slot.name,
             category: 'fan',
             deviceType: 'actuator',
@@ -364,7 +369,7 @@ export class GatewayEnvService {
       let closeDev = await this.deviceRepo.findOne({ where: { onboardDeviceId: closeSlot.id } });
       if (!openDev) {
         openDev = await this.deviceRepo.save(this.deviceRepo.create({
-          userId: gw.userId, gatewayId: gw.id,
+          userId: gw.userId, gatewayId: gw.id, houseId: gw.houseId ?? undefined,
           name: `${header.name} 열기`, category: 'opener', deviceType: 'actuator',
           equipmentType: 'opener_open', source: 'onboard',
           onboardDeviceId: openSlot.id, friendlyName: openSlot.slotKey,
@@ -375,11 +380,14 @@ export class GatewayEnvService {
         openDev.name = `${header.name} 열기`;
         openDev.openerGroupName = header.name;
         openDev.online = gwOnline;
+        if (!openDev.houseId && gw.houseId) openDev.houseId = gw.houseId;
+        // onboard device의 userId는 항상 gateway 소유자와 일치 (위저드/구역관리 필터 정합성)
+        if (openDev.userId !== gw.userId) openDev.userId = gw.userId;
         await this.deviceRepo.save(openDev);
       }
       if (!closeDev) {
         closeDev = await this.deviceRepo.save(this.deviceRepo.create({
-          userId: gw.userId, gatewayId: gw.id,
+          userId: gw.userId, gatewayId: gw.id, houseId: gw.houseId ?? undefined,
           name: `${header.name} 닫기`, category: 'opener', deviceType: 'actuator',
           equipmentType: 'opener_close', source: 'onboard',
           onboardDeviceId: closeSlot.id, friendlyName: closeSlot.slotKey,
@@ -390,6 +398,8 @@ export class GatewayEnvService {
         closeDev.name = `${header.name} 닫기`;
         closeDev.openerGroupName = header.name;
         closeDev.online = gwOnline;
+        if (!closeDev.houseId && gw.houseId) closeDev.houseId = gw.houseId;
+        if (closeDev.userId !== gw.userId) closeDev.userId = gw.userId;
         await this.deviceRepo.save(closeDev);
       }
       // 페어링 정보 업데이트 (인터록용)
@@ -420,9 +430,20 @@ export class GatewayEnvService {
     const irrigSlots = onboardDevices.filter(s => IRRIGATION_SLOT_TYPES.has(s.slotType));
     const enabledIrrig = irrigSlots.filter(s => s.enabled)
       .sort((a, b) => a.sortOrder - b.sortOrder);
-    const existingIrrig = await this.deviceRepo.findOne({
+    // race condition 방어 — 과거에 중복 INSERT된 device가 있으면 가장 오래된 1개만 keep
+    const allIrrig = await this.deviceRepo.find({
       where: { gatewayId: gw.id, source: 'onboard', equipmentType: 'irrigation' },
+      order: { createdAt: 'ASC' },
     });
+    let existingIrrig: Device | null = null;
+    if (allIrrig.length > 0) {
+      existingIrrig = allIrrig[0];
+      if (allIrrig.length > 1) {
+        const dups = allIrrig.slice(1);
+        await this.deviceRepo.remove(dups);
+        this.logger.warn(`onboard 관수 device 중복 ${dups.length}건 자동 정리 (gateway=${gw.gatewayId}, keep=${existingIrrig.id})`);
+      }
+    }
 
     if (enabledIrrig.length > 0) {
       const channelMapping: Record<string, string> = {};
@@ -446,14 +467,23 @@ export class GatewayEnvService {
         channelMapping[mapKey] = `relay_${slot.slotKey}`;
       }
       if (existingIrrig) {
+        // 사용자가 이름 변경했더라도 보존 — channelMapping/online만 갱신
         existingIrrig.channelMapping = channelMapping;
         existingIrrig.online = gwOnline;
+        if (!existingIrrig.houseId && gw.houseId) existingIrrig.houseId = gw.houseId;
+        if (existingIrrig.userId !== gw.userId) existingIrrig.userId = gw.userId;
+        // 기본 이름("관주 컨트롤러")인 경우만 gateway_id suffix를 자동 추가 (BUG-B 완화)
+        if (existingIrrig.name === '관주 컨트롤러') {
+          existingIrrig.name = `관주 컨트롤러 (${gw.gatewayId})`;
+        }
         await this.deviceRepo.save(existingIrrig);
       } else {
+        // BUG-B fix: gateway_id를 이름에 포함하여 동일 사용자의 여러 게이트웨이 구분 가능
         await this.deviceRepo.save(this.deviceRepo.create({
           userId: gw.userId,
           gatewayId: gw.id,
-          name: '관주 컨트롤러',
+          houseId: gw.houseId ?? undefined,
+          name: `관주 컨트롤러 (${gw.gatewayId})`,
           category: 'irrigation',
           deviceType: 'actuator',
           equipmentType: 'irrigation',
@@ -592,24 +622,45 @@ export class GatewayEnvService {
   // ── 통합 조회 (온보드 + 지그비 + 관주 대표 장치) ────────────
   async getAllDevices(gatewayId: string, userId: string, role: string): Promise<{ onboard: GatewayOnboardDevice[]; zigbee: Device[]; irrigationDevice: Device | null }> {
     const gw = await this.assertGatewayOwner(gatewayId, userId, role);
-    const [onboard, zigbee] = await Promise.all([
+    const [onboard, zigbeeRaw] = await Promise.all([
       this.ensureOnboardDevices(gatewayId),
       this.deviceRepo.find({ where: { gatewayId, userId: gw.userId, source: 'zigbee' } as any, order: { createdAt: 'DESC' } }),
     ]);
-    const irrigationDevice = await this.deviceRepo.findOne({
+    const irrigationRaw = await this.deviceRepo.findOne({
       where: { gatewayId, userId: gw.userId, source: 'onboard', equipmentType: 'irrigation' } as any,
     }) ?? null;
+    // deviceSettings의 switchState/switchStates/disabledChannels를 최상위로 expose
+    // (frontend의 환경설정/구역관리/위저드가 직접 device.disabledChannels 등 사용)
+    const zigbee = zigbeeRaw.map(d => this.exposeSwitchFields(d));
+    const irrigationDevice = irrigationRaw ? this.exposeSwitchFields(irrigationRaw) : null;
     return { onboard, zigbee, irrigationDevice };
+  }
+
+  private exposeSwitchFields(device: Device): any {
+    const settings = (device.deviceSettings as any) || {};
+    return {
+      ...device,
+      switchState: settings.switchState ?? null,
+      switchStates: settings.switchStates ?? null,
+      relayActivePhase: settings.relayActivePhase ?? null,
+      disabledChannels: Array.isArray(settings.disabledChannels) ? settings.disabledChannels : [],
+    };
   }
 
   // ── 온보드 관주 대표 이름 수정 ─────────────────────────────
   async updateIrrigationDeviceName(gatewayId: string, name: string, userId: string, role: string): Promise<Device> {
     const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+    // userId 매칭 제거: gateway-device userId 불일치(예: gateway owner 변경 후 device userId 미동기화) 시에도 동작
+    // gateway-env 접근 권한은 assertGatewayOwner에서 이미 검증됨
     const device = await this.deviceRepo.findOne({
-      where: { gatewayId, userId: gw.userId, source: 'onboard', equipmentType: 'irrigation' } as any,
+      where: { gatewayId, source: 'onboard', equipmentType: 'irrigation' } as any,
     });
     if (!device) throw new NotFoundException('관주 컨트롤러 장치를 찾을 수 없습니다.');
     device.name = name;
+    // device userId도 gateway owner와 동기화 (drift 자가 치유)
+    if (device.userId !== gw.userId) {
+      device.userId = gw.userId;
+    }
     return this.deviceRepo.save(device);
   }
 
@@ -642,13 +693,31 @@ export class GatewayEnvService {
     role: string,
   ): Promise<void> {
     const gw = await this.assertGatewayOwner(gatewayId, userId, role);
-    const command: Record<string, string> = { [switchCode]: state ? 'ON' : 'OFF' };
+    // device model에 따라 z2m payload 키 변환 (Tuya TS0601 = state_l1~state_l12)
+    const device = await this.deviceRepo.findOne({ where: { friendlyName, gatewayId: gw.id } as any });
+    const z2mKey = this.translateSwitchKeyForZ2m(switchCode, device?.zigbeeModel);
+    const command: Record<string, string> = { [z2mKey]: state ? 'ON' : 'OFF' };
     await this.mqttService.controlDevice(gw.gatewayId, friendlyName, command);
     // 자동 해제
     if (durationMs && state) {
       setTimeout(async () => {
-        await this.mqttService.controlDevice(gw.gatewayId, friendlyName, { [switchCode]: 'OFF' });
+        await this.mqttService.controlDevice(gw.gatewayId, friendlyName, { [z2mKey]: 'OFF' });
       }, durationMs);
     }
+  }
+
+  /**
+   * 표준 switch_N → device 모델별 z2m payload 키로 변환.
+   * - Tuya TS0601 multi-channel (TS0601, TS0601_switch_2~12): state_l1~state_lN
+   * - 그 외: switch_N 그대로
+   */
+  private translateSwitchKeyForZ2m(switchCode: string, zigbeeModel?: string | null): string {
+    if (!zigbeeModel) return switchCode;
+    const model = zigbeeModel.toLowerCase();
+    const isTuyaMulti = model.includes('ts0601');
+    if (!isTuyaMulti) return switchCode;
+    const m = switchCode.match(/^switch_(\d+)$/);
+    if (!m) return switchCode;
+    return `state_l${m[1]}`;
   }
 }

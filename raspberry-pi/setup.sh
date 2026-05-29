@@ -290,6 +290,19 @@ cp -r "$SCRIPT_DIR/config-agent/"* "$CONFIG_AGENT_DIR/"
 ( cd "$CONFIG_AGENT_DIR" && npm install --omit=dev --silent )
 log_info "Config Agent 설치 완료"
 
+# rpi-golden-image-system: apply-*.sh 스크립트 설치
+SCRIPTS_DEST="${SMART_FARM_DIR}/scripts"
+mkdir -p "$SCRIPTS_DEST" /var/log/smart-farm /var/lib/smartfarm /etc/smartfarm
+cp "$SCRIPT_DIR/scripts/"*.sh "$SCRIPTS_DEST/"
+chmod 750 "$SCRIPTS_DEST"/*.sh
+log_info "원격 설정 적용 스크립트 설치: ${SCRIPTS_DEST}"
+
+# /etc/smartfarm 마커 파일 (기본값)
+echo -n "${GATEWAY_ID}" > /etc/smartfarm/gateway-id
+echo -n "${SERVER_IP}" > /etc/smartfarm/server-ip
+chmod 644 /etc/smartfarm/gateway-id /etc/smartfarm/server-ip
+log_info "/etc/smartfarm 마커 파일 초기화"
+
 cat > /etc/systemd/system/config-agent.service <<SERVICE
 [Unit]
 Description=Smart Farm Config Agent (${GATEWAY_ID})
@@ -359,6 +372,90 @@ systemctl enable config-agent gpio-agent
 systemctl restart config-agent gpio-agent
 log_info "config-agent + gpio-agent 시작 완료"
 
+# ── Fallback Engine (rpi-emergency-failover) ──────────
+# 서버와 통신 단절 시 RPi가 로컬 룰로 작물 안전 동작 수행.
+# 월별 개폐기 스케줄, 관수 30분 타임아웃, 액비 즉시 OFF, 환기팬 온도 히스테리시스.
+log_step "Step 7.5/8: Fallback Engine 설치 (이머전시 페일오버)"
+
+FALLBACK_ENGINE_DIR="${SMART_FARM_DIR}/fallback-engine"
+FALLBACK_DATA_DIR="/var/lib/smartfarm/fallback"
+mkdir -p "$FALLBACK_ENGINE_DIR" "$FALLBACK_DATA_DIR"
+
+if [ -d "$SCRIPT_DIR/fallback-engine" ]; then
+  cp -r "$SCRIPT_DIR/fallback-engine/"* "$FALLBACK_ENGINE_DIR/"
+  # better-sqlite3는 native 모듈 — apt에 빌드 도구 필요할 수 있음
+  if ! command -v g++ >/dev/null 2>&1; then
+    log_info "Fallback engine 의존성 빌드 도구 설치 (build-essential, python3)"
+    apt-get install -y -qq build-essential python3 >/dev/null 2>&1 || true
+  fi
+  ( cd "$FALLBACK_ENGINE_DIR" && npm install --omit=dev --silent ) || \
+    log_warn "fallback-engine npm install 실패 — in-memory queue로 동작 (SQLite 없이)"
+  log_info "Fallback Engine 파일 설치 완료: ${FALLBACK_ENGINE_DIR}"
+
+  # 최소 권한 원칙: pi 시스템 유저로 동작 (없으면 자동 생성)
+  # 골든 이미지 표준화 — 양산 시 모든 Pi에 동일하게 적용됨
+  if ! id pi >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin \
+      --comment "Smart Farm fallback-engine service user" pi
+    log_info "pi 시스템 유저 자동 생성"
+  fi
+  chown -R pi:pi "$FALLBACK_ENGINE_DIR" "$FALLBACK_DATA_DIR"
+  # 기존 root 소유로 생성된 파일(rules.json/SQLite)도 보정 (idempotent)
+  find "$FALLBACK_DATA_DIR" -type f -exec chown pi:pi {} \; 2>/dev/null || true
+  log_info "fallback-engine 소유자 변경: pi:pi (디렉터리 + 기존 파일 전체)"
+
+  cat > /etc/smartfarm/fallback-engine.env <<ENV
+GATEWAY_ID=${GATEWAY_ID}
+MQTT_SERVER=mqtt://${SERVER_IP}:1883
+MQTT_USERNAME=${MQTT_USER}
+MQTT_PASSWORD=${MQTT_PASSWORD}
+FALLBACK_DATA_DIR=${FALLBACK_DATA_DIR}
+FALLBACK_RULES_PATH=${FALLBACK_DATA_DIR}/rules.json
+FALLBACK_DB_PATH=${FALLBACK_DATA_DIR}/fallback.db
+FALLBACK_EVAL_INTERVAL_MS=30000
+NODE_ENV=production
+ENV
+  chmod 600 /etc/smartfarm/fallback-engine.env
+
+  if [ -f "$SCRIPT_DIR/systemd/fallback-engine.service" ]; then
+    cp "$SCRIPT_DIR/systemd/fallback-engine.service" /etc/systemd/system/fallback-engine.service
+    systemctl daemon-reload
+    systemctl enable fallback-engine.service
+    systemctl restart fallback-engine.service
+    log_info "fallback-engine.service 시작 완료"
+  else
+    log_warn "systemd/fallback-engine.service 파일이 없습니다"
+  fi
+else
+  log_warn "fallback-engine 디렉터리가 없습니다 — 폴백 엔진 미설치 (서버 단절 시 안전망 없음)"
+fi
+
+# rpi-golden-image-system: 골든 이미지 양산용 systemd 유닛 설치
+# (first-boot-init.service + reverse-ssh-tunnel.service)
+# autossh가 없으면 reverse-ssh-tunnel이 동작 안 함 → 보강 설치
+if ! command -v autossh >/dev/null 2>&1; then
+  apt-get install -y -qq autossh >/dev/null 2>&1 || true
+  log_info "autossh 설치"
+fi
+
+if [ -f "$SCRIPT_DIR/systemd/first-boot-init.service" ]; then
+  cp "$SCRIPT_DIR/systemd/first-boot-init.service" /etc/systemd/system/first-boot-init.service
+  log_info "first-boot-init.service 등록 (다음 부팅 시 1회 실행 — 골든 이미지 양산용)"
+fi
+
+if [ -f "$SCRIPT_DIR/systemd/reverse-ssh-tunnel.service" ]; then
+  # SERVER_HOST를 setup 시점 SERVER_IP로 치환 (이미 변수가 있음)
+  sed "s|^Environment=SERVER_HOST=.*|Environment=SERVER_HOST=${SERVER_IP}|" \
+    "$SCRIPT_DIR/systemd/reverse-ssh-tunnel.service" \
+    > /etc/systemd/system/reverse-ssh-tunnel.service
+  log_info "reverse-ssh-tunnel.service 등록 (SERVER_HOST=${SERVER_IP}, key는 first-boot에서 생성)"
+fi
+
+systemctl daemon-reload
+systemctl enable first-boot-init.service >/dev/null 2>&1 || true
+# reverse-ssh-tunnel은 enable만 (key가 없으면 실행 실패하므로 first-boot이 끝낸 뒤 자동 활성)
+systemctl enable reverse-ssh-tunnel.service >/dev/null 2>&1 || true
+
 # ── Step 8/8: Reverse SSH 터널 (선택) ──────────────────
 if [ "$WITH_TUNNEL" = true ]; then
   log_step "Step 8/8: Reverse SSH 터널 설치"
@@ -405,7 +502,7 @@ echo "  연결 Broker:      mqtt://${SERVER_IP}:1883"
 echo "  로그 파일:        ${LOG_FILE}"
 echo ""
 echo "  서비스 상태:"
-for svc in zigbee2mqtt config-agent gpio-agent; do
+for svc in zigbee2mqtt config-agent gpio-agent fallback-engine; do
   status=$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")
   printf "    %-18s %s\n" "$svc" "$status"
 done

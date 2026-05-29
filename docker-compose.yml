@@ -96,6 +96,7 @@ services:
       - MQTT_USERNAME=${MQTT_USERNAME}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET 환경변수를 설정하세요}
+      - BOOTSTRAP_TOKEN=${BOOTSTRAP_TOKEN:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:81}
       - ZIGBEE2MQTT_URL=http://zigbee2mqtt:8080
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}

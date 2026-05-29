@@ -1,0 +1,17 @@
+{
+  "name": "smart-farm-fallback-engine",
+  "version": "1.0.0",
+  "description": "Smart Farm RPi Emergency Failover Engine — Hybrid Fallback for server disconnection",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "mqtt": "^5.10.0"
+  }
+}

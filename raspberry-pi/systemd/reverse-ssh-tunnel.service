@@ -1,0 +1,32 @@
+[Unit]
+Description=Smart Farm Reverse SSH Tunnel (Pi ↔ Server)
+After=network-online.target first-boot-init.service
+Wants=network-online.target
+Requires=network-online.target
+# tunnel.env가 없으면 first-boot이 아직 안 끝난 것 — 시작 안 함
+ConditionPathExists=/etc/smartfarm/tunnel.env
+
+[Service]
+Type=simple
+User=root
+# 모든 서버 정보를 tunnel.env에서 받음 (first-boot-init이 register-tunnel-key API 응답으로 자동 채움).
+# 서버 IP 변경 시 apply-server-ip.sh가 이 파일을 재작성.
+EnvironmentFile=/etc/smartfarm/tunnel.env
+Environment=AUTOSSH_GATETIME=0
+Environment=AUTOSSH_POLL=60
+ExecStart=/usr/bin/autossh -M 0 -N \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o ExitOnForwardFailure=yes \
+  -o StrictHostKeyChecking=accept-new \
+  -o UserKnownHostsFile=/root/.ssh/known_hosts_tunnel \
+  -i /root/.ssh/tunnel_key \
+  -R ${REMOTE_PORT}:localhost:22 \
+  -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_HOST}
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

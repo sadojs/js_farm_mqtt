@@ -51,6 +51,7 @@ interface ControllerInfo {
   channelCount: 8 | 12
   canMixFertilizer: boolean
   groupName: string
+  activeZones: number[]   // 환경 설정에서 활성화된 zone 번호 목록 (channelMapping zone_N 키에서 추출)
 }
 
 const props = defineProps<{
@@ -71,45 +72,59 @@ const groupStore = useGroupStore()
 const loading = computed(() => deviceStore.loading)
 
 function getChannelCount(d: any): 8 | 12 {
-  // 1. channelMapping 값에 switch_11/12가 있으면 12CH
+  // 1. zigbeeModel에 명시적 '_switch_N' suffix가 있으면 그것을 우선 사용
+  if (d.zigbeeModel) {
+    const m = String(d.zigbeeModel).toLowerCase().match(/_switch_(\d+)/)
+    if (m) return Number(m[1]) > 8 ? 12 : 8
+  }
+  // 2. channelMapping 값에 switch_usb1/usb2 있으면 onboard 8CH 확정
   if (d.channelMapping) {
     const vals = Object.values(d.channelMapping as Record<string, string>)
-    if (vals.some(v => v === 'switch_11' || v === 'switch_12')) return 12
+    if (vals.some(v => v === 'switch_usb1' || v === 'switch_usb2')) return 8
+    // switch_9~12 사용 시 12CH (zigbee 8CH는 switch_7/8까지 사용하므로 7~8만으로 12CH 판정 불가)
+    if (vals.some(v => /^switch_(9|10|11|12)$/.test(v))) return 12
     return 8
   }
-  // 2. switchStates 키로 판단
+  // 3. switchStates 키로 판단
   if (d.switchStates && Object.keys(d.switchStates).length > 0) {
-    return detectChannelCount(Object.keys(d.switchStates))
+    return detectChannelCount(Object.keys(d.switchStates), d.zigbeeModel)
   }
-  // 3. 판단 불가 → 기본값 8 (status fetch 후 반응적 갱신됨)
+  // 4. 판단 불가 → 기본값 8 (status fetch 후 반응적 갱신됨)
   return 8
 }
 
 const controllers = computed<ControllerInfo[]>(() => {
   const group = groupStore.groups.find(g => g.id === props.groupId)
+  // 선택한 구역의 장치만 노출 — 다른 구역/농장의 관수 컨트롤러가 섞이지 않도록 enforce.
   const groupDevices: any[] = group?.devices ?? []
-  const allDevices = deviceStore.devices
-
-  const candidates = [...groupDevices, ...allDevices].reduce<any[]>((acc, d) => {
-    if (!acc.find(x => x.id === d.id)) acc.push(d)
-    return acc
-  }, [])
-
   const byFarm = props.farmUserId
-    ? candidates.filter((d: any) => !d.userId || d.userId === props.farmUserId)
-    : candidates
+    ? groupDevices.filter((d: any) => !d.userId || d.userId === props.farmUserId)
+    : groupDevices
 
   return byFarm
     .filter(d => d.deviceType === 'actuator' && d.equipmentType === 'irrigation')
     .map(d => {
       const ch = getChannelCount(d)
-      const grp = groupStore.groups.find(g => g.devices?.some((gd: any) => gd.id === d.id))
+      // 활성 zone 추출:
+      // - onboard: ensureOnboardDevices가 enabled=true zone만 channelMapping에 포함
+      // - zigbee: channelMapping은 모두 보존, disabledChannels에 포함된 키는 제외
+      const disabled = new Set<string>((d.disabledChannels ?? []) as string[])
+      const activeZones: number[] = []
+      if (d.channelMapping) {
+        for (const [key, val] of Object.entries(d.channelMapping as Record<string, string>)) {
+          if (disabled.has(key)) continue
+          const m = key.match(/^zone_(\d+)$/)
+          if (m && val && val.length > 0) activeZones.push(Number(m[1]))
+        }
+        activeZones.sort((a, b) => a - b)
+      }
       return {
         deviceId: d.id,
         name: d.name,
         channelCount: ch,
         canMixFertilizer: ch === 12,
-        groupName: grp?.name ?? '농장',
+        groupName: group?.name ?? '농장',
+        activeZones,  // 활성 zone만 valve UI에 표시하도록 다음 스텝에 전달
       } satisfies ControllerInfo
     })
 })

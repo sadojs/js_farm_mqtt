@@ -7,7 +7,7 @@ import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
 import { MqttService } from '../mqtt/mqtt.service';
-import { AVAILABLE_SWITCH_CODES, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
+import { AVAILABLE_SWITCH_CODES, AVAILABLE_SWITCH_CODES_12CH, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
 
 const DEVICE_DEPENDENCY_SQL = `
   SELECT id, name, enabled FROM automation_rules
@@ -40,6 +40,70 @@ export class DevicesService {
   ) {}
 
   /** 장치가 속한 구역(house_group) ID 조회 — rain-override 등에서 사용 */
+  /**
+   * device.source에 따라 MQTT 발행을 라우팅 — automation scheduler 등 외부에서 단일 진입점으로 사용.
+   * - onboard: gpio-agent 토픽 (`farm/{gw}/gpio/relay`)
+   * - 외 (zigbee): z2m 토픽 (`farm/{gw}/z2m/{friendly}/set`)
+   */
+  async publishDeviceSwitch(
+    device: Device,
+    gateway: Gateway,
+    switchCode: string,
+    value: boolean,
+  ): Promise<void> {
+    if (device.source === 'onboard') {
+      await this.publishOnboardRelay(gateway.gatewayId, gateway.id, switchCode, value);
+    } else {
+      if (!device.friendlyName) {
+        throw new BadRequestException(`device ${device.id}: friendlyName 미설정 — z2m 발행 불가`);
+      }
+      // device 모델에 따라 z2m payload 키 변환 (Tuya TS0601 등)
+      const z2mKey = this.translateSwitchKeyForZ2m(switchCode, (device as any).zigbeeModel);
+      await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
+        [z2mKey]: value,
+      });
+    }
+  }
+
+  /** Tuya TS0601 multi-channel은 switch_N 대신 state_lN payload 사용 */
+  private translateSwitchKeyForZ2m(switchCode: string, zigbeeModel?: string | null): string {
+    if (!zigbeeModel) return switchCode;
+    if (!zigbeeModel.toLowerCase().includes('ts0601')) return switchCode;
+    const m = switchCode.match(/^switch_(\d+)$/);
+    return m ? `state_l${m[1]}` : switchCode;
+  }
+
+  /**
+   * onboard 관수 controller의 channelMapping switchCode (예: 'relay_zone_1', 'relay_remote_control')를
+   * gateway_onboard_devices 슬롯으로 reverse lookup하여 gpio-agent에게 publishGpioRelay 호출.
+   * z2m이 처리 못하는 onboard device의 단일 진실 path.
+   */
+  private async publishOnboardRelay(
+    gatewayCode: string,
+    gatewayUuid: string,
+    switchCode: string,
+    state: boolean,
+  ): Promise<void> {
+    // switchCode = 'relay_<slotKey>' → slotKey 추출
+    const slotKey = switchCode.startsWith('relay_') ? switchCode.slice(6) : switchCode;
+    // 반드시 gateway_id 로 필터 — 동일 slot_key가 여러 게이트웨이에 존재
+    const slot = await this.onboardRepo.findOne({ where: { slotKey, gatewayId: gatewayUuid } as any });
+    if (!slot) {
+      this.logger.warn(`onboard slot ${slotKey}@${gatewayCode} 미등록 — skip publish`);
+      return;
+    }
+    if (slot.gpioPin == null) {
+      // remote_control 등 GPIO 핀이 없는 논리 슬롯은 UI 상태만 기록 (publish skip)
+      this.logger.debug(`onboard slot ${slotKey}@${gatewayCode}: 핀 없음 — UI-only 슬롯 skip`);
+      return;
+    }
+    await this.mqttService.publishGpioRelay(gatewayCode, {
+      slot: slot.slotKey,
+      pin: slot.gpioPin,
+      state,
+    });
+  }
+
   private async getDeviceGroupId(deviceId: string): Promise<string | null> {
     const rows = await this.dataSource.query(`
       SELECT h.group_id::text AS group_id
@@ -99,10 +163,24 @@ export class DevicesService {
   }
 
   async findAllByUser(userId: string, role?: string) {
-    return this.devicesRepo.find({
+    const devices = await this.devicesRepo.find({
       where: role === 'admin' ? {} : { userId },
       order: { createdAt: 'DESC' },
     });
+    // deviceSettings 내의 switchState/switchStates를 최상위 필드로 노출 (frontend 호환)
+    return devices.map(d => this.exposeSwitchFields(d));
+  }
+
+  /** deviceSettings의 switchState/switchStates/disabledChannels를 최상위로 expose */
+  exposeSwitchFields(device: Device): any {
+    const settings = (device.deviceSettings as any) || {};
+    return {
+      ...device,
+      switchState: settings.switchState ?? null,
+      switchStates: settings.switchStates ?? null,
+      relayActivePhase: settings.relayActivePhase ?? null,
+      disabledChannels: Array.isArray(settings.disabledChannels) ? settings.disabledChannels : [],
+    };
   }
 
   async findOneByUser(id: string, userId: string) {
@@ -120,7 +198,64 @@ export class DevicesService {
     if (data.category !== undefined) device.category = data.category;
     if (data.equipmentType !== undefined) device.equipmentType = data.equipmentType as any;
     if (data.icon !== undefined) device.icon = data.icon;
-    return this.devicesRepo.save(device);
+
+    // 페어 개폐기의 경우: name이 "<X> 열기" / "<X> 닫기" 패턴이면 opener_group_name도 동기화 +
+    // 페어 device(반대편)의 opener_group_name도 함께 갱신 — 그룹 카드 헤더가 즉시 반영되도록.
+    let openerGroupBase: string | null = null;
+    if (data.name !== undefined && (device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close')) {
+      const m = device.name.match(/^(.+?)\s*(열기|열림|닫기|닫힘)$/);
+      const base = m ? m[1].trim() : device.name.trim();
+      if (base) {
+        openerGroupBase = base;
+        if (base !== (device as any).openerGroupName) {
+          (device as any).openerGroupName = base;
+          if (device.pairedDeviceId) {
+            await this.devicesRepo.update({ id: device.pairedDeviceId }, { openerGroupName: base } as any);
+          }
+        }
+      }
+    }
+
+    const saved = await this.devicesRepo.save(device);
+
+    // 양방향 동기화: onboard device의 이름 변경 → onboard 슬롯 name도 갱신.
+    // ensureOnboardDevices가 slot.name → device.name으로 흘러보내므로, slot.name을 갱신하지 않으면
+    // 다음 호출에서 device.name이 옛 값으로 덮어쓰여짐.
+    if (data.name !== undefined && device.source === 'onboard') {
+      try {
+        if (device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close') {
+          // 개폐기: vent_group header slot의 name을 group base로 갱신 (페어 양쪽이 같은 pair_key)
+          if (openerGroupBase && device.onboardDeviceId) {
+            const ownSlot = await this.onboardRepo.findOne({ where: { id: device.onboardDeviceId } as any });
+            if (ownSlot?.pairKey) {
+              await this.onboardRepo.update(
+                { pairKey: ownSlot.pairKey, slotType: 'vent_group' } as any,
+                { name: openerGroupBase } as any,
+              );
+            }
+          }
+        } else if (device.equipmentType === 'fan' && device.onboardDeviceId) {
+          // 유동팬: 1:1 매핑이므로 slot.name = device.name
+          await this.onboardRepo.update(
+            { id: device.onboardDeviceId } as any,
+            { name: device.name } as any,
+          );
+        } else if (device.equipmentType === 'irrigation') {
+          // 관수: gateway 단위로 1 device. irrigation_group header slot이 있으면 동기화.
+          // pairKey 일치하는 irrig_hdr 슬롯이 정의되어 있을 때만 의미 있음.
+          const irrigHeader = await this.onboardRepo.findOne({
+            where: { gatewayId: device.gatewayId as any, slotType: 'irrigation_group' as any } as any,
+          });
+          if (irrigHeader) {
+            await this.onboardRepo.update({ id: irrigHeader.id } as any, { name: device.name } as any);
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`onboard 슬롯 name 역동기화 실패 (device=${device.id}): ${err?.message ?? err}`);
+      }
+    }
+
+    return saved;
   }
 
   async registerBatch(userId: string, devices: {
@@ -185,12 +320,28 @@ export class DevicesService {
     return results;
   }
 
+  /**
+   * 자동제어룰/스케줄러용 effective mapping —
+   * deviceSettings.disabledChannels에 포함된 키는 제거 (매핑 자체는 보존하되 동작 대상 제외).
+   * 환경설정 UI는 device.channelMapping을 직접 사용 (전체 매핑 표시).
+   */
   getEffectiveMapping(device: Device, switchCodes?: string[]): Record<string, string> {
-    if (device.channelMapping) return { ...device.channelMapping };
-    const deviceAny = device as any;
-    const codes = switchCodes ?? (deviceAny.switchStates ? Object.keys(deviceAny.switchStates) : []);
-    const count = detectChannelCount(codes);
-    return { ...getDefaultMappingByCount(count) };
+    const base: Record<string, string> = device.channelMapping
+      ? { ...device.channelMapping }
+      : (() => {
+          const deviceAny = device as any;
+          const codes = switchCodes ?? (deviceAny.switchStates ? Object.keys(deviceAny.switchStates) : []);
+          const count = detectChannelCount(codes);
+          return { ...getDefaultMappingByCount(count) };
+        })();
+    const settings: any = device.deviceSettings || {};
+    const disabled = new Set<string>(Array.isArray(settings.disabledChannels) ? settings.disabledChannels : []);
+    if (disabled.size === 0) return base;
+    const filtered: Record<string, string> = {};
+    for (const [k, v] of Object.entries(base)) {
+      if (!disabled.has(k)) filtered[k] = v;
+    }
+    return filtered;
   }
 
   async updateChannelMapping(
@@ -202,17 +353,51 @@ export class DevicesService {
     if (role !== 'admin' && role !== 'farm_admin') {
       throw new ForbiddenException('채널 매핑 수정 권한이 없습니다.');
     }
-    const device = await this.devicesRepo.findOne({ where: { id, userId } });
+    // admin은 owner 무관하게 수정 가능
+    const where: any = role === 'admin' ? { id } : { id, userId };
+    const device = await this.devicesRepo.findOne({ where });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     if (device.equipmentType !== 'irrigation') {
       throw new BadRequestException('관수 장비만 채널 매핑을 설정할 수 있습니다.');
     }
-    const invalid = Object.values(mapping).filter(v => v !== '' && !AVAILABLE_SWITCH_CODES.includes(v));
+    // 8CH/12CH 모두 허용 (zigbee 컨트롤러 모델에 따라 채널 수 다름)
+    const ALL_SWITCH_CODES = new Set<string>([...AVAILABLE_SWITCH_CODES, ...AVAILABLE_SWITCH_CODES_12CH]);
+    const invalid = Object.values(mapping).filter(v => v !== '' && !ALL_SWITCH_CODES.has(v));
     if (invalid.length > 0) {
       throw new BadRequestException(`유효하지 않은 switch 코드: ${invalid.join(', ')}`);
     }
     device.channelMapping = mapping;
     return this.devicesRepo.save(device);
+  }
+
+  /**
+   * 채널 활성/비활성 토글 — 매핑은 보존, deviceSettings.disabledChannels 목록만 갱신.
+   * onboard 패턴과 동일: enabled=false여도 gpio_pin/switch_code 정보는 유지.
+   */
+  async updateChannelEnabled(
+    id: string,
+    userId: string,
+    role: string,
+    key: string,
+    enabled: boolean,
+  ): Promise<Device> {
+    if (role !== 'admin' && role !== 'farm_admin') {
+      throw new ForbiddenException('채널 활성화 수정 권한이 없습니다.');
+    }
+    const where: any = role === 'admin' ? { id } : { id, userId };
+    const device = await this.devicesRepo.findOne({ where });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    if (device.equipmentType !== 'irrigation') {
+      throw new BadRequestException('관수 장비만 채널 활성화 상태를 설정할 수 있습니다.');
+    }
+    const settings: any = device.deviceSettings || {};
+    const disabled = new Set<string>(Array.isArray(settings.disabledChannels) ? settings.disabledChannels : []);
+    if (enabled) disabled.delete(key);
+    else disabled.add(key);
+    settings.disabledChannels = [...disabled];
+    device.deviceSettings = settings;
+    const saved = await this.devicesRepo.save(device);
+    return this.exposeSwitchFields(saved);
   }
 
   /**
@@ -252,25 +437,42 @@ export class DevicesService {
       const mapping = this.getEffectiveMapping(device);
       const remoteSwitch = mapping['remote_control'];
       const remoteCmd = commands.find(c => c.code === remoteSwitch);
+      const isOnboardIrrigation = device.source === 'onboard';
 
       if (remoteCmd) {
         if (remoteCmd.value === true) {
-          // 원격제어 ON → fertilizer_b_contact 자동 ON
+          // 원격제어 ON → fertilizer_b_contact 자동 페어 ON
           const bContactSwitch = mapping['fertilizer_b_contact'];
-          await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
-            [bContactSwitch]: true,
-          });
+          if (bContactSwitch) {
+            if (isOnboardIrrigation) {
+              // onboard 관수: relay_XXX switchCode → slot lookup → publishGpioRelay
+              await this.publishOnboardRelay(gateway.gatewayId, gateway.id, bContactSwitch, true);
+            } else {
+              await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
+                [bContactSwitch]: true,
+              });
+            }
+          }
         } else if (remoteCmd.value === false) {
-          // 원격제어 OFF → 모든 관수 스위치 강제 OFF
+          // 원격제어 OFF → 모든 관수 스위치 강제 OFF (페어인 B접점 포함)
           const allSwitches = Object.values(mapping).filter(Boolean);
-          const offPayload: Record<string, any> = {};
-          for (const sw of allSwitches) offPayload[sw] = false;
-          await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
-          this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
-          // 원격제어 OFF → 해당 장치의 활성 관주 자동화 룰 전체 비활성화
+          if (isOnboardIrrigation) {
+            for (const sw of allSwitches) {
+              await this.publishOnboardRelay(gateway.gatewayId, gateway.id, sw, false).catch(() => undefined);
+            }
+            this.logger.log(`원격제어 OFF: onboard 전체 스위치 OFF — ${device.name}`);
+          } else {
+            const offPayload: Record<string, any> = {};
+            for (const sw of allSwitches) offPayload[sw] = false;
+            await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
+            this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
+          }
+          // 원격제어 OFF → 현재 진행 중인 관수 timeline만 중단 (룰 자체는 enabled 유지)
+          // (정책 변경 2026-05-28: 의도치 않은 토글로 룰이 비활성화되는 사고 방지.
+          //  사용자가 의식적으로 룰을 끄고 싶으면 자동제어 페이지에서 직접 toggle하도록 분리.)
           try {
             const allRules = await this.rulesRepo.find({ where: { userId: device.userId, enabled: true } });
-            const toDisable = allRules.filter(r => {
+            const affected = allRules.filter(r => {
               if ((r.conditions as any)?.type !== 'irrigation') return false;
               const acts = r.actions as any;
               const ids: string[] = [];
@@ -278,16 +480,40 @@ export class DevicesService {
               if (Array.isArray(acts?.targetDeviceIds)) ids.push(...acts.targetDeviceIds);
               return ids.includes(id);
             });
-            if (toDisable.length > 0) {
-              for (const r of toDisable) r.enabled = false;
-              await this.rulesRepo.save(toDisable);
-              this.logger.log(`원격제어 OFF → 관주 룰 ${toDisable.length}개 자동 비활성화: ${device.name}`);
+            if (affected.length > 0) {
+              // 스위치는 위에서 이미 OFF publish됨. 룰은 enabled 유지 — 다음 schedule에 자동 재시작.
+              this.logger.log(`원격제어 OFF: 관주 룰 ${affected.length}개 enabled 보존 (다음 schedule 시간에 자동 재시작) — ${device.name}`);
             }
           } catch (err: any) {
-            this.logger.warn(`관주 룰 비활성화 실패: ${err.message}`);
+            this.logger.warn(`관주 룰 처리 실패: ${err.message}`);
           }
-          return { success: true, deviceId: device.id, command: offPayload, deviceName: device.name, equipmentType: device.equipmentType };
+          // device 상태 기록 (verify 응답용)
+          const settings = (device.deviceSettings || {}) as any;
+          const switchStates = { ...(settings.switchStates || {}) };
+          for (const sw of allSwitches) switchStates[sw] = false;
+          settings.switchStates = switchStates;
+          device.deviceSettings = settings;
+          await this.devicesRepo.save(device).catch(() => undefined);
+          return { success: true, deviceId: device.id, command: {}, deviceName: device.name, equipmentType: device.equipmentType };
         }
+      }
+
+      // onboard 관수의 일반 switch 제어 (zone, mixer, fertilizer_motor 등) → gpio-agent
+      if (isOnboardIrrigation) {
+        for (const cmd of commands) {
+          await this.publishOnboardRelay(gateway.gatewayId, gateway.id, cmd.code, !!cmd.value).catch((err) =>
+            this.logger.warn(`onboard relay ${cmd.code} 실패: ${err.message}`)
+          );
+        }
+        // device 상태 기록
+        const settings = (device.deviceSettings || {}) as any;
+        const switchStates = { ...(settings.switchStates || {}) };
+        for (const cmd of commands) switchStates[cmd.code] = !!cmd.value;
+        settings.switchStates = switchStates;
+        settings.lastCommandAt = new Date().toISOString();
+        device.deviceSettings = settings;
+        await this.devicesRepo.save(device).catch(() => undefined);
+        return { success: true, deviceId: device.id, command: commands, deviceName: device.name, equipmentType: device.equipmentType };
       }
     }
 
@@ -492,8 +718,11 @@ export class DevicesService {
     return { message: '개폐기 페어가 삭제되었습니다.', deletedIds: ids };
   }
 
-  async remove(id: string, userId: string) {
-    const device = await this.devicesRepo.findOne({ where: { id, userId } });
+  async remove(id: string, userId: string, role?: string) {
+    // admin은 userId 매칭 우회 (orphan/null userId device 정리 가능)
+    const device = role === 'admin'
+      ? await this.devicesRepo.findOne({ where: { id } })
+      : await this.devicesRepo.findOne({ where: { id, userId } });
     if (!device) throw new NotFoundException();
 
     if (device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close') {

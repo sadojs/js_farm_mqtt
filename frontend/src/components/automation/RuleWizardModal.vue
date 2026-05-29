@@ -169,8 +169,17 @@ watch(
   { immediate: true },
 )
 
-// admin/farm_admin만 채널 매핑 편집 가능
-const canEditMapping = computed(() => isAdmin || isFarmAdmin)
+// admin/farm_admin만 채널 매핑 편집 가능 + onboard device는 자동 매핑이라 UI 숨김
+const canEditMapping = computed(() => {
+  if (!(isAdmin || isFarmAdmin)) return false
+  // 선택된 actuator device가 onboard source면 채널 매핑 UI 표시 안 함
+  const firstId = formData.value.actuatorDeviceIds[0]
+  if (firstId) {
+    const dev = deviceStore.devices.find(d => d.id === firstId)
+    if (dev?.source === 'onboard') return false
+  }
+  return true
+})
 
 // 채널 매핑 변경 → 로컬 즉시 반영 + API 저장
 async function handleMappingUpdate(mapping: ChannelMapping) {

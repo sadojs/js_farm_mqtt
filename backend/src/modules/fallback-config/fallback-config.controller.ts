@@ -1,0 +1,106 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { FallbackConfigService } from './fallback-config.service';
+import { UpdateFallbackConfigDto } from './dto/update-config.dto';
+import { UpsertOpenerScheduleDto } from './dto/upsert-opener-schedule.dto';
+import { MqttService } from '../mqtt/mqtt.service';
+
+@Controller('fallback-config')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class FallbackConfigController {
+  constructor(
+    private readonly service: FallbackConfigService,
+    private readonly mqtt: MqttService,
+  ) {}
+
+  @Get(':gatewayId')
+  @Roles('admin', 'farm_admin')
+  async getFull(@Param('gatewayId') gatewayId: string) {
+    return this.service.getFullConfig(gatewayId);
+  }
+
+  @Patch(':gatewayId')
+  @Roles('admin', 'farm_admin')
+  async updateConfig(
+    @Param('gatewayId') gatewayId: string,
+    @Body() dto: UpdateFallbackConfigDto,
+  ) {
+    return this.service.updateConfig(gatewayId, dto);
+  }
+
+  @Put(':gatewayId/opener/:month')
+  @Roles('admin', 'farm_admin')
+  async upsertSchedule(
+    @Param('gatewayId') gatewayId: string,
+    @Param('month', ParseIntPipe) month: number,
+    @Body() dto: UpsertOpenerScheduleDto,
+  ) {
+    return this.service.upsertOpenerSchedule(gatewayId, month, dto);
+  }
+
+  @Delete(':gatewayId/opener/:month')
+  @Roles('admin', 'farm_admin')
+  async disableSchedule(
+    @Param('gatewayId') gatewayId: string,
+    @Param('month', ParseIntPipe) month: number,
+  ) {
+    return this.service.disableOpenerSchedule(gatewayId, month);
+  }
+
+  @Get(':gatewayId/mode')
+  @Roles('admin', 'farm_admin', 'farm_user')
+  async getMode(@Param('gatewayId') gatewayId: string) {
+    return this.service.getMode(gatewayId);
+  }
+
+  @Get(':gatewayId/events')
+  @Roles('admin', 'farm_admin')
+  async getEvents(
+    @Param('gatewayId') gatewayId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.getEvents(
+      gatewayId,
+      limit ? parseInt(limit, 10) : 100,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
+  /** 룰을 강제로 재동기화 (관리자 트리거) */
+  @Post(':gatewayId/resync')
+  @Roles('admin', 'farm_admin')
+  async resync(@Param('gatewayId') gatewayId: string) {
+    await this.service.publishSync(gatewayId);
+    return { ok: true };
+  }
+
+  /** 비상 정지 (폴백 모드에서도 통과) */
+  @Post(':gatewayId/emergency-stop')
+  @Roles('admin', 'farm_admin')
+  async emergencyStop(
+    @Param('gatewayId') gatewayId: string,
+    @Body() body: { reason: string; by: string },
+  ) {
+    await this.mqtt.publishEmergencyStop(
+      gatewayId,
+      body.reason ?? 'manual',
+      body.by ?? 'unknown',
+    );
+    return { ok: true };
+  }
+}

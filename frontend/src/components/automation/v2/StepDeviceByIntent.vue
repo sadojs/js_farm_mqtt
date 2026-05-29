@@ -79,17 +79,11 @@ const triggerHint = computed(() => '시간/온도 조건')
 
 const devices = computed(() => {
   const group = groupStore.groups.find(g => g.id === props.groupId)
+  // 선택한 구역(group)에 속한 장치만 — 다른 구역/농장의 장치가 섞이지 않도록 enforce.
   const groupDevices: any[] = group?.devices ?? []
-  const allDevices = deviceStore.devices
-
-  const candidates = [...groupDevices, ...allDevices].reduce<any[]>((acc, d) => {
-    if (!acc.find(x => x.id === d.id)) acc.push(d)
-    return acc
-  }, [])
-
   const byFarm = props.farmUserId
-    ? candidates.filter((d: any) => !d.userId || d.userId === props.farmUserId)
-    : candidates
+    ? groupDevices.filter((d: any) => !d.userId || d.userId === props.farmUserId)
+    : groupDevices
 
   if (props.intent === 'opener') {
     return byFarm.filter(d => d.equipmentType === 'opener_open')

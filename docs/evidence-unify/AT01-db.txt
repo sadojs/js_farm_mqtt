@@ -1,0 +1,6 @@
+  gateway_id  |  hostname  
+--------------+------------
+ lgw-test01   | lgw-test01
+ fb_gw_status | lgw-test01
+(2 rows)
+

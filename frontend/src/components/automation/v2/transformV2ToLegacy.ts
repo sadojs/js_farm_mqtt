@@ -21,16 +21,30 @@ function buildIrrigation(state: WizardStateV2): CreateRuleRequest {
     : DEFAULT_CHANNEL_MAPPING_8CH
 
   // 8CH → 4구역(zone_1~4), 12CH → 8구역(zone_1~8)
-  // valveZones가 비어 있으면 (채널매핑 스텝 제거로 인해) 모든 구역 활성화
+  // 우선순위: valves 배열(밸브별 개별 설정) > valveZones + 공통값 (backward compat)
   const zoneCount = irrigation.controllerChannels === 12 ? 8 : 4
+  const useValves = Array.isArray(irrigation.valves) && irrigation.valves.length === zoneCount
   const allZones = irrigation.valveZones.length === 0
-  const zones = Array.from({ length: zoneCount }, (_, i) => ({
-    zone: i + 1,
-    name: `${i + 1}번 밸브`,
-    duration: (allZones || irrigation.valveZones.includes(i + 1)) ? irrigation.durationMin : 0,
-    waitTime: (allZones || irrigation.valveZones.includes(i + 1)) ? irrigation.waitTimeBetweenZones : 0,
-    enabled: allZones || irrigation.valveZones.includes(i + 1),
-  }))
+  const zones = Array.from({ length: zoneCount }, (_, i) => {
+    if (useValves) {
+      const v = irrigation.valves[i]
+      return {
+        zone: v.zone,
+        name: `${v.zone}번 밸브`,
+        duration: v.enabled ? v.duration : 0,
+        waitTime: v.enabled ? v.waitTime : 0,
+        enabled: v.enabled,
+      }
+    }
+    const inSel = allZones || irrigation.valveZones.includes(i + 1)
+    return {
+      zone: i + 1,
+      name: `${i + 1}번 밸브`,
+      duration: inSel ? irrigation.durationMin : 0,
+      waitTime: inSel ? irrigation.waitTimeBetweenZones : 0,
+      enabled: inSel,
+    }
+  })
 
   const conditions: IrrigationConditions = {
     type: 'irrigation',

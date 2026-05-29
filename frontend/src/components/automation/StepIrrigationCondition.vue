@@ -126,12 +126,16 @@
           <span v-else class="switch-hint">{{ effectiveMapping['mixer'] }}</span>
         </div>
         <div class="setting-fields">
+          <!-- 사용자 요구: 교반기는 액비모터에 종속 — 액비 ON 시 자동 ON / OFF 시 자동 OFF / 토글 비활성 -->
           <button
-            class="toggle-btn"
+            class="toggle-btn disabled"
             :class="{ active: form.mixer.enabled }"
-            @click="form.mixer.enabled = !form.mixer.enabled"
+            :disabled="true"
+            title="액비모터에 의해 자동 결정 (액비 활성 시 자동 ON)"
           >{{ form.mixer.enabled ? 'ON' : 'OFF' }}</button>
         </div>
+        <div v-if="!form.fertilizer.enabled" class="mixer-hint">액비모터가 OFF 상태라 교반기는 동작하지 않습니다.</div>
+        <div v-else class="mixer-hint">액비 투여 중 자동으로 함께 동작합니다.</div>
       </div>
 
       <!-- 액비모터 -->
@@ -166,7 +170,7 @@
           <button
             class="toggle-btn"
             :class="{ active: form.fertilizer.enabled }"
-            @click="form.fertilizer.enabled = !form.fertilizer.enabled"
+            @click="toggleFertilizer"
           >{{ form.fertilizer.enabled ? 'ON' : 'OFF' }}</button>
         </div>
         <!-- 액비 시간 초과 경고 -->
@@ -308,6 +312,17 @@ if (raw.fertilizer && raw.fertilizer.enabled === undefined) {
   raw.fertilizer.enabled = raw.fertilizer.duration > 0
 }
 const form = reactive<IrrigationFormData>(raw)
+
+// 사용자 요구: 교반기는 액비모터에 종속 — 둘의 상태를 항상 동기화
+// 1) 초기화 시 — 액비 상태에 mixer 정렬
+form.mixer.enabled = !!form.fertilizer.enabled
+function toggleFertilizer() {
+  const next = !form.fertilizer.enabled
+  form.fertilizer.enabled = next
+  form.mixer.enabled = next   // 교반기 자동 동기화
+}
+// 외부에서 form.fertilizer.enabled가 바뀌어도 mixer 추종 (방어적)
+watch(() => form.fertilizer.enabled, (v) => { form.mixer.enabled = !!v })
 
 // 다중 스케줄 관리
 type ScheduleEntry = { startTime: string; days: number[]; repeat: boolean }
@@ -700,6 +715,19 @@ watch(form, () => {
   background: #451a03;
   border-color: #b45309;
   color: #fbbf24;
+}
+
+/* 교반기 종속 안내 + disabled 토글 */
+.mixer-hint {
+  font-size: 12px; color: var(--text-secondary, #6b7280);
+  margin-top: 4px; padding-left: 4px;
+}
+.toggle-btn.disabled,
+.toggle-btn:disabled {
+  cursor: not-allowed; opacity: 0.7;
+}
+.toggle-btn.disabled:not(.active) {
+  background: #e5e7eb; color: #9ca3af; border-color: #d1d5db;
 }
 </style>
 

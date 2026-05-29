@@ -50,6 +50,25 @@ export class Gateway {
   @Column({ name: 'house_id', nullable: true, type: 'uuid' })
   houseId: string | null;
 
+  // --- rpi-golden-image-system (Migration 018) ---
+  @Column({ name: 'hostname', nullable: true, type: 'varchar', length: 63 })
+  hostname: string | null;
+
+  @Column({ name: 'wifi_ssid', nullable: true, type: 'varchar', length: 100 })
+  wifiSsid: string | null;
+
+  @Column({ name: 'server_ip', nullable: true, type: 'varchar', length: 255 })
+  serverIp: string | null;
+
+  @Column({ name: 'machine_id', nullable: true, type: 'varchar', length: 64 })
+  machineId: string | null;
+
+  @Column({ name: 'last_config_applied_at', nullable: true, type: 'timestamptz' })
+  lastConfigAppliedAt: Date | null;
+
+  @Column({ name: 'bootstrap_token_used_at', nullable: true, type: 'timestamptz' })
+  bootstrapTokenUsedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

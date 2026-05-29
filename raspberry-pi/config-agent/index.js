@@ -9,6 +9,7 @@ const { handleGatewayId } = require('./handlers/gateway-id');
 const { handleIdentity } = require('./handlers/identity');
 const { handleAgentUpdate } = require('./handlers/agent-update');
 const { handleServerIp } = require('./handlers/server-ip');
+const { handleServiceRestart } = require('./handlers/service-restart');
 
 // ---- 환경 변수 ----
 const GATEWAY_ID = process.env.GATEWAY_ID;
@@ -139,6 +140,10 @@ async function handleRequest(payload) {
         break;
       case 'server_ip_update':
         await runRemoteAction(requestId, action, () => handleServerIp(request));
+        break;
+      case 'service_restart':
+        // gpio-agent 등 systemd 서비스 안전 재시작 (config-agent는 root 권한)
+        await runRemoteAction(requestId, action, () => handleServiceRestart(request));
         break;
       default:
         sendResponse(requestId, action, false, { error: `알 수 없는 action: ${action}` });

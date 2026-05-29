@@ -117,6 +117,25 @@ export class DevicesController {
     );
   }
 
+  /**
+   * 채널 활성/비활성 토글 — onboard와 동일 패턴 (매핑은 보존, enabled 상태만 별도 관리).
+   * body: { key: 'zone_3', enabled: false }
+   */
+  @Patch(':id/channel-enabled')
+  updateChannelEnabled(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { key: string; enabled: boolean },
+  ) {
+    return this.devicesService.updateChannelEnabled(
+      id,
+      this.getEffectiveUserId(user),
+      user.role,
+      body.key,
+      body.enabled,
+    );
+  }
+
   @Get(':id/dependencies')
   getDependencies(@Param('id') id: string, @CurrentUser() user: any) {
     return this.devicesService.getDependencies(id, this.getEffectiveUserId(user));
@@ -130,7 +149,7 @@ export class DevicesController {
 
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser() user: any) {
-    const result = await this.devicesService.remove(id, this.getEffectiveUserId(user));
+    const result = await this.devicesService.remove(id, this.getEffectiveUserId(user), user.role);
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,
       action: 'device.delete', targetType: 'device', targetId: id,

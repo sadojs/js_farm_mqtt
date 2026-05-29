@@ -80,7 +80,18 @@ const deviceStore = useDeviceStore()
 const groupStore = useGroupStore()
 const { isAdmin, isFarmAdmin } = useAuthStore()
 
-const canEditMapping = computed(() => isAdmin || isFarmAdmin)
+// admin/farm_admin + 선택된 actuator가 onboard source가 아닌 경우만 채널 매핑 편집 가능
+const canEditMapping = computed(() => {
+  if (!(isAdmin || isFarmAdmin)) return false
+  if (!props.rule) return true
+  const actions = props.rule.actions as any
+  const deviceIds: string[] = actions?.targetDeviceIds || []
+  for (const id of deviceIds) {
+    const dev = deviceStore.devices.find(d => d.id === id)
+    if (dev?.source === 'onboard') return false
+  }
+  return true
+})
 const localChannelMapping = shallowRef<ChannelMapping | undefined>(undefined)
 
 const step = ref<'condition' | 'review'>('condition')

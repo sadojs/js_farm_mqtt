@@ -1,82 +1,66 @@
 <template>
   <div class="step-valve">
     <h3 class="step-title">관수 설정</h3>
-    <p class="step-sub">구역과 시간, 액비를 설정해주세요</p>
+    <p class="step-sub">각 구역의 관수 시간 / 쉬는 시간을 설정해주세요</p>
 
-    <!-- 구역 선택 -->
+    <!-- 구역별 행: 수정 화면과 동일한 UX -->
     <div class="section-block">
-      <label class="section-label">💧 구역 선택 <span class="sub-hint">여러 개 선택 가능</span></label>
-      <div class="valve-grid" role="group" aria-label="구역 선택">
-        <label
-          v-for="zone in zoneCount"
-          :key="zone"
-          class="valve-card"
-          :class="{ selected: selectedZones.includes(zone) }"
-          :aria-label="`${zone}구역`"
+      <label class="section-label">💧 구역별 설정</label>
+      <div class="valve-list">
+        <div
+          v-for="valve in valves"
+          :key="valve.zone"
+          class="valve-row"
+          :class="{ active: valve.enabled }"
         >
-          <input
-            type="checkbox"
-            :value="zone"
-            :checked="selectedZones.includes(zone)"
-            class="sr-only"
-            @change="toggleZone(zone)"
-          />
-          <span class="valve-num">{{ zone }}구역</span>
-        </label>
-      </div>
-    </div>
-
-    <!-- 관수 시간 -->
-    <div class="section-block">
-      <label class="section-label">⏱️ 관수 시간</label>
-      <div class="field-row">
-        <label class="field-label">구역당 관수</label>
-        <div class="input-unit-row">
-          <input type="number" min="1" max="240" class="num-input"
-            :value="durationMin"
-            @input="emit('update:durationMin', +($event.target as HTMLInputElement).value)" />
-          <span class="unit-label">분</span>
+          <div class="zone-label">{{ valve.zone }}번 밸브</div>
+          <!-- (zone-label 색상 fix: var(--text)로 명시적 지정 — 다크 테마/배경에서도 보이게) -->
+          <div class="field">
+            <label>관주 시간</label>
+            <div class="num-unit">
+              <input
+                type="number" min="0" max="240"
+                :value="valve.duration"
+                @input="updateValve(valve.zone, 'duration', +($event.target as HTMLInputElement).value)"
+              />
+              <span>분</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>쉬는 시간</label>
+            <div class="num-unit">
+              <input
+                type="number" min="0" max="60"
+                :value="valve.waitTime"
+                @input="updateValve(valve.zone, 'waitTime', +($event.target as HTMLInputElement).value)"
+              />
+              <span>분</span>
+            </div>
+          </div>
+          <button
+            class="toggle-btn"
+            :class="{ active: valve.enabled }"
+            @click="updateValve(valve.zone, 'enabled', !valve.enabled)"
+          >{{ valve.enabled ? 'ON' : 'OFF' }}</button>
         </div>
       </div>
-      <div class="field-row">
-        <label class="field-label">구역 간 쉬는 시간</label>
-        <div class="input-unit-row">
-          <input type="number" min="0" max="60" class="num-input"
-            :value="waitTimeBetweenZones"
-            @input="emit('update:waitTimeBetweenZones', +($event.target as HTMLInputElement).value)" />
-          <span class="unit-label">분</span>
-        </div>
-      </div>
     </div>
 
-    <!-- 교반기 -->
+    <!-- 액비모터 (교반기는 액비모터에 종속되므로 액비 먼저 배치) -->
     <div class="section-block">
-      <label class="section-label">🔄 교반기 (교반기/혼합기)</label>
+      <label class="section-label">🧪 액비모터</label>
       <div class="toggle-row">
-        <span class="toggle-desc">관수 시 교반기를 함께 동작시킵니다</span>
-        <button
-          class="toggle-btn"
-          :class="{ active: mixerEnabled }"
-          @click="emit('update:mixerEnabled', !mixerEnabled)"
-        >{{ mixerEnabled ? 'ON' : 'OFF' }}</button>
-      </div>
-    </div>
-
-    <!-- 액비모터 -->
-    <div class="section-block">
-      <label class="section-label">🧪 액비 혼합</label>
-      <div class="toggle-row">
-        <span class="toggle-desc">액비모터를 함께 동작시킵니다</span>
+        <span class="toggle-desc">관수 시 액비를 함께 투여합니다</span>
         <button
           class="toggle-btn"
           :class="{ active: useFertilizer }"
-          @click="emit('update:useFertilizer', !useFertilizer)"
+          @click="toggleFertilizer"
         >{{ useFertilizer ? 'ON' : 'OFF' }}</button>
       </div>
 
       <template v-if="useFertilizer">
         <div class="field-row">
-          <label class="field-label">액비 투여 시간</label>
+          <label class="field-label">투여 시간</label>
           <div class="input-unit-row">
             <input type="number" min="1" max="60" class="num-input"
               :value="fertilizer.duration"
@@ -94,140 +78,169 @@
           </div>
         </div>
 
-        <!-- 액비 시간 경고 -->
         <div v-if="fertWarnings.length > 0" class="fert-warning">
           <p v-for="(w, i) in fertWarnings" :key="i">⚠️ {{ w }}</p>
         </div>
       </template>
     </div>
 
-    <!-- 장치 변경 -->
+    <!-- 교반기 (액비모터 종속 — 액비 ON 시 자동 ON, 토글 비활성) -->
+    <div class="section-block">
+      <label class="section-label">🔄 교반기</label>
+      <div class="toggle-row">
+        <span class="toggle-desc">
+          {{ useFertilizer
+              ? '액비를 물에 잘 녹이기 위해 각 밸브 동작 시 자동 함께 작동합니다.'
+              : '액비모터가 비활성화되어 교반기는 동작하지 않습니다.' }}
+        </span>
+        <button
+          class="toggle-btn"
+          :class="{ active: mixerEnabled, disabled: true }"
+          :disabled="true"
+          aria-label="교반기 상태 (액비모터에 의해 자동 결정)"
+        >{{ mixerEnabled ? 'ON' : 'OFF' }}</button>
+      </div>
+    </div>
+
     <button class="btn-link-sm" @click="emit('go-back')">← 다른 관수 장치로 변경</button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FertilizerConfig } from './types'
+import type { FertilizerConfig, IrrigationValve } from './types'
 
 const props = defineProps<{
   controllerChannels: 8 | 12
-  modelValue: number[]
-  durationMin: number
-  waitTimeBetweenZones: number
+  valves: IrrigationValve[]
   mixerEnabled: boolean
   useFertilizer: boolean
   fertilizer: FertilizerConfig
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [zones: number[]]
-  'update:durationMin': [v: number]
-  'update:waitTimeBetweenZones': [v: number]
+  'update:valves': [valves: IrrigationValve[]]
   'update:mixerEnabled': [v: boolean]
   'update:useFertilizer': [v: boolean]
   'update:fertilizer': [v: FertilizerConfig]
   'go-back': []
 }>()
 
-// 8CH → 4구역(zone_1~4), 12CH → 8구역(zone_1~8)
-const zoneCount = computed(() => props.controllerChannels === 12 ? 8 : 4)
-
-const selectedZones = computed(() => props.modelValue)
-
-function toggleZone(zone: number) {
-  const current = [...props.modelValue]
-  const idx = current.indexOf(zone)
-  if (idx === -1) current.push(zone)
-  else current.splice(idx, 1)
-  emit('update:modelValue', current.sort((a, b) => a - b))
+// 액비모터 토글 — 교반기와 항상 동기화 (사용자 요구: 액비 활성 시에만 각 밸브 ON 시간 동안 교반기 함께 ON)
+function toggleFertilizer() {
+  const next = !props.useFertilizer
+  emit('update:useFertilizer', next)
+  // 교반기를 액비 상태에 항상 동기화 — 별도 토글로 분리 불가
+  emit('update:mixerEnabled', next)
 }
 
-function updateFert(key: keyof FertilizerConfig, val: number | boolean) {
+// 채널 수 변경 시 valves 길이 보정 (props에서 받아온 그대로 사용 — IntentWizardModal에서 초기화)
+const valves = computed<IrrigationValve[]>(() => props.valves || [])
+
+function updateValve<K extends keyof IrrigationValve>(zone: number, key: K, val: IrrigationValve[K]) {
+  const next = valves.value.map(v => v.zone === zone ? { ...v, [key]: val } : v)
+  emit('update:valves', next)
+}
+
+function updateFert<K extends keyof FertilizerConfig>(key: K, val: FertilizerConfig[K]) {
   emit('update:fertilizer', { ...props.fertilizer, [key]: val })
 }
 
-const fertWarnings = computed(() => {
+// 액비 시간 vs 총 관주 시간 검증 경고
+const fertWarnings = computed<string[]>(() => {
   if (!props.useFertilizer) return []
-  const fertTotal = (props.fertilizer.duration || 0) + (props.fertilizer.preStopWait || 0)
-  if (fertTotal <= 0 || props.durationMin <= 0) return []
-  if (props.durationMin < fertTotal) {
-    return [`관수 시간(${props.durationMin}분)이 너무 짧습니다. 액비 투여(${props.fertilizer.duration}분) + 종료 전 대기(${props.fertilizer.preStopWait}분) = 최소 ${fertTotal}분 이상이어야 합니다.`]
+  const totalDuration = valves.value.filter(v => v.enabled).reduce((s, v) => s + v.duration, 0)
+  const fertTotal = props.fertilizer.duration + props.fertilizer.preStopWait
+  const warnings: string[] = []
+  if (totalDuration > 0 && fertTotal > totalDuration) {
+    warnings.push(`액비 투여시간(${props.fertilizer.duration}분) + 종료전 대기(${props.fertilizer.preStopWait}분) = ${fertTotal}분이 활성 구역 총 관수시간 ${totalDuration}분보다 깁니다.`)
   }
-  return []
+  return warnings
 })
 </script>
 
 <style scoped>
-.step-valve { display: flex; flex-direction: column; gap: 16px; }
-.step-title { font-size: calc(17px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary); margin: 0; }
-.step-sub { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); margin: -10px 0 0; }
+.step-valve { display: flex; flex-direction: column; gap: 20px; }
+.step-title { font-size: 18px; font-weight: 700; margin: 0; }
+.step-sub { color: var(--text-secondary, #666); margin: 0; font-size: 13px; }
 
 .section-block {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 14px; background: var(--bg-secondary);
-  border-radius: var(--radius-md, 10px);
+  background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
 }
-.section-label {
-  font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary);
-  display: flex; align-items: center; gap: 6px;
+.section-label { font-weight: 600; font-size: 14px; color: var(--text, #1f2937); }
+.sub-hint { font-weight: normal; color: var(--text-secondary, #888); font-size: 12px; margin-left: 4px; }
+
+/* 밸브 row */
+.valve-list { display: flex; flex-direction: column; gap: 8px; }
+.valve-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 70px;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg-secondary, #f8f9fa);
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: background 0.15s;
 }
-.sub-hint { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); font-weight: 400; }
-
-.valve-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-@media (max-width: 400px) { .valve-grid { grid-template-columns: repeat(3, 1fr); } }
-
-.valve-card {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 56px; gap: 2px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md, 10px);
-  background: var(--bg-card);
-  cursor: pointer; padding: 8px 4px;
-  transition: border-color 0.15s, background 0.15s;
+.valve-row.active { background: var(--card-bg, #fff); border-color: #4caf50; }
+/* 명시적 색상 — 다크 배경/테마에서도 가독성 보장 */
+.zone-label {
+  font-weight: 700; font-size: 14px;
+  color: var(--text, #1f2937);
+  white-space: nowrap;
 }
-.valve-card:hover { border-color: var(--color-primary); }
-.valve-card:focus-within { outline: 2px solid var(--color-primary); }
-.valve-card.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--bg-card)); }
-.valve-num { font-size: calc(14px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
-
-.field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.field-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary); font-weight: 500; }
-.input-unit-row { display: flex; align-items: center; gap: 6px; }
-.num-input {
-  width: 72px; padding: 8px 10px; text-align: center;
-  border: 1px solid var(--border-color); border-radius: var(--radius-sm, 6px);
-  background: var(--bg-card); color: var(--text-primary);
-  font-size: calc(14px * var(--content-scale, 1));
+.valve-row .field { display: flex; flex-direction: column; gap: 4px; }
+.valve-row .field label { font-size: 11px; color: var(--text-secondary, #888); }
+.num-unit { display: flex; align-items: center; gap: 4px; }
+.num-unit input {
+  width: 60px; padding: 6px 8px;
+  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px;
 }
-.unit-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
+.num-unit span { color: var(--text-secondary, #666); font-size: 12px; }
 
-.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.toggle-desc { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); flex: 1; }
-
+/* 토글 */
+.toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.toggle-desc { color: var(--text-secondary, #666); font-size: 13px; }
 .toggle-btn {
-  padding: 6px 16px; border: 2px solid var(--border-color);
-  border-radius: var(--radius-sm, 6px); background: var(--bg-card);
-  font-size: calc(13px * var(--content-scale, 1)); font-weight: 600;
-  color: var(--text-muted); cursor: pointer; min-width: 52px;
+  padding: 6px 16px; border-radius: 16px;
+  border: 1px solid var(--border-color, #ccc);
+  background: var(--card-bg, #fff); color: var(--text-secondary, #666);
+  font-weight: 600; cursor: pointer; min-width: 60px;
   transition: all 0.15s;
 }
-.toggle-btn.active { border-color: var(--color-success, #16a34a); background: var(--color-success, #16a34a); color: #fff; }
+.toggle-btn.active { background: #4caf50; color: #fff; border-color: #4caf50; }
+.toggle-btn.disabled,
+.toggle-btn:disabled {
+  cursor: not-allowed; opacity: 0.7;
+}
+.toggle-btn.disabled:not(.active) { background: #e5e7eb; color: #9ca3af; border-color: #d1d5db; }
+
+/* 액비 필드 */
+.field-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.field-label { font-size: 13px; color: var(--text-secondary, #555); }
+.input-unit-row { display: flex; align-items: center; gap: 4px; }
+.input-unit-row .num-input {
+  width: 70px; padding: 6px 8px;
+  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px;
+}
+.unit-label { color: var(--text-secondary, #666); font-size: 12px; }
 
 .fert-warning {
-  padding: 8px 12px;
-  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, var(--bg-secondary));
-  border: 1px solid var(--color-warning, #f59e0b);
-  border-radius: var(--radius-sm, 6px);
-  font-size: calc(12px * var(--content-scale, 1)); color: var(--text-primary); line-height: 1.5;
+  background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px;
+  padding: 8px 12px; font-size: 12px; color: #856404;
 }
-.fert-warning p { margin: 2px 0; }
+.fert-warning p { margin: 0; }
 
 .btn-link-sm {
-  background: none; border: none; color: var(--text-muted);
-  font-size: calc(13px * var(--content-scale, 1)); cursor: pointer; padding: 4px 0;
-  text-align: left; text-decoration: underline;
+  background: none; border: none; color: #4caf50;
+  text-decoration: underline; cursor: pointer; font-size: 13px;
+  padding: 4px 0; align-self: flex-start;
 }
-.btn-link-sm:hover { color: var(--text-primary); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+@media (max-width: 600px) {
+  .valve-row { grid-template-columns: 1fr 1fr 1fr 60px; gap: 8px; }
+  .zone-label { grid-column: 1 / -1; }
+}
 </style>

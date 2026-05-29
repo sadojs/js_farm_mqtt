@@ -55,31 +55,38 @@
 
       <div v-if="zigbeeDevices.length === 0" class="empty-state">추가된 Zigbee 장치가 없습니다.</div>
 
-      <div v-for="dev in zigbeeDevices" :key="dev.id" class="device-card">
-        <div class="card-header">
+      <div v-for="dev in zigbeeDevices" :key="dev.id" class="device-card"
+        :class="{ 'card-enabled': dev.equipmentType === 'irrigation' && zigbeeAnyActive(dev) }">
+        <div class="card-header" :class="{ 'card-header-clickable': dev.equipmentType === 'irrigation' }"
+          @click="dev.equipmentType === 'irrigation' && toggleZigbeeExpand(dev.id)">
           <div class="device-name-row">
             <span v-if="editingId !== dev.id" class="device-name">{{ dev.name }}</span>
-            <input v-else v-model="editName" class="name-input" @keyup.enter="saveZigbeeName(dev)" @keyup.escape="cancelEdit()" />
-            <button v-if="editingId !== dev.id" class="btn-icon" @click="startEdit(dev.id, dev.name)">✏</button>
+            <input v-else v-model="editName" class="name-input" @click.stop @keyup.enter="saveZigbeeName(dev)" @keyup.escape="cancelEdit()" />
+            <button v-if="editingId !== dev.id" class="btn-icon" @click.stop="startEdit(dev.id, dev.name)">✏</button>
             <template v-else>
-              <button class="btn-icon btn-save" @click="saveZigbeeName(dev)">✓</button>
-              <button class="btn-icon" @click="cancelEdit()">✕</button>
+              <button class="btn-icon btn-save" @click.stop="saveZigbeeName(dev)">✓</button>
+              <button class="btn-icon" @click.stop="cancelEdit()">✕</button>
             </template>
           </div>
-          <div class="card-actions">
-            <!-- 관수: 채널 매핑 버튼 -->
-            <button v-if="dev.equipmentType === 'irrigation'" class="btn-settings btn-sm" @click="openMappingModal(dev)">🔀 채널 매핑</button>
-            <!-- 팬: 타이머 설정 버튼 (작은 아이콘) -->
-            <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
-            <!-- 개폐기(열림 대표로만): 타이머 설정 -->
-            <button v-if="dev.equipmentType === 'opener_open'" class="btn-sm btn-timer" @click="openTimerModal(dev, 'opener')" title="타이머 설정">⏱</button>
-            <!-- admin 전용: 채널 테스트 -->
-            <button v-if="authStore.isAdmin && dev.channelMapping && Object.keys(dev.channelMapping).length > 0" class="btn-test btn-sm" @click="openZigbeePinTest(dev)">🔌 테스트</button>
+          <div class="card-actions" @click.stop>
+            <!-- 관수: 활성 채널 수 표시 -->
+            <span v-if="dev.equipmentType === 'irrigation'" class="zb-meta-chip">
+              {{ zigbeeChannelCountFor(dev) }}채널 · 활성 {{ zigbeeActiveCount(dev) }}
+            </span>
+            <!-- 팬: 타이머 설정 버튼 -->
+            <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
+            <!-- 개폐기 타이머 -->
+            <button v-if="dev.equipmentType === 'opener_open'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'opener')" title="타이머 설정">⏱</button>
+            <!-- admin 전용 테스트 -->
+            <button v-if="authStore.isAdmin && dev.channelMapping && Object.keys(dev.channelMapping).length > 0" class="btn-test btn-sm" @click.stop="openZigbeePinTest(dev)">🔌 테스트</button>
             <label class="toggle">
               <input type="checkbox" :checked="dev.enabled !== false" @change="toggleZigbee(dev)" />
               <span class="toggle-slider"></span>
             </label>
-            <button class="btn-danger btn-sm" @click="removeZigbee(dev)">삭제</button>
+            <button class="btn-danger btn-sm" @click.stop="removeZigbee(dev)">삭제</button>
+            <span v-if="dev.equipmentType === 'irrigation'" class="expand-arrow">
+              {{ expandedZigbeeIds.has(dev.id) ? '▲' : '▼' }}
+            </span>
           </div>
         </div>
         <div class="device-meta">
@@ -96,6 +103,38 @@
           <template v-else>
             동작 {{ dev.deviceSettings?.operation_time ?? 30 }}초 · 대기 {{ dev.deviceSettings?.standby_time ?? 60 }}초
           </template>
+        </div>
+        <!-- 관수 채널 그리드 (onboard 동일 스타일, expand 시) -->
+        <div v-if="dev.equipmentType === 'irrigation' && expandedZigbeeIds.has(dev.id)" class="card-body">
+          <div class="channel-grid">
+            <div v-for="(slot, i) in zigbeeChannelSlots(dev)" :key="slot.key" class="channel-row"
+              :class="{ 'ch-inactive': !slot.enabled }">
+              <div class="ch-num" :style="{ background: '#0ea5e922', borderColor: '#0ea5e955', color: '#0ea5e9' }">
+                {{ i + 1 }}
+              </div>
+              <div class="ch-name">{{ slot.label }}</div>
+              <div class="pin-wrap">
+                <span class="pin-label">CH</span>
+                <select class="pin-select" :value="slot.code"
+                  @change="updateZigbeeMapping(dev, slot.key, ($event.target as HTMLSelectElement).value)">
+                  <option v-for="sw in zigbeeAvailableSwitchesFor(dev, slot.key)" :key="sw" :value="sw">{{ sw }}</option>
+                </select>
+              </div>
+              <button class="relay-btn on" :disabled="!slot.code || !slot.enabled"
+                @click="zigbeeTestChannel(dev, slot.code, true)">ON</button>
+              <button class="relay-btn off" :disabled="!slot.code || !slot.enabled"
+                @click="zigbeeTestChannel(dev, slot.code, false)">OFF</button>
+              <label class="toggle toggle-sm">
+                <input type="checkbox" :checked="slot.enabled"
+                  @change="toggleZigbeeChannel(dev, slot.key)" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="bulk-actions">
+            <button class="btn-bulk" @click="zigbeeBulkActivate(dev, true)">전체 활성화</button>
+            <button class="btn-bulk" @click="zigbeeBulkActivate(dev, false)">전체 비활성화</button>
+          </div>
         </div>
       </div>
     </div>
@@ -146,12 +185,15 @@
     <div v-if="mappingModalDev" class="modal-overlay" @click.self="closeMappingModal">
       <div class="modal">
         <h3>채널 매핑 — {{ mappingModalDev.name }}</h3>
-        <p class="modal-desc">Zigbee 스위치 코드와 관수 기능을 연결합니다. ({{ mappingChannelCount }}채널)</p>
+        <p class="modal-desc">
+          Zigbee 스위치 코드와 관수 기능을 연결합니다. ({{ mappingChannelCount }}채널)<br>
+          <small class="modal-hint">⊘ 비활성화로 설정하면 자동제어룰/구역관리에서 해당 채널이 숨겨집니다.</small>
+        </p>
         <div class="mapping-grid">
           <div v-for="(label, key) in activeMappingSlots" :key="key" class="mapping-row">
             <span class="mapping-label">{{ label }}</span>
-            <select :value="getMappingValue(mappingModalDev, key)" @change="updateMapping(mappingModalDev, key, ($event.target as HTMLSelectElement).value)" class="mapping-select">
-              <option value="">-</option>
+            <select :value="getMappingValue(mappingModalDev, key)" @change="updateMapping(mappingModalDev, key, ($event.target as HTMLSelectElement).value)" class="mapping-select" :class="{ disabled: !getMappingValue(mappingModalDev, key) }">
+              <option value="">⊘ 비활성화</option>
               <option v-for="sw in mappingSwitchCodes" :key="sw" :value="sw">{{ sw }}</option>
             </select>
           </div>
@@ -301,7 +343,8 @@ import { gatewayEnvApi, type OnboardDevice, type ZigbeeDevice, type ZigbeeScanne
 import { gatewayApi } from '@/api/gateway.api'
 import { useNotificationStore } from '@/stores/notification.store'
 import { useAuthStore } from '@/stores/auth.store'
-import { detectChannelCount, AVAILABLE_SWITCH_CODES_8CH, AVAILABLE_SWITCH_CODES_12CH } from '@/types/device.types'
+import { detectChannelCount, AVAILABLE_SWITCH_CODES_8CH, AVAILABLE_SWITCH_CODES_12CH, FUNCTION_LABELS } from '@/types/device.types'
+import { deviceApi } from '@/api/device.api'
 import GpioRelayManager from '@/components/gateway/GpioRelayManager.vue'
 import PinTestModal from '@/components/gateway/PinTestModal.vue'
 
@@ -384,6 +427,105 @@ const activeTab = ref<'onboard' | 'zigbee'>('onboard')
 const onboardDevices = ref<OnboardDevice[]>([])
 const zigbeeDevices = ref<ZigbeeDevice[]>([])
 
+// Zigbee 관수 인라인 채널 카드 — onboard 동일 패턴 (매핑은 보존, enabled 별도 관리)
+const expandedZigbeeIds = ref<Set<string>>(new Set())
+function toggleZigbeeExpand(id: string) {
+  if (expandedZigbeeIds.value.has(id)) expandedZigbeeIds.value.delete(id)
+  else expandedZigbeeIds.value.add(id)
+  expandedZigbeeIds.value = new Set(expandedZigbeeIds.value)
+}
+
+interface ZbChannelSlot { key: string; label: string; code: string; enabled: boolean }
+function zigbeeDisabledSet(dev: ZigbeeDevice): Set<string> {
+  return new Set<string>(((dev as any).disabledChannels ?? []) as string[])
+}
+
+function zigbeeChannelSlots(dev: ZigbeeDevice): ZbChannelSlot[] {
+  const mapping = (dev.channelMapping ?? {}) as Record<string, string>
+  const disabled = zigbeeDisabledSet(dev)
+  const order = [
+    'remote_control', 'fertilizer_b_contact',
+    'zone_1', 'zone_2', 'zone_3', 'zone_4', 'zone_5', 'zone_6', 'zone_7', 'zone_8',
+    'mixer', 'fertilizer_motor',
+  ]
+  return order
+    .filter(k => k in mapping)
+    .map(k => ({ key: k, label: FUNCTION_LABELS[k] ?? k, code: mapping[k] ?? '', enabled: !disabled.has(k) }))
+}
+
+function zigbeeChannelCountFor(dev: ZigbeeDevice): 8 | 12 {
+  const vals = Object.values(dev.channelMapping ?? {}).filter(Boolean)
+  return detectChannelCount(vals as string[], (dev as any).zigbeeModel)
+}
+
+function zigbeeActiveCount(dev: ZigbeeDevice): number {
+  return zigbeeChannelSlots(dev).filter(s => s.enabled).length
+}
+
+function zigbeeAnyActive(dev: ZigbeeDevice): boolean {
+  return zigbeeActiveCount(dev) > 0
+}
+
+function zigbeeAvailableSwitchesFor(dev: ZigbeeDevice, currentKey: string): string[] {
+  const count = zigbeeChannelCountFor(dev)
+  const all = count === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH
+  // 다른 슬롯이 이미 사용 중인 코드는 제외 (현재 슬롯이 쓰는 건 유지)
+  const mapping = (dev.channelMapping ?? {}) as Record<string, string>
+  const used = new Set<string>()
+  for (const [k, v] of Object.entries(mapping)) {
+    if (k !== currentKey && v) used.add(v)
+  }
+  return all.filter(sw => !used.has(sw))
+}
+
+// 매핑(switch 코드) 변경 — 사용자가 dropdown으로 switch 선택
+async function updateZigbeeMapping(dev: ZigbeeDevice, key: string, value: string) {
+  const next = { ...(dev.channelMapping ?? {}), [key]: value }
+  try {
+    const { data } = await deviceApi.updateChannelMapping(dev.id, next as any)
+    dev.channelMapping = (data as any).channelMapping ?? next
+  } catch (e: any) {
+    notif.error('저장 실패', e?.response?.data?.message ?? '채널 매핑 저장 실패')
+  }
+}
+
+// 활성/비활성 토글 — 매핑은 보존, deviceSettings.disabledChannels만 갱신
+async function toggleZigbeeChannel(dev: ZigbeeDevice, key: string) {
+  const disabled = zigbeeDisabledSet(dev)
+  const enabled = disabled.has(key) // 현재 비활성 → 활성화
+  try {
+    const { data } = await deviceApi.updateChannelEnabled(dev.id, key, enabled)
+    ;(dev as any).disabledChannels = (data as any).disabledChannels ?? []
+  } catch (e: any) {
+    notif.error('저장 실패', e?.response?.data?.message ?? '채널 활성 상태 저장 실패')
+  }
+}
+
+async function zigbeeBulkActivate(dev: ZigbeeDevice, enable: boolean) {
+  const slots = zigbeeChannelSlots(dev)
+  // 매핑된 모든 채널을 enable/disable 일괄 처리 — 직렬 호출 (간단함 우선)
+  for (const s of slots) {
+    if (enable === s.enabled) continue
+    try {
+      const { data } = await deviceApi.updateChannelEnabled(dev.id, s.key, enable)
+      ;(dev as any).disabledChannels = (data as any).disabledChannels ?? []
+    } catch { /* 개별 실패 시 계속 */ }
+  }
+}
+
+async function zigbeeTestChannel(dev: ZigbeeDevice, switchCode: string, state: boolean) {
+  if (!switchCode) return
+  try {
+    await gatewayEnvApi.testZigbeeChannel(gatewayId, {
+      friendlyName: dev.friendlyName,
+      switchCode, state,
+      durationMs: state ? 2000 : undefined,
+    })
+  } catch (e: any) {
+    notif.error('테스트 실패', `${switchCode} 명령 실패`)
+  }
+}
+
 // 관주 컨트롤러 대표 이름
 const irrigationDeviceId = ref<string | null>(null)
 const irrigationDeviceName = ref<string>('')
@@ -399,18 +541,8 @@ const addFormName = ref<Record<string, string>>({})
 const addedIeees = ref<Set<string>>(new Set())
 const addingOpener = ref<boolean>(false)
 
-// ── 채널 매핑 모달 ──────────────────────────────────────────────
+// ── 채널 매핑 모달 (legacy — 인라인 카드로 대체됨, 일부 코드 호환용 유지) ──
 const mappingModalDev = ref<ZigbeeDevice | null>(null)
-
-function openMappingModal(dev: ZigbeeDevice) {
-  const vals = Object.values(dev.channelMapping ?? {}).filter(Boolean)
-  const hasChannelInfo = vals.some(v => v.startsWith('switch_'))
-  if (!hasChannelInfo) {
-    notif.warning('채널 정보 없음', '이 장치는 채널 정보가 없어 관주 장치에 적합하지 않습니다. 올바른 릴레이 스위치 장치를 등록해 주세요.')
-    return
-  }
-  mappingModalDev.value = dev
-}
 
 function closeMappingModal() {
   mappingModalDev.value = null
@@ -839,8 +971,48 @@ onMounted(loadAllDevices)
   flex-direction: column;
   gap: 10px;
 }
+.device-card.card-enabled { border-color: #0ea5e9; }
 
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-header-clickable { cursor: pointer; user-select: none; }
+.card-header-clickable:hover { background: var(--bg-hover, rgba(0,0,0,.02)); border-radius: 6px; }
+.expand-arrow { font-size: 11px; color: var(--text-secondary, #9ca3af); margin-left: 4px; }
+.zb-meta-chip { font-size: 12px; color: var(--text-secondary); padding: 2px 8px; background: var(--bg-secondary, #f3f4f6); border-radius: 10px; }
+
+/* 채널 그리드 — GpioRelayManager와 동일 스타일 (onboard 일관성) */
+.card-body { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+.channel-grid { display: flex; flex-direction: column; gap: 6px; }
+.channel-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+.channel-row.ch-inactive { opacity: 0.5; }
+.ch-num {
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; border: 1px solid;
+}
+.ch-name { font-size: 12px; color: var(--text-primary, #333); flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.pin-label { font-size: 10px; color: var(--text-secondary, #6b7280); }
+.pin-select { background: var(--bg-input, #fff); border: 1px solid var(--border-color, #d1d5db); border-radius: 6px; padding: 3px 6px; font-size: 12px; color: var(--text-primary, #111); cursor: pointer; min-width: 90px; }
+.pin-select:focus { outline: 2px solid var(--primary, #3b82f6); outline-offset: 1px; }
+.relay-btn { padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid; transition: all 0.15s; flex-shrink: 0; }
+.relay-btn.on { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.relay-btn.on:hover:not(:disabled) { background: #bbf7d0; }
+.relay-btn.off { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+.relay-btn.off:hover:not(:disabled) { background: #fecaca; }
+.relay-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.toggle-sm .toggle-slider { width: 32px; height: 18px; border-radius: 9px; }
+.toggle-sm .toggle-slider::before { width: 12px; height: 12px; top: 3px; left: 3px; }
+.toggle-sm input:checked + .toggle-slider::before { transform: translateX(14px); }
+.bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 4px; border-top: 1px dashed var(--border-color, #e5e7eb); }
+.btn-bulk { padding: 5px 12px; border-radius: 5px; font-size: 11px; background: var(--bg-card, #fff); border: 1px solid var(--border-color, #d1d5db); color: var(--text-secondary, #6b7280); cursor: pointer; }
+.btn-bulk:hover { background: var(--bg-hover, #f3f4f6); }
 .card-actions {
   display: flex;
   align-items: center;
@@ -873,11 +1045,16 @@ onMounted(loadAllDevices)
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   cursor: pointer;
   font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;     /* 컨테이너 좁아져도 텍스트 잘리지 않도록 보장 */
 }
 .btn-settings:hover { background: var(--bg-hover); }
 
@@ -924,6 +1101,8 @@ onMounted(loadAllDevices)
 .mapping-grid { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; max-height: 360px; overflow-y: auto; }
 .mapping-row { display: flex; align-items: center; gap: 10px; }
 .mapping-label { font-size: 13px; width: 100px; color: var(--text-secondary); flex-shrink: 0; }
+.modal-hint { color: var(--text-muted, #888); font-size: 12px; }
+.mapping-select.disabled { color: var(--text-muted, #999); background: var(--bg-secondary, #f5f5f5); }
 .mapping-select {
   border: 1px solid var(--border-color);
   border-radius: 4px;

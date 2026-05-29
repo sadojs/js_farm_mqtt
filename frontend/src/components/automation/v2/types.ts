@@ -5,6 +5,7 @@ export type WizardStep =
   | 'zone'            // 구역(house_group) 선택
   | 'intent'
   | 'irrigation-device'
+  | 'irrigation-valve' // 관수: 밸브별 관주/쉬는 시간 + 액비 설정
   | 'device-by-intent'
   | 'timing'
   | 'review'
@@ -52,12 +53,23 @@ export interface TemperatureTrigger {
   hysteresis: number  // 편차 (기본 2) — onAt = base+hysteresis, offAt = base-hysteresis
 }
 
+// 각 밸브(구역)의 개별 시간 설정 — 수정 화면의 IrrigationZoneConfig와 동일
+export interface IrrigationValve {
+  zone: number      // 1-based (1~4 또는 1~8)
+  enabled: boolean
+  duration: number  // 관주 시간 (분)
+  waitTime: number  // 다음 구역으로 넘어가기 전 쉬는 시간 (분)
+}
+
 export interface IrrigationState {
   controllerDeviceId: string
   controllerChannels: 8 | 12
-  valveZones: number[]        // 선택된 구역 번호 배열 (1-based)
-  durationMin: number         // 구역별 공통 관수 시간(분)
-  waitTimeBetweenZones: number // 구역 간 쉬는 시간(분)
+  // 신규: 각 구역의 개별 설정 (수정 화면과 동일 UX)
+  valves: IrrigationValve[]
+  // 아래는 backward compat (deprecated, 점진 제거 예정)
+  valveZones: number[]
+  durationMin: number
+  waitTimeBetweenZones: number
   mixerEnabled: boolean       // 교반기 ON/OFF
   useFertilizer: boolean      // 액비모터 사용 여부
   fertilizer: FertilizerConfig

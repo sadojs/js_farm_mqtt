@@ -79,9 +79,15 @@ const automationStore = useAutomationStore()
 const mapping = computed<Record<string, string | undefined>>(() =>
   props.device ? deviceStore.getEffectiveMapping(props.device) : {}
 )
-const mappingKeys = computed(() =>
-  Object.keys(FUNCTION_LABELS).filter(key => key in mapping.value)
-)
+// 비활성 채널 제외 — disabledChannels(zigbee 토글) 또는 빈 매핑 모두 제외
+const mappingKeys = computed(() => {
+  const disabled = new Set<string>((props.device as any)?.disabledChannels ?? [])
+  return Object.keys(FUNCTION_LABELS).filter(key => {
+    if (disabled.has(key)) return false
+    const v = mapping.value[key]
+    return v !== undefined && v !== ''
+  })
+})
 
 const deviceStatus = computed(() =>
   props.device ? automationStore.getDeviceIrrigationStatus(props.device.id) : null
@@ -93,41 +99,16 @@ const remainingMinutes = computed(() => {
   return Math.max(0, Math.ceil(remaining / 60000))
 })
 
-// 해당 장치의 활성 자동화 룰에서 구역별 ON/OFF 설정 추출
+// 자동화 상태 = 환경설정 채널 활성 여부.
+// (각 룰별 zone enabled는 별개로 관리되므로 룰 검사하지 않음 — 단순히 게이트웨이 환경설정의
+//  채널 활성화/비활성화만 반영. 비활성 채널은 mappingKeys 필터에서 이미 제외됨.)
 const zoneAutoMap = computed<Record<string, 'on' | 'off'>>(() => {
   if (!props.device) return {}
-  const deviceId = props.device.id
+  const disabled = new Set<string>((props.device as any).disabledChannels ?? [])
   const result: Record<string, 'on' | 'off'> = {}
-
-  // 해당 장치의 모든 활성 irrigation 룰에서 구역 설정 수집
-  for (const rule of automationStore.rules) {
-    if (!rule.enabled) continue
-    const cond = rule.conditions as any
-    if (cond?.type !== 'irrigation') continue
-    const actions = rule.actions as any
-    const ruleDeviceIds: string[] = []
-    if (actions?.targetDeviceId) ruleDeviceIds.push(actions.targetDeviceId)
-    if (Array.isArray(actions?.targetDeviceIds)) ruleDeviceIds.push(...actions.targetDeviceIds)
-    if (!ruleDeviceIds.includes(deviceId)) continue
-
-    // zones 배열에서 각 구역의 enabled 상태
-    for (const zone of (cond.zones || [])) {
-      const fnKey = `zone_${zone.zone}`
-      // 여러 룰에서 하나라도 enabled이면 'on'
-      if (zone.enabled) result[fnKey] = 'on'
-      else if (!result[fnKey]) result[fnKey] = 'off'
-    }
-
-    // mixer
-    if (cond.mixer?.enabled) result['mixer'] = 'on'
-    else if (!result['mixer']) result['mixer'] = 'off'
-
-    // fertilizer_motor (enabled 필드 체크, 하위호환: enabled 없으면 duration > 0으로 판단)
-    const fertEnabled = cond.fertilizer?.enabled !== false && cond.fertilizer?.duration > 0
-    if (fertEnabled) result['fertilizer_motor'] = 'on'
-    else if (!result['fertilizer_motor']) result['fertilizer_motor'] = 'off'
+  for (const key of mappingKeys.value) {
+    result[key] = disabled.has(key) ? 'off' : 'on'
   }
-
   return result
 })
 

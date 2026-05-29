@@ -5,10 +5,19 @@ import { MqttSensorHandler } from './mqtt-sensor.handler';
 import { MqttDeviceHandler } from './mqtt-device.handler';
 import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { ZigbeeDevice } from './mqtt.types';
+type ConfigResponseHandler = (gatewayId: string, payload: Buffer) => void;
+type FallbackModeHandler = (gatewayId: string, payload: Buffer) => void;
+type FallbackEventsHandler = (gatewayId: string, payload: Buffer) => void;
+type FallbackAckHandler = (gatewayId: string, payload: Buffer) => void;
+
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private client: mqtt.MqttClient;
+  private configResponseHandler: ConfigResponseHandler | null = null;
+  private fallbackModeHandler: FallbackModeHandler | null = null;
+  private fallbackEventsHandler: FallbackEventsHandler | null = null;
+  private fallbackAckHandler: FallbackAckHandler | null = null;
 
   constructor(
     private config: ConfigService,
@@ -64,6 +73,10 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       'farm/+/agent/status',            // Config Agent 하트비트
       'farm/+/tunnel/status',           // 리버스 SSH 터널 상태
       'farm/+/gpio/status',             // GPIO 에이전트 릴레이 상태 응답
+      'farm/+/config/response',         // Config Agent — 원격 설정 배포 결과
+      'farm/+/fallback/mode',           // RPi fallback-engine — 현재 모드 (online/fallback)
+      'farm/+/fallback/events',         // RPi fallback-engine — 폴백 이벤트 배치
+      'farm/+/fallback/ack',            // RPi fallback-engine — 룰 동기화 ACK
     ];
 
     for (const topic of topics) {
@@ -100,6 +113,35 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     // GPIO 에이전트 릴레이 응답: farm/{gw}/gpio/status
     if (namespace === 'gpio' && parts[3] === 'status') {
       this.bridgeHandler.handleGpioStatus(gatewayId, payload);
+      return;
+    }
+
+    // RPi fallback-engine: farm/{gw}/fallback/{mode|events|ack}
+    if (namespace === 'fallback') {
+      const sub = parts[3];
+      try {
+        if (sub === 'mode' && this.fallbackModeHandler) {
+          this.fallbackModeHandler(gatewayId, payload);
+        } else if (sub === 'events' && this.fallbackEventsHandler) {
+          this.fallbackEventsHandler(gatewayId, payload);
+        } else if (sub === 'ack' && this.fallbackAckHandler) {
+          this.fallbackAckHandler(gatewayId, payload);
+        }
+      } catch (err: any) {
+        this.logger.warn(`fallback/${sub} 처리 실패: ${err?.message ?? err}`);
+      }
+      return;
+    }
+
+    // Config Agent 응답: farm/{gw}/config/response
+    if (namespace === 'config' && parts[3] === 'response') {
+      if (this.configResponseHandler) {
+        try {
+          this.configResponseHandler(gatewayId, payload);
+        } catch (err: any) {
+          this.logger.warn(`config response 처리 실패: ${err?.message ?? err}`);
+        }
+      }
       return;
     }
 
@@ -185,5 +227,116 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   isConnected(): boolean {
     return this.client?.connected ?? false;
+  }
+
+  /** Config Agent용 원격 요청 발행 → farm/{gatewayId}/config/request */
+  async publishConfigRequest(gatewayId: string, payload: object): Promise<void> {
+    const topic = `farm/${gatewayId}/config/request`;
+    return new Promise((resolve, reject) => {
+      this.client.publish(topic, JSON.stringify(payload), { qos: 1 }, (err) => {
+        if (err) {
+          this.logger.error(`config request 발행 실패: ${topic} - ${err.message}`);
+          reject(err);
+        } else {
+          this.logger.log(`config request: ${topic}`);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Config Agent의 farm/+/config/response 메시지를 처리할 콜백 등록.
+   * 순환 의존을 피하기 위해 MqttService → ConfigDeployService 직접 호출 대신
+   * 콜백 패턴 사용. ConfigDeployService.onModuleInit()에서 1회 등록.
+   */
+  setConfigResponseHandler(handler: ConfigResponseHandler): void {
+    this.configResponseHandler = handler;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // rpi-emergency-failover: Fallback 관련 publish/subscribe
+  // ─────────────────────────────────────────────────────────
+
+  setFallbackHandlers(handlers: {
+    mode?: FallbackModeHandler;
+    events?: FallbackEventsHandler;
+    ack?: FallbackAckHandler;
+  }): void {
+    if (handlers.mode) this.fallbackModeHandler = handlers.mode;
+    if (handlers.events) this.fallbackEventsHandler = handlers.events;
+    if (handlers.ack) this.fallbackAckHandler = handlers.ack;
+  }
+
+  /** 서버 → RPi 하트비트 발행 (10초 주기). retained=false (실시간 도착 기준 판정) */
+  publishServerHeartbeat(gatewayId: string, ts: string): void {
+    if (!this.client?.connected) return;
+    const topic = `farm/${gatewayId}/server/heartbeat`;
+    const payload = JSON.stringify({ ts });
+    this.client.publish(topic, payload, { qos: 0, retain: false });
+  }
+
+  /** 서버 → 모든 게이트웨이 하트비트 발행 (wildcard 없이 개별 publish) */
+  publishServerHeartbeatBatch(gatewayIds: string[], ts: string): void {
+    for (const gw of gatewayIds) this.publishServerHeartbeat(gw, ts);
+  }
+
+  /** 서버 → RPi 폴백 룰 동기화 publish (retained) */
+  async publishFallbackRulesSync(
+    gatewayId: string,
+    payload: {
+      version: number;
+      config: object;
+      schedule: object[];
+      // rpi-fallback-channel-sync (v2): 채널-핀 매핑
+      channelMapping?: {
+        irrigation: Array<{ channel: string; pin: number; name: string }>;
+        fertilizer: Array<{ channel: string; pin: number; name: string }>;
+        fan: Array<{ channel: string; pin: number; name: string }>;
+        opener: {
+          open: Array<{ channel: string; pin: number; name: string }>;
+          close: Array<{ channel: string; pin: number; name: string }>;
+        };
+      };
+    },
+  ): Promise<void> {
+    const topic = `farm/${gatewayId}/fallback/rules/sync`;
+    return new Promise((resolve, reject) => {
+      this.client.publish(
+        topic,
+        JSON.stringify(payload),
+        { qos: 1, retain: true },
+        (err) => {
+          if (err) {
+            this.logger.error(`fallback rules sync 실패: ${topic} - ${err.message}`);
+            reject(err);
+          } else {
+            this.logger.log(`fallback rules sync: ${topic} (v${payload.version})`);
+            resolve();
+          }
+        },
+      );
+    });
+  }
+
+  /** 서버 → RPi 비상 정지 명령. 폴백 모드에서도 통과되어야 함. */
+  async publishEmergencyStop(
+    gatewayId: string,
+    reason: string,
+    by: string,
+  ): Promise<void> {
+    const topic = `farm/${gatewayId}/gpio/emergency-stop`;
+    const payload = JSON.stringify({ reason, by, ts: new Date().toISOString() });
+    return new Promise((resolve, reject) => {
+      this.client.publish(topic, payload, { qos: 1, retain: false }, (err) => {
+        if (err) {
+          this.logger.error(`emergency stop 실패: ${topic} - ${err.message}`);
+          reject(err);
+        } else {
+          this.logger.warn(`EMERGENCY STOP 발행: ${topic} (by ${by})`);
+          resolve();
+        }
+      });
+    });
   }
 }

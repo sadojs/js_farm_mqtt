@@ -70,6 +70,12 @@ const router = createRouter({
       meta: { title: '설정 배포', requiresAuth: true, requiresAdmin: true }
     },
     {
+      path: '/emergency-failover',
+      name: 'emergency-failover',
+      component: () => import('../views/EmergencyFailover.vue'),
+      meta: { title: '이머전시 페일오버', requiresAuth: true, denyFarmUser: true }
+    },
+    {
       path: '/gateways',
       name: 'gateways',
       component: () => import('../views/GatewayManagement.vue'),

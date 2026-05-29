@@ -1,0 +1,26 @@
+[Unit]
+Description=Smart Farm Fallback Engine (Emergency Failover)
+Documentation=docs/02-design/features/rpi-emergency-failover.design.md
+After=network-online.target chrony.service mosquitto.service gpio-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 최소 권한 원칙: pi 유저 + smartfarm 그룹.
+# /var/lib/smartfarm/fallback 디렉터리는 setup.sh에서 pi:pi로 chown.
+User=pi
+Group=pi
+WorkingDirectory=/opt/smart-farm/fallback-engine
+EnvironmentFile=/etc/smartfarm/fallback-engine.env
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+# SD 카드 쓰기 빈도 절감용 환경 변수 (event-queue 버퍼링)
+Environment=FALLBACK_EVENT_BUFFER_MS=30000
+Environment=FALLBACK_EVENT_BUFFER_MAX=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fallback-engine
+
+[Install]
+WantedBy=multi-user.target

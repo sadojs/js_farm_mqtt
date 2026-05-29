@@ -322,9 +322,19 @@
           <label>위치</label>
           <input v-model="form.location" placeholder="예: 강원도 횡성군" />
         </div>
-        <div class="form-group">
-          <label>라즈베리파이 IP</label>
-          <input v-model="form.rpiIp" placeholder="예: 192.168.1.100" />
+        <!-- 라즈베리파이 IP는 Pi가 부팅 시 first-boot-init 으로 자동 보고 → DB에 자동 채워짐.
+             등록 모드에서는 숨기고, 편집 모드에서는 read-only로 표시. -->
+        <div v-if="editTarget" class="form-group">
+          <label>라즈베리파이 IP <small style="color:#94a3b8">(자동 보고)</small></label>
+          <input v-model="form.rpiIp" readonly placeholder="(Pi 부팅 후 자동 채워짐)"
+                 style="background:#f1f5f9; color:#64748b; cursor:not-allowed;" />
+        </div>
+        <div v-else class="form-group">
+          <p style="margin:4px 0; padding:10px 12px; background:#eff6ff; color:#1e40af;
+                     border-radius:6px; font-size:13px; line-height:1.5;">
+            💡 라즈베리파이의 IP·machineId·hostname 등은 Pi 첫 부팅 시 자동으로 보고됩니다.
+            여기서는 <strong>게이트웨이 ID</strong>만 미리 만들어 두면 Pi가 자동 등록됩니다.
+          </p>
         </div>
         <div class="form-group">
           <label>소유 농장</label>

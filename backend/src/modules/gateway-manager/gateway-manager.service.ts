@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -6,6 +6,18 @@ import { Gateway } from './entities/gateway.entity';
 import { House } from '../groups/entities/house.entity';
 import { HouseGroup } from '../groups/entities/house-group.entity';
 import { EventsGateway } from '../gateway/events.gateway';
+import { SshProxyService } from '../ssh-proxy/ssh-proxy.service';
+import { ConfigDeployService } from '../config-deploy/config-deploy.service';
+
+/** Pi에서 재시작을 허용하는 systemd 서비스 (보안 — 임의 서비스 실행 차단) */
+const ALLOWED_SERVICES = new Set([
+  'gpio-agent', 'zigbee2mqtt', 'fallback-engine', 'config-agent', 'reverse-ssh-tunnel',
+]);
+
+/** 자동 복구: gpio-agent heartbeat 부재가 이 시간 초과 시 1회 자동 restart 시도 (ms) */
+const GPIO_AGENT_STALE_MS = 5 * 60 * 1000;   // 5분
+/** 같은 게이트웨이에 대해 자동 restart cooldown — 무한 루프 방지 (ms) */
+const AUTO_RESTART_COOLDOWN_MS = 15 * 60 * 1000; // 15분
 
 /** agentStatus/tunnelStatus 갱신 없이 이 시간이 지나면 오프라인으로 간주 (ms) */
 const AGENT_STALE_MS = 5 * 60 * 1000;    // 5분
@@ -15,12 +27,69 @@ const TUNNEL_STALE_MS = 3 * 60 * 1000;   // 3분
 export class GatewayManagerService {
   private readonly logger = new Logger(GatewayManagerService.name);
 
+  /** 게이트웨이별 마지막 gpio/status 수신 시각 (메모리 캐시) */
+  private gpioStatusLastSeen = new Map<string, number>();
+  /** 게이트웨이별 마지막 자동 restart 시각 (cooldown 적용) */
+  private lastAutoRestartAt = new Map<string, number>();
+
   constructor(
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     @InjectRepository(House) private houseRepo: Repository<House>,
     @InjectRepository(HouseGroup) private groupRepo: Repository<HouseGroup>,
     private eventsGateway: EventsGateway,
+    @Inject(forwardRef(() => SshProxyService))
+    private sshService: SshProxyService,
+    @Inject(forwardRef(() => ConfigDeployService))
+    private configDeployService: ConfigDeployService,
   ) {}
+
+  /** mqtt-bridge.handler가 gpio/status 토픽 수신 시 호출 — 마지막 응답 시각 트래킹 */
+  recordGpioStatus(gatewayCode: string) {
+    this.gpioStatusLastSeen.set(gatewayCode, Date.now());
+  }
+
+  /**
+   * Pi systemd 서비스 재시작 (수동/자동 공통 경로).
+   * 우선순위: 1) MQTT → config-agent (root 권한, sudo 불필요)
+   *           2) SSH → sudo systemctl (NOPASSWD 설정 필요 — fallback)
+   * config-agent path가 더 안전·보편적이므로 가급적 이쪽 사용.
+   */
+  async restartPiService(gw: Gateway, service: string): Promise<{ success: boolean; service: string; output?: string; error?: string; via?: 'mqtt' | 'ssh' }> {
+    if (!ALLOWED_SERVICES.has(service)) {
+      throw new Error(`허용되지 않은 서비스: ${service}. 가능: ${[...ALLOWED_SERVICES].join(', ')}`);
+    }
+    // 1) MQTT path — config-agent 가 살아있고 agent_status=online일 때
+    if (gw.agentStatus === 'online') {
+      try {
+        const result: any = await this.configDeployService.requestServiceRestart(
+          gw.gatewayId,
+          service as any,
+          { id: 'system', name: 'auto-recovery' },
+        );
+        this.logger.log(`[${gw.gatewayId}] MQTT service_restart 발행 (requestId=${result?.requestId}, service=${service})`);
+        return { success: true, service, via: 'mqtt', output: `MQTT 요청 발행됨 (requestId=${result?.requestId})` };
+      } catch (err: any) {
+        this.logger.warn(`[${gw.gatewayId}] MQTT restart 실패, SSH로 fallback: ${err.message}`);
+      }
+    }
+    // 2) SSH fallback — config-agent 무응답 또는 MQTT 실패 시
+    if (!gw.tunnelPort) {
+      return { success: false, service, via: 'ssh', error: 'tunnel_port 미할당 — Pi 터널 비활성' };
+    }
+    try {
+      const { stdout, stderr, code } = await this.sshService.exec(
+        gw.tunnelPort,
+        `sudo -n systemctl restart ${service} && systemctl is-active ${service}`,
+      );
+      const ok = code === 0;
+      const msg = (stdout || '').trim() + (stderr ? ` | ${stderr.trim()}` : '');
+      this.logger.log(`[${gw.gatewayId}] SSH sudo restart ${service} → code=${code} ${msg}`);
+      return { success: ok, service, via: 'ssh', output: msg };
+    } catch (err: any) {
+      this.logger.error(`[${gw.gatewayId}] SSH restart ${service} 실패: ${err.message}`);
+      return { success: false, service, via: 'ssh', error: err.message };
+    }
+  }
 
   /** gateway 목록에 구역 정보 병합 */
   private async attachGroupInfo(gateways: Gateway[]): Promise<any[]> {
@@ -81,6 +150,38 @@ export class GatewayManagerService {
     }
   }
 
+  /**
+   * gpio-agent 무응답 자동 감지 + restart (매 2분).
+   * agent_status=online 인데 gpio/status 가 5분 이상 없으면 1회 자동 restart 발행.
+   * cooldown 15분으로 무한 루프 방지.
+   */
+  @Cron('0 */2 * * * *')
+  async autoRecoverGpioAgent() {
+    const now = Date.now();
+    const onlineGateways = await this.gatewayRepo.find({
+      where: { agentStatus: 'online' },
+    });
+    for (const gw of onlineGateways) {
+      const lastGpio = this.gpioStatusLastSeen.get(gw.gatewayId) ?? 0;
+      const stalenessMs = now - lastGpio;
+      if (lastGpio === 0 || stalenessMs < GPIO_AGENT_STALE_MS) continue;
+
+      const lastRestart = this.lastAutoRestartAt.get(gw.gatewayId) ?? 0;
+      if (now - lastRestart < AUTO_RESTART_COOLDOWN_MS) continue;
+
+      this.logger.warn(`[${gw.gatewayId}] gpio-agent 무응답 ${Math.round(stalenessMs / 1000)}s → 자동 restart 시도`);
+      this.lastAutoRestartAt.set(gw.gatewayId, now);
+      const result = await this.restartPiService(gw, 'gpio-agent');
+      this.eventsGateway.sendNotification(gw.userId, {
+        type: result.success ? 'gpio_agent_recovered' : 'gpio_agent_recovery_failed',
+        title: result.success ? 'gpio-agent 자동 복구' : 'gpio-agent 복구 실패',
+        message: result.success
+          ? `${gw.name} (${gw.gatewayId}) — gpio-agent 자동 재시작 완료`
+          : `${gw.name} (${gw.gatewayId}) — 자동 재시작 실패: ${result.error ?? 'unknown'}`,
+      });
+    }
+  }
+
   /** admin: 전체 게이트웨이 조회 */
   async findAll() {
     const gateways = await this.gatewayRepo.find({ order: { createdAt: 'DESC' } });
@@ -130,6 +231,16 @@ export class GatewayManagerService {
 
     gw.houseId = house.id;
     await this.gatewayRepo.save(gw);
+
+    // onboard device들의 house_id 동기화 — 새 zone(house)에 자동 매핑되어 구역관리/위저드에 즉시 표시
+    // (devices.gateway_id / house_id 가 varchar이므로 명시적 cast)
+    await this.gatewayRepo.manager.query(
+      `UPDATE devices SET house_id = $1::text WHERE gateway_id = $2::text AND source = 'onboard'`,
+      [house.id, gw.id],
+    ).catch((e) => {
+      this.logger.warn(`onboard device house_id sync 실패 (gateway=${gw.gatewayId}): ${e.message}`);
+    });
+
     return { ...gw, groupId: group.id, groupName: group.name };
   }
 
@@ -214,6 +325,10 @@ export class GatewayManagerService {
   }
 
   async updateAgentStatus(gatewayId: string, agentStatus: string) {
+    // 상태 전환 감지를 위해 이전 상태 보관
+    const prev = await this.gatewayRepo.findOne({ where: { gatewayId } });
+    const prevStatus = prev?.agentStatus;
+
     await this.gatewayRepo.update(
       { gatewayId },
       { agentStatus, status: agentStatus, lastSeen: new Date() },
@@ -227,6 +342,17 @@ export class GatewayManagerService {
         [isOnline, gw.id],
       );
       this.eventsGateway.broadcastGatewayStatus(gw.userId, gw.id, agentStatus, agentStatus);
+
+      // 재등장 감지: offline → online 전환 시 운영자 알림 + activity log
+      if (prevStatus === 'offline' && isOnline) {
+        this.logger.log(`게이트웨이 ${gw.gatewayId}: 재등장 감지 (offline → online)`);
+        this.eventsGateway.broadcastGatewayRecovered?.(gw.userId, {
+          gatewayId: gw.gatewayId,
+          name: gw.name,
+          rpiIp: gw.rpiIp,
+          recoveredAt: new Date().toISOString(),
+        });
+      }
     }
   }
 

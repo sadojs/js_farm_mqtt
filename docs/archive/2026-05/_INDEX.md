@@ -18,6 +18,7 @@
 | [rpi-server-ip-rollover](./rpi-server-ip-rollover/) | 2026-05-24 | 94% | 1 | plan, design, analysis, report |
 | [rpi-activity-log-pk-trace](./rpi-activity-log-pk-trace/) | 2026-05-24 | 88% | 1 | plan, analysis, report |
 | [rpi-agent-version-update](./rpi-agent-version-update/) | 2026-05-25 | 85% | 1 | plan, design, analysis, report |
+| [rpi-golden-image-build-fix](./rpi-golden-image-build-fix/) | 2026-05-25 | 100% | 4 | plan, design, analysis, report |
 
 ## Quick Links
 
@@ -105,3 +106,17 @@
 - [design](./rpi-agent-version-update/rpi-agent-version-update.design.md)
 - [analysis](./rpi-agent-version-update/rpi-agent-version-update.analysis.md)
 - [report](./rpi-agent-version-update/rpi-agent-version-update.report.md)
+
+### rpi-golden-image-build-fix (build-golden-image.sh + prepare-master.sh 6건 BUG fix)
+- [plan](./rpi-golden-image-build-fix/rpi-golden-image-build-fix.plan.md)
+- [design](./rpi-golden-image-build-fix/rpi-golden-image-build-fix.design.md)
+- [analysis](./rpi-golden-image-build-fix/rpi-golden-image-build-fix.analysis.md)
+- [report](./rpi-golden-image-build-fix/rpi-golden-image-build-fix.report.md)
+
+**핵심 fix** (양산용 hotfix):
+- BUG-1 [Critical]: dd \| xz 파이프로 raw 30GB 임시파일 제거 (디스크 공간 부족 환경 대응)
+- BUG-2 [High]: SIZE_BYTES 추출 awk → sed regex 수정 (64GB 오판 해결)
+- BUG-3 [High]: SUDO_ASKPASS 지원 (background/CI 빌드 자동화)
+- BUG-4 [Critical]: prepare-master.sh가 gateway-id 강제 lgw-default 덮어쓰기 + machine-id 초기화 (양산 충돌 방지)
+- BUG-5 [High]: prepare-master.sh가 fallback rules.json/SQLite 정리 (양산 stale 제거)
+- BUG-6 [Medium]: setup.sh find -exec chown 보강 (root 소유 잔여 보정)

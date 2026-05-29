@@ -39,4 +39,8 @@ export const deviceApi = {
 
   updateChannelMapping: (id: string, mapping: ChannelMapping) =>
     apiClient.patch(`/devices/${id}/channel-mapping`, { mapping }),
+
+  // 채널 활성/비활성 토글 — 매핑은 보존, deviceSettings.disabledChannels만 갱신
+  updateChannelEnabled: (id: string, key: string, enabled: boolean) =>
+    apiClient.patch(`/devices/${id}/channel-enabled`, { key, enabled }),
 }

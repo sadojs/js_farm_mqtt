@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# apply-hostname.sh — hostname 즉시 변경 + 60초 후 reboot 예약
+# apply-hostname.sh — hostname 즉시 변경 (reboot 없이)
 #
 # 사용법: apply-hostname.sh <new-hostname>
 #
-# Design Q1 결정: hostnamectl 즉시 적용 + 60초 후 reboot 예약
-# (운영자가 WS 응답 확인 시간 확보)
+# 동작 (BUG-2026-05-27 fix: 60초 reboot 제거):
+#   1. hostnamectl set-hostname — 즉시 반영, reboot 불필요
+#   2. /etc/hosts 127.0.1.1 갱신
+#   3. avahi-daemon 재시작 — mDNS broadcast 갱신 (hostname.local 해석용)
+#
+# 주의: dhcpcd는 건드리지 않음. IP가 바뀌면 SSH 터널/MQTT 모두 재연결 필요 → 운영 중단 위험.
+#       gpio-agent / zigbee2mqtt 등 gateway-id 의존 서비스는 apply-gateway-id.sh가 재시작.
 # ============================================================
 
 set -u
@@ -38,8 +43,9 @@ else
   echo "127.0.1.1 ${NEW}" >> /etc/hosts
 fi
 
-# 60초 후 reboot 예약 (응답 전송 시간 확보)
-(sleep 60 && /sbin/reboot) >/dev/null 2>&1 &
-disown $! 2>/dev/null || true
+# avahi-daemon이 새 hostname을 mDNS로 광고하도록 재시작 (있을 때만)
+if systemctl is-enabled avahi-daemon >/dev/null 2>&1; then
+  systemctl restart avahi-daemon >&2 || true
+fi
 
-emit "{\"ok\":true,\"status\":\"success\",\"detail\":\"hostname applied (${OLD}->${NEW}), reboot scheduled in 60s\",\"rebootScheduled\":true}"
+emit "{\"ok\":true,\"status\":\"success\",\"detail\":\"hostname applied (${OLD}->${NEW}), no reboot needed\",\"rebootScheduled\":false}"

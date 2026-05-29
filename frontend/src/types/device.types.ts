@@ -64,9 +64,11 @@ export const FUNCTION_LABELS: Record<string, string> = {
   fertilizer_motor:     '액비모터',
 }
 
+// 8CH dropdown 옵션 — onboard(switch_usb1/2)와 zigbee(switch_7/8) 둘 다 포함하여 매핑 모달에서 선택 가능
 export const AVAILABLE_SWITCH_CODES_8CH = [
   'switch_1', 'switch_2', 'switch_3', 'switch_4',
-  'switch_5', 'switch_6', 'switch_usb1', 'switch_usb2',
+  'switch_5', 'switch_6', 'switch_7', 'switch_8',
+  'switch_usb1', 'switch_usb2',
 ]
 
 export const AVAILABLE_SWITCH_CODES_12CH = [
@@ -78,10 +80,17 @@ export const AVAILABLE_SWITCH_CODES_12CH = [
 // 하위 호환용 별칭
 export const AVAILABLE_SWITCH_CODES = AVAILABLE_SWITCH_CODES_8CH
 
-export function detectChannelCount(switchCodes: string[]): 8 | 12 {
-  // Zigbee: switch_7..12 → 12ch
-  if (switchCodes.some(c => /^switch_(7|8|9|10|11|12)$/.test(c))) return 12
-  // Onboard: relay_zone_5 이상 존재하면 12ch (8ch는 zone_1..4까지)
+export function detectChannelCount(switchCodes: string[], zigbeeModel?: string | null): 8 | 12 {
+  // 1. zigbeeModel suffix '_switch_N' → 명시적 채널 수
+  if (zigbeeModel) {
+    const m = zigbeeModel.toLowerCase().match(/_switch_(\d+)/)
+    if (m) return Number(m[1]) > 8 ? 12 : 8
+  }
+  // 2. switch_usb1/usb2 있으면 onboard 8CH 확정
+  if (switchCodes.some(c => c === 'switch_usb1' || c === 'switch_usb2')) return 8
+  // 3. switch_9..12 사용 → 12CH 확정 (zigbee 8CH는 switch_7/8까지 사용하므로 7~8만으로 판정 불가)
+  if (switchCodes.some(c => /^switch_(9|10|11|12)$/.test(c))) return 12
+  // 4. Onboard: relay_zone_5 이상 존재하면 12ch
   if (switchCodes.some(c => /^relay_zone_([5-9]|[1-9]\d+)$/.test(c))) return 12
   return 8
 }
@@ -116,6 +125,8 @@ export interface Device {
   switchState?: boolean | null
   switchStates?: Record<string, boolean>
   channelMapping?: ChannelMapping | null
+  /** 비활성화된 채널 키 목록 (zigbee 관수 — 매핑은 보존하되 동작 대상 제외) */
+  disabledChannels?: string[]
   sensorData?: SensorData | null
   lastSeen?: string
   createdAt: string
@@ -178,6 +189,13 @@ export interface Gateway {
   lastSeen?: string
   createdAt: string
   updatedAt: string
+  // rpi-golden-image-system (migration 018)
+  hostname?: string | null
+  wifiSsid?: string | null
+  serverIp?: string | null
+  machineId?: string | null
+  tunnelPublicKey?: string | null
+  lastConfigAppliedAt?: string | null
 }
 
 export interface DependencyRule {
