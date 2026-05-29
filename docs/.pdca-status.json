@@ -1,7 +1,8 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-25T03:45:18.000Z",
+  "lastUpdated": "2026-05-29T00:00:00Z",
   "activeFeatures": [
+    "device-replacement",
     "web-terminal",
     "account-username-login",
     "irrigation-relay-mapping",
@@ -182,9 +183,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-02T11:42:17.352Z",
-        "lastUpdated": "2026-05-20T23:14:18.103Z"
+        "lastUpdated": "2026-05-29T11:51:47.220Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/views/ConfigDeploy.vue"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/types/device.types.ts"
     },
     "raspberry-pi": {
       "phase": "do",
@@ -195,9 +196,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T10:02:14.905Z",
-        "lastUpdated": "2026-05-20T23:51:15.069Z"
+        "lastUpdated": "2026-05-25T21:15:31.681Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/setup.sh"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/clone-sd.sh"
     },
     "config-agent": {
       "phase": "do",
@@ -208,7 +209,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T10:02:32.755Z",
-        "lastUpdated": "2026-05-19T11:49:56.272Z"
+        "lastUpdated": "2026-05-28T11:27:03.197Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/config-agent/index.js"
     },
@@ -221,9 +222,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T10:59:53.997Z",
-        "lastUpdated": "2026-05-15T12:25:47.648Z"
+        "lastUpdated": "2026-05-28T12:51:00.273Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/automation/StepActuatorSelect.vue"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/automation/automation-runner.service.ts"
     },
     "gateway-manager": {
       "phase": "do",
@@ -234,9 +235,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T11:23:54.519Z",
-        "lastUpdated": "2026-05-19T12:06:00.780Z"
+        "lastUpdated": "2026-05-28T11:28:52.100Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway-manager/entities/gateway.entity.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway-manager/gateway-manager.module.ts"
     },
     "mqtt": {
       "phase": "do",
@@ -247,9 +248,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T11:24:10.628Z",
-        "lastUpdated": "2026-05-20T22:58:47.825Z"
+        "lastUpdated": "2026-05-28T13:10:22.105Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/mqtt/mqtt.service.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/mqtt/mqtt-sensor.handler.ts"
     },
     "composables": {
       "phase": "do",
@@ -260,9 +261,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-24T10:40:25.267Z",
-        "lastUpdated": "2026-05-20T21:56:16.099Z"
+        "lastUpdated": "2026-05-28T11:48:22.634Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/composables/useEmergencyFailover.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/composables/useWebSocket.ts"
     },
     "stores": {
       "phase": "do",
@@ -286,9 +287,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-27T11:29:49.870Z",
-        "lastUpdated": "2026-05-20T21:42:15.231Z"
+        "lastUpdated": "2026-05-29T11:51:33.192Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/api/emergency-failover.api.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/api/device.api.ts"
     },
     "crop-management": {
       "phase": "do",
@@ -325,9 +326,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-03T08:35:36.674Z",
-        "lastUpdated": "2026-05-03T08:35:54.388Z"
+        "lastUpdated": "2026-05-28T11:24:59.018Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/ssh-proxy/ssh-proxy.module.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/ssh-proxy/ssh-proxy.service.ts"
     },
     "backend": {
       "phase": "do",
@@ -351,7 +352,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-03T08:37:12.706Z",
-        "lastUpdated": "2026-05-21T11:12:31.662Z"
+        "lastUpdated": "2026-05-28T11:32:10.940Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/config-deploy/config-deploy.service.ts"
     },
@@ -364,7 +365,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-03T08:39:37.439Z",
-        "lastUpdated": "2026-05-20T21:54:18.142Z"
+        "lastUpdated": "2026-05-28T11:47:35.833Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway/events.gateway.ts"
     },
@@ -377,7 +378,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-08T13:30:02.904Z",
-        "lastUpdated": "2026-05-20T22:58:28.304Z"
+        "lastUpdated": "2026-05-29T12:26:05.708Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway-env/gateway-env.service.ts"
     },
@@ -390,9 +391,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-08T13:32:22.659Z",
-        "lastUpdated": "2026-05-14T21:53:04.422Z"
+        "lastUpdated": "2026-05-29T12:30:40.143Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/devices/devices.service.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/devices/IrrigationStatusModal.vue"
     },
     "voice": {
       "phase": "do",
@@ -481,9 +482,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-10T22:05:33.243Z",
-        "lastUpdated": "2026-05-15T12:26:42.794Z"
+        "lastUpdated": "2026-05-29T11:50:52.010Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/automation/v2/StepDeviceByIntent.vue"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/automation/v2/StepIrrigationDevice.vue"
     },
     "sensors": {
       "phase": "do",
@@ -533,9 +534,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-19T11:48:20.047Z",
-        "lastUpdated": "2026-05-21T11:40:02.584Z"
+        "lastUpdated": "2026-05-27T14:34:13.328Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/scripts/first-boot-init.sh"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/scripts/apply-hostname.sh"
     },
     "handlers": {
       "phase": "do",
@@ -546,9 +547,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-19T11:49:20.764Z",
-        "lastUpdated": "2026-05-19T11:49:35.074Z"
+        "lastUpdated": "2026-05-28T11:26:48.657Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/config-agent/handlers/server-ip.js"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/raspberry-pi/config-agent/handlers/service-restart.js"
     },
     "fallback-config": {
       "phase": "do",
@@ -559,9 +560,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-20T12:17:18.880Z",
-        "lastUpdated": "2026-05-20T22:56:41.367Z"
+        "lastUpdated": "2026-05-25T04:09:01.091Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/fallback-config/fallback-config.module.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/fallback-config/fallback-config.service.ts"
     },
     "fallback-engine": {
       "phase": "do",
@@ -585,9 +586,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-20T21:42:54.937Z",
-        "lastUpdated": "2026-05-20T21:59:11.584Z"
+        "lastUpdated": "2026-05-25T04:22:39.891Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/emergency-failover/FanFailoverCard.vue"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/components/emergency-failover/OpenerMonthDialog.vue"
     },
     "rule-evaluator": {
       "phase": "do",
@@ -706,6 +707,25 @@
       "startedAt": "2026-05-25T00:00:00Z",
       "archivedAt": "2026-05-25T13:00:00Z",
       "archivedTo": "docs/archive/2026-05/rpi-agent-version-update/"
+    },
+    "rpi-golden-image-build-fix": {
+      "phase": "archived",
+      "matchRate": 100,
+      "iterationCount": 4,
+      "startedAt": "2026-05-25T22:00:00Z",
+      "archivedAt": "2026-05-25T22:32:00Z",
+      "archivedTo": "docs/archive/2026-05/rpi-golden-image-build-fix/",
+      "relatedTo": [
+        "rpi-golden-image-system",
+        "rpi-fallback-channel-sync"
+      ]
+    },
+    "device-replacement": {
+      "phase": "plan",
+      "startedAt": "2026-05-29T00:00:00Z",
+      "docs": {
+        "plan": "docs/01-plan/features/device-replacement.plan.md"
+      }
     }
   },
   "pipeline": {
@@ -716,7 +736,7 @@
   "session": {
     "startedAt": "2026-03-27T09:32:17.896Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-21T11:40:24.276Z"
+    "lastActivity": "2026-05-29T12:30:40.143Z"
   },
   "history": [
     {
@@ -6428,6 +6448,996 @@
     {
       "timestamp": "2026-05-21T11:40:24.276Z",
       "feature": "tmp",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:09:01.091Z",
+      "feature": "fallback-config",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:09:10.722Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:09:24.293Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:09:35.104Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:22:29.827Z",
+      "feature": "emergency-failover",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T04:22:39.891Z",
+      "feature": "emergency-failover",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T12:36:20.710Z",
+      "feature": "raspberry-pi",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T12:36:53.254Z",
+      "feature": "raspberry-pi",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T12:39:59.779Z",
+      "feature": "raspberry-pi",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T21:14:54.340Z",
+      "feature": "raspberry-pi",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-25T21:15:31.681Z",
+      "feature": "raspberry-pi",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T11:42:38.946Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:02:04.379Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:02:11.509Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:06:30.008Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:29:26.045Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:29:43.661Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:30:07.413Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:33:08.524Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:36:02.705Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:36:19.911Z",
+      "feature": "composables",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:37:01.641Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:37:31.964Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:37:45.387Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:38:02.989Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:38:35.829Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:38:59.597Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:48:42.569Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:48:53.809Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:49:11.467Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:49:22.198Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:49:30.486Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:49:46.125Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:50:24.366Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:50:34.252Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:51:42.685Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:51:58.858Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:52:24.351Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:52:54.244Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T12:53:51.320Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:04:16.300Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:04:41.398Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:05:02.707Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:05:10.417Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:05:32.693Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:05:58.420Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:18:11.194Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:20:30.075Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:20:37.095Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:20:42.640Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-26T13:20:49.749Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:19:12.014Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:19:24.124Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:19:31.401Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:19:40.900Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:22:23.305Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T03:24:16.846Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T09:37:01.234Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T09:37:28.268Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T14:34:13.328Z",
+      "feature": "scripts",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T14:34:57.928Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-27T14:35:15.878Z",
+      "feature": "gateway",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:28:46.364Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:39:10.070Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:39:44.885Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:53:44.445Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:53:59.298Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:54:15.103Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:54:28.386Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:54:35.880Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:54:58.302Z",
+      "feature": "composables",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T03:55:10.843Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:06:26.684Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:06:41.866Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:06:58.327Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:07:19.140Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:07:48.977Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:08:36.549Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:11:47.416Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:11:54.925Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:12:03.971Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:12:12.260Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:19:26.603Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:19:52.737Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:20:08.516Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:20:28.037Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:20:49.315Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:21:06.978Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:21:23.970Z",
+      "feature": "ssh-proxy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:24:59.018Z",
+      "feature": "ssh-proxy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:25:05.648Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:25:11.387Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:26:48.657Z",
+      "feature": "handlers",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:26:56.357Z",
+      "feature": "config-agent",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:27:03.198Z",
+      "feature": "config-agent",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:27:43.983Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:27:51.567Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:28:01.984Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:28:23.260Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:28:30.552Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:28:36.726Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:28:52.100Z",
+      "feature": "gateway-manager",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:29:34.011Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:30:40.818Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:31:53.730Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:32:10.940Z",
+      "feature": "config-deploy",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:46:55.335Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:47:14.284Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:47:35.833Z",
+      "feature": "gateway",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:47:43.455Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:48:07.085Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:48:22.634Z",
+      "feature": "composables",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T11:49:12.309Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:00:48.962Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:02:06.313Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:02:25.261Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:02:56.694Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:03:08.866Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:03:28.295Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:04:23.193Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:04:30.583Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:17:19.298Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:17:31.045Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:17:46.617Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:32:04.943Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:33:05.176Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:34:52.707Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:35:05.823Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:39:22.547Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:44:25.434Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:44:52.385Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:45:05.896Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:47:11.936Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:47:31.187Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:47:45.085Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:47:54.507Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:51:00.273Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:59:01.630Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T12:59:19.941Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T13:08:31.975Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T13:08:41.171Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-28T13:10:22.105Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T04:09:39.261Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T04:10:00.513Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T04:10:12.100Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T04:11:02.856Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T04:11:12.319Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:42:47.065Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:43:27.999Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:43:41.635Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:44:53.575Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:45:31.772Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:48:04.163Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:48:32.122Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:48:42.396Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:49:05.215Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:50:18.130Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:50:37.614Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:50:52.010Z",
+      "feature": "v2",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:51:03.949Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:51:33.192Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T11:51:47.220Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T12:25:22.256Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T12:26:05.708Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-29T12:30:40.143Z",
+      "feature": "devices",
       "phase": "do",
       "action": "updated"
     }
