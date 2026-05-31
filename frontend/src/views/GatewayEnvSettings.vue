@@ -384,23 +384,36 @@
               <input v-model="addFormName[sd.ieee_address]" class="scan-name-input" :placeholder="sd.friendly_name" />
             </div>
 
+            <!-- 자동 감지 안내 배지 -->
+            <div v-if="isMultiChannelDevice(sd)" class="detected-banner">
+              🎛 <strong>{{ detectControllerChannelCount(sd) }}채널 컨트롤러</strong>로 감지되었습니다 — 관수/유동팬/개폐기 페어 중 선택하세요
+            </div>
+
             <!-- 1단계: 측정기 / 장치 / 컨트롤러 선택 -->
+            <!-- 다채널 컨트롤러로 감지된 경우 측정기/단일 장치 옵션은 숨김 (혼동 방지) -->
             <div class="dtype-toggle">
-              <button
+              <button v-if="!isMultiChannelDevice(sd)"
                 :class="['dtype-btn', addForm[sd.ieee_address + '_type'] === 'sensor/other' && 'dtype-active']"
                 @click="selectDeviceType(sd.ieee_address, 'sensor')">
                 🌡 측정기
               </button>
-              <button
+              <button v-if="!isMultiChannelDevice(sd)"
                 :class="['dtype-btn', addForm[sd.ieee_address + '_type']?.startsWith('actuator/') && 'dtype-active']"
                 @click="selectDeviceType(sd.ieee_address, 'actuator')">
                 ⚙ 장치
               </button>
-              <button v-if="isMultiChannelModel(sd.model_id)"
+              <button v-if="isMultiChannelDevice(sd)"
                 :class="['dtype-btn', addForm[sd.ieee_address + '_type']?.startsWith('controller/') && 'dtype-active']"
-                @click="selectDeviceType(sd.ieee_address, 'controller')"
-                :title="`${detectControllerChannelCount(sd.model_id)}채널 다채널 컨트롤러로 인식되었습니다`">
-                🎛 컨트롤러 ({{ detectControllerChannelCount(sd.model_id) }}ch)
+                @click="selectDeviceType(sd.ieee_address, 'controller')">
+                🎛 컨트롤러 ({{ detectControllerChannelCount(sd) }}ch)
+              </button>
+              <!-- escape hatch: 다채널 감지 결과를 거부하고 측정기/단일 장치로 처리 -->
+              <button v-if="isMultiChannelDevice(sd)"
+                class="dtype-btn dtype-btn-secondary"
+                :class="{ 'dtype-active': addForm[sd.ieee_address + '_type'] === 'sensor/other' || addForm[sd.ieee_address + '_type']?.startsWith('actuator/') }"
+                @click="selectDeviceType(sd.ieee_address, 'actuator')"
+                title="다채널 감지를 무시하고 단일 장치로 추가 (드물게 z2m 메타데이터 부정확한 경우)">
+                기타…
               </button>
             </div>
 
@@ -916,16 +929,19 @@ const CONTROLLER_MODE_OPTIONS = [
 // 채널별 기본값 (모델로 자동 감지되면 거기 맞춰 초기화)
 const controllerCh = ref<Record<string, 8 | 12>>({})
 
-// 모델 ID로 다채널 컨트롤러 여부 판정 (TS0601_switch_8, TS0601_switch_12 등)
-function isMultiChannelModel(modelId?: string): boolean {
-  if (!modelId) return false
-  return /_switch_(8|12)/i.test(modelId) || /switch_(8|12)$/i.test(modelId)
+// 다채널 컨트롤러 여부 — backend가 추론한 detectedChannelCount 우선, fallback으로 model_id
+function isMultiChannelDevice(sd: ZigbeeScannedDevice): boolean {
+  if (sd.detectedChannelCount === 8 || sd.detectedChannelCount === 12) return true
+  const m = sd.model_id || ''
+  return /_switch_(8|12)/i.test(m) || /switch_(8|12)$/i.test(m)
 }
 
-function detectControllerChannelCount(modelId?: string): 8 | 12 {
-  if (!modelId) return 8
-  const m = modelId.toLowerCase().match(/_switch_(\d+)/) || modelId.toLowerCase().match(/switch_(\d+)$/)
-  if (m) return Number(m[1]) >= 12 ? 12 : 8
+function detectControllerChannelCount(sd: ZigbeeScannedDevice): 8 | 12 {
+  if (sd.detectedChannelCount === 12) return 12
+  if (sd.detectedChannelCount === 8) return 8
+  const m = sd.model_id || ''
+  const match = m.toLowerCase().match(/_switch_(\d+)/) || m.toLowerCase().match(/switch_(\d+)$/)
+  if (match) return Number(match[1]) >= 12 ? 12 : 8
   return 8
 }
 
@@ -1027,10 +1043,10 @@ function selectDeviceType(ieee: string, dt: 'sensor' | 'actuator' | 'controller'
   else if (dt === 'actuator') addForm.value[ieee + '_type'] = 'actuator/'
   else {
     addForm.value[ieee + '_type'] = 'controller/'
-    // 모델 자동 감지값으로 채널 수 초기화
+    // 모델 자동 감지값으로 채널 수 초기화 (detectedChannelCount 우선)
     const sd = scannedDevices.value.find(d => d.ieee_address === ieee)
     if (sd && !controllerCh.value[ieee]) {
-      controllerCh.value[ieee] = detectControllerChannelCount(sd.model_id)
+      controllerCh.value[ieee] = detectControllerChannelCount(sd)
     }
   }
 }
@@ -1609,6 +1625,21 @@ onMounted(loadAllDevices)
 .opener-warning {
   font-size: 12px; color: var(--warning-text, #92400e); background: var(--warning-bg, #fffbeb);
   border: 1px solid var(--warning-border, #fde68a); border-radius: 6px; padding: 8px 10px;
+}
+
+/* 다채널 컨트롤러 자동 감지 안내 배너 */
+.detected-banner {
+  font-size: 12px;
+  color: #1e3a8a;
+  background: rgba(59,130,246,.12);
+  border: 1px solid rgba(59,130,246,.35);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.dtype-btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-secondary, #6b7280);
+  border-style: dashed;
 }
 
 /* 컨트롤러 모드 (다채널 zigbee 일괄 등록) 추가 영역 */

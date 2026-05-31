@@ -177,6 +177,47 @@ export class DevicesController {
     return this.devicesService.getDependencies(id, this.getEffectiveUserId(user));
   }
 
+  // ── device-replacement (Hot Swap) ─────────────────────────────
+
+  /**
+   * 교체 전 영향 분석 — 보존될 룰/매핑/페어/children 카운트 + 호환 조건.
+   */
+  @Get(':id/replace-preview')
+  getReplacePreview(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.devicesService.getReplacePreview(
+      id,
+      this.getEffectiveUserId(user),
+      user.role,
+    );
+  }
+
+  /**
+   * 장치 교체 실행 — devices.id 유지, IEEE/friendly_name swap (controller는 children도 일괄).
+   * 트랜잭션 + activity_logs + z2m unpair(best-effort) + WebSocket broadcast.
+   */
+  @Post(':id/replace')
+  @HttpCode(HttpStatus.OK)
+  async replaceDevice(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: import('./dto/replace-device.dto').ReplaceDeviceDto,
+  ) {
+    return this.devicesService.replaceDeviceTx({
+      oldDeviceId: id,
+      newIeee: body.newIeee,
+      newFriendlyName: body.newFriendlyName,
+      newZigbeeModel: body.newZigbeeModel,
+      pairedNewIeee: body.pairedNewIeee,
+      pairedNewFriendlyName: body.pairedNewFriendlyName,
+      forceStopRunningTimeline: body.forceStopRunningTimeline,
+      user: {
+        id: this.getEffectiveUserId(user),
+        name: user.name || user.username || 'unknown',
+        role: user.role,
+      },
+    });
+  }
+
   @Delete(':id/opener-pair')
   @HttpCode(HttpStatus.OK)
   removeOpenerPair(@Param('id') id: string, @CurrentUser() user: any) {

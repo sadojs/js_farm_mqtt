@@ -197,6 +197,26 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * device-replacement: z2m에서 옛 IEEE 장치 제거 (페어링 해제).
+   * 트랜잭션 외부 best-effort 호출 — 실패해도 backend DB는 이미 swap 완료된 상태.
+   */
+  async removeZigbeeDevice(gatewayId: string, ieee: string): Promise<void> {
+    const topic = `farm/${gatewayId}/z2m/bridge/request/device/remove`;
+    const payload = JSON.stringify({ id: ieee, block: false, force: false });
+    return new Promise((resolve, reject) => {
+      this.client.publish(topic, payload, { qos: 1 }, (err) => {
+        if (err) {
+          this.logger.warn(`z2m device remove 실패 ${gatewayId}/${ieee}: ${err.message}`);
+          reject(err);
+        } else {
+          this.logger.log(`z2m device remove 발행: ${gatewayId}/${ieee}`);
+          resolve();
+        }
+      });
+    });
+  }
+
   /** 페어링 모드 ON/OFF */
   async permitJoin(gatewayId: string, enable: boolean, duration = 120): Promise<void> {
     const topic = `farm/${gatewayId}/z2m/bridge/request/permit_join`;

@@ -172,6 +172,23 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${userId}`).emit('automation:executed', data);
   }
 
+  /**
+   * device-replacement: 장치 교체 완료 broadcast.
+   * Frontend는 deviceStore.refreshById()로 영향 받은 device row(들)을 자동 갱신.
+   */
+  broadcastDeviceReplaced(userId: string, data: {
+    deviceId: string;
+    oldIeee: string;
+    newIeee: string;
+    gatewayId?: string;
+    preservedRules: number;
+    pairedDeviceId?: string | null;
+    childrenIds?: string[];
+  }) {
+    this.server.to(`user:${userId}`).emit('device:replaced', data);
+    this.server.to('admins').emit('device:replaced', data);
+  }
+
   // 관수 시작 알림
   emitIrrigationStarted(data: {
     ruleId: string;

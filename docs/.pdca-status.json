@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-31T03:45:00Z",
+  "lastUpdated": "2026-05-31T04:05:02.897Z",
   "activeFeatures": [
     "zigbee-channel-actuator",
     "device-replacement",
@@ -184,7 +184,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-02T11:42:17.352Z",
-        "lastUpdated": "2026-05-31T03:39:03.942Z"
+        "lastUpdated": "2026-05-31T04:00:47.326Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/views/GatewayEnvSettings.vue"
     },
@@ -223,7 +223,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T10:59:53.997Z",
-        "lastUpdated": "2026-05-29T21:26:41.936Z"
+        "lastUpdated": "2026-05-31T04:03:48.596Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/automation/irrigation-scheduler.service.ts"
     },
@@ -249,9 +249,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-19T11:24:10.628Z",
-        "lastUpdated": "2026-05-30T09:09:45.551Z"
+        "lastUpdated": "2026-05-31T03:53:03.219Z"
       },
-      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/mqtt/mqtt-sensor.handler.ts"
+      "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/mqtt/mqtt.service.ts"
     },
     "composables": {
       "phase": "do",
@@ -288,7 +288,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-27T11:29:49.870Z",
-        "lastUpdated": "2026-05-31T03:29:13.484Z"
+        "lastUpdated": "2026-05-31T03:59:04.117Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/frontend/src/api/gateway-env.api.ts"
     },
@@ -366,7 +366,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-03T08:39:37.439Z",
-        "lastUpdated": "2026-05-28T11:47:35.833Z"
+        "lastUpdated": "2026-05-31T03:53:12.639Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway/events.gateway.ts"
     },
@@ -379,7 +379,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-08T13:30:02.904Z",
-        "lastUpdated": "2026-05-30T09:11:55.278Z"
+        "lastUpdated": "2026-05-31T04:05:02.897Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/gateway-env/gateway-env.service.ts"
     },
@@ -392,7 +392,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-05-08T13:32:22.659Z",
-        "lastUpdated": "2026-05-31T03:41:48.498Z"
+        "lastUpdated": "2026-05-31T03:55:54.716Z"
       },
       "lastFile": "/Users/ohjeongseok/Projects/smart-farm-mqtt/backend/src/modules/devices/devices.service.ts"
     },
@@ -753,7 +753,7 @@
   "session": {
     "startedAt": "2026-03-27T09:32:17.896Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-31T03:41:48.498Z"
+    "lastActivity": "2026-05-31T04:05:02.897Z"
   },
   "history": [
     {
@@ -7749,6 +7749,138 @@
     {
       "timestamp": "2026-05-31T03:41:48.498Z",
       "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:50:29.072Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:52:26.192Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:52:32.229Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:52:39.849Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:53:03.219Z",
+      "feature": "mqtt",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:53:12.639Z",
+      "feature": "gateway",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:53:25.915Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:53:32.536Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:54:53.787Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:55:28.578Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:55:48.943Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:55:54.716Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:58:52.747Z",
+      "feature": "gateway-env",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:59:04.117Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:59:19.001Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:59:45.552Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T03:59:53.556Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T04:00:13.373Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T04:00:47.326Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T04:03:37.974Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T04:03:48.596Z",
+      "feature": "automation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-31T04:05:02.897Z",
+      "feature": "gateway-env",
       "phase": "do",
       "action": "updated"
     }

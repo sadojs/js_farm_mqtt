@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AutomationService } from './automation.service';
 import { AutomationController } from './automation.controller';
@@ -19,12 +19,12 @@ import { RainOverrideModule } from '../rain-override/rain-override.module';
     TypeOrmModule.forFeature([AutomationRule, AutomationLog, Device, Gateway]),
     MqttModule,
     GatewayModule,
-    DevicesModule,
+    forwardRef(() => DevicesModule),
     ActivityLogModule,
     RainOverrideModule,
   ],
   controllers: [AutomationController],
   providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService],
-  exports: [AutomationService],
+  exports: [AutomationService, IrrigationSchedulerService],
 })
 export class AutomationModule {}

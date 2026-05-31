@@ -10,6 +10,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { RainOverrideModule } from '../rain-override/rain-override.module';
+import { AutomationModule } from '../automation/automation.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RainOverrideModule } from '../rain-override/rain-override.module';
     GatewayModule,
     ActivityLogModule,
     forwardRef(() => RainOverrideModule),
+    forwardRef(() => AutomationModule),
   ],
   controllers: [DevicesController],
   providers: [DevicesService],

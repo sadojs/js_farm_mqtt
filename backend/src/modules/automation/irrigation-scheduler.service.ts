@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -56,6 +56,7 @@ export class IrrigationSchedulerService {
     private readonly gatewayRepo: Repository<Gateway>,
     private readonly mqttService: MqttService,
     private readonly eventsGateway: EventsGateway,
+    @Inject(forwardRef(() => DevicesService))
     private readonly devicesService: DevicesService,
   ) {}
 

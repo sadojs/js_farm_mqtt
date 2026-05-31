@@ -8,6 +8,9 @@ import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
 import { MqttService } from '../mqtt/mqtt.service';
+import { IrrigationSchedulerService } from '../automation/irrigation-scheduler.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { EventsGateway } from '../gateway/events.gateway';
 import { AVAILABLE_SWITCH_CODES, AVAILABLE_SWITCH_CODES_12CH, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
 
 const DEVICE_DEPENDENCY_SQL = `
@@ -38,6 +41,10 @@ export class DevicesService {
     private dataSource: DataSource,
     @Inject(forwardRef(() => RainOverrideService))
     private rainOverride: RainOverrideService,
+    @Inject(forwardRef(() => IrrigationSchedulerService))
+    private irrigationScheduler: IrrigationSchedulerService,
+    private activityLog: ActivityLogService,
+    private eventsGateway: EventsGateway,
   ) {}
 
   /** 장치가 속한 구역(house_group) ID 조회 — rain-override 등에서 사용 */
@@ -816,5 +823,344 @@ export class DevicesService {
     await this.devicesRepo.query('DELETE FROM group_devices WHERE device_id = $1', [id]);
     await this.devicesRepo.remove(device);
     return { message: '삭제되었습니다.' };
+  }
+
+  // ── device-replacement: Hot Swap (devices.id 유지, IEEE/friendly_name swap) ──
+
+  /**
+   * device-replacement 교체 전 영향 분석.
+   * 보존될 자동제어룰 / 채널 매핑 / 페어 / children 카운트 + 호환 조건 반환.
+   */
+  async getReplacePreview(deviceId: string, userId: string, role: string) {
+    const where: any = role === 'admin' ? { id: deviceId } : { id: deviceId, userId };
+    const device = await this.devicesRepo.findOne({ where });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+
+    // 자동제어룰 카운트 (target + sensor 둘 다)
+    const ruleRows: { id: string; name: string }[] = await this.devicesRepo.query(
+      `SELECT id, name FROM automation_rules
+       WHERE EXISTS (
+         SELECT 1 FROM jsonb_array_elements(
+           CASE WHEN jsonb_typeof(actions) = 'array' THEN actions ELSE jsonb_build_array(actions) END
+         ) AS action
+         WHERE action->>'targetDeviceId' = $1 OR action->'targetDeviceIds' ? $1
+            OR action->'sensorDeviceIds' ? $1
+       )
+       OR conditions::text LIKE $2`,
+      [deviceId, `%${deviceId}%`],
+    );
+
+    // 페어 정보
+    let pairedDeviceName: string | null = null;
+    if (device.pairedDeviceId) {
+      const paired = await this.devicesRepo.findOne({ where: { id: device.pairedDeviceId } });
+      pairedDeviceName = paired?.name ?? null;
+    }
+
+    // controller(parent)인 경우 children 카운트
+    let childrenCount = 0;
+    if (device.equipmentType === 'controller') {
+      childrenCount = await this.devicesRepo.count({
+        where: { parentDeviceId: device.id } as any,
+      });
+    }
+
+    // 진행 중 관수 timeline
+    const hasRunningTimeline = device.friendlyName
+      ? !!this.irrigationScheduler.getActiveByDevice(device.friendlyName)
+      : false;
+
+    // 호환 채널 수 (irrigation only)
+    let requireChannelCount: 8 | 12 | null = null;
+    if (device.equipmentType === 'irrigation' && device.channelMapping) {
+      const vals = Object.values(device.channelMapping).filter(Boolean) as string[];
+      if (vals.length > 0) requireChannelCount = detectChannelCount(vals);
+    }
+
+    return {
+      device: {
+        id: device.id,
+        name: device.name,
+        equipmentType: device.equipmentType,
+        zigbeeModel: device.zigbeeModel,
+        zigbeeIeee: device.zigbeeIeee,
+        friendlyName: device.friendlyName,
+        source: device.source,
+        parentDeviceId: (device as any).parentDeviceId ?? null,
+        houseId: device.houseId,
+      },
+      impact: {
+        rulesCount: ruleRows.length,
+        ruleNames: ruleRows.map((r) => r.name).slice(0, 10),
+        mappingKeys: Object.keys(device.channelMapping ?? {}).length,
+        pairedDeviceId: device.pairedDeviceId ?? null,
+        pairedDeviceName,
+        childrenCount,
+        hasRunningTimeline,
+      },
+      compatibility: {
+        requireModel: device.zigbeeModel,
+        requireEquipmentType: device.equipmentType,
+        requireChannelCount,
+        requirePair: !!device.pairedDeviceId,
+        requireChildrenCount: childrenCount > 0 ? childrenCount : null,
+      },
+    };
+  }
+
+  /**
+   * 호환성 엄격 검증 — zigbee_model + equipment_type 일치.
+   * controller인 경우 채널 수 추가 검증.
+   */
+  private assertCompatible(
+    oldDevice: Device,
+    candidate: { zigbeeModel?: string; newChannelCount?: 8 | 12 },
+  ): void {
+    if (candidate.zigbeeModel && oldDevice.zigbeeModel
+      && candidate.zigbeeModel.toLowerCase() !== oldDevice.zigbeeModel.toLowerCase()) {
+      throw new BadRequestException({
+        error: 'incompatible',
+        detail: `모델 불일치: 기존 ${oldDevice.zigbeeModel} vs 새 ${candidate.zigbeeModel}`,
+      });
+    }
+  }
+
+  /**
+   * device-replacement 핵심: devices.id 유지한 채 IEEE/friendly_name swap.
+   * Controller인 경우 children도 동일 IEEE로 일괄 swap.
+   * 페어 개폐기인 경우 양쪽 모두 동시 swap.
+   *
+   * 트랜잭션 commit 후 best-effort z2m unpair + WebSocket broadcast.
+   */
+  async replaceDeviceTx(args: {
+    oldDeviceId: string;
+    newIeee: string;
+    newFriendlyName: string;
+    newZigbeeModel?: string;
+    pairedNewIeee?: string;
+    pairedNewFriendlyName?: string;
+    forceStopRunningTimeline?: boolean;
+    user: { id: string; name: string; role: string };
+  }) {
+    const { oldDeviceId, newIeee, newFriendlyName } = args;
+
+    // 1. 트랜잭션 처리
+    const txResult = await this.dataSource.transaction(async (mgr) => {
+      // 1.1 옛 device 조회 + 행 잠금
+      const oldDevice = await mgr.findOne(Device, {
+        where: { id: oldDeviceId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!oldDevice) throw new NotFoundException('장비를 찾을 수 없습니다.');
+      if (args.user.role !== 'admin' && oldDevice.userId !== args.user.id) {
+        throw new ForbiddenException('권한이 없습니다.');
+      }
+
+      // 1.2 호환성 재검증 (race condition 방지)
+      this.assertCompatible(oldDevice, { zigbeeModel: args.newZigbeeModel });
+
+      // 1.3 새 IEEE 중복 검사 (자기 자신 제외)
+      const dup = await mgr.findOne(Device, {
+        where: { zigbeeIeee: newIeee, parentDeviceId: null } as any,
+      });
+      if (dup && dup.id !== oldDeviceId && dup.gatewayId === oldDevice.gatewayId) {
+        throw new ConflictException({ error: 'duplicate_ieee', existingDeviceId: dup.id });
+      }
+
+      // 1.4 멱등 — same IEEE no-op
+      if (oldDevice.zigbeeIeee === newIeee) {
+        return {
+          noop: true,
+          deviceId: oldDevice.id,
+          oldIeee: oldDevice.zigbeeIeee,
+          newIeee,
+          rulesCount: 0,
+          childrenIds: [] as string[],
+          pairedDeviceId: oldDevice.pairedDeviceId ?? null,
+        };
+      }
+
+      // 1.5 진행 중 관수 timeline 검사
+      if (oldDevice.friendlyName) {
+        const active = this.irrigationScheduler.getActiveByDevice(oldDevice.friendlyName);
+        if (active) {
+          if (!args.forceStopRunningTimeline) {
+            throw new ConflictException({ error: 'running_timeline', deviceName: oldDevice.name });
+          }
+          await this.irrigationScheduler.stopByDevice(oldDevice.friendlyName);
+        }
+      }
+
+      // 1.6 페어 device 처리 (opener)
+      let pairedDevice: Device | null = null;
+      if (oldDevice.pairedDeviceId) {
+        if (!args.pairedNewIeee || !args.pairedNewFriendlyName) {
+          throw new ConflictException({
+            error: 'pair_required',
+            pairedDeviceId: oldDevice.pairedDeviceId,
+          });
+        }
+        pairedDevice = await mgr.findOne(Device, {
+          where: { id: oldDevice.pairedDeviceId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (pairedDevice) {
+          const pairDup = await mgr.findOne(Device, {
+            where: { zigbeeIeee: args.pairedNewIeee, parentDeviceId: null } as any,
+          });
+          if (pairDup && pairDup.id !== pairedDevice.id && pairDup.gatewayId === pairedDevice.gatewayId) {
+            throw new ConflictException({ error: 'duplicate_ieee', existingDeviceId: pairDup.id });
+          }
+        }
+      }
+
+      // 1.7 Controller(parent)인 경우 children 조회 + 잠금
+      let children: Device[] = [];
+      if (oldDevice.equipmentType === 'controller') {
+        children = await mgr.find(Device, {
+          where: { parentDeviceId: oldDevice.id } as any,
+          lock: { mode: 'pessimistic_write' },
+        });
+      }
+
+      // 1.8 UPDATE — 옛 device 식별자 swap
+      const oldIeee = oldDevice.zigbeeIeee ?? '';
+      oldDevice.zigbeeIeee = newIeee;
+      oldDevice.friendlyName = newFriendlyName;
+      if (args.newZigbeeModel) oldDevice.zigbeeModel = args.newZigbeeModel;
+      oldDevice.lastSeen = new Date();
+      oldDevice.online = true;
+      await mgr.save(oldDevice);
+
+      // 1.9 Children도 동일 IEEE/friendly_name으로 일괄 swap
+      const childrenIds: string[] = [];
+      if (children.length > 0) {
+        for (const c of children) {
+          c.zigbeeIeee = newIeee;
+          c.friendlyName = newFriendlyName;
+          if (args.newZigbeeModel) c.zigbeeModel = args.newZigbeeModel;
+          c.lastSeen = new Date();
+          c.online = true;
+          childrenIds.push(c.id);
+        }
+        await mgr.save(children);
+      }
+
+      // 1.10 페어 device swap
+      let pairedOldIeee: string | undefined;
+      if (pairedDevice && args.pairedNewIeee) {
+        pairedOldIeee = pairedDevice.zigbeeIeee ?? undefined;
+        pairedDevice.zigbeeIeee = args.pairedNewIeee;
+        pairedDevice.friendlyName = args.pairedNewFriendlyName!;
+        if (args.newZigbeeModel) pairedDevice.zigbeeModel = args.newZigbeeModel;
+        pairedDevice.lastSeen = new Date();
+        pairedDevice.online = true;
+        await mgr.save(pairedDevice);
+      }
+
+      // 1.11 자동제어룰 카운트
+      const ruleRows: { id: string }[] = await mgr.query(
+        `SELECT id FROM automation_rules WHERE EXISTS (
+           SELECT 1 FROM jsonb_array_elements(
+             CASE WHEN jsonb_typeof(actions) = 'array' THEN actions ELSE jsonb_build_array(actions) END
+           ) AS action
+           WHERE action->>'targetDeviceId' = $1 OR action->'targetDeviceIds' ? $1
+              OR action->'sensorDeviceIds' ? $1
+         )
+         OR conditions::text LIKE $2`,
+        [oldDeviceId, `%${oldDeviceId}%`],
+      );
+
+      return {
+        noop: false,
+        deviceId: oldDevice.id,
+        gatewayId: oldDevice.gatewayId,
+        deviceName: oldDevice.name,
+        userId: oldDevice.userId,
+        oldIeee,
+        newIeee,
+        pairedDeviceId: pairedDevice?.id ?? null,
+        pairedOldIeee,
+        pairedNewIeee: args.pairedNewIeee,
+        childrenIds,
+        rulesCount: ruleRows.length,
+        mappingKeysCount: Object.keys(oldDevice.channelMapping ?? {}).length,
+      };
+    });
+
+    // 2. 트랜잭션 commit 후 best-effort cleanup + 알림
+
+    // 2.1 activity_logs
+    await this.activityLog.log({
+      userId: args.user.id,
+      userName: args.user.name,
+      action: 'device.replace',
+      targetType: 'device',
+      targetId: txResult.deviceId,
+      targetName: txResult.deviceName ?? txResult.deviceId,
+      details: {
+        oldIeee: txResult.oldIeee,
+        newIeee: txResult.newIeee,
+        pairedOldIeee: txResult.pairedOldIeee,
+        pairedNewIeee: txResult.pairedNewIeee,
+        childrenCount: txResult.childrenIds.length,
+        preservedRules: txResult.rulesCount,
+        noop: txResult.noop,
+      },
+    }).catch((e) => this.logger.warn(`activity_log 실패: ${e?.message ?? e}`));
+
+    if (txResult.noop) {
+      return {
+        success: true, noop: true,
+        deviceId: txResult.deviceId,
+        oldIeee: txResult.oldIeee, newIeee: txResult.newIeee,
+        preserved: { rules: 0, mappingKeys: 0, childrenCount: 0 },
+      };
+    }
+
+    // 2.2 z2m unpair (best-effort)
+    if (txResult.gatewayId && txResult.oldIeee && txResult.oldIeee !== txResult.newIeee) {
+      try {
+        // gatewayId UUID → gatewayId string 변환
+        const gw = await this.gatewayRepo.findOne({ where: { id: txResult.gatewayId } });
+        if (gw?.gatewayId) {
+          await this.mqttService.removeZigbeeDevice(gw.gatewayId, txResult.oldIeee);
+          if (txResult.pairedOldIeee && txResult.pairedOldIeee !== txResult.pairedNewIeee) {
+            await this.mqttService.removeZigbeeDevice(gw.gatewayId, txResult.pairedOldIeee);
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(`z2m unpair 실패 — 운영자가 수동 정리 가능: ${e?.message ?? e}`);
+      }
+    }
+
+    // 2.3 WebSocket broadcast
+    try {
+      this.eventsGateway.broadcastDeviceReplaced(txResult.userId ?? args.user.id, {
+        deviceId: txResult.deviceId,
+        oldIeee: txResult.oldIeee,
+        newIeee: txResult.newIeee,
+        gatewayId: txResult.gatewayId,
+        preservedRules: txResult.rulesCount,
+        pairedDeviceId: txResult.pairedDeviceId,
+        childrenIds: txResult.childrenIds.length > 0 ? txResult.childrenIds : undefined,
+      });
+    } catch (e: any) {
+      this.logger.warn(`device:replaced broadcast 실패: ${e?.message ?? e}`);
+    }
+
+    return {
+      success: true,
+      noop: false,
+      deviceId: txResult.deviceId,
+      oldIeee: txResult.oldIeee,
+      newIeee: txResult.newIeee,
+      pairedDeviceId: txResult.pairedDeviceId,
+      preserved: {
+        rules: txResult.rulesCount,
+        mappingKeys: txResult.mappingKeysCount,
+        childrenCount: txResult.childrenIds.length,
+      },
+    };
   }
 }

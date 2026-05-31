@@ -43,6 +43,11 @@ export interface ZigbeeScannedDevice {
   friendly_name: string
   model_id?: string
   definition?: { description?: string }
+  /**
+   * Backend가 exposes의 state_lN 또는 모델명에서 추론한 채널 수.
+   * 1 = 단일 채널, 8/12 = 다채널 컨트롤러, null = 미감지(센서 등)
+   */
+  detectedChannelCount?: 1 | 8 | 12 | null
 }
 
 export interface AllDevicesResponse {
