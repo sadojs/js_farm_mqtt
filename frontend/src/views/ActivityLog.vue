@@ -24,7 +24,7 @@
           <div class="log-summary">
             <template v-if="isIrrigationLog(log)">
               <span v-if="log.conditionsMet?.deviceName" class="chip device">{{ log.conditionsMet.deviceName }}</span>
-              <span v-if="log.conditionsMet?.startTime" class="chip">{{ log.conditionsMet.startTime }}</span>
+              <span v-if="getIrrigationRange(log)" class="chip">{{ getIrrigationRange(log) }}</span>
               <span v-if="log.conditionsMet?.enabledZones != null" class="chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
               <span v-if="log.actionsExecuted?.estimatedDurationMin" class="chip">소요 {{ log.actionsExecuted.estimatedDurationMin }}분</span>
               <span v-if="log.conditionsMet?.irrigationMin" class="chip">관주 {{ log.conditionsMet.irrigationMin }}분</span>
@@ -226,6 +226,26 @@ function formatTime(dateStr: string): string {
   const diffHour = Math.floor(diffMin / 60)
   if (diffHour < 24) return `${diffHour}시간 전`
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function hhmm(dateStr?: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// 관수 row의 시작/종료 시각 chip — 종료 row는 "08:00 → 08:35", 시작 row는 "08:00 시작"
+function getIrrigationRange(log: any): string {
+  const cm = log.conditionsMet || {}
+  if (cm.type === 'irrigation' || cm.type === 'irrigation_cancelled') {
+    const s = cm.startedAt ? hhmm(cm.startedAt) : cm.startTime
+    const e = cm.endedAt ? hhmm(cm.endedAt) : hhmm(log.executedAt)
+    if (s && e) return `${s} → ${e}`
+  }
+  if (cm.type === 'irrigation_started') {
+    return cm.startTime ? `${cm.startTime} 시작` : ''
+  }
+  return cm.startTime ?? ''
 }
 </script>
 

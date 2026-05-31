@@ -17,7 +17,7 @@
         <div class="log-summary">
           <span v-if="log.conditionsMet?.groupName" class="summary-chip group">{{ log.conditionsMet.groupName }}</span>
           <span v-if="log.conditionsMet?.deviceName" class="summary-chip device">{{ log.conditionsMet.deviceName }}</span>
-          <span v-if="log.conditionsMet?.startTime" class="summary-chip">{{ log.conditionsMet.startTime }}</span>
+          <span v-if="getRange(log)" class="summary-chip">{{ getRange(log) }}</span>
           <span v-if="log.conditionsMet?.enabledZones != null" class="summary-chip">{{ log.conditionsMet.enabledZones }}/{{ log.conditionsMet.totalZones }}구역</span>
           <span v-if="log.actionsExecuted?.estimatedDurationMin" class="summary-chip">소요 {{ log.actionsExecuted.estimatedDurationMin }}분</span>
           <span v-if="log.conditionsMet?.irrigationMin" class="summary-chip">관주 {{ log.conditionsMet.irrigationMin }}분</span>
@@ -61,6 +61,30 @@ function formatTime(dateStr: string): string {
   const diffHour = Math.floor(diffMin / 60)
   if (diffHour < 24) return `${diffHour}시간 전`
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function hhmm(dateStr?: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// 시작/종료 시각 chip 텍스트 — 종료 row는 "08:00 → 08:35", 시작 row는 "08:00 시작"
+function getRange(log: AutomationLogEntry): string {
+  const cm = log.conditionsMet || {}
+  const startedAt = (cm as any).startedAt as string | undefined
+  const endedAt = (cm as any).endedAt as string | undefined
+  // 종료/취소 row: backend가 명시 timestamp 보냈으면 그것 사용, 아니면 executedAt 활용 fallback
+  if (cm.type === 'irrigation' || cm.type === 'irrigation_cancelled') {
+    const s = startedAt ? hhmm(startedAt) : (cm as any).startTime
+    const e = endedAt ? hhmm(endedAt) : hhmm(log.executedAt)
+    if (s && e) return `${s} → ${e}`
+  }
+  // 시작 row: 시작 시각만
+  if (cm.type === 'irrigation_started') {
+    return (cm as any).startTime ? `${(cm as any).startTime} 시작` : ''
+  }
+  return (cm as any).startTime ?? ''
 }
 
 onMounted(async () => {

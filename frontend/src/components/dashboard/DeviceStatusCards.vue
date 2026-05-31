@@ -77,6 +77,25 @@
                 {{ SENSOR_META[key as string]?.label || key }}
                 <strong>{{ formatVal(key as string, val as number) }}{{ SENSOR_META[key as string]?.unit || '' }}</strong>
               </span>
+              <span
+                v-if="getBattery(device.sensorData) != null"
+                class="sensor-chip battery"
+                :class="getBatteryClass(getBattery(device.sensorData))"
+                :title="`배터리 ${getBattery(device.sensorData)}%`"
+              >
+                {{ getBatteryIcon(getBattery(device.sensorData)) }}
+                <strong>{{ getBattery(device.sensorData) }}%</strong>
+              </span>
+              <!-- 우적센서: rain-override 비활성화 토글 (오탐 방지) -->
+              <label
+                v-if="isRainSensor(device)"
+                class="sensor-chip rain-toggle"
+                :class="{ active: !(device as any).rainOverrideDisabled }"
+                @click.prevent="toggleRainOverride(device)"
+                :title="(device as any).rainOverrideDisabled ? '비 감지 우회 비활성 — 클릭하여 활성화' : '비 감지 우회 활성 — 클릭하여 비활성화 (오탐 방지)'"
+              >
+                {{ (device as any).rainOverrideDisabled ? '🌂 무시' : '☔ 감지' }}
+              </label>
             </div>
             <span v-else :class="['item-status', device.online ? 'running' : 'stopped']">
               {{ device.online ? '대기' : '오프라인' }}
@@ -94,6 +113,7 @@ import { useDeviceStore } from '../../stores/device.store'
 import { useGroupStore } from '../../stores/group.store'
 import { useAutomationStore } from '../../stores/automation.store'
 import type { Device } from '../../types/device.types'
+import { deviceApi } from '../../api/device.api'
 
 const deviceStore = useDeviceStore()
 const groupStore = useGroupStore()
@@ -139,6 +159,42 @@ function getTopSensorValues(sensorData: Record<string, number | null | undefined
   const entries = Object.entries(sensorData)
     .filter(([k, v]) => v != null && DISPLAY_FIELDS.includes(k)) as [string, number][]
   return Object.fromEntries(entries)
+}
+
+function getBattery(sensorData: Record<string, number | null | undefined> | null | undefined): number | null {
+  if (!sensorData) return null
+  const v = (sensorData as any).battery
+  return v != null ? Math.round(Number(v)) : null
+}
+
+function getBatteryIcon(pct: number | null): string {
+  if (pct == null) return ''
+  if (pct >= 75) return '🔋'   // full
+  if (pct >= 30) return '🔋'   // medium
+  return '🪫'                   // low
+}
+
+function getBatteryClass(pct: number | null): string {
+  if (pct == null) return ''
+  if (pct < 20) return 'battery-low'
+  if (pct < 50) return 'battery-mid'
+  return 'battery-ok'
+}
+
+function isRainSensor(device: Device): boolean {
+  const data = device.sensorData as any
+  if (!data) return false
+  return 'rain_detection' in data || 'rain_intensity' in data
+}
+
+async function toggleRainOverride(device: Device) {
+  const next = !(device as any).rainOverrideDisabled
+  try {
+    await deviceApi.updateRainOverrideDisabled(device.id, next)
+    ;(device as any).rainOverrideDisabled = next
+  } catch (err) {
+    console.error('우적센서 토글 실패:', err)
+  }
 }
 
 function formatVal(field: string, value: number): string {
@@ -335,6 +391,27 @@ onMounted(async () => {
 .sensor-chip strong {
   margin-left: 4px;
   font-weight: 700;
+}
+
+.sensor-chip.battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.sensor-chip.battery.battery-ok  { background: rgba(16,185,129,.10); color: #059669; }
+.sensor-chip.battery.battery-mid { background: rgba(245,158,11,.12); color: #d97706; }
+.sensor-chip.battery.battery-low { background: rgba(239,68,68,.12); color: #dc2626; font-weight: 700; }
+
+.sensor-chip.rain-toggle {
+  cursor: pointer;
+  background: rgba(156,163,175,.18);
+  color: #6b7280;
+  font-weight: 600;
+  user-select: none;
+}
+.sensor-chip.rain-toggle.active {
+  background: rgba(37,99,235,.12);
+  color: #2563eb;
 }
 
 @media (max-width: 768px) {

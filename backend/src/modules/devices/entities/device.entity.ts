@@ -38,7 +38,7 @@ export class Device {
   @Column({ name: 'equipment_type', nullable: true })
   equipmentType: 'fan' | 'irrigation' | 'opener_open' | 'opener_close' | 'mixer'
     | 'fertilizer_motor' | 'fertilizer_contact' | 'remote_control'
-    | 'vent_group' | 'irrigation_group' | 'other';
+    | 'vent_group' | 'irrigation_group' | 'controller' | 'other';
 
   @Column({ nullable: true })
   icon: string;
@@ -63,6 +63,14 @@ export class Device {
 
   @Column({ name: 'onboard_device_id', nullable: true, type: 'uuid' })
   onboardDeviceId: string | null;
+
+  /** Zigbee 다채널 컨트롤러의 child일 때 parent device.id (자동제어 타겟은 child) */
+  @Column({ name: 'parent_device_id', nullable: true, type: 'uuid' })
+  parentDeviceId: string | null;
+
+  /** child의 z2m payload 키 (switch_1~switch_12). TS0601은 자동으로 state_lN으로 변환 */
+  @Column({ name: 'channel_code', nullable: true, type: 'varchar', length: 32 })
+  channelCode: string | null;
 
   @Column({ name: 'device_settings', type: 'jsonb', nullable: true })
   deviceSettings: Record<string, any> | null;

@@ -55,10 +55,10 @@
 
       <div v-if="zigbeeDevices.length === 0" class="empty-state">추가된 Zigbee 장치가 없습니다.</div>
 
-      <div v-for="dev in zigbeeDevices" :key="dev.id" class="device-card"
-        :class="{ 'card-enabled': dev.equipmentType === 'irrigation' && zigbeeAnyActive(dev) }">
-        <div class="card-header" :class="{ 'card-header-clickable': dev.equipmentType === 'irrigation' }"
-          @click="dev.equipmentType === 'irrigation' && toggleZigbeeExpand(dev.id)">
+      <div v-for="dev in zigbeeRootDevices" :key="dev.id" class="device-card"
+        :class="{ 'card-enabled': (dev.equipmentType === 'irrigation' && zigbeeAnyActive(dev)) || (dev.equipmentType === 'controller' && controllerAnyActive(dev)) }">
+        <div class="card-header" :class="{ 'card-header-clickable': dev.equipmentType === 'irrigation' || dev.equipmentType === 'controller' }"
+          @click="(dev.equipmentType === 'irrigation' || dev.equipmentType === 'controller') && toggleZigbeeExpand(dev.id)">
           <div class="device-name-row">
             <span v-if="editingId !== dev.id" class="device-name">{{ dev.name }}</span>
             <input v-else v-model="editName" class="name-input" @click.stop @keyup.enter="saveZigbeeName(dev)" @keyup.escape="cancelEdit()" />
@@ -73,6 +73,9 @@
             <span v-if="dev.equipmentType === 'irrigation'" class="zb-meta-chip">
               {{ zigbeeChannelCountFor(dev) }}채널 · 활성 {{ zigbeeActiveCount(dev) }}
             </span>
+            <span v-else-if="dev.equipmentType === 'controller'" class="zb-meta-chip">
+              {{ controllerChildren(dev).length }}{{ controllerModeOf(dev) === 'opener' ? '쌍 개폐기' : '개 유동팬' }} · 활성 {{ controllerActiveUnitsCount(dev) }}
+            </span>
             <!-- 팬: 타이머 설정 버튼 -->
             <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
             <!-- 개폐기 타이머 -->
@@ -84,7 +87,7 @@
               <span class="toggle-slider"></span>
             </label>
             <button class="btn-danger btn-sm" @click.stop="removeZigbee(dev)">삭제</button>
-            <span v-if="dev.equipmentType === 'irrigation'" class="expand-arrow">
+            <span v-if="dev.equipmentType === 'irrigation' || dev.equipmentType === 'controller'" class="expand-arrow">
               {{ expandedZigbeeIds.has(dev.id) ? '▲' : '▼' }}
             </span>
           </div>
@@ -134,6 +137,99 @@
           <div class="bulk-actions">
             <button class="btn-bulk" @click="zigbeeBulkActivate(dev, true)">전체 활성화</button>
             <button class="btn-bulk" @click="zigbeeBulkActivate(dev, false)">전체 비활성화</button>
+          </div>
+        </div>
+
+        <!-- Controller (fan/opener) 채널 그리드 -->
+        <div v-if="dev.equipmentType === 'controller' && expandedZigbeeIds.has(dev.id)" class="card-body">
+          <!-- 유동팬: 1ch = 1 fan, 개별 이름 ✏ -->
+          <div v-if="controllerModeOf(dev) === 'fan'" class="channel-grid">
+            <div v-for="(child, i) in controllerChildren(dev)" :key="child.id" class="channel-row"
+              :class="{ 'ch-inactive': isChildDisabled(dev, child) }">
+              <div class="ch-num" :style="{ background: '#0ea5e922', borderColor: '#0ea5e955', color: '#0ea5e9' }">
+                {{ i + 1 }}
+              </div>
+              <!-- 이름 ✏ -->
+              <template v-if="editingChildId === child.id">
+                <input v-model="editChildName" class="ch-name-input"
+                  @keyup.enter="saveChildName(child)" @keyup.escape="cancelChildEdit()" @click.stop />
+                <button class="btn-icon btn-save" @click.stop="saveChildName(child)">✓</button>
+                <button class="btn-icon" @click.stop="cancelChildEdit()">✕</button>
+              </template>
+              <template v-else>
+                <span class="ch-name">{{ child.name }}</span>
+                <button class="btn-icon" @click.stop="startChildEdit(child)" title="이름 변경">✏</button>
+              </template>
+              <div class="pin-wrap">
+                <span class="pin-label">CH</span>
+                <select class="pin-select" :value="child.channelCode"
+                  @change="updateChildChannelCode(dev, child, ($event.target as HTMLSelectElement).value)">
+                  <option v-for="sw in availableChannelCodesFor(dev, child)" :key="sw" :value="sw">{{ sw }}</option>
+                </select>
+              </div>
+              <button class="relay-btn on" :disabled="isChildDisabled(dev, child)"
+                @click="controllerTestChild(dev, child, true)">ON</button>
+              <button class="relay-btn off" :disabled="isChildDisabled(dev, child)"
+                @click="controllerTestChild(dev, child, false)">OFF</button>
+              <label class="toggle toggle-sm">
+                <input type="checkbox" :checked="!isChildDisabled(dev, child)"
+                  @change="toggleChildEnabled(dev, child)" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 개폐기 페어: 1쌍 = open+close, 페어 대표 이름 ✏만 -->
+          <div v-else-if="controllerModeOf(dev) === 'opener'" class="channel-grid">
+            <div v-for="(pair, pi) in controllerOpenerPairs(dev)" :key="pair.groupName" class="opener-pair-block"
+              :class="{ 'ch-inactive': isPairDisabled(dev, pair) }">
+              <div class="opener-pair-header">
+                <div class="ch-num" :style="{ background: '#0ea5e922', borderColor: '#0ea5e955', color: '#0ea5e9' }">{{ pi + 1 }}</div>
+                <template v-if="editingPairGroup === pair.groupName">
+                  <input v-model="editPairName" class="ch-name-input"
+                    @keyup.enter="savePairName(pair)" @keyup.escape="cancelPairEdit()" @click.stop />
+                  <button class="btn-icon btn-save" @click.stop="savePairName(pair)">✓</button>
+                  <button class="btn-icon" @click.stop="cancelPairEdit()">✕</button>
+                </template>
+                <template v-else>
+                  <span class="ch-name pair-name">{{ pair.groupName }}</span>
+                  <button class="btn-icon" @click.stop="startPairEdit(pair)" title="페어 이름 변경">✏</button>
+                </template>
+                <label class="toggle toggle-sm" style="margin-left:auto;">
+                  <input type="checkbox" :checked="!isPairDisabled(dev, pair)"
+                    @change="togglePairEnabled(dev, pair)" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="opener-sub-row">
+                <span class="opener-sub-label">열림</span>
+                <div class="pin-wrap">
+                  <span class="pin-label">CH</span>
+                  <select class="pin-select" :value="pair.openChild.channelCode"
+                    @change="updateChildChannelCode(dev, pair.openChild, ($event.target as HTMLSelectElement).value)">
+                    <option v-for="sw in availableChannelCodesFor(dev, pair.openChild)" :key="sw" :value="sw">{{ sw }}</option>
+                  </select>
+                </div>
+                <button class="relay-btn on" :disabled="isPairDisabled(dev, pair)"
+                  @click="controllerTestChild(dev, pair.openChild, true)">ON</button>
+                <button class="relay-btn off" :disabled="isPairDisabled(dev, pair)"
+                  @click="controllerTestChild(dev, pair.openChild, false)">OFF</button>
+              </div>
+              <div class="opener-sub-row">
+                <span class="opener-sub-label">닫힘</span>
+                <div class="pin-wrap">
+                  <span class="pin-label">CH</span>
+                  <select class="pin-select" :value="pair.closeChild.channelCode"
+                    @change="updateChildChannelCode(dev, pair.closeChild, ($event.target as HTMLSelectElement).value)">
+                    <option v-for="sw in availableChannelCodesFor(dev, pair.closeChild)" :key="sw" :value="sw">{{ sw }}</option>
+                  </select>
+                </div>
+                <button class="relay-btn on" :disabled="isPairDisabled(dev, pair)"
+                  @click="controllerTestChild(dev, pair.closeChild, true)">ON</button>
+                <button class="relay-btn off" :disabled="isPairDisabled(dev, pair)"
+                  @click="controllerTestChild(dev, pair.closeChild, false)">OFF</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -288,7 +384,7 @@
               <input v-model="addFormName[sd.ieee_address]" class="scan-name-input" :placeholder="sd.friendly_name" />
             </div>
 
-            <!-- 1단계: 측정기 / 장치 선택 -->
+            <!-- 1단계: 측정기 / 장치 / 컨트롤러 선택 -->
             <div class="dtype-toggle">
               <button
                 :class="['dtype-btn', addForm[sd.ieee_address + '_type'] === 'sensor/other' && 'dtype-active']"
@@ -300,15 +396,50 @@
                 @click="selectDeviceType(sd.ieee_address, 'actuator')">
                 ⚙ 장치
               </button>
+              <button v-if="isMultiChannelModel(sd.model_id)"
+                :class="['dtype-btn', addForm[sd.ieee_address + '_type']?.startsWith('controller/') && 'dtype-active']"
+                @click="selectDeviceType(sd.ieee_address, 'controller')"
+                :title="`${detectControllerChannelCount(sd.model_id)}채널 다채널 컨트롤러로 인식되었습니다`">
+                🎛 컨트롤러 ({{ detectControllerChannelCount(sd.model_id) }}ch)
+              </button>
             </div>
 
-            <!-- 2단계: 장치 세부 유형 (장치 선택 시) -->
+            <!-- 2단계 (장치): 장치 세부 유형 -->
             <div v-if="addForm[sd.ieee_address + '_type']?.startsWith('actuator/')" class="equip-options">
               <button v-for="opt in EQUIPMENT_OPTIONS" :key="opt.value"
                 :class="['equip-btn', addForm[sd.ieee_address + '_type'] === 'actuator/' + opt.value && 'equip-active']"
                 @click="selectEquipType(sd.ieee_address, opt.value)">
                 {{ opt.label }}
               </button>
+            </div>
+
+            <!-- 2단계 (컨트롤러): 모드 선택 + 채널 수 -->
+            <div v-if="addForm[sd.ieee_address + '_type']?.startsWith('controller/')" class="equip-options">
+              <button v-for="opt in CONTROLLER_MODE_OPTIONS" :key="opt.value"
+                :class="['equip-btn', addForm[sd.ieee_address + '_type'] === 'controller/' + opt.value && 'equip-active']"
+                @click="selectControllerMode(sd.ieee_address, opt.value)">
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- 컨트롤러 채널 수 선택 (모델로 자동 감지되지 않는 경우 fallback) -->
+            <div v-if="addForm[sd.ieee_address + '_type']?.startsWith('controller/')" class="controller-extra">
+              <label class="scan-field-label">채널 수</label>
+              <div class="dtype-toggle dtype-toggle-sm">
+                <button :class="['dtype-btn', controllerCh[sd.ieee_address] === 8 && 'dtype-active']"
+                  @click="controllerCh[sd.ieee_address] = 8">8채널</button>
+                <button :class="['dtype-btn', controllerCh[sd.ieee_address] === 12 && 'dtype-active']"
+                  @click="controllerCh[sd.ieee_address] = 12">12채널</button>
+              </div>
+              <div class="controller-hint" v-if="controllerCh[sd.ieee_address] === 12 && addForm[sd.ieee_address + '_type'] === 'controller/opener'">
+                ⓘ 12채널 개폐기는 기본 6쌍 (열림/닫힘 인접 채널)으로 생성됩니다
+              </div>
+              <div class="controller-hint" v-else-if="controllerCh[sd.ieee_address] === 8 && addForm[sd.ieee_address + '_type'] === 'controller/opener'">
+                ⓘ 8채널 개폐기는 기본 4쌍 (열림/닫힘 인접 채널)으로 생성됩니다
+              </div>
+              <div class="controller-hint" v-else-if="addForm[sd.ieee_address + '_type'] === 'controller/fan'">
+                ⓘ 유동팬은 각 채널이 1개의 독립 팬으로 등록됩니다 ({{ controllerCh[sd.ieee_address] || 8 }}개)
+              </div>
             </div>
 
             <!-- 개폐기 경고 (한쪽만 선택된 경우) -->
@@ -322,7 +453,10 @@
                 class="btn-primary btn-sm"
                 :disabled="!canAdd(sd.ieee_address)"
                 @click="handleAddDevice(sd)">
-                {{ isOpenerSelected(sd.ieee_address) ? '쌍으로 추가' : '추가' }}
+                {{
+                  addForm[sd.ieee_address + '_type']?.startsWith('controller/') ? '컨트롤러 등록' :
+                  isOpenerSelected(sd.ieee_address) ? '쌍으로 추가' : '추가'
+                }}
               </button>
             </div>
           </div>
@@ -428,6 +562,160 @@ const onboardDevices = ref<OnboardDevice[]>([])
 const zigbeeDevices = ref<ZigbeeDevice[]>([])
 
 // Zigbee 관수 인라인 채널 카드 — onboard 동일 패턴 (매핑은 보존, enabled 별도 관리)
+// Controller card 상태 — root만 v-for에 표시
+const zigbeeRootDevices = computed(() => zigbeeDevices.value.filter(d => !d.parentDeviceId))
+
+function controllerChildren(parent: ZigbeeDevice): ZigbeeDevice[] {
+  return zigbeeDevices.value
+    .filter(d => d.parentDeviceId === parent.id)
+    .sort((a, b) => {
+      // channel_code 숫자 추출 후 정렬 (switch_1 < switch_2 < ... < switch_12)
+      const num = (s: string | null | undefined) => Number((s ?? '').replace(/^switch_/, '')) || 0
+      return num(a.channelCode) - num(b.channelCode)
+    })
+}
+
+function controllerModeOf(parent: ZigbeeDevice): 'fan' | 'opener' | null {
+  const children = controllerChildren(parent)
+  if (children.length === 0) return null
+  const first = children[0]
+  if (first.equipmentType === 'fan') return 'fan'
+  if (first.equipmentType === 'opener_open' || first.equipmentType === 'opener_close') return 'opener'
+  return null
+}
+
+interface OpenerPairInfo { groupName: string; openChild: ZigbeeDevice; closeChild: ZigbeeDevice }
+function controllerOpenerPairs(parent: ZigbeeDevice): OpenerPairInfo[] {
+  const children = controllerChildren(parent)
+  const byGroup = new Map<string, { open?: ZigbeeDevice; close?: ZigbeeDevice }>()
+  for (const c of children) {
+    const g = c.openerGroupName ?? c.name
+    if (!byGroup.has(g)) byGroup.set(g, {})
+    if (c.equipmentType === 'opener_open') byGroup.get(g)!.open = c
+    else if (c.equipmentType === 'opener_close') byGroup.get(g)!.close = c
+  }
+  const result: OpenerPairInfo[] = []
+  for (const [groupName, { open, close }] of byGroup) {
+    if (open && close) result.push({ groupName, openChild: open, closeChild: close })
+  }
+  return result
+}
+
+function parentDisabledSet(parent: ZigbeeDevice): Set<string> {
+  return new Set<string>(((parent as any).disabledChannels ?? []) as string[])
+}
+
+function isChildDisabled(parent: ZigbeeDevice, child: ZigbeeDevice): boolean {
+  return parentDisabledSet(parent).has(child.id)
+}
+
+function isPairDisabled(parent: ZigbeeDevice, pair: OpenerPairInfo): boolean {
+  const set = parentDisabledSet(parent)
+  return set.has(pair.openChild.id) || set.has(pair.closeChild.id)
+}
+
+function controllerAnyActive(parent: ZigbeeDevice): boolean {
+  return controllerChildren(parent).some(c => !isChildDisabled(parent, c))
+}
+
+function controllerActiveUnitsCount(parent: ZigbeeDevice): number {
+  const mode = controllerModeOf(parent)
+  if (mode === 'fan') return controllerChildren(parent).filter(c => !isChildDisabled(parent, c)).length
+  if (mode === 'opener') return controllerOpenerPairs(parent).filter(p => !isPairDisabled(parent, p)).length
+  return 0
+}
+
+function availableChannelCodesFor(parent: ZigbeeDevice, child: ZigbeeDevice): string[] {
+  // parent.zigbeeModel에서 채널 수 추정 (예: TS0601_switch_8 → 8)
+  const m = (parent as any).zigbeeModel?.toLowerCase?.().match(/_switch_(\d+)/)
+  const total = m ? Number(m[1]) : 8
+  const codes = Array.from({ length: total }, (_, i) => `switch_${i + 1}`)
+  const used = new Set<string>()
+  for (const c of controllerChildren(parent)) {
+    if (c.id !== child.id && c.channelCode) used.add(c.channelCode)
+  }
+  return codes.filter(c => !used.has(c))
+}
+
+async function updateChildChannelCode(_parent: ZigbeeDevice, child: ZigbeeDevice, value: string) {
+  try {
+    const { data } = await deviceApi.updateChannelCode(child.id, value)
+    child.channelCode = (data as any).channelCode ?? value
+  } catch (e: any) {
+    notif.error('저장 실패', e?.response?.data?.message ?? '채널 코드 변경 실패')
+  }
+}
+
+async function controllerTestChild(_parent: ZigbeeDevice, child: ZigbeeDevice, state: boolean) {
+  // 자기 channel_code로 z2m publish (backend가 parent friendlyName + state_lN 자동 변환)
+  // 개폐기 페어 인터록도 controlDevice 호출 path를 통해 자동 적용 (devices.service.ts:572)
+  try {
+    await deviceApi.control(child.id, [{ code: child.channelCode ?? 'state', value: state }])
+  } catch (e: any) {
+    notif.error('테스트 실패', `${child.name} ${state ? 'ON' : 'OFF'} 실패`)
+  }
+}
+
+async function toggleChildEnabled(parent: ZigbeeDevice, child: ZigbeeDevice) {
+  const enabled = isChildDisabled(parent, child)
+  const key = child.channelCode || ''
+  if (!key) return
+  try {
+    const { data } = await deviceApi.updateChannelEnabled(parent.id, key, enabled)
+    ;(parent as any).disabledChannels = (data as any).disabledChannels ?? []
+  } catch (e: any) {
+    notif.error('저장 실패', '활성 상태 변경 실패')
+  }
+}
+
+async function togglePairEnabled(parent: ZigbeeDevice, pair: OpenerPairInfo) {
+  const wasActive = !isPairDisabled(parent, pair)
+  // 한 번에 두 child 처리 (열림 + 닫힘 같은 상태로) — key는 child.channelCode
+  for (const child of [pair.openChild, pair.closeChild]) {
+    const key = child.channelCode || ''
+    if (!key) continue
+    try {
+      const { data } = await deviceApi.updateChannelEnabled(parent.id, key, wasActive ? false : true)
+      ;(parent as any).disabledChannels = (data as any).disabledChannels ?? []
+    } catch { /* continue */ }
+  }
+}
+
+// 이름 편집 — child(유동팬)
+const editingChildId = ref<string | null>(null)
+const editChildName = ref('')
+function startChildEdit(child: ZigbeeDevice) { editingChildId.value = child.id; editChildName.value = child.name }
+function cancelChildEdit() { editingChildId.value = null; editChildName.value = '' }
+async function saveChildName(child: ZigbeeDevice) {
+  const newName = editChildName.value.trim()
+  if (!newName) { cancelChildEdit(); return }
+  try {
+    const { data } = await deviceApi.rename(child.id, newName)
+    child.name = data.name
+  } catch { notif.error('저장 실패', '이름 변경 실패') }
+  cancelChildEdit()
+}
+
+// 이름 편집 — 페어 대표 (페어 양쪽 device의 opener_group_name + name 자동 동기화는 backend updateByUser에서)
+const editingPairGroup = ref<string | null>(null)
+const editPairName = ref('')
+function startPairEdit(pair: OpenerPairInfo) { editingPairGroup.value = pair.groupName; editPairName.value = pair.groupName }
+function cancelPairEdit() { editingPairGroup.value = null; editPairName.value = '' }
+async function savePairName(pair: OpenerPairInfo) {
+  const newName = editPairName.value.trim()
+  if (!newName) { cancelPairEdit(); return }
+  try {
+    // 열림 device 이름을 "{newName} 열림"으로 변경 — backend가 opener_group_name + paired 동기화
+    await deviceApi.rename(pair.openChild.id, `${newName} 열림`)
+    await deviceApi.rename(pair.closeChild.id, `${newName} 닫힘`)
+    pair.openChild.name = `${newName} 열림`
+    pair.closeChild.name = `${newName} 닫힘`
+    pair.openChild.openerGroupName = newName
+    pair.closeChild.openerGroupName = newName
+  } catch { notif.error('저장 실패', '페어 이름 변경 실패') }
+  cancelPairEdit()
+}
+
 const expandedZigbeeIds = ref<Set<string>>(new Set())
 function toggleZigbeeExpand(id: string) {
   if (expandedZigbeeIds.value.has(id)) expandedZigbeeIds.value.delete(id)
@@ -618,6 +906,33 @@ const EQUIPMENT_OPTIONS = [
   { value: 'opener_close', label: '개폐기(닫힘)' },
 ]
 
+// 컨트롤러 모드 (다채널 zigbee 컨트롤러 일괄 등록용)
+const CONTROLLER_MODE_OPTIONS = [
+  { value: 'irrigation', label: '🚿 관수' },
+  { value: 'fan',        label: '🌀 유동팬' },
+  { value: 'opener',     label: '🚪 개폐기 페어' },
+]
+
+// 채널별 기본값 (모델로 자동 감지되면 거기 맞춰 초기화)
+const controllerCh = ref<Record<string, 8 | 12>>({})
+
+// 모델 ID로 다채널 컨트롤러 여부 판정 (TS0601_switch_8, TS0601_switch_12 등)
+function isMultiChannelModel(modelId?: string): boolean {
+  if (!modelId) return false
+  return /_switch_(8|12)/i.test(modelId) || /switch_(8|12)$/i.test(modelId)
+}
+
+function detectControllerChannelCount(modelId?: string): 8 | 12 {
+  if (!modelId) return 8
+  const m = modelId.toLowerCase().match(/_switch_(\d+)/) || modelId.toLowerCase().match(/switch_(\d+)$/)
+  if (m) return Number(m[1]) >= 12 ? 12 : 8
+  return 8
+}
+
+function selectControllerMode(ieee: string, mode: string) {
+  addForm.value[ieee + '_type'] = 'controller/' + mode
+}
+
 const IRRIGATION_SLOTS_8CH: Record<string, string> = {
   remote_control:       '원격제어 ON/OFF',
   fertilizer_b_contact: '액비/교반기 B접점',
@@ -707,8 +1022,17 @@ async function saveMappingFor(dev: ZigbeeDevice) {
 }
 
 // 장치 유형 선택
-function selectDeviceType(ieee: string, dt: 'sensor' | 'actuator') {
-  addForm.value[ieee + '_type'] = dt === 'sensor' ? 'sensor/other' : 'actuator/'
+function selectDeviceType(ieee: string, dt: 'sensor' | 'actuator' | 'controller') {
+  if (dt === 'sensor') addForm.value[ieee + '_type'] = 'sensor/other'
+  else if (dt === 'actuator') addForm.value[ieee + '_type'] = 'actuator/'
+  else {
+    addForm.value[ieee + '_type'] = 'controller/'
+    // 모델 자동 감지값으로 채널 수 초기화
+    const sd = scannedDevices.value.find(d => d.ieee_address === ieee)
+    if (sd && !controllerCh.value[ieee]) {
+      controllerCh.value[ieee] = detectControllerChannelCount(sd.model_id)
+    }
+  }
 }
 
 function selectEquipType(ieee: string, equip: string) {
@@ -741,12 +1065,18 @@ const openerPairReady = computed(() =>
 
 function canAdd(ieee: string): boolean {
   const t = addForm.value[ieee + '_type']
-  if (!t || t === 'actuator/') return false
+  if (!t || t === 'actuator/' || t === 'controller/') return false
   if (isOpenerSelected(ieee)) return openerPairReady.value
+  if (t.startsWith('controller/')) return !!controllerCh.value[ieee]
   return true
 }
 
 async function handleAddDevice(sd: ZigbeeScannedDevice) {
+  const t = addForm.value[sd.ieee_address + '_type'] || ''
+  if (t.startsWith('controller/')) {
+    await addZigbeeControllerDevice(sd)
+    return
+  }
   if (isOpenerSelected(sd.ieee_address)) {
     if (!openerPairReady.value) {
       notif.error('추가 불가', '개폐기는 열림/닫힘 세트로 함께 추가해야 합니다.')
@@ -755,6 +1085,27 @@ async function handleAddDevice(sd: ZigbeeScannedDevice) {
     await addOpenerPairAuto()
   } else {
     await addZigbeeDevice(sd)
+  }
+}
+
+async function addZigbeeControllerDevice(sd: ZigbeeScannedDevice) {
+  const t = addForm.value[sd.ieee_address + '_type'] || ''
+  const mode = t.split('/')[1] as 'irrigation' | 'fan' | 'opener'
+  const ch = controllerCh.value[sd.ieee_address] || 8
+  try {
+    const res = await gatewayEnvApi.addZigbeeController(gatewayId, {
+      ieee: sd.ieee_address,
+      friendlyName: sd.friendly_name,
+      zigbeeModel: sd.model_id || '',
+      channelCount: ch,
+      mode,
+    })
+    zigbeeDevices.value.push(res.data.controller, ...res.data.children)
+    addedIeees.value = new Set([...addedIeees.value, sd.ieee_address])
+    const label = mode === 'irrigation' ? '관수' : mode === 'fan' ? '유동팬' : '개폐기 페어'
+    notif.success('컨트롤러 등록 완료', `${ch}채널 ${label} 컨트롤러가 등록되었습니다.`)
+  } catch (e: any) {
+    notif.error('오류', e?.response?.data?.message || '컨트롤러 등록에 실패했습니다.')
   }
 }
 
@@ -991,6 +1342,42 @@ onMounted(loadAllDevices)
   transition: opacity 0.15s;
 }
 .channel-row.ch-inactive { opacity: 0.5; }
+
+/* 컨트롤러 모드 — fan / opener pair UI */
+.opener-pair-block {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+.opener-pair-block.ch-inactive { opacity: 0.5; }
+.opener-pair-header { display: flex; align-items: center; gap: 8px; }
+.opener-sub-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px 4px 26px;
+  border-left: 2px solid var(--border-color, #e5e7eb);
+  margin-left: 10px;
+}
+.opener-sub-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-secondary, #6b7280);
+  min-width: 32px;
+}
+.pair-name { font-weight: 600; color: var(--text-primary, #111); }
+.ch-name-input {
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  background: var(--bg-input, #fff);
+  color: var(--text-primary, #111);
+  flex: 1;
+  min-width: 80px;
+  max-width: 180px;
+}
+
 .ch-num {
   width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -1222,6 +1609,21 @@ onMounted(loadAllDevices)
 .opener-warning {
   font-size: 12px; color: var(--warning-text, #92400e); background: var(--warning-bg, #fffbeb);
   border: 1px solid var(--warning-border, #fde68a); border-radius: 6px; padding: 8px 10px;
+}
+
+/* 컨트롤러 모드 (다채널 zigbee 일괄 등록) 추가 영역 */
+.controller-extra {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px;
+  background: rgba(59,130,246,.06);
+  border: 1px solid rgba(59,130,246,.25);
+  border-radius: 8px;
+}
+.dtype-toggle-sm { gap: 4px; }
+.dtype-toggle-sm .dtype-btn { padding: 4px 10px; font-size: 12px; }
+.controller-hint {
+  font-size: 11px; color: var(--text-secondary, #6b7280);
+  padding: 4px 0 0;
 }
 
 /* Buttons */

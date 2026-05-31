@@ -6,6 +6,7 @@ import { GatewayEnvService } from './gateway-env.service';
 import { UpdateOnboardDeviceDto } from './dto/update-onboard-device.dto';
 import { CreateOnboardDeviceDto } from './dto/create-onboard-device.dto';
 import { AddZigbeeDeviceDto, UpdateZigbeeDeviceDto } from './dto/add-zigbee-device.dto';
+import { CreateZigbeeControllerDto } from './dto/create-zigbee-controller.dto';
 import { TestGpioPinDto, TestZigbeeChannelDto } from './dto/test-pin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -98,6 +99,20 @@ export class GatewayEnvController {
     @CurrentUser() user: any,
   ) {
     return this.svc.addZigbeeDevice(gatewayId, dto, user.id, user.role);
+  }
+
+  /**
+   * Zigbee 8/12채널 컨트롤러 등록 — parent + N children 일괄 생성.
+   * mode='irrigation' | 'fan' | 'opener'
+   */
+  @Post(':gatewayId/zigbee-controller')
+  @Roles('admin', 'farm_admin')
+  addZigbeeController(
+    @Param('gatewayId') gatewayId: string,
+    @Body() dto: CreateZigbeeControllerDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.svc.createZigbeeController(gatewayId, dto, user.id, user.role);
   }
 
   @Patch(':gatewayId/zigbee/:id')

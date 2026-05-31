@@ -32,6 +32,10 @@ export interface ZigbeeDevice {
   source: 'zigbee' | 'onboard'
   pairedDeviceId?: string
   openerGroupName?: string
+  /** parent device.id (zigbee multi-channel controller child) */
+  parentDeviceId?: string | null
+  /** child의 z2m payload 키 (switch_1~switch_12) */
+  channelCode?: string | null
 }
 
 export interface ZigbeeScannedDevice {
@@ -74,6 +78,15 @@ export const gatewayEnvApi = {
 
   addZigbee: (gatewayId: string, data: Partial<ZigbeeDevice> & { pairedDeviceId?: string; openerGroupName?: string }) =>
     apiClient.post<ZigbeeDevice>(`/gateway-env/${gatewayId}/zigbee`, data),
+
+  /** 8/12채널 컨트롤러를 관수/유동팬/개폐기로 일괄 등록 */
+  addZigbeeController: (gatewayId: string, data: {
+    ieee: string; friendlyName: string; zigbeeModel: string;
+    channelCount: 8 | 12; mode: 'irrigation' | 'fan' | 'opener';
+  }) =>
+    apiClient.post<{ controller: ZigbeeDevice; children: ZigbeeDevice[] }>(
+      `/gateway-env/${gatewayId}/zigbee-controller`, data,
+    ),
 
   updateZigbee: (gatewayId: string, deviceId: string, data: { name?: string; houseId?: string; channelMapping?: Record<string, string>; deviceSettings?: Record<string, any>; enabled?: boolean }) =>
     apiClient.patch<ZigbeeDevice>(`/gateway-env/${gatewayId}/zigbee/${deviceId}`, data),

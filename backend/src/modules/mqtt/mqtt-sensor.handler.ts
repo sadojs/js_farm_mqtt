@@ -23,6 +23,9 @@ const SENSOR_MAP: Record<string, { field: string; unit: string; isBoolean?: bool
   rain:            { field: 'rain_detection', unit: '', isBoolean: true },
   rain_intensity:  { field: 'rain_intensity', unit: '' },
   illuminance_raw: { field: 'illuminance', unit: 'lux' },
+  // 배터리 잔량 (% — Zigbee 배터리 device 공통)
+  battery:         { field: 'battery', unit: '%' },
+  battery_low:     { field: 'battery_low', unit: '', isBoolean: true },
 };
 
 @Injectable()

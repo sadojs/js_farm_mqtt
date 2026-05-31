@@ -77,10 +77,11 @@ description: 동일 기종 장치 교체 (Hot Swap) — 기존 룰/설정 보존
 | FR-03 | z2m `permit_join` 모드를 자동 활성화하고 새로 페어링된 device 중 호환 조건을 만족하는 항목만 후보로 보여준다 | High | Pending |
 | FR-04 | 교체 전 영향 분석 패널에 보존될 자원 개수를 표시한다 (자동제어룰 N, 채널 매핑 K키, 페어링 0/1, 진행 중 관수 timeline 0/1) | High | Pending |
 | FR-05 | 교체 실행 시 `devices.id`를 유지하며 `zigbee_ieee`, `friendly_name`, `zigbee_model` (필요 시), `last_seen`, `online` 필드만 swap한다 | High | Pending |
-| FR-06 | 페어 개폐기는 open + close 두 device를 한 트랜잭션으로 교체하고 `paired_device_id` 양방향 관계를 유지한다 | High | Pending |
+| FR-06 | 페어 개폐기는 **한쪽만 교체 가능** — 양쪽 동시 강제 없음. `paired_device_id` 양방향 관계는 그대로 보존 | High | Pending |
 | FR-07 | Onboard 장치(예: 게이트웨이 자체 교체)는 `gateway_id` 동일성 가정 하에 `gateway_onboard_devices`의 `slot_key`/`gpio_pin`만 보존하고 새 SD 카드의 device 객체와 재바인딩한다 | Medium | Pending |
 | FR-08 | 교체 후 옛 device(이전 IEEE)는 z2m에서 자동 unpair + activity_logs에 기록 (옛 device를 따로 남기지 않음) | Medium | Pending |
-| FR-09 | 교체 도중 진행 중인 관수 timeline이 있으면 사전에 경고하고, 운영자가 "안전 중단 후 교체"를 명시 confirm해야 진행한다 | High | Pending |
+| FR-09 | 교체 시점에 작동 중인 모든 자원(관수 timeline, 펄스 사이클, 릴레이 ON 상태)은 **사용자 confirm 없이 자동으로 강제 중지** 후 진행한다 — 모든 채널 OFF 상태로 강제. 정책 변경 (이전: 명시 confirm 요구) | High | Pending |
+| FR-13 | 진입 위치는 **환경설정 Zigbee 탭의 device row 액션 영역만** — 구역관리 진입 경로 제거 (오작동 방지) | High | Pending |
 | FR-10 | 실패 시 (페어링 timeout, 호환성 미달, DB 트랜잭션 실패) 원자적 rollback + 상세 에러 메시지 표시 | High | Pending |
 | FR-11 | admin은 farm_admin 소유 device도 교체 가능 (역할별 권한 동일하게 적용) | Medium | Pending |
 | FR-12 | 활동 로그 `device.replace`에 oldIeee, newIeee, deviceId, preservedRules[], preservedMappings 기록 | Medium | Pending |

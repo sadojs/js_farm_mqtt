@@ -136,6 +136,42 @@ export class DevicesController {
     );
   }
 
+  /**
+   * Zigbee 다채널 컨트롤러의 child device channel_code 변경.
+   * body: { channelCode: 'switch_5' } — 다른 child가 쓰는 코드면 409
+   */
+  @Patch(':id/channel-code')
+  updateChannelCode(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { channelCode: string },
+  ) {
+    return this.devicesService.updateChannelCode(
+      id,
+      this.getEffectiveUserId(user),
+      user.role,
+      body.channelCode,
+    );
+  }
+
+  /**
+   * 우적센서 rain-override 비활성화 토글 (오탐 방지).
+   * body: { disabled: true|false }
+   */
+  @Patch(':id/rain-override-disabled')
+  updateRainOverrideDisabled(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { disabled: boolean },
+  ) {
+    return this.devicesService.updateRainOverrideDisabled(
+      id,
+      this.getEffectiveUserId(user),
+      user.role,
+      body.disabled,
+    );
+  }
+
   @Get(':id/dependencies')
   getDependencies(@Param('id') id: string, @CurrentUser() user: any) {
     return this.devicesService.getDependencies(id, this.getEffectiveUserId(user));

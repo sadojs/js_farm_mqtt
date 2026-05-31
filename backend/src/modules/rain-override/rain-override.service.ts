@@ -44,6 +44,13 @@ export class RainOverrideService {
   }
 
   async handleRainSignal(rainDeviceId: string, rainDetected: boolean) {
+    // 우적센서 device-level 비활성화 토글 — deviceSettings.rainOverrideDisabled=true면 무시
+    // (오탐 방지 — 옆집 스프링쿨러 등으로 인한 잘못된 닫힘 방지)
+    const sensorDev = await this.devicesRepo.findOne({ where: { id: rainDeviceId } });
+    if ((sensorDev?.deviceSettings as any)?.rainOverrideDisabled) {
+      this.logger.log(`🚫 우적센서 ${sensorDev?.name ?? rainDeviceId} 비활성화 상태 — 비 감지 이벤트 무시`);
+      return;
+    }
     const mappings = await this.mappingRepo.find({
       where: { deviceId: rainDeviceId, roleKey: 'rain_detection' },
     });

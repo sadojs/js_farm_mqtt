@@ -127,6 +127,12 @@ export interface Device {
   channelMapping?: ChannelMapping | null
   /** 비활성화된 채널 키 목록 (zigbee 관수 — 매핑은 보존하되 동작 대상 제외) */
   disabledChannels?: string[]
+  /** Zigbee 다채널 컨트롤러의 child일 때 parent device.id */
+  parentDeviceId?: string | null
+  /** child의 z2m payload 키 (switch_1~switch_12) */
+  channelCode?: string | null
+  /** 우적센서 rain-override 비활성화 (오탐 방지) */
+  rainOverrideDisabled?: boolean
   sensorData?: SensorData | null
   lastSeen?: string
   createdAt: string

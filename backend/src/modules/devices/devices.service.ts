@@ -1,3 +1,4 @@
+// controller equipment_type support added (zigbee-channel-actuator)
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -53,16 +54,32 @@ export class DevicesService {
   ): Promise<void> {
     if (device.source === 'onboard') {
       await this.publishOnboardRelay(gateway.gatewayId, gateway.id, switchCode, value);
-    } else {
-      if (!device.friendlyName) {
-        throw new BadRequestException(`device ${device.id}: friendlyName 미설정 — z2m 발행 불가`);
-      }
-      // device 모델에 따라 z2m payload 키 변환 (Tuya TS0601 등)
-      const z2mKey = this.translateSwitchKeyForZ2m(switchCode, (device as any).zigbeeModel);
-      await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
-        [z2mKey]: value,
-      });
+      return;
     }
+
+    // zigbee path — child device(parent_device_id 보유)는 parent의 friendlyName + 자기 channel_code 사용
+    let publishFriendlyName = device.friendlyName;
+    let publishKey = switchCode;
+    let publishModel = (device as any).zigbeeModel;
+
+    if ((device as any).parentDeviceId) {
+      const parent = await this.devicesRepo.findOne({ where: { id: (device as any).parentDeviceId } });
+      if (!parent) {
+        throw new BadRequestException(`child device ${device.id}: parent 미발견`);
+      }
+      publishFriendlyName = parent.friendlyName!;
+      publishKey = (device as any).channelCode ?? switchCode;
+      publishModel = (parent as any).zigbeeModel ?? publishModel;
+    }
+
+    if (!publishFriendlyName) {
+      throw new BadRequestException(`device ${device.id}: friendlyName 미설정 — z2m 발행 불가`);
+    }
+
+    const z2mKey = this.translateSwitchKeyForZ2m(publishKey, publishModel);
+    await this.mqttService.controlDevice(gateway.gatewayId, publishFriendlyName, {
+      [z2mKey]: value,
+    });
   }
 
   /** Tuya TS0601 multi-channel은 switch_N 대신 state_lN payload 사용 */
@@ -180,6 +197,7 @@ export class DevicesService {
       switchStates: settings.switchStates ?? null,
       relayActivePhase: settings.relayActivePhase ?? null,
       disabledChannels: Array.isArray(settings.disabledChannels) ? settings.disabledChannels : [],
+      rainOverrideDisabled: !!settings.rainOverrideDisabled,
     };
   }
 
@@ -371,6 +389,58 @@ export class DevicesService {
   }
 
   /**
+   * 우적센서 rain-override 비활성화 토글 — deviceSettings.rainOverrideDisabled 갱신.
+   * 오탐 방지용 (옆집 스프링쿨러 등으로 인한 잘못된 개폐기 닫힘 방지).
+   */
+  async updateRainOverrideDisabled(
+    id: string,
+    userId: string,
+    role: string,
+    disabled: boolean,
+  ): Promise<Device> {
+    const where: any = role === 'admin' ? { id } : { id, userId };
+    const device = await this.devicesRepo.findOne({ where });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    const settings: any = device.deviceSettings || {};
+    settings.rainOverrideDisabled = disabled;
+    device.deviceSettings = settings;
+    return this.exposeSwitchFields(await this.devicesRepo.save(device));
+  }
+
+  /**
+   * Zigbee 다채널 컨트롤러 child의 channel_code 변경.
+   * 다른 child가 이미 사용 중인 코드면 ConflictException.
+   */
+  async updateChannelCode(
+    id: string,
+    userId: string,
+    role: string,
+    newChannelCode: string,
+  ): Promise<Device> {
+    if (role !== 'admin' && role !== 'farm_admin') {
+      throw new ForbiddenException('채널 코드 수정 권한이 없습니다.');
+    }
+    const where: any = role === 'admin' ? { id } : { id, userId };
+    const device = await this.devicesRepo.findOne({ where });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    if (!(device as any).parentDeviceId) {
+      throw new BadRequestException('child device만 channel_code 변경 가능합니다.');
+    }
+    // 같은 parent의 다른 child가 같은 코드 쓰는지 검사
+    const conflict = await this.devicesRepo.findOne({
+      where: {
+        parentDeviceId: (device as any).parentDeviceId,
+        channelCode: newChannelCode,
+      } as any,
+    });
+    if (conflict && conflict.id !== device.id) {
+      throw new ConflictException(`다른 채널이 이미 ${newChannelCode}를 사용 중입니다.`);
+    }
+    (device as any).channelCode = newChannelCode;
+    return this.exposeSwitchFields(await this.devicesRepo.save(device));
+  }
+
+  /**
    * 채널 활성/비활성 토글 — 매핑은 보존, deviceSettings.disabledChannels 목록만 갱신.
    * onboard 패턴과 동일: enabled=false여도 gpio_pin/switch_code 정보는 유지.
    */
@@ -387,8 +457,9 @@ export class DevicesService {
     const where: any = role === 'admin' ? { id } : { id, userId };
     const device = await this.devicesRepo.findOne({ where });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
-    if (device.equipmentType !== 'irrigation') {
-      throw new BadRequestException('관수 장비만 채널 활성화 상태를 설정할 수 있습니다.');
+    // irrigation: zigbee 관수 8/12채널 + controller: 다채널 zigbee 컨트롤러 (fan/opener) 둘 다 허용
+    if (device.equipmentType !== 'irrigation' && device.equipmentType !== 'controller') {
+      throw new BadRequestException('관수 또는 다채널 컨트롤러 장비만 채널 활성화 상태를 설정할 수 있습니다.');
     }
     const settings: any = device.deviceSettings || {};
     const disabled = new Set<string>(Array.isArray(settings.disabledChannels) ? settings.disabledChannels : []);
@@ -539,8 +610,11 @@ export class DevicesService {
               this.logger.log(`개폐기 인터록 (GPIO): ${paired.name} (BCM${pairedSlot.gpioPin}) OFF → 1초 대기`);
             }
           } else if (paired.friendlyName) {
-            await this.mqttService.controlDevice(pairedGw.gatewayId, paired.friendlyName, { state: 'OFF' });
-            this.logger.log(`개폐기 인터록 (Zigbee): ${paired.name} OFF → 1초 대기`);
+            // 통일 path — child device면 parent.friendlyName + channel_code 자동 처리,
+            // TS0601이면 state_lN 자동 변환. (예전엔 직접 'state' 키 사용해서 다채널 컨트롤러에서 무시됨)
+            const switchCode = (paired as any).channelCode ?? 'state';
+            await this.publishDeviceSwitch(paired, pairedGw, switchCode, false);
+            this.logger.log(`개폐기 인터록 (Zigbee): ${paired.name} OFF (key=${switchCode}) → 1초 대기`);
           }
           await new Promise(r => setTimeout(r, 1000));
         }

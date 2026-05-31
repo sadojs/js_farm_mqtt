@@ -43,4 +43,12 @@ export const deviceApi = {
   // 채널 활성/비활성 토글 — 매핑은 보존, deviceSettings.disabledChannels만 갱신
   updateChannelEnabled: (id: string, key: string, enabled: boolean) =>
     apiClient.patch(`/devices/${id}/channel-enabled`, { key, enabled }),
+
+  // Zigbee 다채널 컨트롤러 child의 channel_code 변경
+  updateChannelCode: (id: string, channelCode: string) =>
+    apiClient.patch(`/devices/${id}/channel-code`, { channelCode }),
+
+  // 우적센서 rain-override 비활성화 토글 (오탐 방지)
+  updateRainOverrideDisabled: (id: string, disabled: boolean) =>
+    apiClient.patch(`/devices/${id}/rain-override-disabled`, { disabled }),
 }

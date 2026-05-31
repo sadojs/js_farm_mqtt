@@ -2,7 +2,8 @@ import {
   ConflictException, ForbiddenException, Injectable, Logger, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
+import { DEFAULT_CHANNEL_MAPPING_8CH_ZIGBEE, DEFAULT_CHANNEL_MAPPING_12CH } from '../devices/channel-mapping.constants';
 import { GatewayOnboardDevice, SlotType } from './entities/gateway-onboard-device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { Device } from '../devices/entities/device.entity';
@@ -85,7 +86,127 @@ export class GatewayEnvService {
     private readonly deviceRepo: Repository<Device>,
     private readonly mqttService: MqttService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Zigbee 8/12채널 컨트롤러 등록 — parent + N children 일괄 생성 (트랜잭션).
+   * mode='irrigation': 단일 zigbee 관수 device (기존 흐름)
+   * mode='fan':        N개 유동팬 child (각 channel = 1 fan)
+   * mode='opener':     N/2 페어 개폐기 child (인접 채널 1+2, 3+4, ...)
+   */
+  async createZigbeeController(
+    gatewayId: string,
+    dto: {
+      ieee: string;
+      friendlyName: string;
+      zigbeeModel: string;
+      channelCount: 8 | 12;
+      mode: 'irrigation' | 'fan' | 'opener';
+    },
+    userId: string,
+    role: string,
+  ): Promise<{ controller: Device; children: Device[] }> {
+    const gw = await this.assertGatewayOwner(gatewayId, userId, role);
+
+    // 중복 IEEE 검사 (root에서만, 같은 게이트웨이 내)
+    const dup = await this.deviceRepo.findOne({
+      where: { gatewayId, zigbeeIeee: dto.ieee, parentDeviceId: IsNull() } as any,
+    });
+    if (dup) throw new ConflictException(`이미 등록된 컨트롤러: ${dto.ieee}`);
+
+    const gwName = (gw.name && gw.name.trim()) || gw.gatewayId;
+
+    return this.dataSource.transaction(async (mgr) => {
+      // irrigation 모드 — 기존 단일 zigbee 관수 device
+      if (dto.mode === 'irrigation') {
+        const defaultMapping = dto.channelCount === 12
+          ? DEFAULT_CHANNEL_MAPPING_12CH
+          : DEFAULT_CHANNEL_MAPPING_8CH_ZIGBEE;
+        const dev = await mgr.save(mgr.create(Device, {
+          userId: gw.userId, gatewayId, houseId: gw.houseId ?? undefined,
+          name: `${gwName}_관수`,
+          category: 'irrigation', deviceType: 'actuator',
+          equipmentType: 'irrigation', source: 'zigbee',
+          zigbeeIeee: dto.ieee, friendlyName: dto.friendlyName,
+          zigbeeModel: dto.zigbeeModel,
+          channelMapping: { ...defaultMapping },
+        } as Partial<Device>));
+        return { controller: dev, children: [] };
+      }
+
+      // parent (controller) — 자동제어 타겟 아님
+      const parent = await mgr.save(mgr.create(Device, {
+        userId: gw.userId, gatewayId, houseId: gw.houseId ?? undefined,
+        name: dto.mode === 'fan' ? `${gwName}_유동팬컨트롤러` : `${gwName}_개폐기컨트롤러`,
+        category: dto.mode === 'fan' ? 'fan' : 'opener',
+        deviceType: 'actuator',
+        equipmentType: 'controller',
+        source: 'zigbee',
+        zigbeeIeee: dto.ieee,
+        friendlyName: dto.friendlyName,
+        zigbeeModel: dto.zigbeeModel,
+      } as Partial<Device>));
+
+      const children: Device[] = [];
+
+      if (dto.mode === 'fan') {
+        // N개 유동팬 child — 각 채널 = 1 fan
+        for (let i = 1; i <= dto.channelCount; i++) {
+          const child = await mgr.save(mgr.create(Device, {
+            userId: gw.userId, gatewayId, houseId: gw.houseId ?? undefined,
+            parentDeviceId: parent.id,
+            name: `${gwName}_유동팬${i}`,
+            category: 'fan', deviceType: 'actuator',
+            equipmentType: 'fan', source: 'zigbee',
+            zigbeeIeee: dto.ieee,         // parent와 동일 IEEE (인덱스는 root에만 unique)
+            friendlyName: dto.friendlyName,
+            zigbeeModel: dto.zigbeeModel,
+            channelCode: `switch_${i}`,
+          } as Partial<Device>));
+          children.push(child);
+        }
+      } else {
+        // 개폐기 페어 — 인접 채널 (1+2, 3+4, ...)
+        const pairCount = dto.channelCount / 2;
+        for (let p = 1; p <= pairCount; p++) {
+          const openCh = p * 2 - 1;
+          const closeCh = p * 2;
+          const groupName = `${gwName}_개폐기${p}`;
+          const openDev = await mgr.save(mgr.create(Device, {
+            userId: gw.userId, gatewayId, houseId: gw.houseId ?? undefined,
+            parentDeviceId: parent.id,
+            name: `${groupName} 열림`,
+            openerGroupName: groupName,
+            category: 'opener', deviceType: 'actuator',
+            equipmentType: 'opener_open', source: 'zigbee',
+            zigbeeIeee: dto.ieee, friendlyName: dto.friendlyName,
+            zigbeeModel: dto.zigbeeModel,
+            channelCode: `switch_${openCh}`,
+          } as Partial<Device>));
+          const closeDev = await mgr.save(mgr.create(Device, {
+            userId: gw.userId, gatewayId, houseId: gw.houseId ?? undefined,
+            parentDeviceId: parent.id,
+            name: `${groupName} 닫힘`,
+            openerGroupName: groupName,
+            category: 'opener', deviceType: 'actuator',
+            equipmentType: 'opener_close', source: 'zigbee',
+            zigbeeIeee: dto.ieee, friendlyName: dto.friendlyName,
+            zigbeeModel: dto.zigbeeModel,
+            channelCode: `switch_${closeCh}`,
+          } as Partial<Device>));
+          // 페어 양방향
+          openDev.pairedDeviceId = closeDev.id;
+          closeDev.pairedDeviceId = openDev.id;
+          await mgr.save([openDev, closeDev]);
+          children.push(openDev, closeDev);
+        }
+      }
+
+      this.logger.log(`Zigbee 컨트롤러 등록: ${parent.name} (mode=${dto.mode}, ${children.length} children)`);
+      return { controller: parent, children };
+    });
+  }
 
   /**
    * rpi-fallback-channel-sync: onboard device 변경 시 fallback-config가 자동 sync 하도록 emit.

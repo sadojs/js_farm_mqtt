@@ -243,6 +243,8 @@ export class IrrigationSchedulerService {
             conditionsMet: {
               type: 'irrigation',
               startTime: conditions.startTime,
+              startedAt: new Date(active.startedAt).toISOString(),  // 실제 시작 timestamp
+              endedAt: new Date().toISOString(),                     // 실제 종료 timestamp
               deviceName: device.name,
               groupName: await this.fetchGroupName(rule.groupId),
               enabledZones: conditions.zones.filter((z: any) => z.enabled && mapping[ZONE_FUNCTION_KEY[z.zone]]).length,
