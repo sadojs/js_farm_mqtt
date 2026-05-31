@@ -80,8 +80,11 @@
             <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
             <!-- 개폐기 타이머 -->
             <button v-if="dev.equipmentType === 'opener_open'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'opener')" title="타이머 설정">⏱</button>
-            <!-- admin 전용 테스트 -->
-            <button v-if="authStore.isAdmin && dev.channelMapping && Object.keys(dev.channelMapping).length > 0" class="btn-test btn-sm" @click.stop="openZigbeePinTest(dev)">🔌 테스트</button>
+            <!-- 단일 채널 지그비 액추에이터 (fan, opener_open, opener_close): inline ON/OFF 테스트 -->
+            <template v-if="authStore.isAdmin && isSingleChannelZigbeeActuator(dev)">
+              <button class="relay-btn on btn-sm" @click.stop="testSingleZigbee(dev, true)" title="테스트 ON">ON</button>
+              <button class="relay-btn off btn-sm" @click.stop="testSingleZigbee(dev, false)" title="테스트 OFF">OFF</button>
+            </template>
             <label class="toggle">
               <input type="checkbox" :checked="dev.enabled !== false" @change="toggleZigbee(dev)" />
               <span class="toggle-slider"></span>
@@ -565,12 +568,6 @@ function openOnboardPinTest() {
   showPinTest.value = true
 }
 
-function openZigbeePinTest(dev: ZigbeeDevice) {
-  pinTestMode.value = 'zigbee'
-  pinTestDevice.value = dev
-  showPinTest.value = true
-}
-
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const activeTab = ref<'onboard' | 'zigbee'>('onboard')
@@ -669,6 +666,25 @@ async function controllerTestChild(_parent: ZigbeeDevice, child: ZigbeeDevice, s
     await deviceApi.control(child.id, [{ code: child.channelCode ?? 'state', value: state }])
   } catch (e: any) {
     notif.error('테스트 실패', `${child.name} ${state ? 'ON' : 'OFF'} 실패`)
+  }
+}
+
+// 단일 채널 지그비 액추에이터 판정 — 멀티채널(irrigation/controller)과 children 제외
+function isSingleChannelZigbeeActuator(dev: ZigbeeDevice): boolean {
+  if (dev.deviceType !== 'actuator') return false
+  if (dev.parentDeviceId) return false  // child는 별도 UI 통해 테스트
+  return dev.equipmentType === 'fan'
+    || dev.equipmentType === 'opener_open'
+    || dev.equipmentType === 'opener_close'
+}
+
+// 단일 채널 지그비 액추에이터 테스트 — 개폐기 페어 인터록은 backend에서 자동 처리
+async function testSingleZigbee(dev: ZigbeeDevice, state: boolean) {
+  try {
+    await deviceApi.control(dev.id, [{ code: 'switch_1', value: state }])
+    notif.success(state ? 'ON 명령' : 'OFF 명령', dev.name)
+  } catch (e: any) {
+    notif.error('테스트 실패', `${dev.name} ${state ? 'ON' : 'OFF'} 실패`)
   }
 }
 
