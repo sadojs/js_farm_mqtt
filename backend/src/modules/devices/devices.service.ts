@@ -84,9 +84,33 @@ export class DevicesService {
     }
 
     const z2mKey = this.translateSwitchKeyForZ2m(publishKey, publishModel);
+    // z2m payload format: TS0601 등 z2m converter는 {state_l1: "ON"|"OFF"} 문자열 기대.
+    // boolean true/false는 일부 모델에서만 동작하고 TS0601 multi-channel은 무시됨.
+    // (예전 path가 ON/OFF로 동작하던 zigbeeTestChannel과 통일)
     await this.mqttService.controlDevice(gateway.gatewayId, publishFriendlyName, {
-      [z2mKey]: value,
+      [z2mKey]: value ? 'ON' : 'OFF',
     });
+  }
+
+  /**
+   * z2m payload 정규화 — TS0601 등 다채널 컨트롤러를 위한 키/값 변환.
+   * - {switch_1: true} → {state_l1: "ON"}  (TS0601)
+   * - {switch_1: true} → {state: "ON"}     (단일 채널 처리, buildMqttCommand가 이미 변환)
+   * - boolean true/false → "ON"/"OFF" 문자열
+   */
+  private normalizeForZ2m(payload: any, zigbeeModel?: string | null): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(payload || {})) {
+      // 키 변환 (switch_N → state_lN for TS0601)
+      const newKey = this.translateSwitchKeyForZ2m(k, zigbeeModel);
+      // 값 변환 (boolean → "ON"/"OFF" 문자열)
+      if (typeof v === 'boolean') {
+        out[newKey] = v ? 'ON' : 'OFF';
+      } else {
+        out[newKey] = v;
+      }
+    }
+    return out;
   }
 
   /** Tuya TS0601 multi-channel은 switch_N 대신 state_lN payload 사용 */
@@ -715,7 +739,9 @@ export class DevicesService {
 
     // MQTT 커맨드 변환 (Tuya 형식 → Zigbee2MQTT 형식)
     const mqttCommand = this.buildMqttCommand(commands);
-    await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommand);
+    // TS0601 multi-channel은 switch_N → state_lN 으로 키 변환 + "ON"/"OFF" 문자열 강제
+    const mqttCommandForZ2m = this.normalizeForZ2m(mqttCommand, device.zigbeeModel);
+    await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommandForZ2m);
 
     // Zigbee 장치 상태 낙관적(optimistic) 기록 — verify가 통과되도록
     // (z2m 응답이 ms 단위로 약간 늦어 verify(1초 후)가 false negative 발생하던 문제 해결)
