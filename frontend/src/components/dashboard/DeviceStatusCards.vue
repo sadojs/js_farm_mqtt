@@ -182,9 +182,15 @@ function getBatteryClass(pct: number | null): string {
 }
 
 function isRainSensor(device: Device): boolean {
+  // 1) 센서 데이터에 rain_* 필드 (실제 비 감지 reading이 있었을 때)
   const data = device.sensorData as any
-  if (!data) return false
-  return 'rain_detection' in data || 'rain_intensity' in data
+  if (data && ('rain_detection' in data || 'rain_intensity' in data || 'rainfall' in data)) return true
+  // 2) 모델/이름 기반 — TS0207 solar rain sensor 등 (아직 reading 없어도 토글은 보여야 함)
+  const model = (device.zigbeeModel || '').toLowerCase()
+  if (model.includes('ts0207') || model.includes('rain')) return true
+  const name = (device.name || '').toLowerCase()
+  if (name.includes('우적') || name.includes('rain')) return true
+  return false
 }
 
 async function toggleRainOverride(device: Device) {

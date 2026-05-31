@@ -731,6 +731,27 @@ export class GatewayEnvService {
     if (device.pairedDeviceId) {
       await this.deviceRepo.update(device.pairedDeviceId, { pairedDeviceId: null as any, openerGroupName: null as any });
     }
+
+    // Controller(parent) 삭제 시 자식들도 명시적 cascade
+    // FK ON DELETE CASCADE가 있지만 환경에 따라 누락된 케이스 대비 (방어적 코드)
+    if (device.equipmentType === 'controller') {
+      await this.deviceRepo.delete({ parentDeviceId: device.id } as any);
+      this.logger.log(`Controller ${device.name} 삭제 — children 일괄 정리`);
+    }
+
+    // child 삭제 시 parent와 다른 형제 child도 함께 (controller는 일체로 동작하므로)
+    if ((device as any).parentDeviceId) {
+      const parentId = (device as any).parentDeviceId;
+      // parent 조회
+      const parent = await this.deviceRepo.findOne({ where: { id: parentId } });
+      if (parent) {
+        // parent 삭제 → cascade로 나머지 children도 삭제됨
+        await this.deviceRepo.remove(parent);
+        this.logger.log(`Child ${device.name} 삭제 요청 → parent + 형제 children 일체 삭제 (controller 단위)`);
+        return;
+      }
+    }
+
     await this.deviceRepo.remove(device);
   }
 

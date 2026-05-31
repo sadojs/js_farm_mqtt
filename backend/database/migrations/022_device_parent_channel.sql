@@ -7,6 +7,24 @@ ALTER TABLE devices
   ADD COLUMN IF NOT EXISTS parent_device_id uuid REFERENCES devices(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS channel_code varchar(32);
 
+-- 1b. ADD COLUMN IF NOT EXISTS는 컬럼이 이미 있으면 REFERENCES 절을 무시한다.
+-- FK가 누락된 환경을 위해 별도로 보장.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'devices'::regclass
+      AND conname = 'fk_devices_parent_device_id'
+  ) THEN
+    EXECUTE 'ALTER TABLE devices ADD CONSTRAINT fk_devices_parent_device_id FOREIGN KEY (parent_device_id) REFERENCES devices(id) ON DELETE CASCADE';
+  END IF;
+END $$;
+
+-- 1c. 기존 orphan child 정리 (FK가 없던 상태에서 parent만 삭제된 케이스)
+DELETE FROM devices
+WHERE parent_device_id IS NOT NULL
+  AND parent_device_id NOT IN (SELECT id FROM devices);
+
 -- 2. parent 빠른 조회용 인덱스
 CREATE INDEX IF NOT EXISTS idx_devices_parent_device_id ON devices(parent_device_id);
 

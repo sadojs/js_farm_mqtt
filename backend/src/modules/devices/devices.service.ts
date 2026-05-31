@@ -494,6 +494,64 @@ export class DevicesService {
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     if (!device.friendlyName) throw new BadRequestException('장비의 friendly_name이 설정되지 않았습니다.');
 
+    // ── child device (다채널 컨트롤러의 채널) 경로 ──
+    // parent.friendlyName + channel_code (TS0601이면 state_lN 자동 변환)
+    // controlDevice의 buildMqttCommand는 switch_N → state ON/OFF만 변환하므로
+    // 다채널 컨트롤러는 publishDeviceSwitch path를 사용해야 동작
+    if ((device as any).parentDeviceId) {
+      const gateway = device.gatewayId
+        ? await this.gatewayRepo.findOne({ where: { id: device.gatewayId } })
+        : null;
+      if (!gateway) throw new NotFoundException('장비에 연결된 게이트웨이를 찾을 수 없습니다.');
+
+      // 개폐기 페어 인터록 (child opener의 경우도)
+      const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+      const isOnCmd = commands.some(c => (c.value === true || c.value === 'ON' || c.value === 1));
+      if (isOpener && isOnCmd && device.pairedDeviceId) {
+        const paired = await this.devicesRepo.findOne({ where: { id: device.pairedDeviceId } });
+        if (paired) {
+          const pairedGw = paired.gatewayId
+            ? await this.gatewayRepo.findOne({ where: { id: paired.gatewayId } })
+            : gateway;
+          if (pairedGw && paired.friendlyName) {
+            const switchCode = (paired as any).channelCode ?? 'state';
+            await this.publishDeviceSwitch(paired, pairedGw, switchCode, false);
+            this.logger.log(`개폐기 인터록 (child): ${paired.name} OFF (key=${switchCode}) → 1초 대기`);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+      }
+
+      // 자기 channel_code로 publish (publishDeviceSwitch 내부에서 parent.friendlyName + state_lN 변환)
+      const switchCode = (device as any).channelCode || commands[0]?.code || 'state';
+      const value = commands[0]?.value === true || commands[0]?.value === 'ON' || commands[0]?.value === 1;
+      await this.publishDeviceSwitch(device, gateway, switchCode, value);
+
+      // 낙관적 상태 기록 (parent의 switchStates에)
+      try {
+        const parent = await this.devicesRepo.findOne({ where: { id: (device as any).parentDeviceId } });
+        if (parent) {
+          const psettings = (parent.deviceSettings || {}) as any;
+          const pStates = { ...(psettings.switchStates || {}) };
+          pStates[switchCode] = value;
+          psettings.switchStates = pStates;
+          psettings.lastCommandAt = new Date().toISOString();
+          parent.deviceSettings = psettings;
+          await this.devicesRepo.save(parent).catch(() => undefined);
+        }
+        // child 자신도 기록
+        const csettings = (device.deviceSettings || {}) as any;
+        csettings.switchState = value;
+        csettings.lastCommandAt = new Date().toISOString();
+        device.deviceSettings = csettings;
+        await this.devicesRepo.save(device).catch(() => undefined);
+      } catch (e: any) {
+        this.logger.warn(`child switchState 기록 실패: ${e?.message ?? e}`);
+      }
+
+      return { success: true, deviceId: device.id, command: { [switchCode]: value }, deviceName: device.name, equipmentType: device.equipmentType };
+    }
+
     // 사용자(명시되지 않은 callerSource) 호출일 때, 비 도중이면 자동 닫힘 suppress
     // 단 개폐기 장치(opener_*)에 한해
     if (!callerSource &&
