@@ -732,6 +732,22 @@ export class GatewayEnvService {
       await this.deviceRepo.update(device.pairedDeviceId, { pairedDeviceId: null as any, openerGroupName: null as any });
     }
 
+    // ── z2m 페어링 해제 — backend가 z2m bridge/request/device/remove 발행 ──
+    // controller(parent) 삭제 시 1번만 발행 (children은 같은 IEEE 공유)
+    // 페어 개폐기 삭제 시 양쪽 모두 z2m에서 해제
+    const ieesToUnpair: { ieee: string; pairedIeee?: string | null }[] = [];
+    if (device.zigbeeIeee) {
+      const item: { ieee: string; pairedIeee?: string | null } = { ieee: device.zigbeeIeee };
+      // 페어 개폐기 — 페어 IEEE도 함께 unpair
+      if (device.pairedDeviceId) {
+        const paired = await this.deviceRepo.findOne({ where: { id: device.pairedDeviceId } });
+        if (paired?.zigbeeIeee && paired.zigbeeIeee !== device.zigbeeIeee) {
+          item.pairedIeee = paired.zigbeeIeee;
+        }
+      }
+      ieesToUnpair.push(item);
+    }
+
     // Controller(parent) 삭제 시 자식들도 명시적 cascade
     // FK ON DELETE CASCADE가 있지만 환경에 따라 누락된 케이스 대비 (방어적 코드)
     if (device.equipmentType === 'controller') {
@@ -748,11 +764,38 @@ export class GatewayEnvService {
         // parent 삭제 → cascade로 나머지 children도 삭제됨
         await this.deviceRepo.remove(parent);
         this.logger.log(`Child ${device.name} 삭제 요청 → parent + 형제 children 일체 삭제 (controller 단위)`);
+        await this.unpairFromZigbee2Mqtt(gw.gatewayId, ieesToUnpair);
         return;
       }
     }
 
     await this.deviceRepo.remove(device);
+    await this.unpairFromZigbee2Mqtt(gw.gatewayId, ieesToUnpair);
+  }
+
+  /**
+   * z2m bridge/request/device/remove publish (best-effort).
+   * DB 삭제는 이미 완료된 상태이므로 z2m 측 실패해도 backend 흐름은 영향 없음.
+   * z2m에서 정리 실패 시 사용자가 z2m UI에서 수동 정리 가능.
+   */
+  private async unpairFromZigbee2Mqtt(
+    gatewayId: string,
+    items: { ieee: string; pairedIeee?: string | null }[],
+  ): Promise<void> {
+    for (const it of items) {
+      try {
+        await this.mqttService.removeZigbeeDevice(gatewayId, it.ieee);
+      } catch (e: any) {
+        this.logger.warn(`z2m unpair 실패 ${gatewayId}/${it.ieee}: ${e?.message ?? e}`);
+      }
+      if (it.pairedIeee) {
+        try {
+          await this.mqttService.removeZigbeeDevice(gatewayId, it.pairedIeee);
+        } catch (e: any) {
+          this.logger.warn(`z2m unpair (paired) 실패 ${gatewayId}/${it.pairedIeee}: ${e?.message ?? e}`);
+        }
+      }
+    }
   }
 
   // ── Zigbee: 스캔 목록 (bridge/devices 캐시) + 다채널 컨트롤러 채널 수 감지 ──

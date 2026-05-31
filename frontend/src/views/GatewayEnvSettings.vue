@@ -1217,7 +1217,12 @@ async function runScan() {
   scannedDevices.value = []
   addForm.value = {}
   addFormName.value = {}
-  // Pre-populate with already-registered IEEE addresses so they're excluded from scan results
+  // 1) DB에서 최신 zigbee device 목록 reload — 외부(z2m UI)에서 직접 삭제했거나
+  //    backend cleanup이 발생한 경우 frontend cache가 stale일 수 있음 → 항상 새로고침
+  try {
+    await loadAllDevices()
+  } catch { /* 무시하고 계속 — 스캔이라도 시도 */ }
+  // 2) Pre-populate with already-registered IEEE addresses so they're excluded from scan results
   addedIeees.value = new Set(zigbeeDevices.value.map(d => d.zigbeeIeee).filter(Boolean) as string[])
   try {
     const res = await gatewayEnvApi.scanZigbee(gatewayId)
