@@ -386,7 +386,10 @@
 
             <!-- 자동 감지 안내 배지 -->
             <div v-if="isMultiChannelDevice(sd)" class="detected-banner">
-              🎛 <strong>{{ detectControllerChannelCount(sd) }}채널 컨트롤러</strong>로 감지되었습니다 — 관수/유동팬/개폐기 페어 중 선택하세요
+              🎛 <strong>다채널 컨트롤러</strong>로 감지되었습니다 — 관수/유동팬/개폐기 페어 중 선택하세요
+              <span v-if="z2mReportedDescription(sd)" class="detected-hint-inline">
+                (z2m 보고: {{ z2mReportedDescription(sd) }} — 실제 채널 수가 다를 수 있으니 아래에서 확인)
+              </span>
             </div>
 
             <!-- 1단계: 측정기 / 장치 / 컨트롤러 선택 -->
@@ -934,6 +937,13 @@ function isMultiChannelDevice(sd: ZigbeeScannedDevice): boolean {
   if (sd.detectedChannelCount === 8 || sd.detectedChannelCount === 12) return true
   const m = sd.model_id || ''
   return /_switch_(8|12)/i.test(m) || /switch_(8|12)$/i.test(m)
+}
+
+// z2m이 보고한 'N gang switch' / 'N channel' 설명 추출 (실제 채널 수 불확실 경고용)
+function z2mReportedDescription(sd: ZigbeeScannedDevice): string | null {
+  const desc = sd.definition?.description || ''
+  const m = desc.match(/(\d+)\s*(gang|channel|ch\b)/i)
+  return m ? `${m[1]}${m[2]}` : null
 }
 
 function detectControllerChannelCount(sd: ZigbeeScannedDevice): 8 | 12 {
@@ -1635,6 +1645,13 @@ onMounted(loadAllDevices)
   border: 1px solid rgba(59,130,246,.35);
   border-radius: 6px;
   padding: 6px 10px;
+}
+.detected-hint-inline {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 3px;
+  font-weight: normal;
 }
 .dtype-btn-secondary {
   background: var(--bg-card);

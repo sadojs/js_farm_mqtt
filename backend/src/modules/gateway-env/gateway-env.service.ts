@@ -747,53 +747,57 @@ export class GatewayEnvService {
   }
 
   /**
-   * z2m bridge/devices exposes에서 state_lN 패턴으로 채널 수 감지.
-   * - TS0601_switch_8/12 등 모델명 명시 우선
-   * - 모델명에 정보 없으면 exposes에서 state_l1, state_l2, ... 카운트
-   * - 단일 채널이면 null 반환
+   * z2m bridge/devices에서 다채널 컨트롤러 여부 + 권장 채널 수 감지.
+   *
+   * 우선순위 (위에서 확실, 아래로 갈수록 추정):
+   *   1. model_id에 `_switch_N` 명시 (TS0601_switch_8 등) — 그 값 그대로 사용
+   *   2. exposes에 state_l1만 존재 → 단일 채널 (1)
+   *   3. 다채널 evidence(2개 이상 state_lN endpoint) 있음:
+   *        - z2m의 generic TS0601 정의가 'N gang switch' 인 경우 그 값을 그대로 믿기 어렵다.
+   *          (실물은 8채널인데 description=12 gang switch 등 케이스 흔함)
+   *        - 따라서 **8을 기본 권장값**으로 반환하고 사용자가 모달에서 8/12 직접 선택하도록 한다.
+   *   4. 단일 채널이거나 정보 부족 → null
+   *
+   * 반환값은 frontend의 detectedChannelCount로 그대로 전달되며,
+   * 모달의 채널 수 토글이 이 값을 default로 사용한다 (사용자 override 가능).
    */
   private detectChannelCountFromExposes(d: any): 1 | 8 | 12 | null {
     if (!d) return null;
     const modelId: string = d.model_id || d.definition?.model || '';
-    // 1순위: 모델명에 채널 수 명시
+
+    // 1. model_id에 명시적 `_switch_N` — 가장 확실
     const modelMatch = modelId.toLowerCase().match(/_?switch_(\d+)/);
     if (modelMatch) {
       const n = Number(modelMatch[1]);
       if (n >= 12) return 12;
       if (n >= 2) return 8;
+      if (n === 1) return 1;
     }
-    // 2순위: exposes 에서 state_lN 개수 (property 우선, name 보조, endpoint 보조)
+
+    // 2. exposes의 실제 state_l* endpoint 카운트
     const exposes: any[] = d.definition?.exposes ?? [];
     const stateKeys = new Set<string>();
     const collect = (e: any) => {
       if (!e) return;
-      // property가 'state_l3' 같은 형태일 수 있고 (TS0601 multi-channel)
-      // name이 'state_l3' 인 경우도 있고 (다른 vendor)
       const propMatch = String(e.property || '').match(/^state_l(\d+)$/);
       if (propMatch) stateKeys.add(`l${propMatch[1]}`);
       const nameMatch = String(e.name || '').match(/^state_l(\d+)$/);
       if (nameMatch) stateKeys.add(`l${nameMatch[1]}`);
-      // endpoint 정보 ('l1', 'l2', ...) + name='state'
-      if (e.endpoint && /^l\d+$/.test(e.endpoint) && (e.name === 'state' || e.property?.startsWith('state'))) {
+      if (e.endpoint && /^l\d+$/.test(e.endpoint) && (e.name === 'state' || e.property?.startsWith('state') || e.type === 'switch')) {
         stateKeys.add(e.endpoint);
       }
       if (Array.isArray(e.features)) e.features.forEach(collect);
       if (Array.isArray(e.exposes)) e.exposes.forEach(collect);
     };
     exposes.forEach(collect);
-    // 3순위: definition.description에 'N gang' 또는 'N channel'
-    const desc: string = d.definition?.description ?? '';
-    const descMatch = desc.match(/(\d+)\s*(gang|channel|ch\b)/i);
-    if (stateKeys.size === 0 && descMatch) {
-      const n = Number(descMatch[1]);
-      if (n >= 12) return 12;
-      if (n >= 2) return 8;
-      if (n === 1) return 1;
-    }
-    if (stateKeys.size >= 12) return 12;
-    if (stateKeys.size >= 2) return 8;
+
+    if (stateKeys.size === 0) return null;
     if (stateKeys.size === 1) return 1;
-    return null;
+
+    // 3. 다채널 evidence는 있지만 model_id에 채널 수 미명시.
+    //    z2m generic 정의(특히 TS0601)는 실물보다 많은 채널을 보고하는 경우가 많아
+    //    기본을 8로 권장 (8채널이 더 흔함). 사용자가 모달에서 12로 변경 가능.
+    return 8;
   }
 
   // ── 통합 조회 (온보드 + 지그비 + 관주 대표 장치) ────────────
