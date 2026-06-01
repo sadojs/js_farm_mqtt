@@ -37,10 +37,10 @@
       <button @click="resetLayout()" class="btn-reset">기본값으로 초기화</button>
     </div>
 
-    <!-- 위젯 동적 렌더링 -->
-    <template v-for="widget in visibleWidgets" :key="widget.id">
+    <!-- Hero row: 날씨 + 요약 카드 side-by-side (둘 다 visible일 때) -->
+    <div v-if="weatherVisible || summaryVisible" class="hero-row">
       <!-- 날씨 위젯 -->
-      <div v-if="widget.type === 'weather'" class="weather-card">
+      <div v-if="weatherVisible" class="weather-card hero-weather">
         <div class="weather-top">
           <div class="weather-left">
             <div class="weather-icon-big">{{ weatherIcon }}</div>
@@ -73,11 +73,16 @@
         </div>
       </div>
 
-      <!-- 요약 카드 위젯 -->
-      <SummaryCards v-else-if="widget.type === 'summary'" />
+      <!-- 요약 카드 (활성 구역 + 자동 제어) — 날씨 오른쪽에 stacked -->
+      <div v-if="summaryVisible" class="hero-summary">
+        <SummaryCards />
+      </div>
+    </div>
 
+    <!-- 나머지 위젯 동적 렌더링 (weather + summary 제외) -->
+    <template v-for="widget in nonHeroVisibleWidgets" :key="widget.id">
       <!-- 장치 상태 정보 위젯 -->
-      <DeviceStatusCards v-else-if="widget.type === 'device-status'" />
+      <DeviceStatusCards v-if="widget.type === 'device-status'" />
 
       <!-- 관수 실행 이력 위젯 -->
       <IrrigationHistoryWidget v-else-if="widget.type === 'irrigation-history'" />
@@ -101,6 +106,13 @@ import { useCropFeature } from '../modules/crop-management/composables/useCropFe
 const { feature: cropFeature } = useCropFeature()
 
 const { isEditMode, layout, visibleWidgets, toggleWidget, moveWidget, enterEditMode, exitEditMode, resetLayout } = useDashboardLayout()
+
+// Hero row: 날씨 + 요약 카드 (활성 구역, 자동 제어) — 첨부 디자인대로 side-by-side 레이아웃
+const weatherVisible = computed(() => visibleWidgets.value.some(w => w.id === 'weather'))
+const summaryVisible = computed(() => visibleWidgets.value.some(w => w.id === 'summary'))
+const nonHeroVisibleWidgets = computed(() =>
+  visibleWidgets.value.filter(w => w.id !== 'weather' && w.id !== 'summary')
+)
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -288,6 +300,18 @@ onMounted(() => {
 }
 .btn-reset:hover { background: var(--bg-hover); }
 
+/* Hero row: 날씨(좌, 2/3) + 요약(우, 1/3) */
+.hero-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+.hero-weather { margin-bottom: 0 !important; height: 100%; }
+.hero-summary { display: flex; }
+.hero-summary > * { width: 100%; }
+
 /* 날씨 카드 */
 .weather-card {
   background: linear-gradient(135deg, #5B9BE6 0%, #4A7FD4 50%, #3B6BC2 100%);
@@ -296,6 +320,8 @@ onMounted(() => {
   color: white;
   margin-bottom: 20px;
   box-shadow: 0 4px 16px rgba(74, 144, 217, 0.25);
+  display: flex;
+  flex-direction: column;
 }
 
 .weather-top {
@@ -384,11 +410,22 @@ onMounted(() => {
 @media (max-width: 768px) {
   .page-container { padding: 12px; }
   .page-header { margin-bottom: 12px; }
-  .weather-card { padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; }
+  /* 모바일: 날씨 + 요약 세로 스택 */
+  .hero-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .weather-card { padding: 12px 14px; margin-bottom: 0; border-radius: 12px; }
   .weather-top { margin-bottom: 8px; }
   .weather-details-grid { gap: 6px; }
   .weather-detail-item { padding: 8px 10px; gap: 2px; }
   .weather-temp-big { font-size: 32px; }
   .detail-value { font-size: 16px; }
+}
+
+/* 태블릿 — 너무 좁아지면 hero도 stack */
+@media (max-width: 900px) and (min-width: 769px) {
+  .hero-row { grid-template-columns: 1fr; }
 }
 </style>
