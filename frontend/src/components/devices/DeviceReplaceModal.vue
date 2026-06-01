@@ -94,9 +94,22 @@ async function runScan() {
 function isCompatible(c: ZigbeeScannedDevice): boolean {
   if (!preview.value) return false
   const { requireModel, requireChannelCount } = preview.value.compatibility
-  // model 엄격 일치 (case-insensitive)
-  if (requireModel && c.model_id && requireModel.toLowerCase() !== c.model_id.toLowerCase()) return false
-  // controller 채널 수 일치
+  // model 일치 (느슨한 패밀리 매칭)
+  // - 정확 일치: TS0601_switch_8 === TS0601_switch_8
+  // - 패밀리 일치: TS0601_switch_8 ↔ TS0601 (z2m generic 정의에서 채널 정보 누락 케이스 허용)
+  // - 패밀리 일치: TS0601_switch_8 ↔ TS0601_switch_12 도 같은 base이지만 채널 수 다르므로 별도 검증
+  if (requireModel && c.model_id) {
+    const a = requireModel.toLowerCase()
+    const b = c.model_id.toLowerCase()
+    if (a !== b) {
+      // base family 추출 (TS0601_switch_N → TS0601)
+      const baseA = a.replace(/_switch_\d+$/, '')
+      const baseB = b.replace(/_switch_\d+$/, '')
+      if (baseA !== baseB) return false
+    }
+  }
+  // 채널 수 일치 — irrigation/controller 둘 다 적용
+  // 옛 device가 8채널이면 새 device도 8채널이어야 채널매핑이 그대로 보존됨
   if (requireChannelCount && c.detectedChannelCount && c.detectedChannelCount !== requireChannelCount) return false
   return true
 }
