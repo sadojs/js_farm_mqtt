@@ -136,6 +136,12 @@
               <!-- 개폐기 그룹 카드 -->
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName" class="sub-card actuator">
                 <div class="sub-card-top">
+                  <EquipmentIcon
+                    type="opener"
+                    :active="(og.openDevice.online || og.closeDevice.online) && (og.openDevice.switchState === true || og.closeDevice.switchState === true)"
+                    :size="16"
+                    title="개폐기"
+                  />
                   <span :class="['status-dot', og.openDevice.online || og.closeDevice.online ? 'online' : 'offline']"></span>
                   <template v-if="renamingOpenerGroup === og.groupName">
                     <input
@@ -178,6 +184,12 @@
               <!-- 관수 장치 카드 -->
               <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
+                  <EquipmentIcon
+                    type="irrigation"
+                    :active="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true"
+                    :size="16"
+                    title="관주"
+                  />
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
                   <template v-if="renamingDeviceId === device.id">
                     <input
@@ -221,6 +233,12 @@
               <!-- 일반 장치 카드 -->
               <div v-for="device in getGroupActuators(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
+                  <EquipmentIcon
+                    :type="device.equipmentType"
+                    :active="device.online && device.switchState === true"
+                    :size="16"
+                    :title="device.equipmentType ?? ''"
+                  />
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
                   <template v-if="renamingDeviceId === device.id">
                     <input
@@ -373,6 +391,7 @@ import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
 import RemoveDeviceModal from '@/components/groups/RemoveDeviceModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'

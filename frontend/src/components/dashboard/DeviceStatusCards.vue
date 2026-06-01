@@ -21,7 +21,12 @@
             class="detail-item"
           >
             <div class="item-left">
-              <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
+              <EquipmentIcon
+                :type="device.equipmentType"
+                :active="isActuatorActive(device)"
+                :size="16"
+                :title="device.equipmentType ?? ''"
+              />
               <div class="item-info">
                 <span class="item-name">{{ device.name }}</span>
                 <span class="item-location">{{ getDeviceLocation(device) }}</span>
@@ -124,6 +129,7 @@ import { useGroupStore } from '../../stores/group.store'
 import { useAutomationStore } from '../../stores/automation.store'
 import type { Device } from '../../types/device.types'
 import { deviceApi } from '../../api/device.api'
+import EquipmentIcon from '../common/EquipmentIcon.vue'
 
 const deviceStore = useDeviceStore()
 const groupStore = useGroupStore()
@@ -136,6 +142,16 @@ function getIrrigationScheduleStatus(device: Device) {
     count: status?.enabledRuleCount ?? 0,
     running: status?.isRunning ?? false,
   }
+}
+
+// EquipmentIcon active 판정 — 기존 가동 판정 로직 그대로 사용
+// 관수는 진행 중 timeline 또는 switchState, 그 외는 device.online && device.switchState
+function isActuatorActive(device: Device): boolean {
+  if (!device.online) return false
+  if (device.equipmentType === 'irrigation') {
+    return getIrrigationScheduleStatus(device).running
+  }
+  return !!device.switchState
 }
 
 const DISPLAY_FIELDS = ['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point']

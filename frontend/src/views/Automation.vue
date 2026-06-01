@@ -3,9 +3,16 @@
     <header class="page-header">
       <div>
         <h2>자동 제어 설정</h2>
-        <p class="page-description">측정값에 따라 장치를 자동으로 제어합니다</p>
+        <p class="page-description">측정값·시간·날씨에 따라 장치를 자동으로 제어합니다</p>
       </div>
-      <button v-if="mainTab === 'rules'" class="btn-primary" @click="openWizard()">+ 설정 추가</button>
+      <div class="page-header-right">
+        <span v-if="mainTab === 'rules' && rules.length > 0" class="active-summary"
+          :title="`총 ${rules.length}개 중 ${activeRuleCount}개 켜짐`">
+          <span class="active-summary-dot"></span>
+          <strong>{{ activeRuleCount }}</strong> / {{ rules.length }} 켜짐
+        </span>
+        <button v-if="mainTab === 'rules'" class="btn-primary" @click="openWizard()">+ 설정 추가</button>
+      </div>
     </header>
 
     <!-- 메인 탭: 규칙 목록 | 실행 로그 -->
@@ -17,11 +24,11 @@
     <!-- 규칙 목록 탭 -->
     <template v-if="mainTab === 'rules'">
     <div class="automation-tabs">
-      <button class="tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">전체 ({{ rules.length }})</button>
-      <button v-if="SHOW_OPENER_TAB" class="tab" :class="{ active: activeTab === 'opener' }" @click="activeTab = 'opener'">개폐기 ({{ openerRules.length }})</button>
-      <button class="tab" :class="{ active: activeTab === 'fan' }" @click="activeTab = 'fan'">환풍기 ({{ fanRules.length }})</button>
-      <button class="tab" :class="{ active: activeTab === 'irrigation' }" @click="activeTab = 'irrigation'">관주 ({{ irrigationRules.length }})</button>
-      <button class="tab" :class="{ active: activeTab === 'other' }" @click="activeTab = 'other'">기타 ({{ otherRules.length }})</button>
+      <button class="tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">전체 <span class="tab-count">{{ rules.length }}</span></button>
+      <button v-if="SHOW_OPENER_TAB" class="tab" :class="{ active: activeTab === 'opener' }" @click="activeTab = 'opener'">개폐기 <span class="tab-count">{{ openerRules.length }}</span></button>
+      <button class="tab" :class="{ active: activeTab === 'fan' }" @click="activeTab = 'fan'">환풍기 <span class="tab-count">{{ fanRules.length }}</span></button>
+      <button class="tab" :class="{ active: activeTab === 'irrigation' }" @click="activeTab = 'irrigation'">관주 <span class="tab-count">{{ irrigationRules.length }}</span></button>
+      <button class="tab" :class="{ active: activeTab === 'other' }" @click="activeTab = 'other'">기타 <span class="tab-count">{{ otherRules.length }}</span></button>
     </div>
 
     <!-- 로딩 -->
@@ -37,69 +44,65 @@
       :action-fn="() => openWizard()"
     />
 
-    <!-- 설정 목록 -->
-    <div v-else class="rules-grid">
-      <div
-        v-for="rule in filteredRules"
-        :key="rule.id"
-        class="rule-card"
-        @click="openWizard(rule)"
-      >
-        <!-- 카드 헤더 -->
-        <div class="rule-header">
-          <h3 class="rule-name">{{ rule.name }}</h3>
-          <div class="rule-header-right">
-            <span :class="['active-badge', rule.enabled ? 'enabled' : 'disabled']">
-              {{ rule.enabled ? '활성' : '비활성' }}
-            </span>
-            <button class="btn-icon-sm" @click.stop="handleDelete(rule)" aria-label="삭제">🗑</button>
+    <!-- 구역별 그룹 + 컴팩트 행 리스트 -->
+    <div v-else class="rule-groups">
+      <section v-for="grp in rulesGroupedByZone" :key="grp.key" class="zone-section">
+        <header class="zone-header">
+          <span class="zone-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9.5L12 3l9 6.5V21H3z" />
+              <path d="M9 21V12h6v9" />
+            </svg>
+          </span>
+          <span class="zone-name">{{ grp.label }}</span>
+          <span class="zone-meta">규칙 {{ grp.rules.length }}개 · {{ grp.activeCount }} 켜짐</span>
+        </header>
+        <div class="zone-card">
+          <div
+            v-for="rule in grp.rules"
+            :key="rule.id"
+            class="rule-row"
+            :class="{ 'is-off': !rule.enabled }"
+            :title="targetLabel(rule)"
+            @click="openWizard(rule)"
+          >
+            <!-- 좌측: 장치 타입 아이콘 -->
+            <EquipmentIcon
+              :type="detectRuleKind(rule)"
+              :active="rule.enabled"
+              :size="20"
+              :title="ruleTypeLabel(rule)"
+            />
+
+            <!-- 본문: 규칙명 + 보조 + 조건 + 동작 -->
+            <div class="rule-row-main">
+              <div class="rule-row-title">
+                <span class="rule-row-name">{{ rule.name }}</span>
+                <span class="rule-row-sub">{{ ruleTypeLabel(rule) }}<span v-if="houseSubLabel(rule)"> · {{ houseSubLabel(rule) }}</span></span>
+              </div>
+              <div class="rule-row-cond">
+                <span class="cond-badge" :class="`cond-badge-${conditionKind(rule)}`">{{ conditionKindLabel(rule) }}</span>
+                <span class="cond-text">{{ conditionText(rule) }}</span>
+                <span class="cond-arrow" aria-hidden="true">→</span>
+                <span class="action-text">{{ actionText(rule) }}</span>
+              </div>
+            </div>
+
+            <!-- 우측: 토글 + 케밥 -->
+            <label class="toggle-switch" @click.stop>
+              <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
+              <span class="toggle-slider"></span>
+            </label>
+            <button class="btn-kebab" @click.stop="handleDelete(rule)" :aria-label="`${rule.name} 삭제`" title="삭제">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="12" cy="19" r="1.6" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        <!-- 대상 -->
-        <div class="rule-target">
-          <span class="target-text">{{ targetLabel(rule) }}</span>
-          <span class="rule-type-badge">{{ ruleTypeLabel(rule) }}</span>
-        </div>
-
-        <!-- 관주 설정: 일정 정보 -->
-        <template v-if="isIrrigationConditions(rule.conditions)">
-          <div class="rule-body irrigation-body">
-            <div class="irrigation-schedule-row">
-              <span class="section-title">일정</span>
-              <span class="section-content">{{ formatIrrigationSchedule(rule.conditions) }}</span>
-            </div>
-            <div class="irrigation-schedule-row">
-              <span class="section-title">구역</span>
-              <span class="section-content">{{ formatIrrigationZones(rule.conditions) }}</span>
-            </div>
-          </div>
-        </template>
-
-        <!-- 일반 설정: 조건만 표시 -->
-        <template v-else>
-          <div class="rule-body">
-            <div class="rule-section condition">
-              <span class="section-title">조건</span>
-              <span class="section-content">{{ formatConditionGroup(rule.conditions) }}</span>
-            </div>
-          </div>
-        </template>
-
-        <!-- 장치 목록 -->
-        <div v-if="getRuleDeviceNames(rule).length > 0" class="rule-devices">
-          <span class="device-label">대상 장치:</span>
-          <span class="device-names">{{ getRuleDeviceNames(rule).join(', ') }}</span>
-        </div>
-
-        <!-- 카드 하단 -->
-        <div class="rule-footer">
-          <label class="toggle-switch" @click.stop>
-            <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
+      </section>
     </div>
 
     </template>
@@ -139,6 +142,7 @@ import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
 import IntentWizardModal from '../components/automation/v2/IntentWizardModal.vue'
 import EmptyState from '../components/common/EmptyState.vue'
+import EquipmentIcon from '../components/common/EquipmentIcon.vue'
 // AutomationLogTimeline → 작업 내역 페이지로 이전됨
 
 const automationStore = useAutomationStore()
@@ -284,6 +288,91 @@ function onRuleSaved() {
   // store에서 이미 fetchRules를 호출하므로 별도 처리 불필요
 }
 
+// ── D2 디자인 보조 (UI 표시 전용 — 데이터/판정 로직 변경 없음) ──
+
+// 헤더 우측: N/M 켜짐 요약
+const activeRuleCount = computed(() => rules.value.filter(r => r.enabled).length)
+
+// 조건 타입(시간/날씨/복합/관주) — 뱃지 표시용
+function conditionKind(rule: AutomationRule): 'time' | 'weather' | 'hybrid' | 'irrigation' {
+  if (isIrrigationConditions(rule.conditions)) return 'irrigation'
+  return rule.ruleType as any
+}
+const CONDITION_KIND_LABELS: Record<string, string> = {
+  time: '시간',
+  weather: '날씨',
+  hybrid: '복합',
+  irrigation: '관주 일정',
+}
+function conditionKindLabel(rule: AutomationRule): string {
+  return CONDITION_KIND_LABELS[conditionKind(rule)] || ''
+}
+
+// 조건 텍스트 (행 표시용 — 기존 formatConditionGroup 그대로)
+function conditionText(rule: AutomationRule): string {
+  if (isIrrigationConditions(rule.conditions)) return formatIrrigationSchedule(rule.conditions)
+  return formatConditionGroup(rule.conditions)
+}
+
+// 동작 텍스트 (관주: 구역 / 일반: 장치 + 액션 요약)
+function actionText(rule: AutomationRule): string {
+  if (isIrrigationConditions(rule.conditions)) {
+    return formatIrrigationZones(rule.conditions)
+  }
+  const names = getRuleDeviceNames(rule)
+  if (names.length === 0) return '대상 장치 없음'
+  const actions = rule.actions as any
+  // 액션 command 가 있으면 함께 표시
+  let suffix = ''
+  if (actions?.command) {
+    const cmd = String(actions.command).toLowerCase()
+    if (cmd === 'on' || cmd === 'open') suffix = ' ON'
+    else if (cmd === 'off' || cmd === 'close') suffix = ' OFF'
+  }
+  return `${names.join(', ')}${suffix}`
+}
+
+// 하우스 보조 라벨 (구역 전체이면 빈 문자열)
+function houseSubLabel(rule: AutomationRule): string {
+  const group = groupStore.groups.find(g => g.id === rule.groupId)
+  if (!group || !rule.houseId) return ''
+  const house = (group.houses || []).find(h => h.id === rule.houseId)
+  return house?.name ?? ''
+}
+
+// 구역별 그룹화 (필터링된 규칙을 groupId로 묶음)
+interface ZoneGroup {
+  key: string
+  label: string
+  rules: AutomationRule[]
+  activeCount: number
+}
+const rulesGroupedByZone = computed<ZoneGroup[]>(() => {
+  const buckets = new Map<string, ZoneGroup>()
+  // groupStore 순서를 유지하기 위해 사전 등록
+  for (const g of groupStore.groups) {
+    buckets.set(g.id, { key: g.id, label: g.name, rules: [], activeCount: 0 })
+  }
+  const unassignedKey = '__unassigned__'
+  buckets.set(unassignedKey, { key: unassignedKey, label: '미지정', rules: [], activeCount: 0 })
+
+  for (const r of filteredRules.value) {
+    const key = r.groupId && buckets.has(r.groupId) ? r.groupId : unassignedKey
+    const b = buckets.get(key)!
+    b.rules.push(r)
+    if (r.enabled) b.activeCount += 1
+  }
+  // 비어있는 그룹 제외 + 미지정은 맨 뒤
+  const arr: ZoneGroup[] = []
+  for (const [k, v] of buckets) {
+    if (k === unassignedKey) continue
+    if (v.rules.length > 0) arr.push(v)
+  }
+  const unassigned = buckets.get(unassignedKey)!
+  if (unassigned.rules.length > 0) arr.push(unassigned)
+  return arr
+})
+
 onMounted(async () => {
   await Promise.all([
     automationStore.fetchRules(),
@@ -397,187 +486,197 @@ onMounted(async () => {
 }
 .empty-state .btn-primary { margin-top: 16px; }
 
-.rules-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 16px;
+/* 헤더 우측 영역 */
+.page-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.active-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(14px * var(--content-scale, 1));
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.active-summary strong { color: var(--text-primary); font-weight: 700; }
+.active-summary-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,.15);
 }
 
-.rule-card {
+/* 카테고리 탭 카운트 (괄호 대신 칩) */
+.tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--bg-hover);
+  font-size: calc(12px * var(--content-scale, 1));
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.tab.active .tab-count { background: var(--accent-bg); color: var(--accent); }
+
+/* ── D2: 구역별 그룹 + 컴팩트 행 ── */
+.rule-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.zone-section { display: flex; flex-direction: column; gap: 10px; }
+
+.zone-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+.zone-icon {
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--accent);
+}
+.zone-icon svg { width: 18px; height: 18px; stroke-linecap: round; stroke-linejoin: round; }
+.zone-name {
+  font-size: calc(16px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.zone-meta {
+  font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.zone-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: 14px;
-  padding: 20px;
   box-shadow: var(--shadow-card);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.rule-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-card-hover, 0 4px 16px rgba(0, 0, 0, 0.12));
+  overflow: hidden;
 }
 
-.rule-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.rule-name {
-  font-size: calc(20px * var(--content-scale, 1));
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.rule-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.active-badge {
-  padding: 4px 12px;
-  border-radius: 6px;
-  font-size: calc(14px * var(--content-scale, 1));
-  font-weight: 600;
-}
-.active-badge.enabled { background: var(--accent-bg); color: var(--accent); }
-.active-badge.disabled { background: var(--bg-hover); color: var(--text-muted); }
-
-.btn-icon-sm {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: calc(14px * var(--content-scale, 1));
-  transition: background 0.2s;
-}
-.btn-icon-sm:hover { background: var(--danger-bg); }
-
-.rule-target {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.target-text {
-  font-size: calc(15px * var(--content-scale, 1));
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.rule-type-badge {
-  padding: 3px 10px;
-  background: var(--bg-badge);
-  border-radius: 6px;
-  font-size: calc(13px * var(--content-scale, 1));
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-/* 조건/동작 2단 */
-.rule-body {
+.rule-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.12s;
 }
+.rule-row:last-child { border-bottom: none; }
+.rule-row:hover { background: var(--bg-hover); }
+.rule-row.is-off { opacity: 0.72; }
 
-.rule-section {
-  padding: 12px;
-  border-radius: 10px;
-}
+.rule-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
-.rule-section.condition {
-  background: var(--bg-condition);
-}
-
-.rule-section.action {
-  background: var(--bg-action);
-}
-
-.section-title {
-  display: block;
-  font-size: calc(13px * var(--content-scale, 1));
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  text-transform: uppercase;
-}
-
-.section-content {
+.rule-row-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rule-row-name {
   font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 600;
   color: var(--text-primary);
+}
+.rule-row-sub {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+}
+
+.rule-row-cond {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-secondary);
   line-height: 1.5;
 }
+.cond-text { color: var(--text-secondary); }
+.cond-arrow { color: var(--text-muted); font-weight: 700; }
+.action-text { color: var(--text-primary); font-weight: 500; }
 
-.irrigation-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
+/* 조건 타입 뱃지 — 4색 (인라인 상수) */
+.cond-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
+.cond-badge-time      { background: rgba(21,101,192,.10);  color: #1565c0; }
+.cond-badge-weather   { background: rgba(2,119,189,.10);   color: #0277bd; }
+.cond-badge-hybrid    { background: rgba(106,27,154,.10);  color: #6a1b9a; }
+.cond-badge-irrigation{ background: rgba(0,131,143,.10);   color: #00838f; }
 
-.irrigation-schedule-row {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-condition);
-}
-
-.rule-devices {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  font-size: calc(15px * var(--content-scale, 1));
-}
-.device-label { color: var(--text-muted); font-weight: 500; }
-.device-names { color: var(--text-secondary); }
-
-.rule-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-light);
-}
-
-/* 토글 */
+/* 토글 — 기존 디자인 유지 */
 .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 48px;
-  height: 26px;
+  width: 44px;
+  height: 24px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
   position: absolute; cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--toggle-off); border-radius: 26px;
+  background: var(--toggle-off); border-radius: 24px;
   transition: background 0.3s;
 }
 .toggle-slider:before {
   content: ''; position: absolute;
-  height: 20px; width: 20px;
+  height: 18px; width: 18px;
   left: 3px; bottom: 3px;
   background: white; border-radius: 50%;
   transition: transform 0.3s;
 }
 input:checked + .toggle-slider { background: var(--toggle-on); }
-input:checked + .toggle-slider:before { transform: translateX(22px); }
+input:checked + .toggle-slider:before { transform: translateX(20px); }
 
+/* 케밥 (삭제) */
+.btn-kebab {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.btn-kebab:hover { background: var(--danger-bg, rgba(239,68,68,.1)); color: var(--danger, #dc2626); }
+
+/* ── 모바일 (≤768px) — 동일 패턴, 행 세로 풀기 ── */
 @media (max-width: 768px) {
   .page-container { padding: 16px; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
-  .rules-grid { grid-template-columns: 1fr; }
-  .rule-body { grid-template-columns: 1fr; }
+  .page-description { font-size: calc(13px * var(--content-scale, 1)); }
+  .btn-primary { padding: 10px 16px; font-size: calc(14px * var(--content-scale, 1)); }
+
+  .rule-groups { gap: 18px; }
+
+  /* 컴팩트 행: 좌측 아이콘 + 본문 + 우측(토글/케밥) 가로 / 본문 내부는 세로 풀기 */
+  .rule-row {
+    grid-template-columns: auto 1fr auto auto;
+    gap: 10px;
+    padding: 13px 14px;
+    min-height: 44px;  /* 터치 타깃 */
+  }
+  .rule-row-name { font-size: calc(14px * var(--content-scale, 1)); }
+  .rule-row-cond {
+    gap: 6px;
+    font-size: calc(12px * var(--content-scale, 1));
+  }
+  .cond-arrow { display: inline; }
+  .toggle-switch { width: 48px; height: 26px; }
+  .toggle-slider:before { height: 20px; width: 20px; left: 3px; bottom: 3px; }
+  input:checked + .toggle-slider:before { transform: translateX(22px); }
 }
 </style>
