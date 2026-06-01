@@ -87,15 +87,25 @@
                 <strong>{{ getBattery(device.sensorData) }}%</strong>
               </span>
               <!-- 우적센서: rain-override 비활성화 토글 (오탐 방지) -->
-              <label
+              <button
                 v-if="isRainSensor(device)"
-                class="sensor-chip rain-toggle"
-                :class="{ active: !(device as any).rainOverrideDisabled }"
-                @click.prevent="toggleRainOverride(device)"
-                :title="(device as any).rainOverrideDisabled ? '비 감지 우회 비활성 — 클릭하여 활성화' : '비 감지 우회 활성 — 클릭하여 비활성화 (오탐 방지)'"
+                type="button"
+                class="rain-toggle-btn"
+                :class="{ 'is-on': !(device as any).rainOverrideDisabled, 'is-off': (device as any).rainOverrideDisabled }"
+                @click.stop="toggleRainOverride(device)"
+                :title="(device as any).rainOverrideDisabled
+                  ? '비 감지 시 자동 개폐기 닫기가 꺼져 있습니다. 클릭하여 다시 켜기'
+                  : '비 감지 시 자동으로 개폐기를 닫습니다. 오탐 방지를 위해 끄려면 클릭'"
               >
-                {{ (device as any).rainOverrideDisabled ? '🌂 무시' : '☔ 감지' }}
-              </label>
+                <span class="rain-toggle-icon">{{ (device as any).rainOverrideDisabled ? '🌂' : '☔' }}</span>
+                <span class="rain-toggle-text">
+                  <span class="rain-toggle-label">비 감지 자동 제어</span>
+                  <span class="rain-toggle-state">{{ (device as any).rainOverrideDisabled ? '꺼짐' : '켜짐' }}</span>
+                </span>
+                <span class="rain-toggle-switch" aria-hidden="true">
+                  <span class="rain-toggle-knob"></span>
+                </span>
+              </button>
             </div>
             <span v-else :class="['item-status', device.online ? 'running' : 'stopped']">
               {{ device.online ? '대기' : '오프라인' }}
@@ -408,17 +418,59 @@ onMounted(async () => {
 .sensor-chip.battery.battery-mid { background: rgba(245,158,11,.12); color: #d97706; }
 .sensor-chip.battery.battery-low { background: rgba(239,68,68,.12); color: #dc2626; font-weight: 700; }
 
-.sensor-chip.rain-toggle {
+/* 우적센서 자동제어 토글 — 명확한 ON/OFF 버튼 (대시보드용) */
+.rain-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
   cursor: pointer;
-  background: rgba(156,163,175,.18);
-  color: #6b7280;
-  font-weight: 600;
+  font-size: calc(12px * var(--content-scale, 1));
   user-select: none;
+  transition: all 0.15s;
+  background: var(--bg-card, #fff);
 }
-.sensor-chip.rain-toggle.active {
-  background: rgba(37,99,235,.12);
-  color: #2563eb;
+.rain-toggle-btn.is-on {
+  background: rgba(37,99,235,.08);
+  border-color: rgba(37,99,235,.35);
+  color: #1e40af;
 }
+.rain-toggle-btn.is-on:hover { background: rgba(37,99,235,.14); }
+.rain-toggle-btn.is-off {
+  background: rgba(156,163,175,.12);
+  border-color: rgba(156,163,175,.35);
+  color: #6b7280;
+}
+.rain-toggle-btn.is-off:hover { background: rgba(156,163,175,.2); }
+
+.rain-toggle-icon { font-size: 18px; line-height: 1; }
+.rain-toggle-text { display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.rain-toggle-label { font-size: calc(11px * var(--content-scale, 1)); opacity: 0.8; font-weight: 500; }
+.rain-toggle-state { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; }
+
+/* iOS-like 슬라이드 스위치 인디케이터 */
+.rain-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px; height: 18px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.rain-toggle-knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.rain-toggle-btn.is-on .rain-toggle-switch { background: #3b82f6; }
+.rain-toggle-btn.is-on .rain-toggle-knob { transform: translateX(16px); }
 
 @media (max-width: 768px) {
   .device-status-wrapper { margin-bottom: 16px; }
@@ -428,5 +480,11 @@ onMounted(async () => {
   .detail-icon { width: 34px; height: 34px; }
   .detail-icon svg { width: 17px; height: 17px; }
   .detail-list { max-height: 240px; }
+  /* 우적 토글: 모바일에서도 한눈에 보이도록 약간 작게 + 더 명확하게 */
+  .rain-toggle-btn { padding: 5px 9px 5px 7px; gap: 7px; }
+  .rain-toggle-icon { font-size: 16px; }
+  .rain-toggle-switch { width: 30px; height: 16px; }
+  .rain-toggle-knob { width: 12px; height: 12px; }
+  .rain-toggle-btn.is-on .rain-toggle-knob { transform: translateX(14px); }
 }
 </style>
