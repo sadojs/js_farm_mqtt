@@ -51,4 +51,56 @@ export const deviceApi = {
   // 우적센서 rain-override 비활성화 토글 (오탐 방지)
   updateRainOverrideDisabled: (id: string, disabled: boolean) =>
     apiClient.patch(`/devices/${id}/rain-override-disabled`, { disabled }),
+
+  // ── device-replacement (Hot Swap) ───────────────────────────────
+  /** 교체 전 영향 분석: 보존될 룰/매핑/페어/children 카운트 + 호환 조건 */
+  replacePreview: (id: string) =>
+    apiClient.get<{
+      device: {
+        id: string
+        name: string
+        equipmentType: string | null
+        zigbeeModel: string | null
+        zigbeeIeee: string | null
+        friendlyName: string | null
+        source: string | null
+        parentDeviceId: string | null
+        houseId: string | null
+      }
+      impact: {
+        rulesCount: number
+        ruleNames: string[]
+        mappingKeys: number
+        pairedDeviceId: string | null
+        pairedDeviceName: string | null
+        childrenCount: number
+        hasRunningTimeline: boolean
+      }
+      compatibility: {
+        requireModel: string | null
+        requireEquipmentType: string | null
+        requireChannelCount: 8 | 12 | null
+        requirePair: boolean
+        requireChildrenCount: number | null
+      }
+    }>(`/devices/${id}/replace-preview`),
+
+  /** 실제 교체 실행: devices.id 유지하고 IEEE/friendly_name swap */
+  replace: (id: string, data: {
+    newIeee: string
+    newFriendlyName: string
+    newZigbeeModel?: string
+    pairedNewIeee?: string
+    pairedNewFriendlyName?: string
+    forceStopRunningTimeline?: boolean
+  }) =>
+    apiClient.post<{
+      success: boolean
+      noop?: boolean
+      deviceId: string
+      oldIeee: string
+      newIeee: string
+      pairedDeviceId: string | null
+      preserved: { rules: number; mappingKeys: number; childrenCount: number }
+    }>(`/devices/${id}/replace`, data),
 }

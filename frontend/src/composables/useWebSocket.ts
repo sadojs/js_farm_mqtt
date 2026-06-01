@@ -147,6 +147,25 @@ export function useWebSocket() {
       }
     })
 
+    // device-replacement: 장치 교체 완료 — device store 새로고침 + 알림
+    socket.on('device:replaced', (data: {
+      deviceId: string
+      oldIeee: string
+      newIeee: string
+      preservedRules: number
+      pairedDeviceId?: string | null
+      childrenIds?: string[]
+    }) => {
+      const deviceStore = useDeviceStore()
+      // 영향 받은 device들 재로드
+      deviceStore.fetchDevices().catch(() => undefined)
+      const notificationStore = useNotificationStore()
+      notificationStore.info(
+        '장치 교체 완료',
+        `자동제어룰 ${data.preservedRules}개가 보존되었습니다.`,
+      )
+    })
+
     // 자동화 실행 알림
     socket.on('automation:executed', (data) => {
       const notificationStore = useNotificationStore()

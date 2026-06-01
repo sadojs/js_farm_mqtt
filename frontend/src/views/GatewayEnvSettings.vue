@@ -85,6 +85,11 @@
               <button class="relay-btn on btn-sm" @click.stop="testSingleZigbee(dev, true)" title="테스트 ON">ON</button>
               <button class="relay-btn off btn-sm" @click.stop="testSingleZigbee(dev, false)" title="테스트 OFF">OFF</button>
             </template>
+            <!-- device-replacement: 🔄 교체 버튼 (FR-13: 환경설정 Zigbee 탭의 device row에만 노출) -->
+            <button v-if="authStore.isAdmin && canReplace(dev)" class="btn-replace btn-sm"
+              @click.stop="openReplaceModal(dev)" title="동일 기종 새 장치로 교체 (기존 룰/매핑 보존)">
+              🔄 교체
+            </button>
             <label class="toggle">
               <input type="checkbox" :checked="dev.enabled !== false" @change="toggleZigbee(dev)" />
               <span class="toggle-slider"></span>
@@ -182,7 +187,7 @@
             </div>
           </div>
 
-          <!-- 개폐기 페어: 1쌍 = open+close, 페어 대표 이름 ✏만 -->
+          <!-- 개폐기 페어: 1쌍 = open+close, 페어 대표 이름 ✏ 편집 -->
           <div v-else-if="controllerModeOf(dev) === 'opener'" class="channel-grid">
             <div v-for="(pair, pi) in controllerOpenerPairs(dev)" :key="pair.groupName" class="opener-pair-block"
               :class="{ 'ch-inactive': isPairDisabled(dev, pair) }">
@@ -190,13 +195,14 @@
                 <div class="ch-num" :style="{ background: '#0ea5e922', borderColor: '#0ea5e955', color: '#0ea5e9' }">{{ pi + 1 }}</div>
                 <template v-if="editingPairGroup === pair.groupName">
                   <input v-model="editPairName" class="ch-name-input"
-                    @keyup.enter="savePairName(pair)" @keyup.escape="cancelPairEdit()" @click.stop />
-                  <button class="btn-icon btn-save" @click.stop="savePairName(pair)">✓</button>
-                  <button class="btn-icon" @click.stop="cancelPairEdit()">✕</button>
+                    @keyup.enter="savePairName(pair)" @keyup.escape="cancelPairEdit()" @click.stop
+                    placeholder="예: 옥수수밭, 천창A 등" autofocus />
+                  <button class="btn-icon btn-save" @click.stop="savePairName(pair)" title="저장">✓</button>
+                  <button class="btn-icon" @click.stop="cancelPairEdit()" title="취소">✕</button>
                 </template>
                 <template v-else>
-                  <span class="ch-name pair-name">{{ pair.groupName }}</span>
-                  <button class="btn-icon" @click.stop="startPairEdit(pair)" title="페어 이름 변경">✏</button>
+                  <span class="ch-name pair-name" @click.stop="startPairEdit(pair)" title="클릭하여 이름 변경">{{ pair.groupName }}</span>
+                  <button class="btn-icon btn-edit-prominent" @click.stop="startPairEdit(pair)" title="페어 이름 변경">✏ 이름</button>
                 </template>
                 <label class="toggle toggle-sm" style="margin-left:auto;">
                   <input type="checkbox" :checked="!isPairDisabled(dev, pair)"
@@ -245,6 +251,15 @@
       :mode="pinTestMode"
       :zigbee-device="pinTestDevice"
       @close="showPinTest = false"
+    />
+
+    <!-- ── device-replacement: 교체 모달 (admin only) ── -->
+    <DeviceReplaceModal
+      :visible="showReplaceModal"
+      :device-id="replaceTargetId"
+      :gateway-uuid="gatewayId"
+      @close="closeReplaceModal"
+      @replaced="onDeviceReplaced"
     />
 
     <!-- ── RPi 3B GPIO 배치도 모달 ── -->
@@ -500,6 +515,7 @@ import { detectChannelCount, AVAILABLE_SWITCH_CODES_8CH, AVAILABLE_SWITCH_CODES_
 import { deviceApi } from '@/api/device.api'
 import GpioRelayManager from '@/components/gateway/GpioRelayManager.vue'
 import PinTestModal from '@/components/gateway/PinTestModal.vue'
+import DeviceReplaceModal from '@/components/devices/DeviceReplaceModal.vue'
 
 const route = useRoute()
 const notif = useNotificationStore()
@@ -686,6 +702,31 @@ async function testSingleZigbee(dev: ZigbeeDevice, state: boolean) {
   } catch (e: any) {
     notif.error('테스트 실패', `${dev.name} ${state ? 'ON' : 'OFF'} 실패`)
   }
+}
+
+// ── device-replacement: 교체 진입점 (FR-13 환경설정 Zigbee 탭에서만) ──
+const showReplaceModal = ref(false)
+const replaceTargetId = ref<string | null>(null)
+
+function canReplace(dev: ZigbeeDevice): boolean {
+  // zigbee actuator + sensor 모두 교체 가능, child는 parent를 통해서만 교체
+  if (dev.parentDeviceId) return false
+  return true
+}
+
+function openReplaceModal(dev: ZigbeeDevice) {
+  replaceTargetId.value = dev.id
+  showReplaceModal.value = true
+}
+
+function closeReplaceModal() {
+  showReplaceModal.value = false
+  replaceTargetId.value = null
+}
+
+async function onDeviceReplaced(_payload: { deviceId: string; oldIeee: string; newIeee: string }) {
+  // 교체 완료 후 device 목록 재로드 (새 IEEE 반영)
+  await loadAllDevices()
 }
 
 async function toggleChildEnabled(parent: ZigbeeDevice, child: ZigbeeDevice) {
@@ -1412,7 +1453,42 @@ onMounted(loadAllDevices)
   color: var(--text-secondary, #6b7280);
   min-width: 32px;
 }
-.pair-name { font-weight: 600; color: var(--text-primary, #111); }
+.pair-name {
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.pair-name:hover {
+  background: rgba(59,130,246,.1);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+.btn-replace {
+  background: rgba(139,92,246,.1);
+  border: 1px solid rgba(139,92,246,.4);
+  color: #7c3aed;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  font-weight: 600;
+}
+.btn-replace:hover { background: rgba(139,92,246,.2); }
+.btn-edit-prominent {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  border: 1px solid var(--border-color, #d1d5db) !important;
+  border-radius: 4px !important;
+  background: var(--bg-card, #fff) !important;
+  color: var(--text-secondary, #6b7280) !important;
+  cursor: pointer;
+}
+.btn-edit-prominent:hover {
+  background: rgba(59,130,246,.1) !important;
+  color: #2563eb !important;
+  border-color: #3b82f6 !important;
+}
 .ch-name-input {
   border: 1px solid #3b82f6;
   border-radius: 4px;
