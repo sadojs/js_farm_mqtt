@@ -207,6 +207,7 @@ export class DevicesController {
       newIeee: body.newIeee,
       newFriendlyName: body.newFriendlyName,
       newZigbeeModel: body.newZigbeeModel,
+      newChannelCount: body.newChannelCount,
       pairedNewIeee: body.pairedNewIeee,
       pairedNewFriendlyName: body.pairedNewFriendlyName,
       forceStopRunningTimeline: body.forceStopRunningTimeline,

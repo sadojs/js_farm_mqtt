@@ -108,9 +108,10 @@ function isCompatible(c: ZigbeeScannedDevice): boolean {
       if (baseA !== baseB) return false
     }
   }
-  // 채널 수 일치 — irrigation/controller 둘 다 적용
-  // 옛 device가 8채널이면 새 device도 8채널이어야 채널매핑이 그대로 보존됨
-  if (requireChannelCount && c.detectedChannelCount && c.detectedChannelCount !== requireChannelCount) return false
+  // 채널 수 — 새 device가 옛 device 이상이어야 (채널 증설 케이스 허용)
+  // 8ch → 8ch ✓, 8ch → 12ch ✓ (8채널 부분 그대로 사용, 9~12 추가 활용 가능)
+  // 8ch → 4ch ✗ (기존 매핑 불가)
+  if (requireChannelCount && c.detectedChannelCount && c.detectedChannelCount < requireChannelCount) return false
   return true
 }
 
@@ -140,6 +141,7 @@ async function executeReplace() {
       newIeee: selectedCandidate.value.ieee_address,
       newFriendlyName: selectedCandidate.value.friendly_name,
       newZigbeeModel: selectedCandidate.value.model_id,
+      newChannelCount: selectedCandidate.value.detectedChannelCount ?? undefined,
       pairedNewIeee: selectedPairedCandidate.value?.ieee_address,
       pairedNewFriendlyName: selectedPairedCandidate.value?.friendly_name,
       forceStopRunningTimeline: forceStopTimeline.value,
@@ -229,7 +231,7 @@ onMounted(() => { if (props.visible) loadPreview() })
           <ul class="compat-list">
             <li>모델: <strong>{{ preview.compatibility.requireModel ?? '제한 없음' }}</strong></li>
             <li>유형: <strong>{{ preview.compatibility.requireEquipmentType }}</strong></li>
-            <li v-if="preview.compatibility.requireChannelCount">채널 수: <strong>{{ preview.compatibility.requireChannelCount }}채널</strong></li>
+            <li v-if="preview.compatibility.requireChannelCount">채널 수: <strong>{{ preview.compatibility.requireChannelCount }}채널 이상</strong> (증설 가능)</li>
             <li v-if="preview.compatibility.requirePair">페어 개폐기: <strong>양쪽 동시 교체 필요</strong></li>
           </ul>
         </div>

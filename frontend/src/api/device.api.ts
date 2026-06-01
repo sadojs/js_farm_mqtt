@@ -90,6 +90,8 @@ export const deviceApi = {
     newIeee: string
     newFriendlyName: string
     newZigbeeModel?: string
+    /** 새 device가 갖는 채널 수 (1/8/12) — 채널 증설 허용 검증용 */
+    newChannelCount?: 1 | 8 | 12
     pairedNewIeee?: string
     pairedNewFriendlyName?: string
     forceStopRunningTimeline?: boolean

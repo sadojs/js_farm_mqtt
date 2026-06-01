@@ -993,20 +993,60 @@ export class DevicesService {
   }
 
   /**
-   * 호환성 엄격 검증 — zigbee_model + equipment_type 일치.
-   * controller인 경우 채널 수 추가 검증.
+   * 호환성 검증 — 패밀리 base 일치 + 채널 수 (현장치 이하만 허용).
+   * 정책:
+   *  - base family (예: TS0601, TS0011) 동일 필요
+   *  - 새 device 채널 수 >= 옛 device 채널 수 (채널 증설 케이스 허용)
+   *  - 즉 8ch → 8ch, 8ch → 12ch 모두 OK / 12ch → 8ch는 거부
+   *  - z2m generic 정의(model_id에 _switch_N 없음, 예: TS0601 → desc='12 gang')도
+   *    base 추출 후 동일성 검사 (TS0601_switch_8 ↔ TS0601 통과)
    */
   private assertCompatible(
     oldDevice: Device,
-    candidate: { zigbeeModel?: string; newChannelCount?: 8 | 12 },
+    candidate: { zigbeeModel?: string; newChannelCount?: 1 | 8 | 12 },
   ): void {
-    if (candidate.zigbeeModel && oldDevice.zigbeeModel
-      && candidate.zigbeeModel.toLowerCase() !== oldDevice.zigbeeModel.toLowerCase()) {
+    if (!candidate.zigbeeModel || !oldDevice.zigbeeModel) return;
+    const a = candidate.zigbeeModel.toLowerCase();
+    const b = oldDevice.zigbeeModel.toLowerCase();
+    if (a === b) {
+      // 정확 일치 — 추가 채널 수 검증도 생략 가능
+    } else {
+      // base family 추출 (TS0601_switch_8 → TS0601)
+      const baseA = a.replace(/_switch_\d+$/, '');
+      const baseB = b.replace(/_switch_\d+$/, '');
+      if (baseA !== baseB) {
+        throw new BadRequestException({
+          error: 'incompatible',
+          detail: `모델 패밀리 불일치: 기존 ${oldDevice.zigbeeModel} vs 새 ${candidate.zigbeeModel}`,
+        });
+      }
+    }
+    // 채널 수 검증 — 새 device가 옛 device 이상이어야 (증설 허용)
+    const oldCh = this.extractChannelCount(oldDevice);
+    const newCh = candidate.newChannelCount;
+    if (oldCh && newCh && newCh < oldCh) {
       throw new BadRequestException({
         error: 'incompatible',
-        detail: `모델 불일치: 기존 ${oldDevice.zigbeeModel} vs 새 ${candidate.zigbeeModel}`,
+        detail: `채널 수 부족: 기존 ${oldCh}채널 → 새 ${newCh}채널 (이상이어야 함)`,
       });
     }
+  }
+
+  /** device의 채널 수 추정 (irrigation은 channel_mapping, controller는 children, 기타는 1) */
+  private extractChannelCount(device: Device): 1 | 8 | 12 | null {
+    if (device.equipmentType === 'irrigation' && device.channelMapping) {
+      const vals = Object.values(device.channelMapping).filter(Boolean) as string[];
+      if (vals.length > 0) return detectChannelCount(vals);
+    }
+    // model_id에서 _switch_N 추출
+    const m = (device.zigbeeModel || '').toLowerCase().match(/_switch_(\d+)/);
+    if (m) {
+      const n = Number(m[1]);
+      if (n >= 12) return 12;
+      if (n >= 2) return 8;
+      if (n === 1) return 1;
+    }
+    return null;
   }
 
   /**
@@ -1021,6 +1061,8 @@ export class DevicesService {
     newIeee: string;
     newFriendlyName: string;
     newZigbeeModel?: string;
+    /** 새 device가 갖는 채널 수 (frontend가 scan에서 detectedChannelCount로 전달) — 채널 수 >= 옛 device 검증용 */
+    newChannelCount?: 1 | 8 | 12;
     pairedNewIeee?: string;
     pairedNewFriendlyName?: string;
     forceStopRunningTimeline?: boolean;
@@ -1041,7 +1083,10 @@ export class DevicesService {
       }
 
       // 1.2 호환성 재검증 (race condition 방지)
-      this.assertCompatible(oldDevice, { zigbeeModel: args.newZigbeeModel });
+      this.assertCompatible(oldDevice, {
+        zigbeeModel: args.newZigbeeModel,
+        newChannelCount: args.newChannelCount,
+      });
 
       // 1.3 새 IEEE 중복 검사 (자기 자신 제외)
       const dup = await mgr.findOne(Device, {

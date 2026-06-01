@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches } from 'class-validator';
 
 /**
  * device-replacement — POST /api/devices/:id/replace
@@ -17,6 +17,12 @@ export class ReplaceDeviceDto {
   @IsOptional()
   @IsString()
   newZigbeeModel?: string;
+
+  /** 새 device가 갖는 채널 수 (1/8/12) — 채널 증설 케이스 허용 검증용 */
+  @IsOptional()
+  @IsInt()
+  @IsIn([1, 8, 12])
+  newChannelCount?: 1 | 8 | 12;
 
   /** 페어 개폐기일 때 필수 — 페어 동시 교체 강제 (FR-06 호환) */
   @IsOptional()
