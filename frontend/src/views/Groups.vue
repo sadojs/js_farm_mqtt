@@ -274,13 +274,38 @@
             </div>
           </template>
 
-          <!-- 자동 제어 설정 -->
+          <!-- 자동 제어 설정 — D2 컴팩트 행 (Automation.vue와 동일 패턴) -->
           <template v-if="getGroupRules(group.id).length > 0">
-            <div class="section-label automation">자동 제어 ({{ getGroupRules(group.id).length }})</div>
-            <div class="rules-list">
-              <div v-for="rule in getGroupRules(group.id)" :key="rule.id" class="rule-row clickable" @click="openEditRule(rule)">
-                <span class="rule-name">{{ rule.name }}</span>
-                <span class="rule-summary">{{ getRuleSummary(rule) }}</span>
+            <div class="section-label automation">
+              자동 제어 ({{ getGroupRules(group.id).length }})
+              <span class="rules-active-meta">· {{ getGroupRulesActiveCount(group.id) }} 켜짐</span>
+            </div>
+            <div class="rules-list zone-card">
+              <div
+                v-for="rule in getGroupRules(group.id)"
+                :key="rule.id"
+                class="rule-row d2"
+                :class="{ 'is-off': !rule.enabled }"
+                @click="openEditRule(rule)"
+              >
+                <EquipmentIcon
+                  :type="detectRuleKind(rule)"
+                  :active="rule.enabled"
+                  :size="20"
+                  :title="ruleKindLabel(rule)"
+                />
+                <div class="rule-row-main">
+                  <div class="rule-row-title">
+                    <span class="rule-row-name">{{ rule.name }}</span>
+                    <span class="rule-row-sub">{{ ruleKindLabel(rule) }}</span>
+                  </div>
+                  <div class="rule-row-cond">
+                    <span class="cond-badge" :class="`cond-badge-${conditionKindOf(rule)}`">{{ conditionKindLabelOf(rule) }}</span>
+                    <span class="cond-text">{{ conditionTextOf(rule) }}</span>
+                    <span class="cond-arrow" aria-hidden="true">→</span>
+                    <span class="action-text">{{ actionTextOf(rule) }}</span>
+                  </div>
+                </div>
                 <label class="toggle-switch" @click.stop>
                   <input type="checkbox" :checked="rule.enabled" @change="toggleRule(rule.id)" />
                   <span class="toggle-slider"></span>
@@ -406,7 +431,7 @@ import type { Gateway } from '../types/device.types'
 import type { Device, DependencyRule, ChannelMapping } from '../types/device.types'
 import { FUNCTION_LABELS } from '../types/device.types'
 import type { AutomationRule } from '../types/automation.types'
-import { formatConditionGroup } from '../utils/automation-helpers'
+import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
 
 const route = useRoute()
 useRouter()
@@ -930,13 +955,78 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
 const getGroupRules = (groupId: string): AutomationRule[] =>
   automationStore.rules.filter(r => r.groupId === groupId)
 
-const getRuleSummary = (rule: AutomationRule): string => {
+const getGroupRulesActiveCount = (groupId: string): number =>
+  getGroupRules(groupId).filter(r => r.enabled).length
+
+// getRuleSummary: 이전 디자인에서 사용 — D2 디자인은 conditionTextOf + actionTextOf로 대체.
+const _getRuleSummary = (rule: AutomationRule): string => {
   const condText = formatConditionGroup(rule.conditions)
   const actions = rule.actions as any
   const cmd = actions?.command === 'on' ? 'ON' : actions?.command === 'off' ? 'OFF' : ''
   const count = actions?.targetDeviceIds?.length || 0
   if (count > 0 && cmd) return `${condText} → ${count}개 장치 ${cmd}`
   return condText
+}
+void _getRuleSummary
+
+// ── D2 디자인 보조 (Automation.vue와 동일 패턴) ──
+type RuleKind = 'opener' | 'fan' | 'irrigation' | 'other'
+function detectRuleKind(rule: AutomationRule): RuleKind {
+  const actions = rule.actions as any
+  const deviceIds: string[] = actions?.targetDeviceIds || (actions?.targetDeviceId ? [actions.targetDeviceId] : [])
+  for (const id of deviceIds) {
+    const device = deviceStore.devices.find(d => d.id === id)
+    const et = device?.equipmentType
+    if (!et) continue
+    if (et === 'opener_open' || et === 'opener_close') return 'opener'
+    if (et === 'fan' || et === 'irrigation') return et
+  }
+  return 'other'
+}
+const RULE_KIND_LABELS: Record<RuleKind, string> = {
+  opener: '개폐기',
+  fan: '환풍기',
+  irrigation: '관주',
+  other: '기타',
+}
+function ruleKindLabel(rule: AutomationRule): string {
+  return RULE_KIND_LABELS[detectRuleKind(rule)]
+}
+
+const CONDITION_KIND_LABELS: Record<string, string> = {
+  time: '시간',
+  weather: '날씨',
+  hybrid: '복합',
+  irrigation: '관주 일정',
+}
+function conditionKindOf(rule: AutomationRule): 'time' | 'weather' | 'hybrid' | 'irrigation' {
+  if (isIrrigationConditions(rule.conditions)) return 'irrigation'
+  return (rule.ruleType as any) ?? 'time'
+}
+function conditionKindLabelOf(rule: AutomationRule): string {
+  return CONDITION_KIND_LABELS[conditionKindOf(rule)] || ''
+}
+function conditionTextOf(rule: AutomationRule): string {
+  if (isIrrigationConditions(rule.conditions)) return formatIrrigationSchedule(rule.conditions)
+  return formatConditionGroup(rule.conditions)
+}
+function actionTextOf(rule: AutomationRule): string {
+  if (isIrrigationConditions(rule.conditions)) return formatIrrigationZones(rule.conditions)
+  const actions = rule.actions as any
+  const deviceIds: string[] = actions?.targetDeviceIds || (actions?.targetDeviceId ? [actions.targetDeviceId] : [])
+  const names: string[] = []
+  for (const id of deviceIds) {
+    const device = deviceStore.devices.find(d => d.id === id)
+    if (device) names.push(device.name)
+  }
+  if (names.length === 0) return '대상 장치 없음'
+  let suffix = ''
+  if (actions?.command) {
+    const cmd = String(actions.command).toLowerCase()
+    if (cmd === 'on' || cmd === 'open') suffix = ' ON'
+    else if (cmd === 'off' || cmd === 'close') suffix = ' OFF'
+  }
+  return `${names.join(', ')}${suffix}`
 }
 
 const toggleRule = async (ruleId: string) => {
@@ -1487,6 +1577,21 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   overflow: hidden;
 }
 
+/* D2: 자동제어 설정 페이지(Automation.vue)와 동일한 컴팩트 행 패턴 */
+.rules-list.zone-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.rules-active-meta {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
 .rule-row {
   display: flex;
   align-items: center;
@@ -1500,6 +1605,67 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rule-row.clickable:hover { background: var(--bg-secondary); }
 .rule-name { font-size: var(--font-size-label) !important; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .rule-summary { flex: 1; color: var(--text-muted); font-size: calc(13px * var(--content-scale, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* D2 컴팩트 행 — Automation.vue와 동일 패턴 */
+.rule-row.d2 {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.rule-row.d2:last-child { border-bottom: none; }
+.rule-row.d2:hover { background: var(--bg-hover); }
+.rule-row.d2.is-off { opacity: 0.72; }
+
+.rule-row.d2 .rule-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rule-row.d2 .rule-row-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rule-row.d2 .rule-row-name {
+  font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.rule-row.d2 .rule-row-sub {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+}
+.rule-row.d2 .rule-row-cond {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.rule-row.d2 .cond-text { color: var(--text-secondary); }
+.rule-row.d2 .cond-arrow { color: var(--text-muted); font-weight: 700; }
+.rule-row.d2 .action-text { color: var(--text-primary); font-weight: 500; }
+
+.rule-row.d2 .cond-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.rule-row.d2 .cond-badge-time      { background: rgba(21,101,192,.10);  color: #1565c0; }
+.rule-row.d2 .cond-badge-weather   { background: rgba(2,119,189,.10);   color: #0277bd; }
+.rule-row.d2 .cond-badge-hybrid    { background: rgba(106,27,154,.10);  color: #6a1b9a; }
+.rule-row.d2 .cond-badge-irrigation{ background: rgba(0,131,143,.10);   color: #00838f; }
+
+@media (max-width: 768px) {
+  .rule-row.d2 {
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    padding: 13px 14px;
+    min-height: 44px;
+  }
+  .rule-row.d2 .rule-row-name { font-size: calc(14px * var(--content-scale, 1)); }
+  .rule-row.d2 .rule-row-cond { font-size: calc(12px * var(--content-scale, 1)); gap: 6px; }
+}
 
 .no-devices {
   padding: 24px;

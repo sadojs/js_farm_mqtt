@@ -760,9 +760,27 @@ export class DevicesService {
         }
       }
       settings.switchStates = switchStates;
+      // 단일채널 액추에이터(fan/opener_*): 최상위 switchState도 동기화
+      // (Groups.vue 등 UI가 device.switchState로 토글 상태를 판정 — 미동기화 시 click 직후 OFF로 복귀)
+      // 다채널(irrigation)은 switchStates 다중 키로 판정하므로 switchState 갱신 불필요.
+      if (
+        (mqttCommand as any).state !== undefined &&
+        device.equipmentType !== 'irrigation' &&
+        device.equipmentType !== 'controller'
+      ) {
+        settings.switchState = isOn;
+      }
       settings.lastCommandAt = new Date().toISOString();
       device.deviceSettings = settings;
       await this.devicesRepo.save(device);
+
+      // 동일한 정보를 WebSocket으로 broadcast — 다른 클라이언트도 즉시 반영
+      this.eventsGateway.broadcastDeviceSwitchUpdate?.(device.userId, {
+        deviceId: device.id,
+        switchState: settings.switchState ?? null,
+        switchStates: settings.switchStates ?? null,
+        online: device.online,
+      });
     } catch (err: any) {
       this.logger.warn(`Zigbee switchStates 기록 실패: ${err?.message}`);
     }
