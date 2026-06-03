@@ -1,6 +1,9 @@
 <template>
   <div class="step-device">
-    <h3 class="step-title">어느 관수 장치를 사용할까요?</h3>
+    <div class="step-head">
+      <h3 class="step-title">어느 관수 장치를 사용할까요?</h3>
+      <p class="step-desc">관수 컨트롤러를 선택하세요</p>
+    </div>
 
     <EmptyState
       v-if="!loading && controllers.length === 0"
@@ -25,6 +28,21 @@
           class="sr-only"
           @change="handleSelect(ctrl)"
         />
+        <!-- 좌측: 라디오 원 -->
+        <span class="radio-mark" :class="{ checked: modelValue === ctrl.deviceId }" aria-hidden="true">
+          <svg v-if="modelValue === ctrl.deviceId" viewBox="0 0 24 24" width="14" height="14" fill="none"
+            stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+        <!-- 장비 아이콘 칩 (관수 = cyan) -->
+        <EquipmentIcon
+          type="irrigation"
+          :active="modelValue === ctrl.deviceId"
+          :size="20"
+          title="관수"
+        />
+        <!-- 본문 -->
         <div class="device-info">
           <div class="device-name-row">
             <span class="device-name">{{ ctrl.name }}</span>
@@ -32,7 +50,6 @@
           </div>
           <span class="device-meta">{{ ctrl.channelCount }}채널 · {{ ctrl.groupName }}</span>
         </div>
-        <span v-if="modelValue === ctrl.deviceId" class="check-mark" aria-hidden="true">✓</span>
       </label>
     </div>
   </div>
@@ -44,6 +61,7 @@ import { useDeviceStore } from '@/stores/device.store'
 import { useGroupStore } from '@/stores/group.store'
 import { detectChannelCount } from '@/types/device.types'
 import EmptyState from '@/components/common/EmptyState.vue'
+import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 
 interface ControllerInfo {
   deviceId: string
@@ -157,32 +175,53 @@ onMounted(async () => {
 
 <style scoped>
 .step-device { display: flex; flex-direction: column; gap: 16px; }
+
+.step-head { display: flex; flex-direction: column; gap: 4px; }
 .step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
+.step-desc { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); margin: 0; }
+
 .loading-msg { color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); }
 
 .device-list { display: flex; flex-direction: column; gap: 10px; }
 
 .device-card {
-  display: flex; align-items: center; justify-content: space-between;
-  min-height: 72px; padding: 14px 16px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md, 10px);
+  display: flex; align-items: center; gap: 12px;
+  min-height: 64px; padding: 12px 14px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 13px;
   background: var(--bg-card);
-  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.12));
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.device-card:hover { border-color: var(--color-primary); background: var(--bg-secondary); }
-.device-card.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-card)); }
-.device-card:focus-within { outline: 2px solid var(--color-primary); }
+.device-card:hover { border-color: var(--primary, var(--color-primary, #4caf50)); background: var(--bg-hover); }
+.device-card.selected {
+  border-color: var(--primary, var(--color-primary, #4caf50));
+  background: color-mix(in srgb, var(--primary, #4caf50) 8%, var(--bg-card));
+}
+.device-card:focus-within { outline: 2px solid var(--primary, #4caf50); outline-offset: 2px; }
 
-.device-info { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+/* 좌측 라디오 원 */
+.radio-mark {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  transition: all 0.15s;
+}
+.radio-mark.checked {
+  background: var(--primary, var(--color-primary, #4caf50));
+  border-color: var(--primary, var(--color-primary, #4caf50));
+}
+
+.device-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .device-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.device-name { font-size: calc(15px * var(--content-scale, 1)); font-weight: 500; color: var(--text-primary); }
-.device-meta { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
+.device-name { font-size: calc(15px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.device-meta { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); }
 
-.badge { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 8px; border-radius: 99px; font-weight: 600; }
-.badge-fert { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); }
-.check-mark { color: var(--color-primary); font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.badge { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+.badge-fert { background: color-mix(in srgb, var(--color-success, #10b981) 15%, transparent); color: var(--color-success, #10b981); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 </style>
