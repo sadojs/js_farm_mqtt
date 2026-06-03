@@ -144,7 +144,7 @@ const scheduleSummary = computed(() => {
 
 <style scoped>
 .step-review { display: flex; flex-direction: column; gap: 16px; }
-.step-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
 .step-desc { font-size: 14px; color: var(--text-muted); margin: 0; }
 
 .form-field { display: flex; flex-direction: column; gap: 6px; }

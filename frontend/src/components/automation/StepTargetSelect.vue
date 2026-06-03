@@ -1,29 +1,45 @@
 <template>
   <div class="step-target">
-    <h3 class="step-title">구역 선택</h3>
-    <p class="step-desc">자동 제어를 적용할 구역을 선택하세요</p>
+    <div class="step-head">
+      <h3 class="step-title">어느 구역에 적용할까요?</h3>
+      <p class="step-desc">자동 제어를 적용할 하우스/구역을 선택하세요</p>
+    </div>
 
-    <div v-if="groupStore.loading" class="loading">구역 로딩 중...</div>
-    <div v-else-if="groupStore.groups.length === 0" class="empty">
+    <div v-if="groupStore.loading" class="loading-msg">구역 로딩 중...</div>
+    <div v-else-if="groupStore.groups.length === 0" class="empty-msg">
       등록된 구역이 없습니다. 먼저 구역을 만들어주세요.
     </div>
-    <div v-else class="group-list">
-      <div
+    <div v-else class="group-list" role="radiogroup" aria-label="구역 선택">
+      <button
         v-for="group in groupStore.groups"
         :key="group.id"
+        type="button"
         class="group-card"
         :class="{ selected: modelValue === group.id }"
+        role="radio"
+        :aria-checked="modelValue === group.id"
         @click="$emit('update:modelValue', group.id)"
       >
-        <div class="group-icon">📁</div>
+        <!-- 좌측 격자 아이콘 -->
+        <span class="zone-icon" :class="{ active: modelValue === group.id }" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V21H3z" />
+            <path d="M9 21V12h6v9" />
+          </svg>
+        </span>
         <div class="group-info">
           <div class="group-name">{{ group.name }}</div>
-          <div class="group-meta">
-            장치 {{ group.devices?.length || 0 }}대
-          </div>
+          <div class="group-meta">{{ formatMeta(group) }}</div>
         </div>
-        <div v-if="modelValue === group.id" class="check-mark">✓</div>
-      </div>
+        <!-- 우측 라디오 원 -->
+        <span class="radio-mark" :class="{ checked: modelValue === group.id }" aria-hidden="true">
+          <svg v-if="modelValue === group.id" viewBox="0 0 24 24" width="14" height="14" fill="none"
+            stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+      </button>
     </div>
   </div>
 </template>
@@ -35,35 +51,100 @@ defineProps<{ modelValue?: string }>()
 defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const groupStore = useGroupStore()
+
+function formatMeta(group: any): string {
+  const parts: string[] = []
+  const crop = group.houses?.[0]?.crop || group.cropName
+  if (crop) parts.push(String(crop))
+  const devices = group.devices ?? []
+  const sensorCount = devices.filter((d: any) => d.deviceType === 'sensor').length
+  const actuatorCount = devices.filter((d: any) => d.deviceType === 'actuator').length
+  if (sensorCount > 0) parts.push(`측정기 ${sensorCount}`)
+  if (actuatorCount > 0) parts.push(`장치 ${actuatorCount}`)
+  if (parts.length === 0) parts.push(`장비 ${devices.length}개`)
+  return parts.join(' · ')
+}
 </script>
 
 <style scoped>
 .step-target { display: flex; flex-direction: column; gap: 16px; }
-.step-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.step-desc { font-size: 14px; color: var(--text-muted); margin: 0; }
 
-.loading, .empty {
-  text-align: center; padding: 32px; color: var(--text-muted); font-size: 14px;
+.step-head { display: flex; flex-direction: column; gap: 4px; }
+.step-title {
+  font-size: calc(18px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.step-desc {
+  font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-muted);
+  margin: 0;
 }
 
-.group-list { display: flex; flex-direction: column; gap: 8px; }
+.loading-msg, .empty-msg {
+  text-align: center; padding: 32px; color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1));
+}
+
+.group-list { display: flex; flex-direction: column; gap: 10px; }
 
 .group-card {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px; border: 2px solid var(--border-input); border-radius: 12px;
-  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 14px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 13px;
+  background: var(--bg-card);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s, background 0.15s;
 }
-.group-card:hover { border-color: #c8e6c9; background: var(--bg-hover); }
-.group-card.selected { border-color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+.group-card:hover { border-color: var(--primary, var(--color-primary, #4caf50)); background: var(--bg-hover); }
+.group-card.selected {
+  border-color: var(--primary, var(--color-primary, #4caf50));
+  background: color-mix(in srgb, var(--primary, #4caf50) 8%, var(--bg-card));
+}
+.group-card:focus-visible { outline: 2px solid var(--primary, #4caf50); outline-offset: 2px; }
 
-.group-icon { font-size: 24px; }
-.group-info { flex: 1; }
-.group-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-.group-meta { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.zone-icon {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-hover, #eef2f6);
+  color: var(--text-muted, #9ca3af);
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.zone-icon.active {
+  background: color-mix(in srgb, var(--primary, #4caf50) 12%, transparent);
+  color: var(--primary, #4caf50);
+}
 
-.check-mark {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: #4caf50; color: white; font-size: 14px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
+.group-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.group-name {
+  font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.group-meta {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+}
+
+.radio-mark {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.radio-mark.checked {
+  background: var(--primary, var(--color-primary, #4caf50));
+  border-color: var(--primary, var(--color-primary, #4caf50));
+  color: #fff;
 }
 </style>

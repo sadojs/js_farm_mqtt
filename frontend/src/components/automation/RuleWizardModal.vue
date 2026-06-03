@@ -1,66 +1,52 @@
 <template>
-    <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-      <div class="modal-container">
-        <!-- 헤더 -->
-        <div class="modal-header">
-          <h2 class="modal-title">{{ editRule ? '자동 제어 설정 수정' : '새 자동 제어 설정' }}</h2>
-          <button class="btn-close" @click="$emit('close')">✕</button>
-        </div>
-
-        <!-- 스텝 인디케이터 -->
-        <div class="stepper">
-          <div v-for="s in stepList" :key="s.num" class="step-item" :class="{ active: currentStep === s.num, done: currentStep > s.num }">
-            <span class="step-circle">{{ currentStep > s.num ? '✓' : s.num }}</span>
-            <span class="step-name">{{ s.label }}</span>
-          </div>
-        </div>
-
-        <!-- 스텝 본문 -->
-        <div class="modal-body">
-          <StepTargetSelect
-            v-if="currentStep === 1"
-            v-model="formData.groupId"
-          />
-          <StepActuatorSelect
-            v-if="currentStep === 2"
-            v-model:selectedIds="formData.actuatorDeviceIds"
-            :groupId="formData.groupId"
-            :include-opener="true"
-          />
-          <StepIrrigationCondition
-            v-if="currentStep === 3 && isIrrigation"
-            v-model="irrigationForm"
-            :channelMapping="localChannelMapping"
-            :editableMapping="canEditMapping"
-            @update:channelMapping="handleMappingUpdate"
-          />
-          <StepConditionBuilder
-            v-if="currentStep === 3 && !isIrrigation"
-            v-model="formData.conditions"
-            :timeOnly="false"
-            :equipmentType="selectedEquipmentType"
-            :groupId="formData.groupId"
-          />
-          <StepReview
-            v-if="currentStep === 4"
-            :formData="formData"
-            :irrigationConditions="isIrrigation ? irrigationForm : undefined"
-            @update:name="formData.name = $event"
-            @update:description="formData.description = $event"
-          />
-        </div>
-
-        <!-- 푸터 -->
-        <div class="modal-footer">
-          <button v-if="currentStep > 1" class="btn-secondary" @click="currentStep--">이전</button>
-          <div class="spacer" />
-          <button v-if="currentStep < 4" class="btn-primary" :disabled="!canNext" @click="currentStep++">다음</button>
-          <button v-else class="btn-primary" :disabled="!canSave || saving" @click="handleSave">
-            {{ saving ? '저장 중...' : '저장' }}
-          </button>
-        </div>
-      </div>
-    </div>
+  <WizardFrame
+    v-if="visible"
+    :title="editRule ? '자동 제어 수정' : '새 자동 제어 설정'"
+    :edit-mode="!!editRule"
+    :step-index="currentStep - 1"
+    :total-steps="stepList.length"
+    :show-prev="currentStep > 1"
+    :show-next="true"
+    :can-proceed="currentStep < 4 ? canNext : (canSave && !saving)"
+    :can-proceed-hint="canProceedHint"
+    :next-label="currentStep < 4 ? '다음' : (editRule ? '✓ 수정 완료' : '✓ 만들기')"
+    :saving="saving"
+    @close="$emit('close')"
+    @prev="currentStep--"
+    @next="currentStep < 4 ? currentStep++ : handleSave()"
+  >
+    <StepTargetSelect
+      v-if="currentStep === 1"
+      v-model="formData.groupId"
+    />
+    <StepActuatorSelect
+      v-if="currentStep === 2"
+      v-model:selectedIds="formData.actuatorDeviceIds"
+      :groupId="formData.groupId"
+      :include-opener="true"
+    />
+    <StepIrrigationCondition
+      v-if="currentStep === 3 && isIrrigation"
+      v-model="irrigationForm"
+      :channelMapping="localChannelMapping"
+      :editableMapping="canEditMapping"
+      @update:channelMapping="handleMappingUpdate"
+    />
+    <StepConditionBuilder
+      v-if="currentStep === 3 && !isIrrigation"
+      v-model="formData.conditions"
+      :timeOnly="false"
+      :equipmentType="selectedEquipmentType"
+      :groupId="formData.groupId"
+    />
+    <StepReview
+      v-if="currentStep === 4"
+      :formData="formData"
+      :irrigationConditions="isIrrigation ? irrigationForm : undefined"
+      @update:name="formData.name = $event"
+      @update:description="formData.description = $event"
+    />
+  </WizardFrame>
 </template>
 
 <script setup lang="ts">
@@ -77,6 +63,7 @@ import StepActuatorSelect from './StepActuatorSelect.vue'
 import StepConditionBuilder from './StepConditionBuilder.vue'
 import StepIrrigationCondition from './StepIrrigationCondition.vue'
 import StepReview from './StepReview.vue'
+import WizardFrame from './WizardFrame.vue'
 
 const props = defineProps<{ visible: boolean; editRule?: AutomationRule | null }>()
 const emit = defineEmits<{ close: []; saved: [rule: any] }>()
@@ -227,6 +214,16 @@ const canSave = computed(() => {
   return !!formData.value.name.trim() && formData.value.actuatorDeviceIds.length > 0
 })
 
+const canProceedHint = computed(() => {
+  if (currentStep.value === 1) return '구역을 선택해주세요'
+  if (currentStep.value === 2) return '장치를 하나 이상 선택해주세요'
+  if (currentStep.value === 3) return isIrrigation.value
+    ? '관수 일정·구역을 설정해주세요 (액비 활성 시 관주시간 ≥ 투여+종료전대기)'
+    : '조건을 모두 입력해주세요'
+  if (currentStep.value === 4) return '룰 이름을 입력해주세요'
+  return ''
+})
+
 onBeforeUnmount(() => { document.body.style.overflow = '' })
 
 async function handleSave() {
@@ -275,81 +272,5 @@ async function handleSave() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); display: flex;
-  align-items: center; justify-content: center; z-index: 1000;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-}
-.modal-container {
-  background: var(--bg-card); border-radius: 16px; width: 560px; max-height: 90vh;
-  display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: var(--shadow-modal); border: 1px solid var(--border-color);
-  padding: 0;
-}
-
-.modal-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 20px 24px 12px;
-}
-.modal-title { font-size: var(--font-size-title); font-weight: 700; color: var(--text-primary); }
-.btn-close {
-  background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer;
-  padding: 4px 8px;
-}
-.btn-close:hover { color: var(--text-primary); }
-
-.stepper {
-  display: flex; justify-content: center; gap: 32px; padding: 20px 24px 24px;
-  border-bottom: 1px solid var(--border-light);
-}
-.step-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.step-circle {
-  width: 44px; height: 44px; border-radius: 50%; border: 2.5px solid var(--border-input);
-  display: flex; align-items: center; justify-content: center;
-  font-size: var(--font-size-subtitle); font-weight: 700; color: var(--text-muted);
-}
-.step-item.active .step-circle { border-color: #4caf50; background: #4caf50; color: white; }
-.step-item.done .step-circle { border-color: #4caf50; color: #4caf50; }
-.step-name { font-size: var(--font-size-body); color: var(--text-muted); }
-.step-item.active .step-name { color: #4caf50; font-weight: 600; }
-.step-item.done .step-name { color: #4caf50; }
-
-.modal-body { flex: 1; overflow-y: auto; padding: 24px; }
-
-.modal-footer {
-  display: flex; align-items: center; padding: 16px 24px;
-  border-top: 1px solid var(--border-light);
-}
-.spacer { flex: 1; }
-
-.btn-primary {
-  padding: 10px 28px; background: #4caf50; color: white; border: none;
-  border-radius: 10px; font-size: var(--font-size-label); font-weight: 600; cursor: pointer;
-}
-.btn-primary:hover { background: #43a047; }
-.btn-primary:disabled { background: var(--text-muted); cursor: not-allowed; }
-
-.btn-secondary {
-  padding: 10px 28px; background: var(--bg-card); color: var(--text-link); border: 1px solid var(--border-input);
-  border-radius: 10px; font-size: var(--font-size-label); font-weight: 500; cursor: pointer;
-}
-.btn-secondary:hover { background: var(--bg-hover); }
-
-@media (max-width: 768px) {
-  .modal-overlay { padding: 0; }
-  .modal-container {
-    width: 100%;
-    max-height: 100%;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-  .stepper { gap: 16px; padding: 12px 16px 16px; }
-  .step-circle { width: 36px; height: 36px; font-size: var(--font-size-body); }
-  .step-name { font-size: var(--font-size-caption); }
-  .modal-body { padding: 16px; }
-  .modal-header { padding: 16px 16px 8px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
-  .modal-footer { padding: 12px 16px; }
-}
+/* RuleWizardModal — 컨테이너/푸터 스타일은 WizardFrame이 담당. 별도 스타일 불필요. */
 </style>

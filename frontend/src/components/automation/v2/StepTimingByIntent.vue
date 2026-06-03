@@ -511,7 +511,7 @@ if (props.intent !== 'irrigation') {
 
 <style scoped>
 .step-timing { display: flex; flex-direction: column; gap: 18px; }
-.step-title { font-size: calc(17px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary); margin: 0; }
+.step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
 
 .schedule-block { display: flex; flex-direction: column; gap: 14px; padding: 14px; background: var(--bg-secondary); border-radius: var(--radius-md, 10px); }
 .sched-header { display: flex; justify-content: space-between; align-items: center; }

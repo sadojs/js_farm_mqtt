@@ -157,7 +157,7 @@ onMounted(async () => {
 
 <style scoped>
 .step-device { display: flex; flex-direction: column; gap: 16px; }
-.step-title { font-size: calc(17px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary); margin: 0; }
+.step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
 .loading-msg { color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); }
 
 .device-list { display: flex; flex-direction: column; gap: 10px; }

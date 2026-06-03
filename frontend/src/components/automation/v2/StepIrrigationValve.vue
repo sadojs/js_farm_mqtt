@@ -161,7 +161,7 @@ const fertWarnings = computed<string[]>(() => {
 
 <style scoped>
 .step-valve { display: flex; flex-direction: column; gap: 20px; }
-.step-title { font-size: 18px; font-weight: 700; margin: 0; }
+.step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .step-sub { color: var(--text-secondary, #666); margin: 0; font-size: 13px; }
 
 .section-block {

@@ -1,32 +1,20 @@
 <template>
-  <Teleport to="#app">
-    <div
-      class="iwm-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="자동 제어 룰 만들기"
-      @click.self="handleOverlayClick"
-      @keydown.esc="handleClose"
-    >
-      <div class="iwm-container" @click.stop>
-        <!-- 헤더 -->
-        <div class="iwm-header">
-          <button class="btn-close" aria-label="닫기" @click="handleClose">✕</button>
-          <div class="iwm-dots" role="progressbar" :aria-label="`진행률 ${wizard.stepIndex.value + 1}/${wizard.totalSteps.value}`">
-            <span
-              v-for="i in wizard.totalSteps.value"
-              :key="i"
-              class="iwm-dot"
-              :class="{ active: i - 1 <= wizard.stepIndex.value }"
-              aria-hidden="true"
-            />
-          </div>
-          <div class="header-spacer" />
-        </div>
-
-        <!-- 본문 -->
-        <div class="iwm-body">
-          <StepFarmAdminSelect
+  <WizardFrame
+    title="자동 제어 추가"
+    :edit-mode="false"
+    :step-index="wizard.stepIndex.value"
+    :total-steps="wizard.totalSteps.value"
+    :show-prev="showPrev"
+    :show-next="showNext"
+    :can-proceed="wizard.canProceed.value"
+    :can-proceed-hint="canProceedHint"
+    :next-label="nextLabel"
+    :saving="saving"
+    @close="handleClose"
+    @prev="wizard.prev()"
+    @next="handleNext"
+  >
+    <StepFarmAdminSelect
             v-if="wizard.currentStep.value === 'farm-admin'"
             :modelValue="wizard.state.value.farmUserId"
             @update:modelValue="v => { wizard.state.value.farmUserId = v; wizard.state.value.groupId = null }"
@@ -122,36 +110,11 @@
             @jump-to="wizard.goTo($event)"
             @save="handleSave"
           />
-        </div>
-
-        <!-- 푸터 -->
-        <div class="iwm-footer">
-          <button
-            v-if="showPrev"
-            class="btn-prev"
-            @click="wizard.prev()"
-          >← 이전</button>
-
-          <div class="spacer" />
-
-          <button
-            v-if="showNext"
-            class="btn-next"
-            :disabled="!wizard.canProceed.value || saving"
-            :title="!wizard.canProceed.value ? canProceedHint : ''"
-            @click="handleNext"
-          >
-            <span v-if="saving">저장 중...</span>
-            <span v-else>{{ nextLabel }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  </WizardFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRuleWizardV2 } from '@/composables/useRuleWizardV2'
 import { useAutomationStore } from '@/stores/automation.store'
 import { useGroupStore } from '@/stores/group.store'
@@ -169,6 +132,7 @@ import StepIrrigationValve from './StepIrrigationValve.vue'
 import StepDeviceByIntent from './StepDeviceByIntent.vue'
 import StepTimingByIntent from './StepTimingByIntent.vue'
 import StepReviewSummary from './StepReviewSummary.vue'
+import WizardFrame from '../WizardFrame.vue'
 
 const emit = defineEmits<{
   close: []
@@ -294,7 +258,7 @@ async function handleSave() {
   }
 }
 
-// 닫기 처리
+// 닫기 처리 — WizardFrame이 Esc/overlay click도 emit('close')로 전달
 function handleClose() {
   if (wizard.currentStep.value === 'review') {
     if (!confirm('입력 내용이 사라집니다. 닫을까요?')) return
@@ -302,123 +266,11 @@ function handleClose() {
   emit('close')
 }
 
-function handleOverlayClick() {
-  handleClose()
-}
-
-// ESC 키
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') handleClose()
-}
-
 onMounted(async () => {
-  document.body.style.overflow = 'hidden'
-  document.addEventListener('keydown', onKeydown)
   if (groupStore.groups.length === 0) await groupStore.fetchGroups()
-})
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = ''
-  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
 <style scoped>
-.iwm-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  z-index: 1100;
-  display: flex; align-items: center; justify-content: center;
-}
-
-.iwm-container {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  width: 100%; max-width: 560px;
-  max-height: 90vh;
-  display: flex; flex-direction: column;
-  box-shadow: var(--shadow-modal, 0 20px 60px rgba(0,0,0,0.4));
-  overflow: hidden;
-}
-
-/* 모바일: 풀스크린 바텀 시트 */
-@media (max-width: 600px) {
-  .iwm-overlay { align-items: flex-end; }
-  .iwm-container {
-    max-width: 100%; width: 100%;
-    max-height: 92vh;
-    border-radius: 20px 20px 0 0;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-.iwm-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.btn-close {
-  background: none; border: none; font-size: 20px;
-  color: var(--text-muted); cursor: pointer;
-  padding: 4px 8px; border-radius: var(--radius-sm, 6px);
-  min-width: 44px; min-height: 44px;
-  display: flex; align-items: center; justify-content: center;
-  transition: color 0.12s, background 0.12s;
-}
-.btn-close:hover { color: var(--text-primary); background: var(--bg-secondary); }
-.btn-close:focus-visible { outline: 2px solid var(--color-primary); }
-
-.iwm-dots { display: flex; gap: 8px; }
-.iwm-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--border-color);
-  transition: background 0.2s;
-}
-.iwm-dot.active { background: var(--color-primary); }
-
-.header-spacer { width: 60px; }
-
-.iwm-body {
-  flex: 1; overflow-y: auto; padding: 20px;
-  -webkit-overflow-scrolling: touch;
-  background: var(--bg-secondary);
-}
-
-.iwm-footer {
-  display: flex; align-items: center;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
-  background: var(--bg-card); /* 헤더/푸터는 카드색으로 body와 구분 */
-  position: sticky; bottom: 0;
-}
-
-.spacer { flex: 1; }
-
-.btn-prev {
-  background: none; border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-sm, 6px);
-  color: var(--text-primary); cursor: pointer;
-  padding: 10px 18px; font-size: calc(14px * var(--content-scale, 1));
-  min-height: 44px;
-  transition: border-color 0.12s;
-}
-.btn-prev:hover { border-color: var(--color-primary); }
-.btn-prev:focus-visible { outline: 2px solid var(--color-primary); }
-
-.btn-next {
-  background: var(--color-primary); border: none;
-  border-radius: var(--radius-sm, 6px);
-  color: #fff; cursor: pointer;
-  padding: 10px 24px; font-size: calc(14px * var(--content-scale, 1));
-  font-weight: 600; min-height: 44px;
-  transition: opacity 0.12s;
-}
-.btn-next:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-next:not(:disabled):hover { opacity: 0.9; }
-.btn-next:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* IntentWizardModal — 컨테이너/푸터 스타일은 WizardFrame이 담당. 별도 스타일 불필요. */
 </style>

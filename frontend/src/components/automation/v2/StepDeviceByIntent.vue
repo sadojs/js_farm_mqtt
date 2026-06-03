@@ -1,7 +1,9 @@
 <template>
   <div class="step-dev">
-    <h3 class="step-title">{{ title }}</h3>
-    <p class="step-sub">여러 개 선택 가능해요</p>
+    <div class="step-head">
+      <h3 class="step-title">{{ title }}</h3>
+      <p class="step-desc">여러 개 선택 가능합니다</p>
+    </div>
 
     <EmptyState
       v-if="!loading && devices.length === 0"
@@ -27,25 +29,41 @@
           class="sr-only"
           @change="toggle(d.id)"
         />
+        <!-- 좌측 체크박스 -->
+        <span class="check-box" :class="{ checked: modelValue.includes(d.id) }" aria-hidden="true">
+          <svg v-if="modelValue.includes(d.id)" viewBox="0 0 24 24" width="13" height="13" fill="none"
+            stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+        <!-- 장비 아이콘 칩 (선택 시 컬러) -->
+        <EquipmentIcon
+          :type="intent === 'opener' ? 'opener' : 'fan'"
+          :active="modelValue.includes(d.id)"
+          :size="20"
+          :title="label"
+        />
+        <!-- 본문 -->
         <div class="device-info">
           <span class="device-name">{{ d.name }}</span>
           <span class="device-meta">
             {{ getEquipmentLabel(d, { openerPaired: false }) }}<template v-if="intent === 'opener' && d.openerGroupName"> · {{ d.openerGroupName }}</template>
           </span>
         </div>
-        <span v-if="modelValue.includes(d.id)" class="check-icon" aria-hidden="true">✓</span>
       </label>
     </div>
 
-    <!-- 안내 문구 -->
+    <!-- 안내 배너 (info 톤) -->
     <div class="hints">
       <p class="hint-info">
-        ℹ️ 다음 단계에서 설정한 {{ triggerHint }}이 만족되면
+        <span class="hint-icon">ℹ️</span>
+        다음 단계에서 설정한 {{ triggerHint }}이 만족되면
         {{ intent === 'opener' ? '열리고' : '켜지고' }},
         벗어나면 자동으로 {{ intent === 'opener' ? '닫힙니다.' : '꺼집니다.' }}
       </p>
       <p v-if="intent === 'opener'" class="hint-warn">
-        ⚠️ 안전을 위해 열림/닫힘은 1초 간격으로 순차 동작합니다.
+        <span class="hint-icon">⚠️</span>
+        안전을 위해 열림/닫힘은 1초 간격으로 순차 동작합니다.
       </p>
     </div>
   </div>
@@ -56,6 +74,7 @@ import { computed, onMounted } from 'vue'
 import { useDeviceStore } from '@/stores/device.store'
 import { useGroupStore } from '@/stores/group.store'
 import EmptyState from '@/components/common/EmptyState.vue'
+import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 import type { WizardIntent } from './types'
 import { getEquipmentLabel } from '@/utils/device-labels'
 
@@ -79,7 +98,6 @@ const triggerHint = computed(() => '시간/온도 조건')
 
 const devices = computed(() => {
   const group = groupStore.groups.find(g => g.id === props.groupId)
-  // 선택한 구역(group)에 속한 장치만 — 다른 구역/농장의 장치가 섞이지 않도록 enforce.
   const groupDevices: any[] = group?.devices ?? []
   const byFarm = props.farmUserId
     ? groupDevices.filter((d: any) => !d.userId || d.userId === props.farmUserId)
@@ -106,37 +124,90 @@ onMounted(async () => {
 
 <style scoped>
 .step-dev { display: flex; flex-direction: column; gap: 16px; }
-.step-title { font-size: calc(17px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary); margin: 0; }
-.step-sub { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); margin: -10px 0 0; }
+
+.step-head { display: flex; flex-direction: column; gap: 4px; }
+.step-title {
+  font-size: calc(18px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.step-desc {
+  font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-muted);
+  margin: 0;
+}
+
 .loading-msg { color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); }
 
-.device-list { display: flex; flex-direction: column; gap: 8px; }
+.device-list { display: flex; flex-direction: column; gap: 10px; }
 
 .device-card {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 12px;
   min-height: 60px; padding: 12px 16px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md, 10px);
-  background: var(--bg-card); cursor: pointer;
-  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.12));
+  border: 1.5px solid var(--border-color);
+  border-radius: 13px;
+  background: var(--bg-card);
+  cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.device-card:hover { border-color: var(--color-primary); background: var(--bg-secondary); }
-.device-card:focus-within { outline: 2px solid var(--color-primary); }
-.device-card.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-card)); }
+.device-card:hover { border-color: var(--primary, var(--color-primary, #4caf50)); background: var(--bg-hover); }
+.device-card:focus-within { outline: 2px solid var(--primary, #4caf50); outline-offset: 2px; }
+.device-card.selected {
+  border-color: var(--primary, var(--color-primary, #4caf50));
+  background: color-mix(in srgb, var(--primary, #4caf50) 8%, var(--bg-card));
+}
 
-.device-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.device-name { font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; color: var(--text-primary); }
-.device-meta { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); }
-.check-icon { color: var(--color-primary); font-size: 16px; font-weight: 700; flex-shrink: 0; }
+/* 좌측 체크박스 */
+.check-box {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  color: #fff;
+}
+.check-box.checked {
+  background: var(--primary, var(--color-primary, #4caf50));
+  border-color: var(--primary, var(--color-primary, #4caf50));
+}
 
+.device-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.device-name {
+  font-size: calc(14px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.device-meta {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+}
+
+/* 안내 배너 (info / warn) */
 .hints { display: flex; flex-direction: column; gap: 8px; }
 .hint-info, .hint-warn {
-  font-size: calc(13px * var(--content-scale, 1)); padding: 10px 12px;
-  border-radius: var(--radius-sm, 6px); margin: 0; line-height: 1.5;
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: calc(13px * var(--content-scale, 1));
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin: 0;
+  line-height: 1.5;
+  border: 1px solid;
 }
-.hint-info { background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-secondary)); color: var(--text-primary); }
-.hint-warn { background: color-mix(in srgb, var(--color-warning, #f59e0b) 10%, var(--bg-secondary)); color: var(--text-primary); }
+.hint-info {
+  background: color-mix(in srgb, var(--primary, #4caf50) 6%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--primary, #4caf50) 25%, transparent);
+  color: var(--text-primary);
+}
+.hint-warn {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--text-primary);
+}
+.hint-icon { flex-shrink: 0; font-size: 14px; line-height: 1.4; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 </style>
