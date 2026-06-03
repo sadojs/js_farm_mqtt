@@ -1,5 +1,6 @@
 // controller equipment_type support added (zigbee-channel-actuator)
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { RainOverrideService } from '../rain-override/rain-override.service';
@@ -45,6 +46,7 @@ export class DevicesService {
     private irrigationScheduler: IrrigationSchedulerService,
     private activityLog: ActivityLogService,
     private eventsGateway: EventsGateway,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /** 장치가 속한 구역(house_group) ID 조회 — rain-override 등에서 사용 */
@@ -229,6 +231,9 @@ export class DevicesService {
       relayActivePhase: settings.relayActivePhase ?? null,
       disabledChannels: Array.isArray(settings.disabledChannels) ? settings.disabledChannels : [],
       rainOverrideDisabled: !!settings.rainOverrideDisabled,
+      // 수동 우회 정책 — frontend가 배지 표시용으로 사용
+      userOverride: !!settings.userOverride,
+      ruleIntendedState: settings.ruleIntendedState ?? null,
     };
   }
 
@@ -517,6 +522,40 @@ export class DevicesService {
     const device = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     if (!device.friendlyName) throw new BadRequestException('장비의 friendly_name이 설정되지 않았습니다.');
+
+    // ── 수동 pin/release 정책 ──
+    // 사용자 명령(callerSource undefined)일 때만 적용 — 자동제어/rain-override는 영향 없음.
+    // 정책:
+    //   1) ruleIntendedState가 활성(non-null)이고 새 값이 룰 의도와 다르면 → userOverride=true (pin)
+    //      → 룰이 다음 cron tick에 이 device를 건너뜀 → 사용자 수동 상태 유지
+    //   2) userOverride=true이고 새 값이 룰 의도와 같으면 → userOverride=false (release)
+    //      → 다음 cron tick에 룰이 다시 publish하여 ON/OFF 결정
+    //   3) ruleIntendedState가 null(룰 inactive)이면 일반 수동 제어, override 변경 없음
+    // (단일채널 단순 비교 — irrigation/controller는 다중 스위치라 ruleIntendedState=true 기반 비교)
+    if (!callerSource) {
+      const settings: any = device.deviceSettings || {};
+      const intent: boolean | null = settings.ruleIntendedState ?? null;
+      const isOnCmd = commands.some(c => c.value === true || c.value === 'ON' || c.value === 1);
+      const isOffCmd = commands.some(c => c.value === false || c.value === 'OFF' || c.value === 0);
+      // 단일 ON/OFF 명령만 처리 (관수의 다중 switch는 ruleIntendedState 적용 안 함)
+      if (intent != null && (isOnCmd || isOffCmd)) {
+        const newValue = isOnCmd;
+        if (settings.userOverride && newValue === intent) {
+          settings.userOverride = false;
+          device.deviceSettings = settings;
+          await this.devicesRepo.save(device).catch(() => undefined);
+          this.logger.log(`[manual-release] ${device.name} 자동제어 복귀 (사용자 토글이 룰 의도와 일치)`);
+          // 룰이 다음 cron tick에 즉시 재평가하도록 lastState 클리어 신호 emit
+          // (relay cycle OFF 구간에서 사용자가 ON 복귀 시 룰이 다시 OFF로 보낼 수 있도록)
+          this.eventEmitter.emit('device.manual.released', { deviceId: device.id });
+        } else if (!settings.userOverride && newValue !== intent) {
+          settings.userOverride = true;
+          device.deviceSettings = settings;
+          await this.devicesRepo.save(device).catch(() => undefined);
+          this.logger.log(`[manual-pin] ${device.name} 수동 우회 활성 (rule=${intent ? 'ON' : 'OFF'}, user=${newValue ? 'ON' : 'OFF'})`);
+        }
+      }
+    }
 
     // ── child device (다채널 컨트롤러의 채널) 경로 ──
     // parent.friendlyName + channel_code (TS0601이면 state_lN 자동 변환)

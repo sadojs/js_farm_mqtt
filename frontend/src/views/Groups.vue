@@ -262,6 +262,10 @@
                     >✎</button>
                   </template>
                   <span class="type-tag actuator">장치</span>
+                  <span v-if="device.userOverride" class="manual-override-badge"
+                    title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
+                    🖐 수동
+                  </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
                   <span class="control-label">{{ device.switchState === true ? '가동중' : '정지' }}</span>
@@ -1450,6 +1454,19 @@ onBeforeUnmount(() => {
 }
 .type-tag.sensor { background: var(--sensor-bg); color: var(--sensor-accent); }
 .type-tag.actuator { background: var(--accent-bg); color: var(--accent); }
+
+/* 수동 우회 배지 — 자동제어 룰 의도와 다르게 수동 조작된 상태 표시 */
+.manual-override-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(245,158,11,.14);
+  color: #b45309;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 .sub-card-sensor-chips {
   display: flex;

@@ -43,6 +43,11 @@
             <span v-else :class="['item-status', device.switchState ? 'running' : 'stopped']">
               {{ device.online ? (device.switchState ? '가동중' : '대기') : '오프라인' }}
             </span>
+            <!-- 수동 우회 활성: 룰이 일시 정지됨을 명시 -->
+            <span v-if="device.userOverride" class="manual-override-badge"
+              title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
+              🖐 수동 모드
+            </span>
           </div>
         </div>
       </div>
@@ -433,6 +438,19 @@ onMounted(async () => {
 .sensor-chip.battery.battery-ok  { background: rgba(16,185,129,.10); color: #059669; }
 .sensor-chip.battery.battery-mid { background: rgba(245,158,11,.12); color: #d97706; }
 .sensor-chip.battery.battery-low { background: rgba(239,68,68,.12); color: #dc2626; font-weight: 700; }
+
+/* 수동 우회 배지 (manual override) — 자동제어가 일시 정지됨을 명시 */
+.manual-override-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(245,158,11,.12);
+  color: #b45309;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: 4px;
+}
 
 /* 우적센서 자동제어 토글 — 명확한 ON/OFF 버튼 (대시보드용) */
 .rain-toggle-btn {

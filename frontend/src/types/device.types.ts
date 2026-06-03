@@ -133,6 +133,10 @@ export interface Device {
   channelCode?: string | null
   /** 우적센서 rain-override 비활성화 (오탐 방지) */
   rainOverrideDisabled?: boolean
+  /** 수동 우회 활성 — 사용자가 룰 의도와 다르게 토글하여 룰이 일시 정지된 상태 */
+  userOverride?: boolean
+  /** 룰이 마지막으로 의도한 상태 (true=ON 유지, null=룰 inactive) — 다음 사용자 토글 판정용 */
+  ruleIntendedState?: boolean | null
   sensorData?: SensorData | null
   lastSeen?: string
   createdAt: string

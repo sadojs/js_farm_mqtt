@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
@@ -112,6 +113,80 @@ export class AutomationRunnerService {
     );
 
     return { executed: success, actions: actionResults, errorMessage };
+  }
+
+  /**
+   * 룰 enable/disable toggle 시 호출 — runner의 in-memory state + device의 manual override 리셋.
+   * 동작:
+   *  - lastState 캐시 삭제 → 다음 cron tick에 신규 매칭처럼 재평가
+   *  - 룰 대상 device의 userOverride / ruleIntendedState / relayActivePhase 리셋
+   *    (사용자가 룰을 명시적으로 재활성화 = 자동제어 의도 → 수동 우회 해제)
+   *  - 룰 disable 시 device의 sticky 상태도 정리하여 UI 토글이 즉시 반영
+   */
+  async onRuleToggled(rule: AutomationRule): Promise<void> {
+    this.lastState.delete(rule.id);
+    const ids = this.extractTargetDeviceIds(rule);
+    for (const id of ids) {
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      if (!dev) continue;
+      const settings: any = dev.deviceSettings || {};
+      let changed = false;
+      if (settings.userOverride) { settings.userOverride = false; changed = true; }
+      if (settings.ruleIntendedState != null) { settings.ruleIntendedState = null; changed = true; }
+      // 룰 disable 시: sticky 정리 + switchState=false → UI 즉시 반영
+      if (!rule.enabled && (settings.relayActivePhase || settings.switchState)) {
+        settings.relayActivePhase = null;
+        settings.relayActiveRuleId = null;
+        settings.relayActiveUntil = null;
+        settings.switchState = false;
+        changed = true;
+      }
+      if (changed) {
+        dev.deviceSettings = settings;
+        await this.devicesRepo.save(dev).catch(() => undefined);
+        this.eventsGateway.broadcastDeviceSwitchUpdate?.(dev.userId, {
+          deviceId: dev.id,
+          switchState: settings.switchState ?? null,
+          switchStates: settings.switchStates ?? null,
+          online: dev.online,
+        });
+      }
+    }
+    this.logger.log(`onRuleToggled: rule=${rule.name} enabled=${rule.enabled} → lastState + devices(${ids.length}) reset`);
+  }
+
+  /**
+   * 사용자가 수동 우회 release(룰 의도와 일치하는 토글)할 때 호출됨.
+   * 해당 device를 target으로 하는 룰들의 lastState 캐시 클리어 → 다음 cron tick에 신규 매칭처럼 재평가.
+   * (relay cycle OFF 구간에서 사용자가 ON으로 release했을 때 룰이 다시 OFF로 보낼 수 있도록)
+   */
+  @OnEvent('device.manual.released')
+  async onDeviceManualReleased({ deviceId }: { deviceId: string }): Promise<void> {
+    try {
+      const rules = await this.rulesRepo.find({ where: { enabled: true } });
+      let cleared = 0;
+      for (const rule of rules) {
+        const ids = this.extractTargetDeviceIds(rule);
+        if (ids.includes(deviceId) && this.lastState.has(rule.id)) {
+          this.lastState.delete(rule.id);
+          cleared += 1;
+        }
+      }
+      if (cleared > 0) {
+        this.logger.log(`[manual-release] device ${deviceId} → ${cleared}개 룰의 lastState 클리어 (다음 cron tick에 재평가)`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`onDeviceManualReleased 처리 실패: ${err?.message ?? err}`);
+    }
+  }
+
+  /** 룰 actions에서 대상 device id 추출 (페어 포함) */
+  private extractTargetDeviceIds(rule: AutomationRule): string[] {
+    const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
+    const ids = new Set<string>();
+    if (action?.targetDeviceId) ids.add(action.targetDeviceId);
+    if (Array.isArray(action?.targetDeviceIds)) action.targetDeviceIds.forEach((id: string) => ids.add(id));
+    return [...ids];
   }
 
   async executeRule(rule: AutomationRule) {
@@ -899,11 +974,15 @@ export class AutomationRunnerService {
       }
       for (const t of targets) {
         const settings: any = t.deviceSettings || {};
-        if (settings.relayActivePhase || settings.switchState) {
+        if (settings.relayActivePhase || settings.switchState
+          || settings.ruleIntendedState != null || settings.userOverride) {
           settings.relayActivePhase = null;
           settings.relayActiveRuleId = null;
           settings.relayActiveUntil = null;
           settings.switchState = false;
+          // 룰 inactive 전환 시 수동 pin/release state도 리셋 (룰이 더 이상 device를 관리하지 않음)
+          settings.ruleIntendedState = null;
+          settings.userOverride = false;
           t.deviceSettings = settings;
           await this.devicesRepo.save(t);
           this.eventsGateway.broadcastDeviceSwitchUpdate?.(t.userId, {
@@ -925,9 +1004,38 @@ export class AutomationRunnerService {
     const action = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
     // 개폐기 페어 라우팅: hysteresis 방향에 따라 open/close 장치 선택
     const openerTargets = await this.resolveOpenerTargets(action, hysteresisAction);
-    const actionOverride = openerTargets
+    let actionOverride = openerTargets
       ? { ...action, targetDeviceId: openerTargets[0], targetDeviceIds: openerTargets, command: relay.isOnPhase ? 'on' : 'off' }
       : { ...action, command: relay.isOnPhase ? 'on' : 'off' };
+
+    // userOverride 체크 — 수동 우회 활성 device는 룰 실행 대상에서 제외
+    const targetIds: string[] = [
+      ...(actionOverride.targetDeviceId ? [actionOverride.targetDeviceId] : []),
+      ...(Array.isArray(actionOverride.targetDeviceIds) ? actionOverride.targetDeviceIds : []),
+    ];
+    const skippedIds: string[] = [];
+    const remainingIds: string[] = [];
+    for (const id of new Set(targetIds)) {
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      if (dev && (dev.deviceSettings as any)?.userOverride) {
+        skippedIds.push(id);
+        this.logger.log(`[manual-override] ${dev.name} 수동 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
+      } else {
+        remainingIds.push(id);
+      }
+    }
+    if (remainingIds.length === 0) {
+      // 모든 대상이 수동 우회 — 발행 안 함, 로그만 남김
+      return { executed: false, reason: 'manual_override_all', skippedIds };
+    }
+    if (skippedIds.length > 0) {
+      // 일부 대상만 우회 — 나머지로만 실행
+      actionOverride = {
+        ...actionOverride,
+        targetDeviceId: remainingIds[0],
+        targetDeviceIds: remainingIds,
+      };
+    }
 
     let success = true;
     let errorMessage: string | undefined;
@@ -976,6 +1084,11 @@ export class AutomationRunnerService {
         settings.relayActiveUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
         // 룰 active 동안은 switchState도 true로 sticky 유지
         settings.switchState = true;
+        // 수동 pin/release 정책: 룰이 active 동안 device가 "동작 상태"여야 함을 기록
+        // 사용자가 다른 상태(OFF)로 토글하면 userOverride=true로 pin
+        // 사용자가 다시 ON으로 토글하면 → 룰 의도와 일치 → userOverride=false로 release
+        // (relay 펄스 OFF 구간이라도 사용자 관점에서 rule은 "동작 중"이므로 true 유지)
+        settings.ruleIntendedState = true;
         dev.deviceSettings = settings;
         await this.devicesRepo.save(dev);
         this.eventsGateway.broadcastDeviceSwitchUpdate?.(dev.userId, {

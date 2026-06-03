@@ -85,6 +85,14 @@ export class AutomationService {
     rule.enabled = !rule.enabled;
     const saved = await this.rulesRepo.save(rule);
 
+    // 룰 toggle 시 runner의 in-memory lastState 강제 무효화 + 대상 device의 manual override / rule intent 리셋
+    // → 룰 disable→enable 시 즉시 재평가되고 ON/OFF가 새로 적용되도록 보장.
+    try {
+      this.runnerService.onRuleToggled(saved);
+    } catch (err: any) {
+      this.logger.warn(`onRuleToggled 호출 실패: ${err?.message ?? err}`);
+    }
+
     // FR-03: 관수 룰 활성화 시 원격제어 자동 ON
     let remoteControlEnabled = false;
     if (saved.enabled && options?.autoEnableRemote && (saved.conditions as any)?.type === 'irrigation') {
