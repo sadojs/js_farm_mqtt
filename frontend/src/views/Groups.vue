@@ -89,6 +89,13 @@
             <div class="device-sub-grid">
               <div v-for="device in getGroupSensors(group)" :key="device.id" class="sub-card sensor">
                 <div class="sub-card-top">
+                  <!-- 타입 아이콘 칩 (헤더 순서 통일: [칩][상태점+이름+✎][배지]) -->
+                  <EquipmentIcon
+                    :type="isRainSensor(device) ? 'rain' : 'sensor'"
+                    :active="device.online"
+                    :size="20"
+                    :title="isRainSensor(device) ? '우적센서' : '측정기'"
+                  />
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
                   <template v-if="renamingDeviceId === device.id">
                     <input
@@ -139,7 +146,7 @@
                   <EquipmentIcon
                     type="opener"
                     :active="(og.openDevice.online || og.closeDevice.online) && (og.openDevice.switchState === true || og.closeDevice.switchState === true)"
-                    :size="16"
+                    :size="20"
                     title="개폐기"
                   />
                   <span :class="['status-dot', og.openDevice.online || og.closeDevice.online ? 'online' : 'offline']"></span>
@@ -164,7 +171,7 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span class="type-tag actuator">개폐기</span>
+                  <span class="type-tag actuator type-tag-opener">개폐기</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
                   <span class="control-label">열림</span>
@@ -187,7 +194,7 @@
                   <EquipmentIcon
                     type="irrigation"
                     :active="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true"
-                    :size="16"
+                    :size="20"
                     title="관주"
                   />
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
@@ -213,7 +220,7 @@
                     >✎</button>
                   </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
-                  <span class="type-tag actuator">관주</span>
+                  <span class="type-tag actuator type-tag-irrigation">관주</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
                   <span class="control-label">원격제어 ON/OFF</span>
@@ -236,7 +243,7 @@
                   <EquipmentIcon
                     :type="device.equipmentType"
                     :active="device.online && device.switchState === true"
-                    :size="16"
+                    :size="20"
                     :title="device.equipmentType ?? ''"
                   />
                   <span :class="['status-dot', device.online ? 'online' : 'offline']"></span>
@@ -816,6 +823,19 @@ function isEventSensor(device: any): boolean {
 }
 function eventSensorField(device: any): string {
   return EVENT_SENSOR_MODEL_FIELD[device?.zigbeeModel] || ''
+}
+
+// 우적/비 감지 센서 — EquipmentIcon 'rain' 타입 사용 (DeviceStatusCards와 동일 로직)
+function isRainSensor(device: any): boolean {
+  // 1) sensorData에 rain_* 필드 존재
+  const data = device?.sensorData as any
+  if (data && ('rain_detection' in data || 'rain_intensity' in data || 'rainfall' in data)) return true
+  // 2) 모델/이름 기반 (페어링 직후 reading 없어도 아이콘 표시)
+  const model = (device?.zigbeeModel || '').toLowerCase()
+  if (model.includes('ts0207') || model.includes('rain')) return true
+  const name = (device?.name || '').toLowerCase()
+  if (name.includes('우적') || name.includes('rain')) return true
+  return false
 }
 
 const ALLOWED_SENSOR_FIELDS = new Set(['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point', 'rain_detection', 'pressure'])
@@ -1453,7 +1473,18 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .type-tag.sensor { background: var(--sensor-bg); color: var(--sensor-accent); }
+/* actuator는 기본 초록(primary) — 유동팬/기타 장치 */
 .type-tag.actuator { background: var(--accent-bg); color: var(--accent); }
+/* 개폐기 = 주황 */
+.type-tag.type-tag-opener {
+  background: color-mix(in srgb, var(--device-opener, #ff9800) 14%, transparent);
+  color: var(--device-opener, #b45309);
+}
+/* 관주 = 파랑/cyan */
+.type-tag.type-tag-irrigation {
+  background: color-mix(in srgb, var(--device-irrigation, #00bcd4) 14%, transparent);
+  color: #0277bd;
+}
 
 /* 수동 우회 배지 — 자동제어 룰 의도와 다르게 수동 조작된 상태 표시 */
 .manual-override-badge {

@@ -26,6 +26,7 @@ export type EquipmentKind =
   | 'opener_close'
   | 'other'
   | 'sensor'
+  | 'rain'      // 우적/비 감지 센서 — 파랑 톤 + 비구름 아이콘
   | string  // graceful fallback
 
 interface Props {
@@ -41,12 +42,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // 타입 정규화 — opener_open/opener_close → opener로 합침
-const normalizedType = computed<'fan' | 'irrigation' | 'opener' | 'sensor' | 'other'>(() => {
+const normalizedType = computed<'fan' | 'irrigation' | 'opener' | 'sensor' | 'rain' | 'other'>(() => {
   const t = props.type ?? 'other'
   if (t === 'opener_open' || t === 'opener_close' || t === 'opener') return 'opener'
   if (t === 'fan') return 'fan'
   if (t === 'irrigation') return 'irrigation'
   if (t === 'sensor') return 'sensor'
+  if (t === 'rain') return 'rain'
   return 'other'
 })
 
@@ -56,7 +58,10 @@ const typeColorVar = computed(() => {
     case 'fan': return 'var(--device-fan, #2196f3)'
     case 'irrigation': return 'var(--device-irrigation, #00bcd4)'
     case 'opener': return 'var(--device-opener, #ff9800)'
-    case 'sensor': return 'var(--device-sensor, #9c27b0)'
+    // 일반 측정기 — 보라 톤 (--sensor-accent 우선, fallback --device-sensor)
+    case 'sensor': return 'var(--sensor-accent, var(--device-sensor, #7b1fa2))'
+    // 우적/비 감지 센서 — 파랑 톤
+    case 'rain': return '#1565c0'
     default: return 'var(--device-other, #607d8b)'
   }
 })
@@ -111,11 +116,19 @@ const chipStyle = computed(() => {
       <path d="M12 4v16" />
     </svg>
 
-    <!-- 측정기 (sensor): 그래프 라인 -->
+    <!-- 측정기 (sensor): activity/waveform - 온습도 등 일반 측정기 -->
     <svg v-else-if="normalizedType === 'sensor'" :width="svgSize" :height="svgSize" viewBox="0 0 24 24"
       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <polyline points="3 17 9 11 13 15 21 7" />
-      <polyline points="14 7 21 7 21 14" />
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+
+    <!-- 우적 (rain): 비구름 - 우적/누수 센서 -->
+    <svg v-else-if="normalizedType === 'rain'" :width="svgSize" :height="svgSize" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
+      <line x1="8" y1="19" x2="8" y2="21" />
+      <line x1="12" y1="19" x2="12" y2="21" />
+      <line x1="16" y1="19" x2="16" y2="21" />
     </svg>
 
     <!-- 기타 (other): 톱니 (설정) -->
