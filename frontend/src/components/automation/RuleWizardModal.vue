@@ -96,9 +96,18 @@ watch(() => props.visible, (open) => {
     const deviceIds = actions.targetDeviceIds?.length
       ? actions.targetDeviceIds
       : actions.targetDeviceId ? [actions.targetDeviceId] : []
-    // 레거시 룰: description에 JSON 메타데이터가 저장된 경우 사용자에게 노출하지 않음
+    // 레거시 룰: description에 JSON 메타데이터(channelMapping, originalV2State, hysteresisOffAt 등)가
+    // 저장된 경우 사용자에게 노출하지 않음 — 사용자가 직접 JSON을 설명으로 쓰는 경우는 거의 없으므로
+    // 트림 후 '{'로 시작하고 JSON 파싱이 성공하면 메타데이터로 간주.
     const rawDesc = rule.description || ''
-    const isJsonMeta = /^\s*\{.*"(originalV2State|hysteresisOffAt)"/.test(rawDesc)
+    let isJsonMeta = false
+    const trimmed = rawDesc.trim()
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        JSON.parse(trimmed)
+        isJsonMeta = true
+      } catch { /* 파싱 실패 → 일반 텍스트로 간주 */ }
+    }
     formData.value = {
       groupId: rule.groupId,
       sensorDeviceIds: sensorIds,

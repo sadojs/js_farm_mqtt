@@ -58,8 +58,10 @@ function buildIrrigation(state: WizardStateV2): CreateRuleRequest {
     schedules: irrigation.schedule.map(s => ({ startTime: s.startTime, days: s.days, repeat: true })),
   }
 
-  const meta: Record<string, unknown> = {}
-  meta.channelMapping = mapping
+  // channelMapping을 description에 JSON으로 저장하지 않음 — 어디서도 읽지 않는 dead metadata였고,
+  // 수정 위저드의 '설명' 입력란에 JSON이 그대로 노출되는 버그의 원인이었음.
+  // 채널 매핑은 device.channelMapping에서 직접 조회 가능.
+  void mapping
 
   return {
     name: ruleName,
@@ -71,7 +73,6 @@ function buildIrrigation(state: WizardStateV2): CreateRuleRequest {
       sensorDeviceIds: [],
     } as any,
     priority: 1,
-    ...(Object.keys(meta).length ? { description: JSON.stringify(meta) } : {}),
   }
 }
 
