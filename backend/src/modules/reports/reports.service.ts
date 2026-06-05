@@ -30,17 +30,26 @@ export class ReportsService {
       values.push(params.endDate);
     }
     if (params.groupId) {
-      conditions.push(`gd.group_id = $${paramIndex++}`);
+      // 그룹 소속 장치 = group_devices 직접 매핑 ∪ gateway→house→group 경로 매핑.
+      // env-config.service 의 getSources() 와 동일한 매핑 로직.
+      // (group_devices 가 비어있어도 gateway 경로로 추적되도록 UNION)
+      conditions.push(`sd.device_id IN (
+        SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = $${paramIndex}::uuid
+        UNION
+        SELECT d.id FROM devices d
+        JOIN gateways g ON g.id::text = d.gateway_id
+        JOIN houses h ON h.id = g.house_id
+        WHERE h.group_id = $${paramIndex}::uuid
+      )`);
       values.push(params.groupId);
+      paramIndex++;
     }
     return { conditions, values, paramIndex };
   }
 
-  private groupJoin(params: ReportParams): string {
-    if (params.groupId) {
-      return 'JOIN group_devices gd ON gd.device_id = sd.device_id';
-    }
-    return 'LEFT JOIN group_devices gd ON gd.device_id = sd.device_id';
+  private groupJoin(_params: ReportParams): string {
+    // 그룹 필터는 buildConditions 의 sd.device_id IN (...) 서브쿼리로 처리한다.
+    return '';
   }
 
   async getStatistics(userId: string, params: ReportParams) {
