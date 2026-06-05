@@ -76,6 +76,16 @@ export class AutomationService {
     if (dto.priority !== undefined) rule.priority = dto.priority;
 
     const saved = await this.rulesRepo.save(rule);
+
+    // 룰 update 시 runner의 in-memory lastState 강제 무효화 + 대상 device의 manual override / rule intent 리셋
+    // 이유: conditions 변경(특히 relay: true→false 같은 모드 전환) 시 stale lastState가 'already_active'로 publish를 막아
+    //       새 조건이 즉시 반영되지 않는 문제 발생. toggle과 동일하게 처리.
+    try {
+      this.runnerService.onRuleToggled(saved);
+    } catch (err: any) {
+      this.logger.warn(`onRuleToggled (update) 호출 실패: ${err?.message ?? err}`);
+    }
+
     return this.withTarget(saved);
   }
 
@@ -109,6 +119,14 @@ export class AutomationService {
   async remove(id: string, userId: string | null) {
     const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
+    // 삭제 직전 runner의 in-memory lastState + 대상 device의 sticky 상태 정리
+    // (rule.enabled를 false로 가정한 cleanup — relayActivePhase / ruleIntendedState 등 리셋)
+    try {
+      rule.enabled = false;
+      this.runnerService.onRuleToggled(rule);
+    } catch (err: any) {
+      this.logger.warn(`onRuleToggled (remove) 호출 실패: ${err?.message ?? err}`);
+    }
     await this.rulesRepo.remove(rule);
     return { message: '삭제되었습니다.' };
   }
