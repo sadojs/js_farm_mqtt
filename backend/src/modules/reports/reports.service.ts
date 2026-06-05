@@ -115,7 +115,7 @@ export class ReportsService {
         date_trunc('hour', al.executed_at) as time,
         COUNT(*) as total_actions
       FROM automation_logs al
-      LEFT JOIN automation_rules ar ON ar.id = al.rule_id
+      LEFT JOIN automation_rules ar ON ar.id::text = al.rule_id
       WHERE ${whereClause}
       GROUP BY date_trunc('hour', al.executed_at)
       ORDER BY time ASC
