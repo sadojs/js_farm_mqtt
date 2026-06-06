@@ -65,11 +65,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
-import { useNotificationStore } from '../stores/notification.store'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const notificationStore = useNotificationStore()
 
 interface LoginData {
   username: string
@@ -92,7 +90,7 @@ const handleLogin = async () => {
 
   try {
     await authStore.login(loginData.value.username, loginData.value.password)
-    notificationStore.success('로그인 성공', `${authStore.user?.name}님 환영합니다.`)
+    // 로그인 성공은 라우팅으로 즉시 인지 가능 — 별도 알림 노출하지 않음
     router.push('/dashboard')
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || '사용자명 또는 비밀번호가 올바르지 않습니다.'

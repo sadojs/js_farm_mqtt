@@ -242,8 +242,12 @@ export class AutomationRunnerService {
         await this.refreshRelayActiveUntil(rule).catch(() => undefined);
         return { executed: false, reason: 'relay_state_unchanged' };
       }
+      // 로그는 "의미 있는 변화"에서만 기록한다 — 룰이 막 활성화되었거나(이전 매치 없음)
+      // 펄스 방향이 바뀌었을 때(예: 열기 → 닫기)만 logsRepo.save 호출.
+      // 같은 활성 사이클 내의 30s ON ↔ 60s OFF 펄스 토글은 발행은 하되 로그는 생략.
+      const isNewActivation = !prev?.matched || directionChanged;
       this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction });
-      return this.executeRelayAction(rule, relayResult, hysteresisAction);
+      return this.executeRelayAction(rule, relayResult, hysteresisAction, isNewActivation);
     }
 
     // 일반 자동화: 이미 조건 충족 중이면 중복 실행 방지
@@ -1000,6 +1004,7 @@ export class AutomationRunnerService {
     rule: AutomationRule,
     relay: { isOnPhase: boolean; condition: any },
     hysteresisAction?: 'on' | 'off' | 'hold',
+    shouldLog: boolean = true,
   ) {
     const action = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
     // 개폐기 페어 라우팅: hysteresis 방향에 따라 open/close 장치 선택
@@ -1104,34 +1109,37 @@ export class AutomationRunnerService {
       this.logger.error(`릴레이 실행 실패: ${err.message}`);
     }
 
-    // 릴레이 실행 로그 기록
-    const deviceNames = actionResult?.devices
-      ? actionResult.devices.map((d: any) => d.deviceName || d.deviceId).filter(Boolean)
-      : [];
-    await this.logsRepo.save(
-      this.logsRepo.create({
-        ruleId: rule.id,
-        userId: rule.userId,
-        success,
-        conditionsMet: {
-          type: 'relay',
-          ruleName: rule.name,
-          isOnPhase: relay.isOnPhase,
-          relayOnMinutes: relay.condition.relayOnMinutes,
-          relayOffMinutes: relay.condition.relayOffMinutes,
-          relayOnSeconds: relay.condition.relayOnSeconds,
-          relayOffSeconds: relay.condition.relayOffSeconds,
-          hysteresisAction: hysteresisAction || null,
-          field: relay.condition.field,
-          equipmentType: action?.equipmentType || null,
-        },
-        actionsExecuted: {
-          deviceNames,
-          command: relay.isOnPhase ? 'on' : 'off',
-        },
-        errorMessage,
-      }),
-    );
+    // 릴레이 실행 로그 기록 — 새 활성화/방향 전환/실패에서만 기록(shouldLog).
+    // 같은 활성 사이클 내의 펄스 토글은 사용자 입장에선 "변화 없음"이므로 로그 생략.
+    if (shouldLog || !success) {
+      const deviceNames = actionResult?.devices
+        ? actionResult.devices.map((d: any) => d.deviceName || d.deviceId).filter(Boolean)
+        : [];
+      await this.logsRepo.save(
+        this.logsRepo.create({
+          ruleId: rule.id,
+          userId: rule.userId,
+          success,
+          conditionsMet: {
+            type: 'relay',
+            ruleName: rule.name,
+            isOnPhase: relay.isOnPhase,
+            relayOnMinutes: relay.condition.relayOnMinutes,
+            relayOffMinutes: relay.condition.relayOffMinutes,
+            relayOnSeconds: relay.condition.relayOnSeconds,
+            relayOffSeconds: relay.condition.relayOffSeconds,
+            hysteresisAction: hysteresisAction || null,
+            field: relay.condition.field,
+            equipmentType: action?.equipmentType || null,
+          },
+          actionsExecuted: {
+            deviceNames,
+            command: relay.isOnPhase ? 'on' : 'off',
+          },
+          errorMessage,
+        }),
+      );
+    }
 
     return { executed: success, relay: true, isOnPhase: relay.isOnPhase, actions: actionResult ? [actionResult] : [] };
   }

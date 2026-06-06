@@ -10,7 +10,7 @@ export function useAuth() {
   async function login(email: string, password: string) {
     try {
       await authStore.login(email, password)
-      notificationStore.success('로그인 성공', `${authStore.user?.name}님 환영합니다.`)
+      // 로그인 성공 알림은 노이즈 — 대시보드로 곧장 이동하면 사용자는 이미 성공을 인지한다.
       router.push('/dashboard')
     } catch (err: any) {
       const message = err.response?.data?.message || '로그인에 실패했습니다.'
@@ -21,7 +21,6 @@ export function useAuth() {
 
   function logout() {
     authStore.logout()
-    notificationStore.info('로그아웃', '정상적으로 로그아웃되었습니다.')
     router.push('/login')
   }
 
