@@ -223,12 +223,32 @@ export class AutomationRunnerService {
       if (hysteresisAction === 'off') {
         const isOpenerRule = await this.isOpenerRule(rule);
         if (!isOpenerRule) {
+          const wasActive = this.lastState.get(rule.id)?.matched === true;
           // 항상 clearRelayActivePhase 호출 — backend 재시작으로 lastState 캐시가 비어있어도
           // device.deviceSettings.relayActivePhase가 남아있으면 정리 (내부에서 idempotent)
           await this.clearRelayActivePhase(rule).catch(err =>
             this.logger.warn(`relayActivePhase 해제 실패: ${err.message}`)
           );
           this.lastState.delete(rule.id);
+          // 활성 → 비활성 전환은 "변화 시점" — 로그 1건만 남긴다.
+          // (사용자가 환풍기 등이 언제 꺼졌는지 추적 가능)
+          if (wasActive) {
+            await this.logsRepo.save(
+              this.logsRepo.create({
+                ruleId: rule.id,
+                userId: rule.userId,
+                success: true,
+                conditionsMet: {
+                  type: 'relay',
+                  ruleName: rule.name,
+                  hysteresisAction: 'off',
+                  equipmentType: (rule.actions as any)?.equipmentType || null,
+                  deactivated: true,
+                },
+                actionsExecuted: { deviceNames: [], command: 'off' },
+              }),
+            ).catch(err => this.logger.warn(`룰 종료 로그 저장 실패: ${err?.message ?? err}`));
+          }
           return { executed: false, reason: 'hysteresis_off_non_opener' };
         }
       }
