@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -46,15 +47,22 @@ export class UpdateFallbackConfigDto {
   @IsBoolean()
   fanEnabled?: boolean;
 
+  /** 트리거 측정값 종류. temperature 면 fan_on_temp/off_temp 가 °C, humidity 면 % */
+  @IsOptional()
+  @IsIn(['temperature', 'humidity'])
+  fanTriggerType?: 'temperature' | 'humidity';
+
+  /** ON 임계값 — 범위는 -10~100 (°C 또는 %) */
   @IsOptional()
   @IsNumber()
   @Min(-10)
-  @Max(60)
+  @Max(100)
   fanOnTemp?: number;
 
+  /** OFF 임계값 — 범위는 -10~100 (°C 또는 %) */
   @IsOptional()
   @IsNumber()
   @Min(-10)
-  @Max(60)
+  @Max(100)
   fanOffTemp?: number;
 }

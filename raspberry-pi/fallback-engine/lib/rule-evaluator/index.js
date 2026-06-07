@@ -22,6 +22,7 @@ class RuleEvaluator {
     this.state = {
       channels: {},        // { channel: { state, onSince } }
       lastTemperature: null,
+      lastHumidity: null,
       rainActive: false,
       fanState: false,
       openerIntent: null,  // 'open' | 'closed' | null
@@ -39,10 +40,17 @@ class RuleEvaluator {
 
   ingestSensor(deviceName, data) {
     if (!data || typeof data !== 'object') return;
-    const candidates = ['temperature', 'temp', 'air_temperature'];
-    for (const key of candidates) {
+    const tempKeys = ['temperature', 'temp', 'air_temperature'];
+    for (const key of tempKeys) {
       if (typeof data[key] === 'number') {
         this.state.lastTemperature = data[key];
+        break;
+      }
+    }
+    const humidityKeys = ['humidity', 'relative_humidity', 'rh'];
+    for (const key of humidityKeys) {
+      if (typeof data[key] === 'number') {
+        this.state.lastHumidity = data[key];
         break;
       }
     }

@@ -1,5 +1,6 @@
 export type FallbackMode = 'online' | 'fallback' | 'unknown'
 export type OpenerScheduleMode = 'time' | 'always-open'
+export type FanTriggerType = 'temperature' | 'humidity'
 
 export interface FallbackConfig {
   gatewayId: string
@@ -11,6 +12,7 @@ export interface FallbackConfig {
   irrigationMaxRuntimeMinutes: number
   fertilizerEnabled: boolean
   fanEnabled: boolean
+  fanTriggerType: FanTriggerType
   fanOnTemp: number
   fanOffTemp: number
   version: number
@@ -62,6 +64,7 @@ export interface UpdateConfigDto {
   irrigationMaxRuntimeMinutes?: number
   fertilizerEnabled?: boolean
   fanEnabled?: boolean
+  fanTriggerType?: FanTriggerType
   fanOnTemp?: number
   fanOffTemp?: number
 }

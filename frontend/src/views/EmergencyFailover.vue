@@ -10,7 +10,8 @@ import IrrigationFailoverCard from '../components/emergency-failover/IrrigationF
 import FertilizerFailoverCard from '../components/emergency-failover/FertilizerFailoverCard.vue'
 import FanFailoverCard from '../components/emergency-failover/FanFailoverCard.vue'
 import type { Gateway } from '../types/device.types'
-import type { OpenerSchedule, UpsertScheduleDto } from '../types/emergency-failover.types'
+import type { OpenerSchedule, UpsertScheduleDto, FanTriggerType } from '../types/emergency-failover.types'
+import { eventTypeLabel, eventPayloadSummary, eventBadgeClass } from '../utils/fallback-event-humanizer'
 
 const gateways = ref<Gateway[]>([])
 const selectedGatewayId = ref<string | null>(null)
@@ -30,11 +31,19 @@ const editable = ref({
   irrigationMaxRuntimeMinutes: 30,
   fertilizerEnabled: true,
   fanEnabled: false,
+  fanTriggerType: 'temperature' as FanTriggerType,
   fanOnTemp: 35,
   fanOffTemp: 28,
 })
 
-const fanValid = computed(() => editable.value.fanOnTemp > editable.value.fanOffTemp)
+const fanValid = computed(() => {
+  if (editable.value.fanOnTemp <= editable.value.fanOffTemp) return false
+  if (editable.value.fanTriggerType === 'humidity') {
+    const { fanOnTemp, fanOffTemp } = editable.value
+    if (fanOnTemp < 0 || fanOnTemp > 100 || fanOffTemp < 0 || fanOffTemp > 100) return false
+  }
+  return true
+})
 
 // M-3: 최소 안전 룰 비활성화 시 경고
 const allCriticalDisabled = computed(() =>
@@ -68,6 +77,7 @@ watch(selectedGatewayId, async (gid) => {
       irrigationMaxRuntimeMinutes: fail.config.value.irrigationMaxRuntimeMinutes,
       fertilizerEnabled: fail.config.value.fertilizerEnabled,
       fanEnabled: fail.config.value.fanEnabled,
+      fanTriggerType: (fail.config.value.fanTriggerType ?? 'temperature') as FanTriggerType,
       fanOnTemp: Number(fail.config.value.fanOnTemp),
       fanOffTemp: Number(fail.config.value.fanOffTemp),
     }
@@ -188,11 +198,28 @@ function fmt(d: string | null) {
 
       <FanFailoverCard
         v-model:fanEnabled="editable.fanEnabled"
+        v-model:fanTriggerType="editable.fanTriggerType"
         v-model:fanOnTemp="editable.fanOnTemp"
         v-model:fanOffTemp="editable.fanOffTemp"
       />
 
-      <!-- 최근 이벤트 -->
+      <!-- 폴백 측정값 소스 안내 -->
+      <section class="card info-card">
+        <h3>ℹ️ 폴백 모드 측정값 소스</h3>
+        <p>
+          폴백 모드(서버 단절) 동안 라즈베리파이는 이 게이트웨이에 연결된
+          <strong>모든 온/습도 측정기</strong> 의 가장 최근 수신 값을 사용합니다.
+          (<code>구역 관리 → 센서 환경 설정</code> 의 내부 온/습도 매핑과는 <strong>별개</strong> —
+          오프라인 상태에서 매핑 정보 조회가 불가능하기 때문)
+        </p>
+        <ul>
+          <li>특정 측정기의 값으로 동작시키려면 해당 게이트웨이에 그 측정기만 연결하세요.</li>
+          <li>여러 측정기가 있으면 마지막에 게시된 값이 사용됩니다 (각 측정기가 평균으로 합산되지 않음).</li>
+          <li>온라인 복귀 시 자동제어 룰이 다시 메인 컨트롤러를 잡으며, 폴백 사용 임계값은 안전망입니다.</li>
+        </ul>
+      </section>
+
+      <!-- 최근 이벤트 (한글화) -->
       <section class="card" v-if="fail.events.value.length">
         <h3>최근 폴백 이벤트 ({{ fail.events.value.length }}건)</h3>
         <table class="events-table">
@@ -206,8 +233,12 @@ function fmt(d: string | null) {
           <tbody>
             <tr v-for="e in fail.events.value" :key="e.id">
               <td>{{ fmt(e.occurredAt) }}</td>
-              <td><span class="badge-event" :data-type="e.eventType">{{ e.eventType }}</span></td>
-              <td><code>{{ JSON.stringify(e.payload) }}</code></td>
+              <td>
+                <span :class="['badge-event', `badge-${eventBadgeClass(e.eventType)}`]">
+                  {{ eventTypeLabel(e.eventType) }}
+                </span>
+              </td>
+              <td>{{ eventPayloadSummary(e) }}</td>
             </tr>
           </tbody>
         </table>
@@ -275,8 +306,16 @@ function fmt(d: string | null) {
   padding: 2px 8px; border-radius: 8px; font-size: 11px;
   background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555);
 }
-.badge-event[data-type="safety_off"] { background: #ffebee; color: #c62828; }
-.badge-event[data-type="mode_change"] { background: #fff3e0; color: #ef6c00; }
+.badge-event.badge-danger { background: #ffebee; color: #c62828; }
+.badge-event.badge-warning { background: #fff3e0; color: #ef6c00; }
+.badge-event.badge-info { background: #e3f2fd; color: #1565c0; }
+.badge-event.badge-success { background: #e8f5e9; color: #2e7d32; }
+.badge-event.badge-neutral { background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555); }
+
+.info-card { background: #f0f4f8; border-color: #b0bec5; }
+.info-card p { margin: 0 0 8px 0; line-height: 1.6; font-size: 14px; color: #37474f; }
+.info-card ul { margin: 8px 0 0 20px; padding: 0; font-size: 13px; color: #455a64; line-height: 1.7; }
+.info-card code { background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
 
 .page-footer { display: flex; justify-content: flex-end; margin-top: 24px; }
 .btn-primary {

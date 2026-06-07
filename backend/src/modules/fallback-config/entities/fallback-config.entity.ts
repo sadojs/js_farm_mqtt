@@ -34,9 +34,15 @@ export class FallbackConfig {
   @Column({ name: 'fan_enabled', type: 'boolean', default: false })
   fanEnabled!: boolean;
 
+  /** 트리거 측정값 종류 — 'temperature'(°C) | 'humidity'(%) */
+  @Column({ name: 'fan_trigger_type', type: 'varchar', length: 20, default: 'temperature' })
+  fanTriggerType!: 'temperature' | 'humidity';
+
+  /** ON 임계값 — fanTriggerType 이 temperature 면 °C, humidity 면 % */
   @Column({ name: 'fan_on_temp', type: 'numeric', precision: 5, scale: 2, default: 35.0, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
   fanOnTemp!: number;
 
+  /** OFF 임계값 — fanTriggerType 이 temperature 면 °C, humidity 면 % */
   @Column({ name: 'fan_off_temp', type: 'numeric', precision: 5, scale: 2, default: 28.0, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
   fanOffTemp!: number;
 

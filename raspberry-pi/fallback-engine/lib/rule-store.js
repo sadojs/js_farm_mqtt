@@ -26,6 +26,7 @@ const DEFAULT_RULES = {
     irrigationMaxRuntimeMinutes: 30,
     fertilizerEnabled: true,
     fanEnabled: false,
+    fanTriggerType: 'temperature',
     fanOnTemp: 35,
     fanOffTemp: 28,
   },

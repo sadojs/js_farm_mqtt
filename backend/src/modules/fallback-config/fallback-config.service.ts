@@ -126,11 +126,18 @@ export class FallbackConfigService implements OnModuleInit {
 
     const next = { ...config, ...dto };
 
-    // 환기팬: onTemp > offTemp 강제
+    // 환기팬: ON > OFF 강제 (온도/습도 모두 — 큰 값에서 켜고 작은 값에서 끈다)
     if (next.fanOnTemp <= next.fanOffTemp) {
+      const unit = next.fanTriggerType === 'humidity' ? '%' : '°C';
       throw new BadRequestException(
-        '환기팬 ON 임계값은 OFF 임계값보다 커야 합니다',
+        `환기팬 ON 임계값(${next.fanOnTemp}${unit})은 OFF 임계값(${next.fanOffTemp}${unit})보다 커야 합니다`,
       );
+    }
+    // 습도 모드: 0~100 범위 강제
+    if (next.fanTriggerType === 'humidity') {
+      if (next.fanOnTemp < 0 || next.fanOnTemp > 100 || next.fanOffTemp < 0 || next.fanOffTemp > 100) {
+        throw new BadRequestException('환기팬 습도 임계값은 0~100% 범위여야 합니다');
+      }
     }
 
     Object.assign(config, dto);
@@ -314,6 +321,7 @@ export class FallbackConfigService implements OnModuleInit {
         irrigationMaxRuntimeMinutes: config.irrigationMaxRuntimeMinutes,
         fertilizerEnabled: config.fertilizerEnabled,
         fanEnabled: config.fanEnabled,
+        fanTriggerType: config.fanTriggerType,
         fanOnTemp: config.fanOnTemp,
         fanOffTemp: config.fanOffTemp,
       },
