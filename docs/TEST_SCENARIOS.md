@@ -2,7 +2,13 @@
 
 > 매 디자인/로직 수정 후 실행해야 하는 **재현 가능한 회귀 테스트** 모음.
 > 모든 시나리오는 mtest 계정(`farm_admin`)으로 검증 가능. 결과는 ✅/❌로 표시.
-> 마지막 일괄 검증: `2026-06-04` (10건 PASS / 0건 FAIL / 1건 발견 사항 별도 정리 → [CONTROL_LOGIC_VERIFICATION.md](./CONTROL_LOGIC_VERIFICATION.md))
+> 마지막 일괄 검증: `2026-06-07` — 골든 이미지 추출 직전 최종 회귀.
+> 10/10 PASS + 최근 회귀 6/6 PASS → [GOLDEN_IMAGE_FINAL_VERIFICATION.md](./GOLDEN_IMAGE_FINAL_VERIFICATION.md)
+> 이전 회귀: `2026-06-04` → [CONTROL_LOGIC_VERIFICATION.md](./CONTROL_LOGIC_VERIFICATION.md)
+>
+> ⚠ **테스트 스크립트 작성 시 주의**:
+> 1. 룰 수정은 **PUT** 메서드 (PATCH 미지원)
+> 2. 개폐기 인터록 검증은 `device.switchState` 대신 **MQTT 캡처** 로 (switchState 는 비동기 ack 슬롯)
 
 ---
 
