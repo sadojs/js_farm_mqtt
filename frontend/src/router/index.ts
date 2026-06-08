@@ -88,6 +88,18 @@ const router = createRouter({
       meta: { title: '생육관리', requiresAuth: true }
     },
     {
+      path: '/spray-schedule',
+      name: 'spray-schedule',
+      component: () => import('../modules/spray-schedule/SprayScheduleView.vue'),
+      meta: { title: '방재일정', requiresAuth: true, denyFarmUser: true }
+    },
+    {
+      path: '/worker-payroll',
+      name: 'worker-payroll',
+      component: () => import('../modules/worker-payroll/WorkerPayrollView.vue'),
+      meta: { title: '일꾼 관리', requiresAuth: true, denyFarmUser: true }
+    },
+    {
       path: '/gateways/:id/env',
       name: 'gateway-env',
       component: () => import('../views/GatewayEnvSettings.vue'),
