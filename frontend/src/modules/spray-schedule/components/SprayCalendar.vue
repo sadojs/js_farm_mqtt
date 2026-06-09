@@ -235,7 +235,7 @@ function onDrop(date: string) {
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-caption); color: var(--text-secondary); }
 .grid-head {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 .grid-head span {
@@ -249,10 +249,11 @@ function onDrop(date: string) {
 .grid-head .sat { color: var(--text-info-banner); }
 .grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 .cell {
+  min-width: 0;
   min-height: 104px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
@@ -261,6 +262,7 @@ function onDrop(date: string) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow: hidden;
 }
 .cell.muted { background: var(--bg-primary); opacity: 0.6; }
 .cell.today { border-color: var(--accent); }
@@ -275,8 +277,12 @@ function onDrop(date: string) {
   border-radius: 6px;
   padding: 1px 6px;
   margin-left: auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.cell-events { display: flex; flex-direction: column; gap: 3px; }
+.cell-events { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .event-chip {
   border-left: 3px solid;
   border-radius: 4px;
@@ -284,13 +290,19 @@ function onDrop(date: string) {
   cursor: grab;
   font-size: 11px;
   line-height: 1.3;
+  min-width: 0;
+  overflow: hidden;
 }
 .event-chip:active { cursor: grabbing; }
-.chip-line1 { display: block; font-weight: 700; color: var(--text-primary); }
-.chip-line2 { display: block; color: var(--text-secondary); font-size: 10px; }
+.chip-line1 { display: block; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-line2 { display: block; color: var(--text-secondary); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manual-mark { color: var(--accent); font-weight: 700; }
 @media (max-width: 768px) {
-  .cell { min-height: 72px; }
+  .cell { min-height: 64px; padding: 4px; }
   .btn-add-single { margin-left: 0; }
+  .cal-toolbar { gap: 8px; }
+  .day-num { font-size: 11px; }
+  .plant-badge { font-size: 9px; padding: 1px 4px; }
+  .event-chip { font-size: 10px; padding: 2px 4px; }
 }
 </style>

@@ -185,8 +185,8 @@ async function removeAdvance(id: string) {
   gap: 12px;
 }
 .card-title { font-size: var(--font-size-label); font-weight: 700; color: var(--text-primary); }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.field { display: flex; flex-direction: column; gap: 4px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field span { font-size: var(--font-size-caption); color: var(--text-secondary); font-weight: 600; }
 .inp {
   padding: 10px 12px;
@@ -194,13 +194,17 @@ async function removeAdvance(id: string) {
   border-radius: 8px;
   background: var(--bg-input);
   color: var(--text-primary);
+  min-width: 0;
+  box-sizing: border-box;
 }
+.field .inp { width: 100%; }
 .inp:disabled { background: var(--bg-hover); color: var(--text-muted); }
 .hint { color: var(--text-muted); font-size: var(--font-size-caption); }
-.line-row { display: flex; align-items: center; gap: 8px; }
-.flex { flex: 1; }
-.amount { width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
-.adv-note { flex: 1; color: var(--text-secondary); font-size: var(--font-size-caption); }
+.line-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.line-row .inp { flex: 1 1 120px; }
+.flex { flex: 1 1 120px; min-width: 0; }
+.line-row .amount { flex: 0 1 130px; text-align: right; font-variant-numeric: tabular-nums; }
+.adv-note { flex: 1 1 120px; min-width: 0; color: var(--text-secondary); font-size: var(--font-size-caption); }
 .btn-icon {
   width: 32px;
   height: 36px;
@@ -225,7 +229,7 @@ async function removeAdvance(id: string) {
 .btn-add:hover { background: var(--accent-bg); }
 .sum-row { color: var(--text-secondary); font-size: var(--font-size-label); }
 .sum-row strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.actions { display: flex; justify-content: flex-end; gap: 8px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .btn-save {
   background: var(--accent);
   color: #fff;

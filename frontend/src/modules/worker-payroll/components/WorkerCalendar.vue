@@ -168,7 +168,7 @@ defineExpose({ reload })
 
 <style scoped>
 .worker-calendar { display: flex; flex-direction: column; gap: 14px; }
-.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .kpi {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -213,11 +213,12 @@ defineExpose({ reload })
 .sw.ot { background: var(--warning); }
 .sw.holiday { background: var(--text-muted); }
 .sw.advance { background: var(--sensor-accent); }
-.grid-head, .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.grid-head, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .grid-head span { text-align: center; font-size: var(--font-size-caption); font-weight: 600; color: var(--text-muted); padding: 4px 0; }
 .grid-head .sun { color: var(--danger); }
 .grid-head .sat { color: var(--text-info-banner); }
 .cell {
+  min-width: 0;
   min-height: 96px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
@@ -226,6 +227,7 @@ defineExpose({ reload })
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow: hidden;
 }
 .cell.blank { background: transparent; border: none; }
 /* 다음 달 칸은 옅은 음영 + 좌측 강조선으로 구분 */
@@ -275,6 +277,7 @@ defineExpose({ reload })
 .work-btn:hover { background: var(--accent); color: #fff; }
 .hours-chip {
   align-self: flex-start;
+  max-width: 100%;
   background: var(--success-bg);
   color: var(--success-text);
   font-weight: 700;
@@ -284,19 +287,20 @@ defineExpose({ reload })
 }
 .hours-chip.ot { background: var(--warning-bg); color: var(--warning-text); }
 .hours-chip.early { background: var(--danger-bg); color: var(--danger); }
-.day-actions { display: flex; gap: 3px; margin-top: auto; }
+.day-actions { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
 .day-actions button {
-  flex: 1;
+  flex: 1 1 28px;
   border: 1px solid var(--border-input);
   background: var(--bg-input);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
-  padding: 3px 0;
+  padding: 4px 0;
   min-width: 0;
+  min-height: 28px;
 }
-.day-actions .holiday-btn { flex: 1.4; font-size: 11px; }
+.day-actions .holiday-btn { flex: 1 1 100%; font-size: 11px; }
 .day-actions button:hover { background: var(--bg-hover); }
 .advance-chip {
   background: var(--sensor-bg);
@@ -306,9 +310,17 @@ defineExpose({ reload })
   border-radius: 6px;
   padding: 1px 6px;
   align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (max-width: 768px) {
   .kpi-row { grid-template-columns: 1fr; }
-  .cell { min-height: 80px; }
+  .cell { min-height: 96px; padding: 4px; }
+  .day-num { font-size: 11px; }
+  .day-num.with-month { padding: 1px 4px; }
+  .settle-badge { font-size: 9px; padding: 1px 4px; }
+  .hours-chip { font-size: 11px; padding: 2px 6px; }
 }
 </style>

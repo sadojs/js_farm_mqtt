@@ -387,8 +387,8 @@ defineExpose({ reload: load })
   flex-direction: column;
   gap: 10px;
 }
-.program-head { display: flex; align-items: center; gap: 10px; }
-.pest-name { width: 160px; font-weight: 600; }
+.program-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pest-name { width: 160px; min-width: 0; font-weight: 600; }
 .program-meta { color: var(--text-muted); font-size: var(--font-size-caption); }
 .btn-icon {
   margin-left: auto;
@@ -475,7 +475,19 @@ defineExpose({ reload: load })
 .btn-save:hover { background: var(--accent-hover); }
 .btn-save:disabled { opacity: 0.6; cursor: default; }
 @media (max-width: 768px) {
-  .product-row { grid-template-columns: 40px 1fr; grid-auto-rows: auto; }
   .product-head-row { display: none; }
+  .product-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .product-row .inp { min-width: 0; }
+  .product-row .col-name { flex: 1 1 120px; }
+  .product-row .col-date { flex: 1 1 120px; }
+  .product-row .stepper { flex: 1 1 90px; }
+  .product-row .col-del { flex: 0 0 auto; }
+  .zone-crop { flex: 1 1 120px; width: auto; }
+  .zone-name { flex: 1 1 100%; }
 }
 </style>

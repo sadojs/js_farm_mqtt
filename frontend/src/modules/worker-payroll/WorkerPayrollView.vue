@@ -154,7 +154,7 @@ onMounted(async () => {
 }
 .page-header h2 { font-size: var(--font-size-title); font-weight: 700; color: var(--text-primary); }
 .page-description { color: var(--text-muted); }
-.lang-toggle { display: flex; gap: 2px; background: var(--bg-hover); border-radius: 10px; padding: 4px; }
+.lang-toggle { display: flex; flex-wrap: wrap; gap: 2px; background: var(--bg-hover); border-radius: 10px; padding: 4px; }
 .lang-btn {
   border: none;
   background: none;
@@ -166,7 +166,7 @@ onMounted(async () => {
   font-size: var(--font-size-caption);
 }
 .lang-btn.active { background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-card); }
-.layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
 .worker-list {
   display: flex;
   flex-direction: column;
@@ -231,8 +231,9 @@ onMounted(async () => {
 .tab:disabled { opacity: 0.4; cursor: default; }
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
 @media (max-width: 768px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
   .worker-list { flex-direction: row; overflow-x: auto; }
-  .worker-item { min-width: 180px; }
+  .worker-item { min-width: 180px; flex-shrink: 0; }
+  .tabs { flex-wrap: wrap; }
 }
 </style>
