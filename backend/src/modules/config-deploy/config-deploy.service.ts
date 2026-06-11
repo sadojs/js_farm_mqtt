@@ -428,8 +428,14 @@ export class ConfigDeployService implements OnModuleInit {
     if (!gateway) {
       const ownerUserId = await this.findDefaultOwnerUserId();
       const shortMid = params.machineId.slice(0, 8);
-      // gateway_id가 unique constraint → 충돌 없게 machineId 접미사 추가
-      const newGatewayId = `${params.gatewayId}-${shortMid}`;
+      // gateway_id가 unique constraint → 충돌 없게 machineId 접미사 추가.
+      // 빈 문자열/공백 또는 placeholder 'lgw-default' 인 경우 'lgw' 를 prefix 로 사용
+      // (앞 '-' 가 붙은 invalid ID 생성 방지 — apply-gateway-id.sh 검증 통과).
+      const sanitizedPrefix = (params.gatewayId ?? '').trim();
+      const prefix = !sanitizedPrefix || sanitizedPrefix === 'lgw-default'
+        ? 'lgw'
+        : sanitizedPrefix;
+      const newGatewayId = `${prefix}-${shortMid}`;
       gateway = this.gatewayRepo.create({
         userId: ownerUserId,
         gatewayId: newGatewayId,
