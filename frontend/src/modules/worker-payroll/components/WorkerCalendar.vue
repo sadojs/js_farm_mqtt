@@ -1,7 +1,7 @@
 <template>
   <div v-if="data" class="worker-calendar">
-    <!-- KPI -->
-    <div class="kpi-row">
+    <!-- KPI (관리자 달력 탭) -->
+    <div v-if="!hideKpi" class="kpi-row">
       <div class="kpi">
         <span class="kpi-label">{{ t(lang, 'workDays') }}</span>
         <span class="kpi-value">{{ data.kpi.workDays }}<small>{{ t(lang, 'daysUnit') }}</small></span>
@@ -9,9 +9,6 @@
       <div class="kpi">
         <span class="kpi-label">{{ t(lang, 'totalHours') }}</span>
         <span class="kpi-value">{{ fmtH(data.kpi.totalHours) }}<small>h</small></span>
-        <span v-if="data.kpi.overtimeHours" class="kpi-sub">
-          {{ t(lang, 'overtime') }} {{ data.kpi.overtimeHours > 0 ? '+' : '' }}{{ fmtH(data.kpi.overtimeHours) }}h
-        </span>
       </div>
       <div class="kpi">
         <span class="kpi-label">{{ t(lang, 'expectedTotal') }}</span>
@@ -29,7 +26,6 @@
     <!-- 범례 -->
     <div class="legend">
       <span class="lg"><i class="sw work"></i>{{ t(lang, 'legendWork') }}</span>
-      <span class="lg"><i class="sw ot"></i>{{ t(lang, 'legendOvertime') }}</span>
       <span class="lg"><i class="sw holiday"></i>{{ t(lang, 'legendHoliday') }}</span>
       <span class="lg"><i class="sw advance"></i>{{ t(lang, 'legendAdvance') }}</span>
     </div>
@@ -39,7 +35,13 @@
       <span v-for="(d, i) in weekdays" :key="d" :class="{ sun: i === 0, sat: i === 6 }">{{ d }}</span>
     </div>
     <div class="grid">
-      <div v-for="cell in cells" :key="cell.date" class="cell" :class="{ blank: !cell.day, 'next-month': cell.nextMonth, 'month-start': cell.showMonth && cell.day !== undefined }">
+      <div
+        v-for="cell in cells"
+        :key="cell.date"
+        class="cell"
+        :class="{ blank: !cell.day, 'next-month': cell.nextMonth, tappable: cell.day && !cell.beforeStart && (isMobile || !editable) }"
+        @click="onCellClick(cell)"
+      >
         <template v-if="cell.day">
           <div class="cell-head">
             <span class="day-num" :class="{ sun: cell.dow === 0, sat: cell.dow === 6, 'with-month': cell.showMonth }">
@@ -51,18 +53,16 @@
 
           <div v-if="cell.beforeStart" class="muted-cell"></div>
           <template v-else>
-            <div v-if="cell.holiday" class="holiday-cell">
+            <div v-if="cell.status === 'off'" class="holiday-cell">
               <span class="holiday-label">{{ t(lang, 'holiday') }}</span>
-              <button class="work-btn" @click="toggleHoliday(cell)">{{ t(lang, 'work') }}</button>
+              <button v-if="editable && !isMobile" class="work-btn" @click.stop="setWork(cell)">{{ t(lang, 'work') }}</button>
             </div>
             <template v-else>
-              <span class="hours-chip" :class="{ ot: cell.deltaHours > 0, early: cell.deltaHours < 0 }">
-                {{ fmtH(cell.hours) }}h
-              </span>
-              <div class="day-actions">
-                <button @click="adjust(cell, -0.5)">−</button>
-                <button @click="adjust(cell, 0.5)">+</button>
-                <button class="holiday-btn" @click="toggleHoliday(cell)">{{ t(lang, 'holiday') }}</button>
+              <span class="hours-chip">{{ fmtH(cell.hours) }}h</span>
+              <div v-if="editable && !isMobile" class="day-actions">
+                <button @click.stop="adjustHours(cell, -0.5)">−</button>
+                <button @click.stop="adjustHours(cell, 0.5)">+</button>
+                <button class="holiday-btn" @click.stop="setOff(cell)">{{ t(lang, 'holiday') }}</button>
               </div>
             </template>
             <span v-if="cell.advance" class="advance-chip">
@@ -72,27 +72,53 @@
         </template>
       </div>
     </div>
+
+    <DayModal
+      v-if="modalCell"
+      :date="modalCell.date"
+      :dow="modalCell.dow"
+      :status="modalCell.status"
+      :hours="modalCell.hours"
+      :advance="modalCell.advance"
+      :daily-hours="data.worker.dailyHours"
+      :editable="!!editable"
+      :lang="lang"
+      @save="onModalSave"
+      @close="modalCell = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
-import type { CalendarResponse, CalendarDay } from '../types/worker-payroll.types'
+import type { CalendarResponse, CalendarDay, DayStatus } from '../types/worker-payroll.types'
 import { type PayrollLang, t, formatMoney, shortMD } from '../i18n/payroll-i18n'
+import DayModal from './DayModal.vue'
 
-const props = defineProps<{ workerId: string; lang: PayrollLang }>()
+const props = defineProps<{
+  workerId: string
+  lang: PayrollLang
+  editable?: boolean
+  hideKpi?: boolean
+}>()
+const emit = defineEmits<{ (e: 'period-change', periodStart: string): void }>()
 
 const notify = useNotificationStore()
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const data = ref<CalendarResponse | null>(null)
 const period = ref<string | undefined>(undefined)
+const modalCell = ref<any | null>(null)
+
+// 모바일 여부 (반응형)
+const isMobile = ref(false)
+let mq: MediaQueryList | null = null
+function syncMq() { isMobile.value = mq?.matches ?? false }
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
-
 function parse(iso: string): Date {
   return new Date(`${iso.slice(0, 10)}T00:00:00.000Z`)
 }
@@ -115,10 +141,9 @@ const cells = computed(() => {
       day: dt.getUTCDate(),
       dow: dt.getUTCDay(),
       month,
-      // 첫 칸이거나 1일이면 '월/일'로 표기해 달 경계를 명확히
       showMonth: idx === 0 || dt.getUTCDate() === 1,
       nextMonth: month !== firstMonth,
-      isSettleDay: d.date === anchor, // 정산 기준일(근무시작일과 같은 날)
+      isSettleDay: d.date === anchor,
     })
   })
   return out
@@ -126,6 +151,7 @@ const cells = computed(() => {
 
 async function reload() {
   data.value = await workerPayrollApi.getCalendar(props.workerId, period.value)
+  emit('period-change', data.value.periodStart)
 }
 
 function go(p: string | null) {
@@ -134,35 +160,50 @@ function go(p: string | null) {
   reload()
 }
 
-async function adjust(cell: CalendarDay, delta: number) {
-  const newDelta = Math.round((cell.deltaHours + delta) * 2) / 2
+async function setDay(date: string, status: DayStatus, hours?: number) {
+  if (!props.editable) return
   try {
-    await workerPayrollApi.setDayOverride(props.workerId, {
-      date: cell.date,
-      holiday: false,
-      deltaHours: newDelta,
-    })
+    await workerPayrollApi.setDay(props.workerId, { date, status, hours })
     await reload()
   } catch {
-    notify.error('일꾼 관리', '근무시간 조정에 실패했습니다.')
+    notify.error('일꾼 관리', '근무 설정에 실패했습니다.')
   }
 }
 
-async function toggleHoliday(cell: CalendarDay) {
-  try {
-    await workerPayrollApi.setDayOverride(props.workerId, {
-      date: cell.date,
-      holiday: !cell.holiday,
-      deltaHours: 0,
-    })
-    await reload()
-  } catch {
-    notify.error('일꾼 관리', '휴일 처리에 실패했습니다.')
+function adjustHours(cell: CalendarDay, delta: number) {
+  const next = Math.max(0, Math.round((cell.hours + delta) * 2) / 2)
+  setDay(cell.date, 'work', next)
+}
+function setOff(cell: CalendarDay) {
+  setDay(cell.date, 'off')
+}
+function setWork(cell: CalendarDay) {
+  // 기본 근무시간으로 복원
+  setDay(cell.date, 'work', data.value?.worker.dailyHours)
+}
+
+function onCellClick(cell: any) {
+  if (!cell.day || cell.beforeStart) return
+  // 데스크탑 + 편집가능 = 인라인 컨트롤 사용 (모달 안 띄움)
+  if (props.editable && !isMobile.value) return
+  modalCell.value = cell
+}
+
+function onModalSave(payload: { status: DayStatus; hours?: number }) {
+  if (modalCell.value) {
+    setDay(modalCell.value.date, payload.status, payload.hours)
   }
+  modalCell.value = null
 }
 
 watch(() => props.workerId, () => { period.value = undefined; reload() })
-onMounted(reload)
+onMounted(() => {
+  mq = window.matchMedia('(max-width: 768px)')
+  syncMq()
+  mq.addEventListener('change', syncMq)
+  reload()
+})
+onUnmounted(() => mq?.removeEventListener('change', syncMq))
 defineExpose({ reload })
 </script>
 
@@ -183,7 +224,6 @@ defineExpose({ reload })
 .kpi-value { font-size: 28px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
 .kpi-value small { font-size: 15px; color: var(--text-muted); margin-left: 2px; }
 .kpi-value.money { font-size: 22px; }
-.kpi-sub { font-size: var(--font-size-caption); color: var(--warning); font-weight: 600; }
 .period-nav {
   display: flex;
   align-items: center;
@@ -210,7 +250,6 @@ defineExpose({ reload })
 .lg { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-caption); color: var(--text-secondary); }
 .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .sw.work { background: var(--success-text); }
-.sw.ot { background: var(--warning); }
 .sw.holiday { background: var(--text-muted); }
 .sw.advance { background: var(--sensor-accent); }
 .grid-head, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
@@ -230,9 +269,9 @@ defineExpose({ reload })
   overflow: hidden;
 }
 .cell.blank { background: transparent; border: none; }
-/* 다음 달 칸은 옅은 음영 + 좌측 강조선으로 구분 */
 .cell.next-month { background: var(--bg-primary); }
-.cell.month-start { border-left: 3px solid var(--accent); }
+.cell.tappable { cursor: pointer; }
+.cell.tappable:hover { border-color: var(--accent); }
 .day-num.with-month {
   background: var(--accent-bg);
   color: var(--accent);
@@ -263,7 +302,6 @@ defineExpose({ reload })
   font-weight: 600;
   font-size: var(--font-size-caption);
 }
-.holiday-label { color: var(--text-muted); }
 .work-btn {
   border: 1px solid var(--accent);
   background: var(--accent-bg);
@@ -285,8 +323,6 @@ defineExpose({ reload })
   padding: 2px 8px;
   font-variant-numeric: tabular-nums;
 }
-.hours-chip.ot { background: var(--warning-bg); color: var(--warning-text); }
-.hours-chip.early { background: var(--danger-bg); color: var(--danger); }
 .day-actions { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
 .day-actions button {
   flex: 1 1 28px;
@@ -317,10 +353,10 @@ defineExpose({ reload })
 }
 @media (max-width: 768px) {
   .kpi-row { grid-template-columns: 1fr; }
-  .cell { min-height: 96px; padding: 4px; }
+  .cell { min-height: 72px; padding: 4px; }
   .day-num { font-size: 11px; }
   .day-num.with-month { padding: 1px 4px; }
   .settle-badge { font-size: 9px; padding: 1px 4px; }
-  .hours-chip { font-size: 11px; padding: 2px 6px; }
+  .hours-chip { font-size: 13px; padding: 2px 6px; }
 }
 </style>

@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { authApi } from '../api/auth.api'
+import apiClient from '../api/client'
 import type { User } from '../types/auth.types'
 
 // 14분마다 silent refresh (accessToken 만료 15분 기준)
@@ -17,6 +18,28 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isFarmAdmin = computed(() => user.value?.role === 'farm_admin')
   const isFarmUser = computed(() => user.value?.role === 'farm_user')
+
+  // 일꾼 계정 여부: payroll_workers 에 account_user_id 로 연결된 farm_user
+  // null=미확인. true 인 경우 일꾼 관리(정산) 페이지만 접근 가능.
+  const isWorkerAccount = ref<boolean | null>(null)
+  const isWorker = computed(() => isFarmUser.value && isWorkerAccount.value === true)
+
+  async function resolveWorkerStatus(): Promise<boolean> {
+    // 사용자 미확정 시 캐시하지 않음 (앱 초기화 레이스 방지)
+    if (!user.value) return false
+    if (user.value.role !== 'farm_user') {
+      isWorkerAccount.value = false
+      return false
+    }
+    if (isWorkerAccount.value !== null) return isWorkerAccount.value === true
+    try {
+      const { data } = await apiClient.get('/worker-payroll/me')
+      isWorkerAccount.value = !!data
+    } catch {
+      isWorkerAccount.value = false
+    }
+    return isWorkerAccount.value === true
+  }
 
   function startSilentRefreshTimer() {
     stopSilentRefreshTimer()
@@ -39,6 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
       // refreshToken은 백엔드가 httpOnly 쿠키로 설정 → JS에서 접근 불가
       accessToken.value = data.accessToken
       user.value = data.user
+      isWorkerAccount.value = null
       startSilentRefreshTimer()
     } finally {
       loading.value = false
@@ -53,6 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     user.value = null
     accessToken.value = null
+    isWorkerAccount.value = null
     stopSilentRefreshTimer()
   }
 
@@ -103,6 +128,9 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isFarmAdmin,
     isFarmUser,
+    isWorkerAccount,
+    isWorker,
+    resolveWorkerStatus,
     login,
     logout,
     refreshToken,

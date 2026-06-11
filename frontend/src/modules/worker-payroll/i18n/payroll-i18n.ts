@@ -34,6 +34,12 @@ type LabelKey =
   | 'hoursUnit'
   | 'daysUnit'
   | 'perHour'
+  | 'readonly'
+  | 'expectedNet'
+  | 'requestConfirm'
+  | 'requested'
+  | 'approve'
+  | 'waitingApproval'
 
 export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
   ko: {
@@ -59,6 +65,12 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     hoursUnit: '시간',
     daysUnit: '일',
     perHour: '시급',
+    readonly: '보기 전용',
+    expectedNet: '이번 달 예상 실수령액',
+    requestConfirm: '정산 확정 요청',
+    requested: '확정 요청됨',
+    approve: '정산 승인',
+    waitingApproval: '관리자 승인 대기 중',
   },
   tl: {
     workDays: 'Araw ng trabaho',
@@ -83,6 +95,12 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     hoursUnit: 'oras',
     daysUnit: 'araw',
     perHour: 'kada oras',
+    readonly: 'Tingin lamang',
+    expectedNet: 'Tinatayang net sahod ngayong buwan',
+    requestConfirm: 'Hilingin ang kumpirmasyon',
+    requested: 'Naipadala na',
+    approve: 'Aprubahan',
+    waitingApproval: 'Naghihintay ng pag-apruba',
   },
   th: {
     workDays: 'วันทำงาน',
@@ -107,6 +125,12 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     hoursUnit: 'ชม.',
     daysUnit: 'วัน',
     perHour: 'ต่อชั่วโมง',
+    readonly: 'ดูอย่างเดียว',
+    expectedNet: 'เงินสุทธิโดยประมาณเดือนนี้',
+    requestConfirm: 'ขอยืนยันการจ่ายเงิน',
+    requested: 'ส่งคำขอแล้ว',
+    approve: 'อนุมัติ',
+    waitingApproval: 'รออนุมัติจากผู้ดูแล',
   },
   lo: {
     workDays: 'ມື້ເຮັດວຽກ',
@@ -131,6 +155,12 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     hoursUnit: 'ຊມ.',
     daysUnit: 'ມື້',
     perHour: 'ຕໍ່ຊົ່ວໂມງ',
+    readonly: 'ເບິ່ງຢ່າງດຽວ',
+    expectedNet: 'ເງິນສຸດທິໂດຍປະມານເດືອນນີ້',
+    requestConfirm: 'ຂໍຢືນຢັນການຈ່າຍເງິນ',
+    requested: 'ສົ່ງຄຳຂໍແລ້ວ',
+    approve: 'ອະນຸມັດ',
+    waitingApproval: 'ລໍຖ້າການອະນຸມັດ',
   },
 }
 

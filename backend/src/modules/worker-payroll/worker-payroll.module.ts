@@ -7,6 +7,7 @@ import { WorkerDayOverride } from './entities/worker-day-override.entity';
 import { WorkerSettlement } from './entities/worker-settlement.entity';
 import { WorkerPayrollService } from './worker-payroll.service';
 import { WorkerPayrollController } from './worker-payroll.controller';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { WorkerPayrollController } from './worker-payroll.controller';
       WorkerDayOverride,
       WorkerSettlement,
     ]),
+    UsersModule,
   ],
   controllers: [WorkerPayrollController],
   providers: [WorkerPayrollService],

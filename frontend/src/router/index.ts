@@ -97,7 +97,7 @@ const router = createRouter({
       path: '/worker-payroll',
       name: 'worker-payroll',
       component: () => import('../modules/worker-payroll/WorkerPayrollView.vue'),
-      meta: { title: '일꾼 관리', requiresAuth: true, denyFarmUser: true }
+      meta: { title: '일꾼 관리', requiresAuth: true }
     },
     {
       path: '/gateways/:id/env',
@@ -115,7 +115,7 @@ const router = createRouter({
 })
 
 // 인증 가드 - Pinia 스토어 기반
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
   // 공개 페이지는 그냥 통과
@@ -128,6 +128,18 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
     return
+  }
+
+  // 일꾼 계정(farm_user + 근무 프로필 연결)은 정산 페이지만 접근 가능
+  if (authStore.isAuthenticated && authStore.isFarmUser) {
+    const isWorker =
+      authStore.isWorkerAccount === null
+        ? await authStore.resolveWorkerStatus()
+        : authStore.isWorkerAccount === true
+    if (isWorker && to.path !== '/worker-payroll') {
+      next('/worker-payroll')
+      return
+    }
   }
 
   // farm_user 접근 불가 페이지

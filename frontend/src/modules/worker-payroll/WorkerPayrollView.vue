@@ -1,76 +1,96 @@
 <template>
   <div class="payroll-view">
-    <header class="page-header">
-      <div>
-        <h2>일꾼 관리</h2>
-        <p class="page-description">{{ farmLabel }} · 근무·월급 관리</p>
-      </div>
-      <!-- 언어 토글 (근무 달력 / 월 정산에서 노동자에게 보여주기) -->
-      <div v-if="selectedId && tab !== 'settings'" class="lang-toggle" role="group" aria-label="언어 선택">
-        <button
-          v-for="opt in LANG_OPTIONS"
-          :key="opt.code"
-          :class="['lang-btn', { active: lang === opt.code }]"
-          @click="lang = opt.code"
-        >{{ opt.label }}</button>
-      </div>
-    </header>
+    <!-- 일꾼(farm_user) 본인 화면 -->
+    <WorkerSelfView v-if="isWorker" />
 
-    <div class="layout">
-      <!-- 일꾼 목록 (마스터) -->
-      <aside class="worker-list">
-        <button
-          v-for="w in workers"
-          :key="w.id"
-          :class="['worker-item', { active: w.id === selectedId }]"
-          @click="select(w.id)"
-        >
-          <span class="w-avatar">{{ w.name.charAt(0) }}</span>
-          <span class="w-info">
-            <span class="w-name">{{ w.name }}</span>
-            <span class="w-sub">시급 {{ w.hourlyWage.toLocaleString() }}원 · {{ Number(w.dailyHours) }}h/일</span>
-          </span>
-        </button>
-        <button class="worker-add" :class="{ active: selectedId === null && creating }" @click="newWorker">
-          + 일꾼 추가
-        </button>
-      </aside>
-
-      <!-- 디테일 -->
-      <section class="worker-detail">
-        <div v-if="selectedId === null && !creating" class="empty">
-          <p>일꾼을 선택하거나 새 일꾼을 추가해 주세요.</p>
+    <!-- 관리자(admin/farm_admin) 화면 -->
+    <template v-else>
+      <header class="page-header">
+        <div>
+          <h2>일꾼 관리</h2>
+          <p class="page-description">{{ farmLabel }} · 근무·월급 관리</p>
         </div>
+        <div
+          v-if="mode === 'workers' && selectedId && tab !== 'settings'"
+          class="lang-toggle"
+          role="group"
+          aria-label="언어 선택"
+        >
+          <button
+            v-for="opt in LANG_OPTIONS"
+            :key="opt.code"
+            :class="['lang-btn', { active: lang === opt.code }]"
+            @click="lang = opt.code"
+          >{{ opt.label }}</button>
+        </div>
+      </header>
 
-        <template v-else>
-          <div class="tabs">
-            <button :class="['tab', { active: tab === 'calendar' }]" :disabled="!selectedId" @click="tab = 'calendar'">근무 달력</button>
-            <button :class="['tab', { active: tab === 'settlement' }]" :disabled="!selectedId" @click="tab = 'settlement'">월 정산</button>
-            <button :class="['tab', { active: tab === 'settings' }]" @click="tab = 'settings'">설정</button>
+      <!-- 상위 모드 탭 -->
+      <div class="mode-tabs">
+        <button :class="['mode-tab', { active: mode === 'workers' }]" @click="mode = 'workers'">일꾼별 근무·정산</button>
+        <button :class="['mode-tab', { active: mode === 'history' }]" @click="mode = 'history'">정산 이력</button>
+      </div>
+
+      <!-- 정산 이력 -->
+      <SettlementHistory v-if="mode === 'history'" />
+
+      <!-- 일꾼별 -->
+      <div v-else class="layout">
+        <aside class="worker-list">
+          <button
+            v-for="w in workers"
+            :key="w.id"
+            :class="['worker-item', { active: w.id === selectedId }]"
+            @click="select(w.id)"
+          >
+            <span class="w-avatar">{{ w.name.charAt(0) }}</span>
+            <span class="w-info">
+              <span class="w-name">{{ w.name }}</span>
+              <span class="w-sub">{{ w.username ? '@' + w.username : '' }} · {{ w.hourlyWage.toLocaleString() }}원/h</span>
+            </span>
+          </button>
+          <button class="worker-add" :class="{ active: selectedId === null && creating }" @click="newWorker">
+            + 일꾼 등록
+          </button>
+        </aside>
+
+        <section class="worker-detail">
+          <div v-if="selectedId === null && !creating" class="empty">
+            <p>일꾼을 선택하거나 새 일꾼을 등록해 주세요.</p>
           </div>
 
-          <WorkerCalendar
-            v-if="tab === 'calendar' && selectedId"
-            :key="'cal' + selectedId"
-            :worker-id="selectedId"
-            :lang="lang"
-          />
-          <WorkerSettlement
-            v-else-if="tab === 'settlement' && selectedId"
-            :key="'set' + selectedId"
-            :worker-id="selectedId"
-            :lang="lang"
-          />
-          <WorkerSettings
-            v-else-if="tab === 'settings'"
-            :key="'cfg' + (selectedId ?? 'new')"
-            :worker-id="selectedId"
-            @saved="onSaved"
-            @delete="onDelete"
-          />
-        </template>
-      </section>
-    </div>
+          <template v-else>
+            <div class="tabs">
+              <button :class="['tab', { active: tab === 'calendar' }]" :disabled="!selectedId" @click="tab = 'calendar'">근무 달력</button>
+              <button :class="['tab', { active: tab === 'settlement' }]" :disabled="!selectedId" @click="tab = 'settlement'">월 정산</button>
+              <button :class="['tab', { active: tab === 'settings' }]" @click="tab = 'settings'">{{ creating ? '계정 등록' : '설정' }}</button>
+            </div>
+
+            <WorkerCalendar
+              v-if="tab === 'calendar' && selectedId"
+              :key="'cal' + selectedId"
+              :worker-id="selectedId"
+              :lang="lang"
+              editable
+            />
+            <WorkerSettlement
+              v-else-if="tab === 'settlement' && selectedId"
+              :key="'set' + selectedId"
+              :worker-id="selectedId"
+              :lang="lang"
+              show-nav
+            />
+            <WorkerSettings
+              v-else-if="tab === 'settings'"
+              :key="'cfg' + (selectedId ?? 'new')"
+              :worker-id="selectedId"
+              @saved="onSaved"
+              @delete="onDelete"
+            />
+          </template>
+        </section>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -84,11 +104,15 @@ import { LANG_OPTIONS, type PayrollLang } from './i18n/payroll-i18n'
 import WorkerCalendar from './components/WorkerCalendar.vue'
 import WorkerSettlement from './components/WorkerSettlement.vue'
 import WorkerSettings from './components/WorkerSettings.vue'
+import WorkerSelfView from './components/WorkerSelfView.vue'
+import SettlementHistory from './components/SettlementHistory.vue'
 
 const authStore = useAuthStore()
 const notify = useNotificationStore()
+const isWorker = authStore.isFarmUser
 const farmLabel = `${authStore.user?.name ?? '우리'} 농장`
 
+const mode = ref<'workers' | 'history'>('workers')
 const workers = ref<Worker[]>([])
 const selectedId = ref<string | null>(null)
 const creating = ref(false)
@@ -134,6 +158,7 @@ async function onDelete() {
 }
 
 onMounted(async () => {
+  if (isWorker) return
   await loadWorkers()
   if (workers.value.length > 0) {
     selectedId.value = workers.value[0].id
@@ -166,6 +191,18 @@ onMounted(async () => {
   font-size: var(--font-size-caption);
 }
 .lang-btn.active { background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-card); }
+.mode-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border-light); }
+.mode-tab {
+  border: none;
+  background: none;
+  padding: 10px 4px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.mode-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
 .worker-list {
   display: flex;
@@ -205,7 +242,7 @@ onMounted(async () => {
 }
 .w-info { display: flex; flex-direction: column; min-width: 0; }
 .w-name { font-weight: 600; color: var(--text-primary); }
-.w-sub { font-size: var(--font-size-caption); color: var(--text-muted); }
+.w-sub { font-size: var(--font-size-caption); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .worker-add {
   border: 1px dashed var(--accent);
   background: none;

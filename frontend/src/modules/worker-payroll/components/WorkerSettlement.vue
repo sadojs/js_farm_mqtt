@@ -8,22 +8,19 @@
       </p>
     </header>
 
-    <div class="period-nav">
+    <div v-if="showNav" class="period-nav">
       <button class="nav-btn" :disabled="!data.prevPeriodStart" @click="go(data.prevPeriodStart)">‹</button>
       <span class="period-label">{{ shortMD(data.periodStart) }} ~ {{ shortMD(data.periodEnd) }}</span>
       <button class="nav-btn" @click="go(data.nextPeriodStart)">›</button>
     </div>
 
-    <!-- 영수증 -->
+    <!-- 영수증 (확정 요청 전 전체 내역 표시) -->
     <div class="receipt">
       <div class="rcpt-row gross">
         <div class="rcpt-main">
           <span class="rcpt-label">
             {{ t(lang, 'work') }} {{ data.workDays }}{{ t(lang, 'daysUnit') }} ·
             {{ fmtH(data.totalHours) }}{{ t(lang, 'hoursUnit') }} × {{ formatMoney(data.hourlyWage, lang) }}
-          </span>
-          <span v-if="data.overtimeHours" class="rcpt-note">
-            {{ t(lang, 'overtimeIncluded') }} {{ data.overtimeHours > 0 ? '+' : '' }}{{ fmtH(data.overtimeHours) }}h
           </span>
         </div>
         <span class="rcpt-amount">{{ formatMoney(data.grossPay, lang) }}</span>
@@ -47,11 +44,31 @@
       </div>
     </div>
 
+    <!-- 박제 안내 -->
+    <p v-if="data.frozen" class="immutable-note">
+      이 정산은 당시 시급 {{ data.hourlyWage.toLocaleString() }}원 기준으로 보존됩니다 — 현재 시급으로 재계산되지 않습니다.
+    </p>
+
+    <!-- 상태/액션 -->
     <div class="settle-actions">
-      <span v-if="data.confirmed" class="confirmed-chip">✓ {{ t(lang, 'confirmed') }}</span>
-      <button class="btn-confirm" :disabled="confirming" @click="confirm">
-        {{ confirming ? '…' : t(lang, 'confirm') }}
-      </button>
+      <span v-if="data.status === 'confirmed'" class="status-chip done">✓ {{ t(lang, 'confirmed') }}</span>
+      <span v-else-if="data.status === 'requested'" class="status-chip pending">
+        {{ t(lang, 'requested') }}<template v-if="!data.canApprove"> · {{ t(lang, 'waitingApproval') }}</template>
+      </span>
+
+      <button
+        v-if="data.canRequest"
+        class="btn-primary"
+        :disabled="busy"
+        @click="request"
+      >{{ busy ? '…' : t(lang, 'requestConfirm') }}</button>
+
+      <button
+        v-if="data.canApprove"
+        class="btn-primary"
+        :disabled="busy"
+        @click="approve"
+      >{{ busy ? '…' : t(lang, 'approve') }}</button>
     </div>
   </div>
 </template>
@@ -70,12 +87,18 @@ import {
   translateLabel,
 } from '../i18n/payroll-i18n'
 
-const props = defineProps<{ workerId: string; lang: PayrollLang }>()
+const props = defineProps<{
+  workerId: string
+  lang: PayrollLang
+  showNav?: boolean
+  initialPeriod?: string
+}>()
+const emit = defineEmits<{ (e: 'changed'): void; (e: 'period-change', p: string): void }>()
 const notify = useNotificationStore()
 
 const data = ref<SettlementResponse | null>(null)
-const period = ref<string | undefined>(undefined)
-const confirming = ref(false)
+const period = ref<string | undefined>(props.initialPeriod)
+const busy = ref(false)
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
@@ -83,6 +106,7 @@ function fmtH(n: number): string {
 
 async function reload() {
   data.value = await workerPayrollApi.getSettlement(props.workerId, period.value)
+  emit('period-change', data.value.periodStart)
 }
 
 function go(p: string | null) {
@@ -91,20 +115,36 @@ function go(p: string | null) {
   reload()
 }
 
-async function confirm() {
-  confirming.value = true
+async function request() {
+  busy.value = true
   try {
-    await workerPayrollApi.confirmSettlement(props.workerId, data.value?.periodStart)
-    notify.success('일꾼 관리', '정산을 확정했습니다.')
+    await workerPayrollApi.requestSettlement(props.workerId, data.value?.periodStart)
+    notify.success('일꾼 관리', '정산 확정을 요청했습니다.')
     await reload()
-  } catch {
-    notify.error('일꾼 관리', '정산 확정에 실패했습니다.')
+    emit('changed')
+  } catch (e: any) {
+    notify.error('일꾼 관리', e?.response?.data?.message ?? '정산 요청에 실패했습니다.')
   } finally {
-    confirming.value = false
+    busy.value = false
   }
 }
 
-watch(() => props.workerId, () => { period.value = undefined; reload() })
+async function approve() {
+  busy.value = true
+  try {
+    await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart)
+    notify.success('일꾼 관리', '정산을 승인했습니다.')
+    await reload()
+    emit('changed')
+  } catch (e: any) {
+    notify.error('일꾼 관리', e?.response?.data?.message ?? '정산 승인에 실패했습니다.')
+  } finally {
+    busy.value = false
+  }
+}
+
+watch(() => props.workerId, () => { period.value = props.initialPeriod; reload() })
+watch(() => props.initialPeriod, (p) => { if (p !== period.value) { period.value = p; reload() } })
 onMounted(reload)
 defineExpose({ reload })
 </script>
@@ -151,27 +191,36 @@ defineExpose({ reload })
   border-bottom: 1px solid var(--border-light);
 }
 .rcpt-row:last-child { border-bottom: none; }
-.rcpt-main { display: flex; flex-direction: column; gap: 2px; }
+.rcpt-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rcpt-label { color: var(--text-secondary); font-size: var(--font-size-label); }
-.rcpt-note { color: var(--text-muted); font-size: var(--font-size-caption); }
 .rcpt-amount { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rcpt-amount.minus { color: var(--danger); }
-.rcpt-row.gross { background: var(--bg-card); }
 .rcpt-row.gross .rcpt-amount { font-size: var(--font-size-subtitle); }
 .rcpt-row.net { background: var(--accent-bg); }
 .rcpt-row.net .rcpt-label { font-weight: 800; color: var(--accent); font-size: var(--font-size-subtitle); }
 .rcpt-row.net .rcpt-amount { color: var(--accent); font-size: var(--font-size-title); }
-.settle-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.confirmed-chip { color: var(--success-text); font-weight: 700; }
-.btn-confirm {
+.immutable-note {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: var(--font-size-caption);
+}
+.settle-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+.status-chip { font-weight: 700; }
+.status-chip.done { color: var(--success-text); }
+.status-chip.pending { color: var(--warning-text); }
+.btn-primary {
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 11px 22px;
+  padding: 12px 22px;
   font-weight: 600;
   cursor: pointer;
+  min-height: 44px;
 }
-.btn-confirm:hover { background: var(--accent-hover); }
-.btn-confirm:disabled { opacity: 0.6; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:disabled { opacity: 0.6; }
 </style>

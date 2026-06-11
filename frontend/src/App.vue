@@ -52,6 +52,14 @@
         </router-link>
       </nav>
 
+      <!-- 일꾼(농장 사용자-근무계정) 메뉴: 정산만 -->
+      <nav v-else-if="isWorker" class="sidebar-nav">
+        <router-link to="/worker-payroll" class="sidebar-link">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></span>
+          <span>내 근무·정산</span>
+        </router-link>
+      </nav>
+
       <!-- 일반 사용자 메뉴 -->
       <nav v-else class="sidebar-nav">
         <router-link to="/dashboard" class="sidebar-link">
@@ -203,6 +211,14 @@
         </router-link>
       </nav>
 
+      <!-- 일꾼(농장 사용자-근무계정) 메뉴 (모바일): 정산만 -->
+      <nav v-else-if="isWorker" class="sidebar-nav">
+        <router-link to="/worker-payroll" class="sidebar-link" @click="isDrawerOpen = false">
+          <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></span>
+          <span>내 근무·정산</span>
+        </router-link>
+      </nav>
+
       <!-- 일반 사용자 메뉴 (모바일) -->
       <nav v-else class="sidebar-nav">
         <router-link to="/dashboard" class="sidebar-link" @click="isDrawerOpen = false">
@@ -308,6 +324,7 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const isFarmUser = computed(() => authStore.isFarmUser)
 const isFarmAdmin = computed(() => authStore.isFarmAdmin)
+const isWorker = computed(() => authStore.isWorker)
 
 const { feature: cropFeature, fetchFeature: fetchCropFeature, setFeature: setCropFeature } = useCropFeature()
 const showSettings = ref(false)
@@ -361,6 +378,7 @@ onMounted(() => {
   if (authStore.isAuthenticated) {
     connect()
     fetchCropFeature()
+    authStore.resolveWorkerStatus()
   }
   updateClock()
   clockTimer = setInterval(updateClock, 10000)

@@ -1,10 +1,39 @@
 <template>
   <div class="worker-settings">
-    <!-- ① 근무조건 -->
+    <!-- ① 로그인 계정 (신규 등록 시) -->
     <div class="card">
-      <h3 class="card-title">① 근무조건</h3>
+      <h3 class="card-title">① 로그인 계정</h3>
+      <template v-if="!workerId">
+        <div class="grid2">
+          <label class="field">
+            <span>이름</span>
+            <input v-model="form.name" class="inp" placeholder="일꾼 이름" />
+          </label>
+          <label class="field">
+            <span>연락처 (선택)</span>
+            <input v-model="form.phone" class="inp" placeholder="010-0000-0000" />
+          </label>
+          <label class="field">
+            <span>아이디 (로그인용)</span>
+            <input v-model="form.username" class="inp" placeholder="lee-worker" autocapitalize="off" />
+          </label>
+          <label class="field">
+            <span>임시 비밀번호</span>
+            <input v-model="form.password" type="text" class="inp" placeholder="첫 로그인 시 변경 안내" />
+          </label>
+        </div>
+        <p class="hint">아이디는 영문 소문자·숫자로, 일꾼에게 전달됩니다. 권한: 농장 사용자(일꾼) — 본인 데이터만 조회, 수정 불가.</p>
+      </template>
+      <p v-else class="account-readonly">
+        아이디 <strong>{{ accountUsername || '—' }}</strong> · 권한: 농장 사용자(일꾼). 계정 정보는 등록 후 변경할 수 없습니다.
+      </p>
+    </div>
+
+    <!-- ② 근무조건 -->
+    <div class="card">
+      <h3 class="card-title">② 근무조건</h3>
       <div class="grid2">
-        <label class="field">
+        <label v-if="workerId" class="field">
           <span>이름</span>
           <input v-model="form.name" class="inp" placeholder="일꾼 이름" />
         </label>
@@ -29,7 +58,7 @@
 
     <!-- ② 기본 공제 항목 -->
     <div class="card">
-      <h3 class="card-title">② 기본 공제 항목</h3>
+      <h3 class="card-title">③ 기본 공제 항목</h3>
       <div v-for="(d, i) in form.deductions" :key="i" class="line-row">
         <input v-model="d.label" class="inp flex" placeholder="항목 (예: 숙소비)" />
         <input v-model.number="d.amount" type="number" min="0" step="1000" class="inp amount" placeholder="금액" />
@@ -41,7 +70,7 @@
 
     <!-- ③ 가불 내역 -->
     <div class="card">
-      <h3 class="card-title">③ 가불 내역</h3>
+      <h3 class="card-title">④ 가불 내역</h3>
       <template v-if="workerId">
         <div v-for="adv in advances" :key="adv.id" class="line-row">
           <input :value="adv.date" type="date" class="inp" disabled />
@@ -80,12 +109,16 @@ const saving = ref(false)
 
 const form = reactive({
   name: '',
+  username: '',
+  password: '',
+  phone: '',
   startDate: new Date().toISOString().slice(0, 10),
   hourlyWage: 12000,
   dailyHours: 8,
   deductions: [] as { id?: string; label: string; amount: number }[],
 })
 
+const accountUsername = ref<string | null>(null)
 const advances = ref<Advance[]>([])
 const newAdvance = reactive({ date: new Date().toISOString().slice(0, 10), amount: 0, note: '' })
 
@@ -99,19 +132,25 @@ const anchorDay = computed(() =>
 async function load() {
   if (!props.workerId) {
     form.name = ''
+    form.username = ''
+    form.password = ''
+    form.phone = ''
     form.startDate = new Date().toISOString().slice(0, 10)
     form.hourlyWage = 12000
     form.dailyHours = 8
     form.deductions = []
+    accountUsername.value = null
     advances.value = []
     return
   }
   const w = await workerPayrollApi.getWorker(props.workerId)
   form.name = w.name
+  form.phone = w.phone ?? ''
   form.startDate = w.startDate.slice(0, 10)
   form.hourlyWage = w.hourlyWage
   form.dailyHours = Number(w.dailyHours)
   form.deductions = (w.deductions ?? []).map((d) => ({ id: d.id, label: d.label, amount: d.amount }))
+  accountUsername.value = w.username ?? null
   advances.value = await workerPayrollApi.listAdvances(props.workerId)
 }
 
@@ -123,11 +162,25 @@ async function save() {
     notify.warning('일꾼 관리', '이름을 입력해 주세요.')
     return
   }
+  const isNew = !props.workerId
+  if (isNew) {
+    if (!/^[a-z][a-z0-9_-]{2,49}$/.test(form.username.trim())) {
+      notify.warning('일꾼 관리', '아이디는 영문 소문자로 시작하고 소문자·숫자·_·- 만 사용해 주세요.')
+      return
+    }
+    if (form.password.trim().length < 6) {
+      notify.warning('일꾼 관리', '임시 비밀번호는 6자 이상 입력해 주세요.')
+      return
+    }
+  }
   saving.value = true
   try {
     const saved = await workerPayrollApi.saveWorker({
       id: props.workerId ?? undefined,
       name: form.name.trim(),
+      username: isNew ? form.username.trim() : undefined,
+      password: isNew ? form.password : undefined,
+      phone: form.phone.trim() || undefined,
       startDate: form.startDate,
       hourlyWage: form.hourlyWage,
       dailyHours: form.dailyHours,
@@ -135,10 +188,10 @@ async function save() {
         .filter((d) => d.label.trim())
         .map((d, i) => ({ id: d.id, label: d.label.trim(), amount: Number(d.amount) || 0, sortOrder: i })),
     })
-    notify.success('일꾼 관리', '근무조건을 저장했습니다.')
+    notify.success('일꾼 관리', isNew ? '일꾼 계정을 등록했습니다.' : '근무조건을 저장했습니다.')
     emit('saved', saved)
-  } catch {
-    notify.error('일꾼 관리', '저장에 실패했습니다.')
+  } catch (e: any) {
+    notify.error('일꾼 관리', e?.response?.data?.message ?? '저장에 실패했습니다.')
   } finally {
     saving.value = false
   }
@@ -200,6 +253,8 @@ async function removeAdvance(id: string) {
 .field .inp { width: 100%; }
 .inp:disabled { background: var(--bg-hover); color: var(--text-muted); }
 .hint { color: var(--text-muted); font-size: var(--font-size-caption); }
+.account-readonly { color: var(--text-secondary); font-size: var(--font-size-label); }
+.account-readonly strong { color: var(--text-primary); }
 .line-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .line-row .inp { flex: 1 1 120px; }
 .flex { flex: 1 1 120px; min-width: 0; }

@@ -8,16 +8,23 @@ export interface Deduction {
 export interface Worker {
   id: string
   name: string
+  phone?: string | null
   startDate: string
   hourlyWage: number
   dailyHours: number
   isActive: boolean
+  accountUserId?: string | null
+  username?: string | null
   deductions: Deduction[]
 }
 
+/** 신규 등록 시 username/password 포함, 수정 시 근무조건만 */
 export interface SaveWorkerPayload {
   id?: string
   name: string
+  username?: string
+  password?: string
+  phone?: string
   startDate: string
   hourlyWage: number
   dailyHours: number
@@ -31,14 +38,14 @@ export interface Advance {
   note: string | null
 }
 
+export type DayStatus = 'work' | 'off' | 'none'
+
 export interface CalendarDay {
   date: string
   beforeStart: boolean
-  holiday: boolean
-  deltaHours: number
+  status: DayStatus
   hours: number
   advance: number
-  isSettleDay: boolean
 }
 
 export interface PeriodMeta {
@@ -49,34 +56,31 @@ export interface PeriodMeta {
   prevPeriodStart: string | null
 }
 
+export interface WorkerBrief {
+  id: string
+  name: string
+  startDate: string
+  hourlyWage: number
+  dailyHours: number
+}
+
 export interface CalendarResponse extends PeriodMeta {
-  worker: {
-    id: string
-    name: string
-    startDate: string
-    hourlyWage: number
-    dailyHours: number
-  }
+  worker: WorkerBrief
+  canEdit: boolean
   kpi: {
     workDays: number
     totalHours: number
-    overtimeHours: number
     grossPay: number
   }
   days: CalendarDay[]
 }
 
+export type SettlementStatus = 'open' | 'pending' | 'requested' | 'confirmed'
+
 export interface SettlementResponse extends PeriodMeta {
-  worker: {
-    id: string
-    name: string
-    startDate: string
-    hourlyWage: number
-    dailyHours: number
-  }
+  worker: WorkerBrief
   workDays: number
   totalHours: number
-  overtimeHours: number
   hourlyWage: number
   grossPay: number
   deductions: { label: string; amount: number }[]
@@ -84,6 +88,24 @@ export interface SettlementResponse extends PeriodMeta {
   advances: { date: string; amount: number; note: string | null }[]
   advanceTotal: number
   netPay: number
-  confirmed: boolean
+  status: SettlementStatus
+  frozen: boolean
+  requestedAt: string | null
   confirmedAt: string | null
+  canRequest: boolean
+  canApprove: boolean
+}
+
+export interface SettlementHistoryItem {
+  id: string
+  workerId: string
+  workerName: string
+  periodStart: string
+  periodEnd: string
+  settleDate: string
+  status: 'requested' | 'confirmed'
+  netPay: number
+  requestedAt: string | null
+  confirmedAt: string | null
+  snapshot: SettlementResponse
 }

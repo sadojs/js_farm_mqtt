@@ -257,8 +257,8 @@ export class GddService {
              CASE WHEN ds.hours_covered >= 12 THEN ds.avg_temp
                   ELSE (ds.avg_temp * ds.hours_covered + dw.avg_temp * (24 - ds.hours_covered)) / 24
              END,
-             dw.avg_temp + $5
-           ) - $4,
+             dw.avg_temp + $5::numeric
+           ) - $4::numeric,
            0
          ) AS gdd,
          COALESCE(ds.hours_covered, 0) AS hours_covered
@@ -294,10 +294,10 @@ export class GddService {
          AVG(temperature) +
          CASE
            WHEN $5::date IS NOT NULL AND DATE_TRUNC('day', time) < $5::date
-           THEN $6
-           ELSE $3
+           THEN $6::numeric
+           ELSE $3::numeric
          END
-         - $4, 0
+         - $4::numeric, 0
        ) AS gdd
        FROM weather_data
        WHERE user_id = $1

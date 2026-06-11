@@ -14,47 +14,53 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { WorkerPayrollService } from './worker-payroll.service';
 import { SaveWorkerDto } from './dto/worker.dto';
 import { UpsertAdvanceDto } from './dto/advance.dto';
-import { SetDayOverrideDto } from './dto/day-override.dto';
+import { SetDayDto } from './dto/day-override.dto';
 
 @Controller('worker-payroll')
 @UseGuards(JwtAuthGuard)
 export class WorkerPayrollController {
   constructor(private readonly service: WorkerPayrollService) {}
 
-  private effectiveUserId(user: any): string {
+  private ownerId(user: any): string {
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
   }
 
+  /** 관리자(admin/farm_admin) 전용 동작 */
   private assertManager(user: any): void {
     if (user.role !== 'admin' && user.role !== 'farm_admin') {
-      throw new ForbiddenException('농장 관리자만 접근 가능합니다.');
+      throw new ForbiddenException('농장 관리자만 가능합니다.');
     }
   }
 
-  // ──── 일꾼 ────
+  // ──── 일꾼 목록 / 본인 ────
 
   @Get('workers')
   listWorkers(@CurrentUser() user: any) {
     this.assertManager(user);
-    return this.service.listWorkers(this.effectiveUserId(user));
+    return this.service.listWorkers(this.ownerId(user));
+  }
+
+  /** 일꾼 본인 프로필 (farm_user 진입점) */
+  @Get('me')
+  getMe(@CurrentUser() user: any) {
+    return this.service.getMyWorker(user.id);
   }
 
   @Get('workers/:id')
   getWorker(@CurrentUser() user: any, @Param('id') id: string) {
-    this.assertManager(user);
-    return this.service.getWorker(this.effectiveUserId(user), id);
+    return this.service.getWorker(user, id);
   }
 
   @Post('workers')
   saveWorker(@CurrentUser() user: any, @Body() dto: SaveWorkerDto) {
     this.assertManager(user);
-    return this.service.saveWorker(this.effectiveUserId(user), dto);
+    return this.service.saveWorker(this.ownerId(user), dto);
   }
 
   @Delete('workers/:id')
   async removeWorker(@CurrentUser() user: any, @Param('id') id: string) {
     this.assertManager(user);
-    await this.service.removeWorker(this.effectiveUserId(user), id);
+    await this.service.removeWorker(this.ownerId(user), id);
     return { ok: true };
   }
 
@@ -62,8 +68,7 @@ export class WorkerPayrollController {
 
   @Get('workers/:id/advances')
   listAdvances(@CurrentUser() user: any, @Param('id') id: string) {
-    this.assertManager(user);
-    return this.service.listAdvances(this.effectiveUserId(user), id);
+    return this.service.listAdvances(user, id);
   }
 
   @Post('workers/:id/advances')
@@ -73,29 +78,29 @@ export class WorkerPayrollController {
     @Body() dto: UpsertAdvanceDto,
   ) {
     this.assertManager(user);
-    return this.service.addAdvance(this.effectiveUserId(user), id, dto);
+    return this.service.addAdvance(this.ownerId(user), id, dto);
   }
 
   @Delete('advances/:advanceId')
   async removeAdvance(@CurrentUser() user: any, @Param('advanceId') advanceId: string) {
     this.assertManager(user);
-    await this.service.removeAdvance(this.effectiveUserId(user), advanceId);
+    await this.service.removeAdvance(this.ownerId(user), advanceId);
     return { ok: true };
   }
 
-  // ──── 일자 조정 ────
+  // ──── 일자 근무 설정 (관리자) ────
 
-  @Post('workers/:id/day-override')
-  setDayOverride(
+  @Post('workers/:id/day')
+  setDay(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() dto: SetDayOverrideDto,
+    @Body() dto: SetDayDto,
   ) {
     this.assertManager(user);
-    return this.service.setDayOverride(this.effectiveUserId(user), id, dto);
+    return this.service.setDay(this.ownerId(user), id, dto);
   }
 
-  // ──── 근무 달력 / 정산 ────
+  // ──── 근무 달력 / 정산 (읽기는 본인/관리자) ────
 
   @Get('workers/:id/calendar')
   getCalendar(
@@ -103,8 +108,7 @@ export class WorkerPayrollController {
     @Param('id') id: string,
     @Query('periodStart') periodStart?: string,
   ) {
-    this.assertManager(user);
-    return this.service.getCalendar(this.effectiveUserId(user), id, periodStart);
+    return this.service.getCalendar(user, id, periodStart);
   }
 
   @Get('workers/:id/settlement')
@@ -113,17 +117,35 @@ export class WorkerPayrollController {
     @Param('id') id: string,
     @Query('periodStart') periodStart?: string,
   ) {
-    this.assertManager(user);
-    return this.service.getSettlement(this.effectiveUserId(user), id, periodStart);
+    return this.service.getSettlement(user, id, periodStart);
   }
 
-  @Post('workers/:id/settlement/confirm')
-  confirmSettlement(
+  /** 정산 확정 요청 (일꾼 또는 관리자) */
+  @Post('workers/:id/settlement/request')
+  requestSettlement(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { periodStart?: string },
+  ) {
+    return this.service.requestSettlement(user, id, body?.periodStart);
+  }
+
+  /** 정산 승인 (관리자) */
+  @Post('workers/:id/settlement/approve')
+  approveSettlement(
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: { periodStart?: string },
   ) {
     this.assertManager(user);
-    return this.service.confirmSettlement(this.effectiveUserId(user), id, body?.periodStart);
+    return this.service.approveSettlement(this.ownerId(user), id, body?.periodStart);
+  }
+
+  // ──── 정산 이력 (관리자) ────
+
+  @Get('settlements')
+  listSettlements(@CurrentUser() user: any) {
+    this.assertManager(user);
+    return this.service.listSettlements(this.ownerId(user));
   }
 }
