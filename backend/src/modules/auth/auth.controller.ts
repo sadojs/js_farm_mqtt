@@ -20,7 +20,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
     res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
