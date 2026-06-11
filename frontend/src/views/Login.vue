@@ -16,6 +16,10 @@
             type="text"
             name="username"
             autocomplete="username"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+            inputmode="text"
             placeholder="사용자명을 입력하세요"
             class="form-input"
             required
@@ -89,7 +93,9 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    await authStore.login(loginData.value.username, loginData.value.password)
+    // iOS Safari 자동 대문자화 방지 — 사용자명 소문자 정규화 후 전송
+    const username = loginData.value.username.trim().toLowerCase()
+    await authStore.login(username, loginData.value.password)
     // 로그인 성공은 라우팅으로 즉시 인지 가능 — 별도 알림 노출하지 않음
     router.push('/dashboard')
   } catch (err: any) {
