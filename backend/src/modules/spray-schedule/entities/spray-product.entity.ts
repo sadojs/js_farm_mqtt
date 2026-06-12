@@ -38,9 +38,13 @@ export class SprayProduct {
   @Column({ name: 'count', type: 'int', default: 1 })
   count: number;
 
-  /** 벌(호박벌 등) 사용 여부 — true 면 방재일 오전 벌문 닫기 + 2일 후 벌문 개방 일정 생성 */
+  /** 벌(호박벌 등) 사용 여부 — true 면 방재일 벌문 닫기 + 방재 후 벌문 개방 일정 생성 */
   @Column({ name: 'has_bees', default: false })
   hasBees: boolean;
+
+  /** 방재 시간대: 'am'(오전) | 'pm'(오후). 벌문 개방 시점: 오전 +2일, 오후 +3일. 기본 오후. */
+  @Column({ name: 'time_of_day', type: 'varchar', length: 2, default: 'pm' })
+  timeOfDay: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

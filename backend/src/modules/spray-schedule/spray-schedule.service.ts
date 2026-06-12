@@ -25,9 +25,8 @@ function diffDays(a: string, b: string): number {
   return Math.round((parseDate(a).getTime() - parseDate(b).getTime()) / 86400000);
 }
 
-// 벌(호박벌) 사용 방재: 방재 2일 후 벌문 개방
-const BEE_GATE_OPEN_OFFSET_DAYS = 2;
-const BEE_GATE_COLOR = '#f9a825'; // 꿀/앰버색
+// 벌(호박벌) 사용 방재: 벌문 개방 칩 색(꿀/앰버색)
+const BEE_GATE_COLOR = '#f9a825';
 
 @Injectable()
 export class SprayScheduleService {
@@ -142,6 +141,7 @@ export class SprayScheduleService {
                 intervalDays: pr.intervalDays,
                 count: pr.count,
                 hasBees: pr.hasBees ?? false,
+                timeOfDay: pr.timeOfDay === 'am' ? 'am' : 'pm',
               }),
             ),
           );
@@ -176,9 +176,12 @@ export class SprayScheduleService {
     for (const { program, products } of programs) {
       for (const product of products) {
         const bee = !!product.hasBees;
+        const timeOfDay = product.timeOfDay === 'am' ? 'am' : 'pm';
+        // 벌문 개방 시점: 오전 방재 +2일, 오후 방재 +3일 (모두 오전 개방)
+        const beeOffset = timeOfDay === 'am' ? 2 : 3;
         for (let i = 0; i < product.count; i++) {
           const sprayDate = addDays(product.startDate, product.intervalDays * i);
-          // 방재 이벤트 (벌 사용 시 bee=true → 오전 벌문 닫기 표시)
+          // 방재 이벤트 (벌 사용 시 bee=true → 벌문 닫기 표시)
           rows.push({
             userId,
             zoneId: zone.id,
@@ -191,23 +194,25 @@ export class SprayScheduleService {
             round: i + 1,
             kind: 'spray',
             bee,
+            timeOfDay,
             isManual: false,
             pinned: false,
           });
-          // 벌 사용 시: 방재 2일 후 '벌문 개방' 이벤트 생성
+          // 벌 사용 시: 방재 후 '벌문 개방' 이벤트 생성 (오전 개방)
           if (bee) {
             rows.push({
               userId,
               zoneId: zone.id,
               programId: program.id,
               productId: product.id,
-              date: addDays(sprayDate, BEE_GATE_OPEN_OFFSET_DAYS),
+              date: addDays(sprayDate, beeOffset),
               pest: '벌문 개방',
-              product: `${program.pest} ${i + 1}차 방재 후`,
+              product: `${program.pest} ${i + 1}차(${timeOfDay === 'am' ? '오전' : '오후'}) 방재 후`,
               color: BEE_GATE_COLOR,
               round: i + 1,
               kind: 'bee_open',
               bee: true,
+              timeOfDay: 'am',
               isManual: false,
               pinned: false,
             });

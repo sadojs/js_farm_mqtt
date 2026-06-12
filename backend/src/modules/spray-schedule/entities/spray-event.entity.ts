@@ -53,9 +53,13 @@ export class SprayEvent {
   @Column({ name: 'kind', type: 'varchar', length: 12, default: 'spray' })
   kind: string;
 
-  /** 벌 사용 방재 여부 — 방재일 오전 벌문 닫기 필요 표시 */
+  /** 벌 사용 방재 여부 — 방재일 벌문 닫기 필요 표시 */
   @Column({ name: 'bee', default: false })
   bee: boolean;
+
+  /** 방재 시간대 스냅샷: 'am' | 'pm' (방재 이벤트). 벌문 개방은 항상 오전. */
+  @Column({ name: 'time_of_day', type: 'varchar', length: 2, nullable: true })
+  timeOfDay: string | null;
 
   @Column({ name: 'is_manual', default: false })
   isManual: boolean;

@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsInt,
   IsBoolean,
+  IsIn,
   IsArray,
   ValidateNested,
   Min,
@@ -37,6 +38,10 @@ export class ProductInputDto {
   @IsOptional()
   @IsBoolean()
   hasBees?: boolean;
+
+  @IsOptional()
+  @IsIn(['am', 'pm'])
+  timeOfDay?: 'am' | 'pm';
 }
 
 export class ProgramInputDto {

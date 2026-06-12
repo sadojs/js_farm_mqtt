@@ -20,6 +20,8 @@ export const ZONE_COLOR_PRESETS: string[] = [
   '#5e35b1',
 ]
 
+export type SprayTimeOfDay = 'am' | 'pm'
+
 export interface SprayProduct {
   id?: string
   rank: number
@@ -28,6 +30,7 @@ export interface SprayProduct {
   intervalDays: number
   count: number
   hasBees?: boolean
+  timeOfDay?: SprayTimeOfDay
 }
 
 export interface SprayProgram {
@@ -73,6 +76,7 @@ export interface SprayEvent {
   round: number
   kind: 'spray' | 'bee_open'
   bee: boolean
+  timeOfDay: SprayTimeOfDay | null
   isManual: boolean
   pinned: boolean
   note: string | null

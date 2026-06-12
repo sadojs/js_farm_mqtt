@@ -55,6 +55,7 @@
               <span class="col-rank">순위</span>
               <span class="col-name">약품명</span>
               <span class="col-date">시작일</span>
+              <span class="col-time">시간</span>
               <span class="col-step">간격</span>
               <span class="col-step">횟수</span>
               <span class="col-bee">벌</span>
@@ -68,6 +69,10 @@
               <span class="rank-badge" :style="{ background: program.color }">{{ pri + 1 }}</span>
               <input v-model="product.name" class="inp col-name" placeholder="약품명" />
               <input v-model="product.startDate" type="date" class="inp col-date" />
+              <div class="time-toggle col-time" title="방재 시간대 — 오전 방재 시 2일 후, 오후 방재 시 3일 후 오전 벌문 개방">
+                <button type="button" :class="{ on: product.timeOfDay === 'am' }" @click="product.timeOfDay = 'am'">오전</button>
+                <button type="button" :class="{ on: product.timeOfDay !== 'am' }" @click="product.timeOfDay = 'pm'">오후</button>
+              </div>
               <div class="stepper col-step">
                 <button @click="product.intervalDays = Math.max(1, product.intervalDays - 1)">−</button>
                 <span class="num">{{ product.intervalDays }}<small>일</small></span>
@@ -141,6 +146,7 @@ interface ProductDraft {
   intervalDays: number
   count: number
   hasBees: boolean
+  timeOfDay: 'am' | 'pm'
 }
 interface ProgramDraft {
   key: string
@@ -183,6 +189,7 @@ function toDraft(z: SprayZone): ZoneDraft {
         intervalDays: pr.intervalDays,
         count: pr.count,
         hasBees: pr.hasBees ?? false,
+        timeOfDay: pr.timeOfDay === 'am' ? 'am' : 'pm',
       })),
     })),
     saving: false,
@@ -251,6 +258,7 @@ function addProduct(zone: ZoneDraft, program: ProgramDraft) {
     intervalDays: 3,
     count: 3,
     hasBees: false,
+    timeOfDay: 'pm',
   })
 }
 
@@ -304,6 +312,7 @@ async function saveZone(zone: ZoneDraft) {
           intervalDays: pr.intervalDays,
           count: pr.count,
           hasBees: pr.hasBees,
+          timeOfDay: pr.timeOfDay,
         })),
       })),
     })
@@ -418,12 +427,29 @@ defineExpose({ reload: load })
 .product-rows { display: flex; flex-direction: column; gap: 6px; }
 .product-row {
   display: grid;
-  grid-template-columns: 44px 1fr 140px 108px 108px 64px 34px;
+  grid-template-columns: 40px 1fr 130px 88px 96px 96px 56px 32px;
   gap: 8px;
   align-items: center;
 }
 .product-head-row span { font-size: var(--font-size-caption); color: var(--text-muted); }
 .col-del { margin-left: 0; }
+.col-time { text-align: center; }
+.time-toggle {
+  display: flex;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.time-toggle button {
+  flex: 1;
+  border: none;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  padding: 7px 0;
+  cursor: pointer;
+}
+.time-toggle button.on { background: var(--accent-bg); color: var(--accent); font-weight: 700; }
 .col-bee { text-align: center; }
 .bee-check {
   display: flex;
@@ -515,6 +541,7 @@ defineExpose({ reload: load })
   .product-row .inp { min-width: 0; }
   .product-row .col-name { flex: 1 1 120px; }
   .product-row .col-date { flex: 1 1 120px; }
+  .product-row .col-time { flex: 1 1 110px; }
   .product-row .stepper { flex: 1 1 90px; }
   .product-row .col-bee { flex: 0 0 auto; }
   .product-row .col-del { flex: 0 0 auto; }

@@ -70,10 +70,11 @@
           >
             <span class="chip-line1">
               <span v-if="ev.isManual" class="manual-mark">✚</span>
-              <template v-if="ev.kind === 'bee_open'">🐝 {{ ev.pest }}</template>
+              <template v-if="ev.kind === 'bee_open'">{{ zoneAbbr(ev) }} · 🐝 {{ ev.pest }}</template>
               <template v-else>
                 {{ zoneAbbr(ev) }} · {{ ev.pest }} <template v-if="!ev.isManual">{{ ev.round }}차</template>
-                <span v-if="ev.bee" class="bee-tag">🐝 오전 벌문닫기</span>
+                <span v-if="ev.timeOfDay" class="time-tag">{{ ev.timeOfDay === 'am' ? '오전' : '오후' }}</span>
+                <span v-if="ev.bee" class="bee-tag">🐝 벌문닫기</span>
               </template>
             </span>
             <span class="chip-line2">{{ ev.product }}</span>
@@ -308,6 +309,16 @@ function onDrop(date: string) {
   border-radius: 4px;
   background: var(--warning-bg);
   color: var(--warning-text);
+  font-size: 9px;
+  font-weight: 700;
+}
+.time-tag {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
   font-size: 9px;
   font-weight: 700;
 }
