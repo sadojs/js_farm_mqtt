@@ -1,158 +1,166 @@
-# 신규 Pi 빌드 절차 — 골든 이미지 사용
+# 신규 Pi 빌드 절차 — 마스터 골든 이미지 사용
 
-> 골든 이미지 `golden-hk-house-20260608.img.xz` 로 신규 라즈베리파이 게이트웨이를 구축하는 표준 절차.
+> 마스터 골든 이미지로 신규 라즈베리파이 게이트웨이를 빌드하는 표준 절차.
+> 운영자 의도된 흐름(단계 1~8) 100% 자동/반자동 동작 지원.
+
+---
+
+## 사용자 의도된 흐름
+
+| # | 단계 | 자동/수동 |
+|---|---|---|
+| 1 | SD 카피 | 🛠 수동 (macOS) |
+| 2 | 신규 Pi 부팅 | 🛠 수동 |
+| 3 | **자동 wifi 연결 + IP 부여 + 개발 서버 자동 등록** | 🤖 **자동** |
+| 4 | hostname 변경 | 👤 브라우저 (게이트웨이 시스템 설정) |
+| 5 | 기능 테스트 | 👤 검증 |
+| 6 | Server IP → 프로덕션 IP 변경 | 👤 브라우저 |
+| 7 | 원하는 hostname + 현장 SSID/PW 입력 | 👤 브라우저 |
+| 8 | 장치 등록 + 사용 | 👤 브라우저 |
 
 ---
 
 ## 0. 사전 준비
 
-- macOS (이 가이드 기준)
+- macOS (clone-sd.sh / build-golden-image.sh 작동 환경)
 - SD 카드 (32GB 이상, Class 10+)
-- USB SD 카드 리더기
-- 골든 이미지 파일: `~/Projects/golden-images/golden-hk-house-20260608.img.xz`
-- 서버 운영자로부터 발급 받을 정보:
-  - 신규 게이트웨이 ID (예: `farm-001`)
-  - bootstrap 토큰 (서버 측에서 생성)
-  - 서버 IP/FQDN
+- USB SD 카드 리더기 (가능하면 USB 3.0 — 쓰기 속도 60~70 MB/s)
+- 마스터 골든 이미지 (예: `~/Projects/golden-images/golden-master-20260611.img.xz`)
 
 ---
 
-## 1. SD 카드 굽기
+## 1. SD 카드 굽기 (단계 1)
 
 ```bash
-# 1) SD 카드 식별 (반드시 external/USB만 — 시스템 디스크 절대 금지)
-diskutil list external
-
-# 2) clone-sd.sh 로 굽기 (안전 검증 포함)
+diskutil list external                  # SD 식별 (예: disk6)
 cd ~/Projects/smart-farm-mqtt/raspberry-pi
-bash clone-sd.sh ~/Projects/golden-images/golden-hk-house-20260608.img.xz diskN
-
-# diskN 은 위 1)에서 확인한 식별자 (예: disk6)
-# 약 40분 소요 (xz 풀면서 dd, ~10MB/s)
+bash clone-sd.sh ~/Projects/golden-images/golden-master-20260611.img.xz diskN
 ```
 
-쓰기 완료 후 SD 카드를 신규 Pi 에 꽂고 부팅.
+약 10~15분 소요 (USB3 + Class 10 SD 기준).
 
 ---
 
-## 2. 신규 Pi 첫 접속
+## 2. 신규 Pi 부팅 (단계 2)
 
-골든 이미지에는 hk-house 의 정보가 그대로 들어있어 **sanitize 가 반드시 필요**합니다.
+SD를 신규 Pi 에 꽂고 전원 켜기. 약 1~2분 대기.
 
-### 2-1. SSH 또는 콘솔 접근
-
-신규 Pi 가 부팅되면 hk-house 의 Wi-Fi/eth0 설정이 그대로 적용되므로 같은 네트워크라면 `172.30.1.89` 로 접속 가능 (충돌 위험 — 즉시 sanitize 필요).
-
-```bash
-ssh lgwadmin@172.30.1.89
-# 비밀번호: Admin123!
-```
-
-**또는** HDMI + 키보드 직접 접속.
-
-### 2-2. Sanitize 스크립트 실행
-
-```bash
-sudo bash /opt/smart-farm/raspberry-pi/sanitize-new-pi.sh
-```
-
-이 스크립트가 자동 처리:
-- ✅ smartfarm 식별 정보 제거 (gateway-id / bootstrap.token / server-ip)
-- ✅ machine-id 재생성 설정
-- ✅ Wi-Fi 자격증명 제거 (eth0 static 은 보존)
-- ✅ SSH host key 정리 (재생성 트리거)
-- ✅ tunnel key 제거
-- ✅ first-boot 마커 제거
-- ✅ bash history 정리
-
-모든 정보는 `/root/sanitize-backup-YYYYMMDD-HHMMSS/` 에 백업.
+**부팅 시 자동 처리되는 것**:
+- `systemd-machine-id-setup` → 새 machine-id 생성
+- NetworkManager → 본부 Wi-Fi 자동 연결 → DHCP IP 부여
+- `first-boot-init.service`:
+  - 새 SSH host key 생성
+  - 새 tunnel keypair 발급
+  - `POST /api/config-deploy/register-tunnel-key` (bootstrap.token 사용)
+  - 응답으로 받은 `lgw-{machineId8자}` 로 모든 env 파일 + base_topic 자동 갱신
+  - `.first-boot-done` 마커 생성
+- 모든 smartfarm 서비스 active
+- `config-agent` 가 백엔드에 heartbeat 전송 → status=online
 
 ---
 
-## 3. 신규 게이트웨이 등록
-
-### 3-1. setup.sh 재실행
+## 3. 자동 등록 확인 (단계 3)
 
 ```bash
-sudo bash /opt/smart-farm/raspberry-pi/setup.sh \
-  --bootstrap-token <NEW_TOKEN> \
-  --server-ip <SERVER_IP> \
-  --gateway-id <NEW_GATEWAY_ID>
+# 백엔드에 새 게이트웨이가 자동으로 등록됐는지 확인
+curl -s http://localhost:3100/api/gateways \
+  -H "Authorization: Bearer $(curl -s -X POST http://localhost:3100/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"...."}' \
+    | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')" \
+  | python3 -m json.tool | head -40
 ```
 
-또는 (대화형):
-
-```bash
-sudo bash /opt/smart-farm/raspberry-pi/setup.sh --with-tunnel
-# 프롬프트에서 토큰/서버IP/게이트웨이ID 입력
-```
-
-### 3-2. 재부팅 + first-boot-init 실행
-
-```bash
-sudo reboot
-```
-
-부팅 후 `first-boot-init.service` 가 자동 실행:
-- 새 SSH host key 생성
-- 새 tunnel keypair 생성
-- 서버 `/api/config-deploy/register-tunnel-key` 호출
-- 응답으로 받은 정보로 `/etc/smartfarm/gateway-id` 갱신
-- `/var/lib/smartfarm/.first-boot-done` 마커 생성
+정상이면 `lgw-{shortMid}` 형태의 새 게이트웨이가 보이며 `status=online, agentStatus=online, tunnelStatus=connected`.
 
 ---
 
-## 4. 검증
+## 4. 운영자 작업 (단계 4~8) — 모두 브라우저 UI
 
-```bash
-# 1) 서비스 상태
-systemctl is-active fallback-engine mosquitto zigbee2mqtt config-agent gpio-agent reverse-ssh-tunnel
+### 단계 4: hostname 변경
 
-# 2) 서버 등록 확인 (백엔드 측)
-curl http://<SERVER_IP>:3100/api/gateways | jq '.[] | select(.gatewayId == "<NEW_GATEWAY_ID>")'
+1. https://&lt;개발 서버&gt;:5174/login → admin 로그인
+2. 게이트웨이 관리 → `lgw-{shortMid}` 선택
+3. 시스템 설정 → hostname 입력 + 저장
+4. 자동 재부팅 후 적용 확인
 
-# 3) 터널 상태
-journalctl -u reverse-ssh-tunnel -n 20 --no-pager
-```
+### 단계 5: 기능 테스트
 
-정상이면:
-- 서비스 모두 `active`
-- 백엔드 API 에서 신규 게이트웨이 조회 가능
-- `tunnelStatus: "connected"`
+- 백엔드 ↔ Pi MQTT 양방향 통신
+- 자동 제어 룰 / 장치 제어 / 폴백 엔진 / Zigbee 등
+
+### 단계 6: Server IP → 프로덕션 IP 변경
+
+1. 게이트웨이 시스템 설정 → Server IP 입력
+2. 신규 Pi 가 프로덕션 서버에 다시 등록 (machine-id 기준 자동 인식)
+
+### 단계 7: hostname + SSID/PW 현장 입력
+
+1. 게이트웨이 시스템 설정 → hostname / SSID / PW 입력 + 저장
+2. 신규 Pi 가 새 자격증명으로 재연결 시도
+
+### 단계 8: 장치 등록 + 사용
+
+브라우저에서 정상 운영.
 
 ---
 
-## 5. 정리
+## 마스터 골든 이미지 만들기 (참고)
 
-```bash
-# Sanitize 백업 삭제 (운영 정상 확인 후)
-sudo rm -rf /root/sanitize-backup-*
-```
+> 운영자가 새 마스터 골든 이미지를 만들어야 할 때
+
+1. **마스터 Pi 준비** (운영 X, 검증용 Pi):
+   - hk-house 의 일반적 운영 상태로 동작 중
+   - 골든 이미지 인 SD 로 부팅한 후 정상 운영 확인
+
+2. **sanitize 실행**:
+   ```bash
+   sudo bash /opt/smart-farm/raspberry-pi/sanitize-new-pi.sh
+   ```
+
+3. **sync + 종료**:
+   ```bash
+   sync && sudo fstrim -av
+   sudo shutdown -h now
+   ```
+
+4. **macOS 에서 추출** — `build-golden-image.sh` 또는 SSH 라이브 dd:
+   ```bash
+   ssh pi@<master> 'sudo dd if=/dev/mmcblk0 bs=4M | xz -T4 -1' > golden-master-YYYYMMDD.img.xz
+   ```
+
+5. **sha256 검증** + JSON metadata 작성:
+   ```bash
+   shasum -a 256 golden-master-YYYYMMDD.img.xz > golden-master-YYYYMMDD.img.xz.sha256
+   ```
 
 ---
 
 ## 트러블슈팅
 
-### sanitize-new-pi.sh 가 없을 때
-골든 이미지가 6/8 추출본이라 sanitize-new-pi.sh 가 포함되어 있지 않을 수 있습니다.
-다음 중 하나로 가져오기:
+### Wi-Fi 자동 연결 안 될 때
 
-```bash
-# macOS 에서 scp 푸시
-scp ~/Projects/smart-farm-mqtt/raspberry-pi/sanitize-new-pi.sh lgwadmin@172.30.1.89:/tmp/
-ssh lgwadmin@172.30.1.89 'sudo cp /tmp/sanitize-new-pi.sh /opt/smart-farm/raspberry-pi/'
+마스터 골든 이미지에 본부 Wi-Fi 가 들어있어야 자동 연결됩니다. 만약 빠져있다면:
 
-# 또는 git pull (smart-farm 디렉토리에 .git 가 있으면)
-cd /opt/smart-farm && sudo git pull
-```
+1. SD 다시 macOS 에 꽂기
+2. bootfs (FAT32) 에 `firstrun.sh` + `cmdline.txt` systemd.run 지시자 추가:
+   ```bash
+   # firstrun.sh 안에 NetworkManager nmconnection 작성
+   # cmdline.txt 끝에 systemd.run=/boot/firmware/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target
+   ```
 
-### SSH 충돌 (hk-house 와 같은 SSH host key)
-첫 SSH 시도가 `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` 로 거부되면:
-```bash
-ssh-keygen -R 172.30.1.89
-```
-그 후 재시도. 신규 Pi 의 새 host key 가 등록됨.
+### 자동 등록 실패 (`required env file missing`)
+
+`bootstrap.token` 또는 `server-ip` 가 골든 이미지에 빠진 경우. **반드시 보존** 해야 함. `sanitize-new-pi.sh` 의 보존 정책 확인.
+
+### 서비스 시작 실패 (`Failed to load environment files`)
+
+`fallback-engine.env` 또는 `gpio-agent.env` 가 sanitize 로 사라진 경우. 두 파일은 **보존** 하고 `GATEWAY_ID` 만 placeholder 로 변경해야 함. `apply-gateway-id.sh` 가 자동으로 실제 ID 로 갱신함.
 
 ---
 
-마지막 검증: 6/10 — 신규 골든 이미지 (hk-house 추출본) 기준
+## 변경 이력
+
+- **2026-06-12**: 자동 등록 흐름 100% 작동 검증 (`lgw-82cc8893`). sanitize 정책 수정:
+  - 보존: `bootstrap.token`, `server-ip`, `fallback-engine.env`, `gpio-agent.env`, Wi-Fi 자격증명
+  - 제거: `gateway-id`, `machine-id`, `.first-boot-done`, SSH host key, tunnel key, hostname → `lgw-default`
