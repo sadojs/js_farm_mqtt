@@ -27,6 +27,7 @@ export interface SprayProduct {
   startDate: string
   intervalDays: number
   count: number
+  hasBees?: boolean
 }
 
 export interface SprayProgram {
@@ -70,6 +71,8 @@ export interface SprayEvent {
   product: string | null
   color: string | null
   round: number
+  kind: 'spray' | 'bee_open'
+  bee: boolean
   isManual: boolean
   pinned: boolean
   note: string | null

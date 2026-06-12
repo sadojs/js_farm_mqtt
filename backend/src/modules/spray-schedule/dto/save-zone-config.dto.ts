@@ -4,6 +4,7 @@ import {
   IsUUID,
   IsDateString,
   IsInt,
+  IsBoolean,
   IsArray,
   ValidateNested,
   Min,
@@ -32,6 +33,10 @@ export class ProductInputDto {
   @IsInt()
   @Min(1)
   count: number;
+
+  @IsOptional()
+  @IsBoolean()
+  hasBees?: boolean;
 }
 
 export class ProgramInputDto {

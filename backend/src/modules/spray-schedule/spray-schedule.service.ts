@@ -25,6 +25,10 @@ function diffDays(a: string, b: string): number {
   return Math.round((parseDate(a).getTime() - parseDate(b).getTime()) / 86400000);
 }
 
+// 벌(호박벌) 사용 방재: 방재 2일 후 벌문 개방
+const BEE_GATE_OPEN_OFFSET_DAYS = 2;
+const BEE_GATE_COLOR = '#f9a825'; // 꿀/앰버색
+
 @Injectable()
 export class SprayScheduleService {
   constructor(
@@ -137,6 +141,7 @@ export class SprayScheduleService {
                 startDate: pr.startDate,
                 intervalDays: pr.intervalDays,
                 count: pr.count,
+                hasBees: pr.hasBees ?? false,
               }),
             ),
           );
@@ -170,20 +175,43 @@ export class SprayScheduleService {
     const rows: Partial<SprayEvent>[] = [];
     for (const { program, products } of programs) {
       for (const product of products) {
+        const bee = !!product.hasBees;
         for (let i = 0; i < product.count; i++) {
+          const sprayDate = addDays(product.startDate, product.intervalDays * i);
+          // 방재 이벤트 (벌 사용 시 bee=true → 오전 벌문 닫기 표시)
           rows.push({
             userId,
             zoneId: zone.id,
             programId: program.id,
             productId: product.id,
-            date: addDays(product.startDate, product.intervalDays * i),
+            date: sprayDate,
             pest: program.pest,
             product: product.name,
             color: program.color,
             round: i + 1,
+            kind: 'spray',
+            bee,
             isManual: false,
             pinned: false,
           });
+          // 벌 사용 시: 방재 2일 후 '벌문 개방' 이벤트 생성
+          if (bee) {
+            rows.push({
+              userId,
+              zoneId: zone.id,
+              programId: program.id,
+              productId: product.id,
+              date: addDays(sprayDate, BEE_GATE_OPEN_OFFSET_DAYS),
+              pest: '벌문 개방',
+              product: `${program.pest} ${i + 1}차 방재 후`,
+              color: BEE_GATE_COLOR,
+              round: i + 1,
+              kind: 'bee_open',
+              bee: true,
+              isManual: false,
+              pinned: false,
+            });
+          }
         }
       }
     }
@@ -257,10 +285,22 @@ export class SprayScheduleService {
     if (dto.mode === 'single' || event.isManual || !event.productId) {
       event.date = dto.date;
       event.pinned = true;
-      return this.eventRepo.save(event);
+      await this.eventRepo.save(event);
+      // 방재 이벤트를 옮기면 짝인 '벌문 개방'도 같은 만큼 이동(2일 간격 유지)
+      if (event.kind === 'spray' && event.productId) {
+        const paired = await this.eventRepo.find({
+          where: { userId, productId: event.productId, round: event.round, kind: 'bee_open' },
+        });
+        for (const p of paired) {
+          p.date = addDays(p.date, delta);
+          p.pinned = true;
+        }
+        if (paired.length) await this.eventRepo.save(paired);
+      }
+      return this.findOwnedEvent(userId, eventId);
     }
 
-    // following: 같은 약품(productId)의 이 회차 이상 전체를 delta 만큼 이동
+    // following: 같은 약품(productId)의 이 회차 이상 전체(방재+벌문 개방)를 delta 만큼 이동
     const siblings = await this.eventRepo.find({
       where: { userId, productId: event.productId },
     });

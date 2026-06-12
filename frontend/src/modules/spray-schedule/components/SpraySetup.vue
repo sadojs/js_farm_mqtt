@@ -57,6 +57,7 @@
               <span class="col-date">시작일</span>
               <span class="col-step">간격</span>
               <span class="col-step">횟수</span>
+              <span class="col-bee">벌</span>
               <span class="col-del"></span>
             </div>
             <div
@@ -77,6 +78,14 @@
                 <span class="num">{{ product.count }}<small>회</small></span>
                 <button @click="product.count = product.count + 1">+</button>
               </div>
+              <label
+                class="col-bee bee-check"
+                :class="{ on: product.hasBees }"
+                title="벌(호박벌) 사용 — 방재일 오전 벌문 닫기 + 방재 2일 후 벌문 개방 일정 자동 추가"
+              >
+                <input type="checkbox" v-model="product.hasBees" />
+                <span>🐝 벌</span>
+              </label>
               <button class="btn-icon danger col-del" title="약품 삭제" @click="removeProduct(program, pri)">−</button>
             </div>
           </div>
@@ -131,6 +140,7 @@ interface ProductDraft {
   startDate: string
   intervalDays: number
   count: number
+  hasBees: boolean
 }
 interface ProgramDraft {
   key: string
@@ -172,6 +182,7 @@ function toDraft(z: SprayZone): ZoneDraft {
         startDate: pr.startDate?.slice(0, 10) ?? z.transplantDate?.slice(0, 10),
         intervalDays: pr.intervalDays,
         count: pr.count,
+        hasBees: pr.hasBees ?? false,
       })),
     })),
     saving: false,
@@ -239,6 +250,7 @@ function addProduct(zone: ZoneDraft, program: ProgramDraft) {
     startDate,
     intervalDays: 3,
     count: 3,
+    hasBees: false,
   })
 }
 
@@ -291,6 +303,7 @@ async function saveZone(zone: ZoneDraft) {
           startDate: pr.startDate,
           intervalDays: pr.intervalDays,
           count: pr.count,
+          hasBees: pr.hasBees,
         })),
       })),
     })
@@ -405,12 +418,29 @@ defineExpose({ reload: load })
 .product-rows { display: flex; flex-direction: column; gap: 6px; }
 .product-row {
   display: grid;
-  grid-template-columns: 48px 1fr 150px 120px 120px 36px;
+  grid-template-columns: 44px 1fr 140px 108px 108px 64px 34px;
   gap: 8px;
   align-items: center;
 }
 .product-head-row span { font-size: var(--font-size-caption); color: var(--text-muted); }
 .col-del { margin-left: 0; }
+.col-bee { text-align: center; }
+.bee-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  padding: 6px 4px;
+  cursor: pointer;
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+.bee-check input { cursor: pointer; }
+.bee-check.on { border-color: var(--warning); background: var(--warning-bg); color: var(--warning-text); font-weight: 600; }
 .rank-badge {
   width: 28px;
   height: 28px;
@@ -486,6 +516,7 @@ defineExpose({ reload: load })
   .product-row .col-name { flex: 1 1 120px; }
   .product-row .col-date { flex: 1 1 120px; }
   .product-row .stepper { flex: 1 1 90px; }
+  .product-row .col-bee { flex: 0 0 auto; }
   .product-row .col-del { flex: 0 0 auto; }
   .zone-crop { flex: 1 1 120px; width: auto; }
   .zone-name { flex: 1 1 100%; }

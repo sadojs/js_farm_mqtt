@@ -70,7 +70,11 @@
           >
             <span class="chip-line1">
               <span v-if="ev.isManual" class="manual-mark">✚</span>
-              {{ zoneAbbr(ev) }} · {{ ev.pest }} <template v-if="!ev.isManual">{{ ev.round }}차</template>
+              <template v-if="ev.kind === 'bee_open'">🐝 {{ ev.pest }}</template>
+              <template v-else>
+                {{ zoneAbbr(ev) }} · {{ ev.pest }} <template v-if="!ev.isManual">{{ ev.round }}차</template>
+                <span v-if="ev.bee" class="bee-tag">🐝 오전 벌문닫기</span>
+              </template>
             </span>
             <span class="chip-line2">{{ ev.product }}</span>
           </div>
@@ -297,6 +301,16 @@ function onDrop(date: string) {
 .chip-line1 { display: block; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-line2 { display: block; color: var(--text-secondary); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manual-mark { color: var(--accent); font-weight: 700; }
+.bee-tag {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 9px;
+  font-weight: 700;
+}
 @media (max-width: 768px) {
   .cell { min-height: 64px; padding: 4px; }
   .btn-add-single { margin-left: 0; }

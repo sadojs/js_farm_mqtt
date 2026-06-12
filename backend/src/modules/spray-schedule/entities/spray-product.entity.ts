@@ -38,6 +38,10 @@ export class SprayProduct {
   @Column({ name: 'count', type: 'int', default: 1 })
   count: number;
 
+  /** 벌(호박벌 등) 사용 여부 — true 면 방재일 오전 벌문 닫기 + 2일 후 벌문 개방 일정 생성 */
+  @Column({ name: 'has_bees', default: false })
+  hasBees: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

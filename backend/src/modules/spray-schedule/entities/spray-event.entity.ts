@@ -49,6 +49,14 @@ export class SprayEvent {
   @Column({ name: 'round', type: 'int', default: 1 })
   round: number;
 
+  /** 이벤트 종류: 'spray'(방재) | 'bee_open'(벌문 개방) */
+  @Column({ name: 'kind', type: 'varchar', length: 12, default: 'spray' })
+  kind: string;
+
+  /** 벌 사용 방재 여부 — 방재일 오전 벌문 닫기 필요 표시 */
+  @Column({ name: 'bee', default: false })
+  bee: boolean;
+
   @Column({ name: 'is_manual', default: false })
   isManual: boolean;
 
