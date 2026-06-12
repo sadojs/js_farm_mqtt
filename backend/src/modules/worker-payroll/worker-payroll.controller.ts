@@ -125,20 +125,25 @@ export class WorkerPayrollController {
   requestSettlement(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() body: { periodStart?: string },
+    @Body() body: { periodStart?: string; variableAmounts?: Record<string, number> },
   ) {
-    return this.service.requestSettlement(user, id, body?.periodStart);
+    return this.service.requestSettlement(user, id, body?.periodStart, body?.variableAmounts);
   }
 
-  /** 정산 승인 (관리자) */
+  /** 정산 승인 (관리자) — 변동 공제 금액 함께 입력 */
   @Post('workers/:id/settlement/approve')
   approveSettlement(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() body: { periodStart?: string },
+    @Body() body: { periodStart?: string; variableAmounts?: Record<string, number> },
   ) {
     this.assertManager(user);
-    return this.service.approveSettlement(this.ownerId(user), id, body?.periodStart);
+    return this.service.approveSettlement(
+      this.ownerId(user),
+      id,
+      body?.periodStart,
+      body?.variableAmounts,
+    );
   }
 
   // ──── 정산 이력 (관리자) ────

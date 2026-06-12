@@ -10,6 +10,7 @@ import {
   Min,
   MinLength,
   Matches,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -20,6 +21,11 @@ export class DeductionInputDto {
 
   @IsString()
   label: string;
+
+  /** 'fixed' | 'variable' (기본 fixed) */
+  @IsOptional()
+  @IsIn(['fixed', 'variable'])
+  kind?: 'fixed' | 'variable';
 
   @IsInt()
   @Min(0)

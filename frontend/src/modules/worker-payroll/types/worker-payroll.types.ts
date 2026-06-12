@@ -1,8 +1,16 @@
+export type DeductionKind = 'fixed' | 'variable'
+
 export interface Deduction {
   id?: string
   label: string
+  kind?: DeductionKind
   amount: number
   sortOrder?: number
+}
+
+export interface VariableDeductionDef {
+  id: string
+  label: string
 }
 
 export interface Worker {
@@ -83,7 +91,7 @@ export interface SettlementResponse extends PeriodMeta {
   totalHours: number
   hourlyWage: number
   grossPay: number
-  deductions: { label: string; amount: number }[]
+  deductions: { label: string; amount: number; kind?: DeductionKind }[]
   deductionTotal: number
   advances: { date: string; amount: number; note: string | null }[]
   advanceTotal: number
@@ -94,6 +102,7 @@ export interface SettlementResponse extends PeriodMeta {
   confirmedAt: string | null
   canRequest: boolean
   canApprove: boolean
+  variableDeductions: VariableDeductionDef[]
 }
 
 export interface SettlementHistoryItem {

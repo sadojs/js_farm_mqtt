@@ -49,6 +49,14 @@
       </table>
     </div>
     <p v-else class="empty">아직 정산 이력이 없습니다.</p>
+
+    <VariableDeductionModal
+      v-if="varModal"
+      :items="varModal.items"
+      :month-label="varModal.month + '월'"
+      @submit="onVarSubmit"
+      @cancel="varModal = null"
+    />
   </div>
 </template>
 
@@ -56,11 +64,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
-import type { SettlementHistoryItem } from '../types/worker-payroll.types'
+import type { SettlementHistoryItem, VariableDeductionDef } from '../types/worker-payroll.types'
+import VariableDeductionModal from './VariableDeductionModal.vue'
 
 const notify = useNotificationStore()
 const items = ref<SettlementHistoryItem[]>([])
 const busyId = ref<string | null>(null)
+const varModal = ref<{ req: SettlementHistoryItem; items: VariableDeductionDef[]; month: number } | null>(null)
 
 const pending = computed(() => items.value.filter((i) => i.status === 'requested'))
 
@@ -82,9 +92,24 @@ async function load() {
 }
 
 async function approve(req: SettlementHistoryItem) {
-  busyId.value = req.id
+  // 변동 공제가 있으면 금액 입력 모달 먼저
   try {
-    await workerPayrollApi.approveSettlement(req.workerId, req.periodStart)
+    const s = await workerPayrollApi.getSettlement(req.workerId, req.periodStart)
+    if ((s.variableDeductions?.length ?? 0) > 0) {
+      varModal.value = { req, items: s.variableDeductions, month: monthOf(req.periodEnd) }
+      return
+    }
+  } catch {
+    /* 조회 실패 시 그냥 승인 시도 */
+  }
+  await doApprove(req)
+}
+
+async function doApprove(req: SettlementHistoryItem, variableAmounts?: Record<string, number>) {
+  busyId.value = req.id
+  varModal.value = null
+  try {
+    await workerPayrollApi.approveSettlement(req.workerId, req.periodStart, variableAmounts)
     notify.success('일꾼 관리', `${req.workerName}님의 정산을 승인했습니다.`)
     await load()
   } catch {
@@ -92,6 +117,10 @@ async function approve(req: SettlementHistoryItem) {
   } finally {
     busyId.value = null
   }
+}
+
+function onVarSubmit(amounts: Record<string, number>) {
+  if (varModal.value) doApprove(varModal.value.req, amounts)
 }
 
 onMounted(load)

@@ -26,8 +26,19 @@
         <span class="rcpt-amount">{{ formatMoney(data.grossPay, lang) }}</span>
       </div>
 
-      <div v-for="(d, i) in data.deductions" :key="'d' + i" class="rcpt-row">
-        <span class="rcpt-label">{{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}</span>
+      <div
+        v-for="(d, i) in data.deductions"
+        :key="'d' + i"
+        class="rcpt-row"
+        :class="{ 'rcpt-variable': d.kind === 'variable' }"
+      >
+        <span class="rcpt-label">
+          <template v-if="d.kind === 'variable'">
+            ⚡ {{ t(lang, 'variable') }} · {{ translateLabel(d.label, lang) }}
+            <span class="bill-src">({{ billMonth }}월 고지서)</span>
+          </template>
+          <template v-else>{{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}</template>
+        </span>
         <span class="rcpt-amount minus">−{{ formatMoney(d.amount, lang) }}</span>
       </div>
 
@@ -67,14 +78,22 @@
         v-if="data.canApprove"
         class="btn-primary"
         :disabled="busy"
-        @click="approve"
+        @click="tryApprove"
       >{{ busy ? '…' : t(lang, 'approve') }}</button>
     </div>
+
+    <VariableDeductionModal
+      v-if="showVarModal && data"
+      :items="data.variableDeductions"
+      :month-label="billMonth + '월'"
+      @submit="approve"
+      @cancel="showVarModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { SettlementResponse } from '../types/worker-payroll.types'
@@ -86,6 +105,7 @@ import {
   shortMD,
   translateLabel,
 } from '../i18n/payroll-i18n'
+import VariableDeductionModal from './VariableDeductionModal.vue'
 
 const props = defineProps<{
   workerId: string
@@ -99,10 +119,17 @@ const notify = useNotificationStore()
 const data = ref<SettlementResponse | null>(null)
 const period = ref<string | undefined>(props.initialPeriod)
 const busy = ref(false)
+const showVarModal = ref(false)
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
+
+// 변동 공제 출처 표기용 — 정산 기간의 마감 월(고지서 월)
+const billMonth = computed(() => {
+  const iso = data.value?.periodEnd ?? ''
+  return iso ? new Date(`${iso.slice(0, 10)}T00:00:00.000Z`).getUTCMonth() + 1 : 0
+})
 
 async function reload() {
   data.value = await workerPayrollApi.getSettlement(props.workerId, period.value)
@@ -129,10 +156,20 @@ async function request() {
   }
 }
 
-async function approve() {
+// 변동 공제가 있으면 금액 입력 모달 먼저, 없으면 바로 승인
+function tryApprove() {
+  if ((data.value?.variableDeductions?.length ?? 0) > 0) {
+    showVarModal.value = true
+  } else {
+    approve()
+  }
+}
+
+async function approve(variableAmounts?: Record<string, number>) {
   busy.value = true
+  showVarModal.value = false
   try {
-    await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart)
+    await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart, variableAmounts)
     notify.success('일꾼 관리', '정산을 승인했습니다.')
     await reload()
     emit('changed')
@@ -195,6 +232,9 @@ defineExpose({ reload })
 .rcpt-label { color: var(--text-secondary); font-size: var(--font-size-label); }
 .rcpt-amount { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rcpt-amount.minus { color: var(--danger); }
+.rcpt-row.rcpt-variable { background: var(--warning-bg); }
+.rcpt-row.rcpt-variable .rcpt-label { color: var(--warning-text); font-weight: 600; }
+.bill-src { color: var(--warning-text); font-size: var(--font-size-caption); opacity: 0.85; }
 .rcpt-row.gross .rcpt-amount { font-size: var(--font-size-subtitle); }
 .rcpt-row.net { background: var(--accent-bg); }
 .rcpt-row.net .rcpt-label { font-weight: 800; color: var(--accent); font-size: var(--font-size-subtitle); }

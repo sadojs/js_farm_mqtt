@@ -56,16 +56,37 @@
       </p>
     </div>
 
-    <!-- ② 기본 공제 항목 -->
+    <!-- ③ 공제 항목 (고정/변동) -->
     <div class="card">
-      <h3 class="card-title">③ 기본 공제 항목</h3>
-      <div v-for="(d, i) in form.deductions" :key="i" class="line-row">
-        <input v-model="d.label" class="inp flex" placeholder="항목 (예: 숙소비)" />
-        <input v-model.number="d.amount" type="number" min="0" step="1000" class="inp amount" placeholder="금액" />
-        <button class="btn-icon danger" @click="form.deductions.splice(i, 1)">−</button>
+      <h3 class="card-title">③ 공제 항목</h3>
+      <p class="hint">매달 같은 금액은 '고정', 전기·수도·가스처럼 매달 바뀌는 항목은 '변동'으로 등록하세요.</p>
+
+      <!-- 고정 공제 -->
+      <div class="ded-section">
+        <div class="ded-head"><span class="ded-title">고정 공제</span><span class="ded-sub">매달 동일 · 자동 차감</span></div>
+        <div v-for="(d, i) in form.fixedDeductions" :key="'f' + i" class="line-row">
+          <input v-model="d.label" class="inp flex" placeholder="항목 (예: 숙소비)" />
+          <input v-model.number="d.amount" type="number" min="0" step="1000" class="inp amount" placeholder="금액" />
+          <button class="btn-icon danger" @click="form.fixedDeductions.splice(i, 1)">−</button>
+        </div>
+        <button class="btn-add" @click="form.fixedDeductions.push({ label: '', amount: 0 })">+ 고정 항목 추가</button>
+        <div class="sum-row">매월 고정 공제 합계 <strong>{{ fixedTotal.toLocaleString() }}원</strong></div>
       </div>
-      <button class="btn-add" @click="form.deductions.push({ label: '', amount: 0 })">+ 공제 항목 추가</button>
-      <div class="sum-row">매월 공제 합계 <strong>{{ deductionTotal.toLocaleString() }}원</strong></div>
+
+      <!-- 변동 공제 -->
+      <div class="ded-section variable">
+        <div class="ded-head">
+          <span class="ded-title">변동 공제</span>
+          <span class="badge-var">매달 입력</span>
+        </div>
+        <p class="var-note">설정에는 항목만 등록하고, 금액은 정산할 때 그 달 고지서 값을 입력합니다.</p>
+        <div v-for="(d, i) in form.variableDeductions" :key="'v' + i" class="line-row">
+          <input v-model="d.label" class="inp flex" placeholder="항목 (예: 전기 · 수도 · 가스)" />
+          <span class="var-amount">정산월마다 금액 입력</span>
+          <button class="btn-icon danger" @click="form.variableDeductions.splice(i, 1)">−</button>
+        </div>
+        <button class="btn-add" @click="form.variableDeductions.push({ label: '' })">+ 변동 항목 추가</button>
+      </div>
     </div>
 
     <!-- ③ 가불 내역 -->
@@ -115,15 +136,16 @@ const form = reactive({
   startDate: new Date().toISOString().slice(0, 10),
   hourlyWage: 12000,
   dailyHours: 8,
-  deductions: [] as { id?: string; label: string; amount: number }[],
+  fixedDeductions: [] as { id?: string; label: string; amount: number }[],
+  variableDeductions: [] as { id?: string; label: string }[],
 })
 
 const accountUsername = ref<string | null>(null)
 const advances = ref<Advance[]>([])
 const newAdvance = reactive({ date: new Date().toISOString().slice(0, 10), amount: 0, note: '' })
 
-const deductionTotal = computed(() =>
-  form.deductions.reduce((s, d) => s + (Number(d.amount) || 0), 0),
+const fixedTotal = computed(() =>
+  form.fixedDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0),
 )
 const anchorDay = computed(() =>
   form.startDate ? Number(form.startDate.slice(8, 10)) : 0,
@@ -138,7 +160,8 @@ async function load() {
     form.startDate = new Date().toISOString().slice(0, 10)
     form.hourlyWage = 12000
     form.dailyHours = 8
-    form.deductions = []
+    form.fixedDeductions = []
+    form.variableDeductions = []
     accountUsername.value = null
     advances.value = []
     return
@@ -149,7 +172,13 @@ async function load() {
   form.startDate = w.startDate.slice(0, 10)
   form.hourlyWage = w.hourlyWage
   form.dailyHours = Number(w.dailyHours)
-  form.deductions = (w.deductions ?? []).map((d) => ({ id: d.id, label: d.label, amount: d.amount }))
+  const deds = w.deductions ?? []
+  form.fixedDeductions = deds
+    .filter((d) => (d.kind ?? 'fixed') !== 'variable')
+    .map((d) => ({ id: d.id, label: d.label, amount: d.amount }))
+  form.variableDeductions = deds
+    .filter((d) => d.kind === 'variable')
+    .map((d) => ({ id: d.id, label: d.label }))
   accountUsername.value = w.username ?? null
   advances.value = await workerPayrollApi.listAdvances(props.workerId)
 }
@@ -184,9 +213,14 @@ async function save() {
       startDate: form.startDate,
       hourlyWage: form.hourlyWage,
       dailyHours: form.dailyHours,
-      deductions: form.deductions
-        .filter((d) => d.label.trim())
-        .map((d, i) => ({ id: d.id, label: d.label.trim(), amount: Number(d.amount) || 0, sortOrder: i })),
+      deductions: [
+        ...form.fixedDeductions
+          .filter((d) => d.label.trim())
+          .map((d) => ({ id: d.id, label: d.label.trim(), kind: 'fixed' as const, amount: Number(d.amount) || 0 })),
+        ...form.variableDeductions
+          .filter((d) => d.label.trim())
+          .map((d) => ({ id: d.id, label: d.label.trim(), kind: 'variable' as const, amount: 0 })),
+      ].map((d, i) => ({ ...d, sortOrder: i })),
     })
     notify.success('일꾼 관리', isNew ? '일꾼 계정을 등록했습니다.' : '근무조건을 저장했습니다.')
     emit('saved', saved)
@@ -284,6 +318,28 @@ async function removeAdvance(id: string) {
 .btn-add:hover { background: var(--accent-bg); }
 .sum-row { color: var(--text-secondary); font-size: var(--font-size-label); }
 .sum-row strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ded-section { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border-light); border-radius: 12px; }
+.ded-section.variable { border-color: var(--warning-border); background: var(--warning-bg); }
+.ded-head { display: flex; align-items: center; gap: 8px; }
+.ded-title { font-weight: 700; color: var(--text-primary); }
+.ded-sub { font-size: var(--font-size-caption); color: var(--text-muted); }
+.badge-var {
+  font-size: var(--font-size-tiny);
+  font-weight: 700;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  padding: 1px 8px;
+}
+.var-note { font-size: var(--font-size-caption); color: var(--warning-text); }
+.var-amount {
+  flex: 0 1 150px;
+  text-align: right;
+  font-size: var(--font-size-caption);
+  color: var(--warning-text);
+  font-weight: 600;
+}
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .btn-save {
   background: var(--accent);

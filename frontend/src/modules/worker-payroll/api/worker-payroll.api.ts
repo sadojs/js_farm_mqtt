@@ -65,14 +65,22 @@ export const workerPayrollApi = {
       .get(`/worker-payroll/workers/${workerId}/settlement`, { params: { periodStart } })
       .then((r) => r.data)
   },
-  requestSettlement(workerId: string, periodStart?: string): Promise<unknown> {
+  requestSettlement(
+    workerId: string,
+    periodStart?: string,
+    variableAmounts?: Record<string, number>,
+  ): Promise<unknown> {
     return apiClient
-      .post(`/worker-payroll/workers/${workerId}/settlement/request`, { periodStart })
+      .post(`/worker-payroll/workers/${workerId}/settlement/request`, { periodStart, variableAmounts })
       .then((r) => r.data)
   },
-  approveSettlement(workerId: string, periodStart?: string): Promise<unknown> {
+  approveSettlement(
+    workerId: string,
+    periodStart?: string,
+    variableAmounts?: Record<string, number>,
+  ): Promise<unknown> {
     return apiClient
-      .post(`/worker-payroll/workers/${workerId}/settlement/approve`, { periodStart })
+      .post(`/worker-payroll/workers/${workerId}/settlement/approve`, { periodStart, variableAmounts })
       .then((r) => r.data)
   },
   listSettlements(): Promise<SettlementHistoryItem[]> {

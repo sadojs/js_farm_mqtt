@@ -40,6 +40,7 @@ type LabelKey =
   | 'requested'
   | 'approve'
   | 'waitingApproval'
+  | 'variable'
 
 export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
   ko: {
@@ -71,6 +72,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     requested: '확정 요청됨',
     approve: '정산 승인',
     waitingApproval: '관리자 승인 대기 중',
+    variable: '변동',
   },
   tl: {
     workDays: 'Araw ng trabaho',
@@ -101,6 +103,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     requested: 'Naipadala na',
     approve: 'Aprubahan',
     waitingApproval: 'Naghihintay ng pag-apruba',
+    variable: 'Variable',
   },
   th: {
     workDays: 'วันทำงาน',
@@ -131,6 +134,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     requested: 'ส่งคำขอแล้ว',
     approve: 'อนุมัติ',
     waitingApproval: 'รออนุมัติจากผู้ดูแล',
+    variable: 'ผันแปร',
   },
   lo: {
     workDays: 'ມື້ເຮັດວຽກ',
@@ -161,6 +165,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     requested: 'ສົ່ງຄຳຂໍແລ້ວ',
     approve: 'ອະນຸມັດ',
     waitingApproval: 'ລໍຖ້າການອະນຸມັດ',
+    variable: 'ປ່ຽນແປງ',
   },
 }
 

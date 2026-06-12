@@ -214,12 +214,15 @@ export class WorkerPayrollService {
     await manager.delete(WorkerDeduction, { workerId });
     let idx = 0;
     for (const d of deductions) {
+      const kind = d.kind === 'variable' ? 'variable' : 'fixed';
       await manager.save(
         manager.create(WorkerDeduction, {
           userId: ownerId,
           workerId,
           label: d.label,
-          amount: d.amount,
+          kind,
+          // 변동 공제는 금액을 미리 정하지 않음(정산 시 입력)
+          amount: kind === 'variable' ? 0 : d.amount,
           sortOrder: d.sortOrder ?? idx,
         }),
       );
@@ -414,7 +417,11 @@ export class WorkerPayrollService {
 
   // ──── 정산 영수증 계산 (라이브) ────
 
-  private async computeReceipt(worker: Worker, meta: ReturnType<WorkerPayrollService['resolvePeriod']>) {
+  private async computeReceipt(
+    worker: Worker,
+    meta: ReturnType<WorkerPayrollService['resolvePeriod']>,
+    variableAmounts?: Record<string, number>,
+  ) {
     const base = num(worker.dailyHours);
     const dayRows = await this.dayRepo.find({ where: { workerId: worker.id } });
     const dayMap = new Map(dayRows.map((o) => [o.date.slice(0, 10), o]));
@@ -444,7 +451,15 @@ export class WorkerPayrollService {
       where: { workerId: worker.id },
       order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
-    const deductions = deductionRows.map((d) => ({ label: d.label, amount: d.amount }));
+    const deductions = deductionRows.map((d) => {
+      const kind = d.kind === 'variable' ? 'variable' : 'fixed';
+      // 변동 공제는 정산 시 입력값 사용(없으면 0), 고정은 설정 금액
+      const amount =
+        kind === 'variable'
+          ? Math.max(0, Math.round(variableAmounts?.[d.id] ?? 0))
+          : d.amount;
+      return { label: d.label, kind, amount };
+    });
     const deductionTotal = deductions.reduce((s, d) => s + d.amount, 0);
 
     const advanceRows = await this.advanceRepo.find({
@@ -473,11 +488,21 @@ export class WorkerPayrollService {
     };
   }
 
+  /** 현재 변동 공제 항목 정의 (정산 입력 모달용) */
+  private async variableDefs(workerId: string) {
+    const rows = await this.deductionRepo.find({
+      where: { workerId, kind: 'variable' },
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
+    });
+    return rows.map((d) => ({ id: d.id, label: d.label }));
+  }
+
   // ──── 정산 조회 (확정/요청된 건 snapshot 박제) ────
 
   async getSettlement(user: any, workerId: string, periodStart?: string) {
     const { worker, canEdit } = await this.resolveWorker(user, workerId);
     const meta = this.resolvePeriod(worker, periodStart);
+    const variableDeductions = await this.variableDefs(worker.id);
 
     const row = await this.settlementRepo.findOne({
       where: { workerId: worker.id, periodStart: meta.periodStart },
@@ -492,6 +517,7 @@ export class WorkerPayrollService {
         confirmedAt: row.confirmedAt,
         canRequest: false,
         canApprove: canEdit && row.status === 'requested',
+        variableDeductions,
       };
     }
 
@@ -506,11 +532,17 @@ export class WorkerPayrollService {
       // 일꾼은 요청, 관리자는 직접 승인(직접 확정)
       canRequest: ended && !canEdit,
       canApprove: canEdit && ended,
+      variableDeductions,
     };
   }
 
   /** 정산 확정 요청 (일꾼 또는 관리자) — 정산일 경과 시 snapshot 박제 + status='requested' */
-  async requestSettlement(user: any, workerId: string, periodStart?: string) {
+  async requestSettlement(
+    user: any,
+    workerId: string,
+    periodStart?: string,
+    variableAmounts?: Record<string, number>,
+  ) {
     const { worker } = await this.resolveWorker(user, workerId);
     const meta = this.resolvePeriod(worker, periodStart);
     if (meta.settleDate > todayStr()) {
@@ -521,7 +553,7 @@ export class WorkerPayrollService {
     });
     if (existing) return existing;
 
-    const receipt = await this.computeReceipt(worker, meta);
+    const receipt = await this.computeReceipt(worker, meta, variableAmounts);
     return this.settlementRepo.save(
       this.settlementRepo.create({
         userId: worker.userId,
@@ -537,8 +569,13 @@ export class WorkerPayrollService {
     );
   }
 
-  /** 정산 승인 (관리자) — 요청이 없으면 즉시 박제 후 확정 */
-  async approveSettlement(ownerId: string, workerId: string, periodStart?: string) {
+  /** 정산 승인 (관리자) — 변동 금액 입력 시 스냅샷 재계산 후 확정 */
+  async approveSettlement(
+    ownerId: string,
+    workerId: string,
+    periodStart?: string,
+    variableAmounts?: Record<string, number>,
+  ) {
     const worker = await this.findOwnedWorker(ownerId, workerId);
     const meta = this.resolvePeriod(worker, periodStart);
     let row = await this.settlementRepo.findOne({
@@ -548,7 +585,7 @@ export class WorkerPayrollService {
       if (meta.settleDate > todayStr()) {
         throw new BadRequestException('아직 정산일이 지나지 않았습니다.');
       }
-      const receipt = await this.computeReceipt(worker, meta);
+      const receipt = await this.computeReceipt(worker, meta, variableAmounts);
       row = this.settlementRepo.create({
         userId: worker.userId,
         workerId: worker.id,
@@ -560,6 +597,11 @@ export class WorkerPayrollService {
         status: 'requested',
         requestedAt: new Date(),
       });
+    } else if (variableAmounts) {
+      // 확정 전이므로 변동 금액 재입력 반영하여 스냅샷 재계산
+      const receipt = await this.computeReceipt(worker, meta, variableAmounts);
+      row.snapshot = receipt;
+      row.netPay = receipt.netPay;
     }
     row.status = 'confirmed';
     row.confirmedAt = new Date();
