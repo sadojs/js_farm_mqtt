@@ -513,6 +513,7 @@ export class WorkerPayrollService {
         ...(row.snapshot as any),
         status: row.status,
         frozen: true,
+        canEdit,
         requestedAt: row.requestedAt,
         confirmedAt: row.confirmedAt,
         canRequest: false,
@@ -527,6 +528,7 @@ export class WorkerPayrollService {
       ...receipt,
       status: ended ? 'pending' : 'open',
       frozen: false,
+      canEdit,
       requestedAt: null,
       confirmedAt: null,
       // 일꾼은 요청, 관리자는 직접 승인(직접 확정)

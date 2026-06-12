@@ -427,12 +427,13 @@ defineExpose({ reload: load })
 .product-rows { display: flex; flex-direction: column; gap: 6px; }
 .product-row {
   display: grid;
-  grid-template-columns: 40px 1fr 130px 88px 96px 96px 56px 32px;
+  grid-template-columns: 34px minmax(110px, 1fr) 172px 78px 92px 92px 50px 30px;
   gap: 8px;
   align-items: center;
 }
 .product-head-row span { font-size: var(--font-size-caption); color: var(--text-muted); }
 .col-del { margin-left: 0; }
+.col-date { padding-left: 8px; padding-right: 6px; }
 .col-time { text-align: center; }
 .time-toggle {
   display: flex;

@@ -98,6 +98,7 @@ export interface SettlementResponse extends PeriodMeta {
   netPay: number
   status: SettlementStatus
   frozen: boolean
+  canEdit?: boolean
   requestedAt: string | null
   confirmedAt: string | null
   canRequest: boolean

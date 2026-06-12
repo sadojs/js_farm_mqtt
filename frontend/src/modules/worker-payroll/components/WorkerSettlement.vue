@@ -26,21 +26,40 @@
         <span class="rcpt-amount">{{ formatMoney(data.grossPay, lang) }}</span>
       </div>
 
-      <div
-        v-for="(d, i) in data.deductions"
-        :key="'d' + i"
-        class="rcpt-row"
-        :class="{ 'rcpt-variable': d.kind === 'variable' }"
-      >
-        <span class="rcpt-label">
-          <template v-if="d.kind === 'variable'">
-            ⚡ {{ t(lang, 'variable') }} · {{ translateLabel(d.label, lang) }}
-            <span class="bill-src">({{ billMonth }}월 고지서)</span>
-          </template>
-          <template v-else>{{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}</template>
-        </span>
+      <!-- 고정 공제 -->
+      <div v-for="(d, i) in fixedDeductions" :key="'f' + i" class="rcpt-row">
+        <span class="rcpt-label">{{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}</span>
         <span class="rcpt-amount minus">−{{ formatMoney(d.amount, lang) }}</span>
       </div>
+
+      <!-- 변동 공제: 관리자가 정산 시 그 달 금액 직접 입력 -->
+      <template v-if="editableVariable">
+        <div v-for="def in data.variableDeductions" :key="'ve' + def.id" class="rcpt-row rcpt-variable">
+          <span class="rcpt-label">
+            ⚡ {{ t(lang, 'variable') }} · {{ translateLabel(def.label, lang) }}
+            <span class="bill-src">({{ billMonth }}월 고지서)</span>
+          </span>
+          <span class="var-edit">
+            <input
+              v-model.number="variableInputs[def.id]"
+              type="number"
+              min="0"
+              step="1000"
+              class="var-amt-input"
+              placeholder="0"
+            /><span class="won-u">원</span>
+          </span>
+        </div>
+      </template>
+      <template v-else>
+        <div v-for="(d, i) in variableDeductions" :key="'v' + i" class="rcpt-row rcpt-variable">
+          <span class="rcpt-label">
+            ⚡ {{ t(lang, 'variable') }} · {{ translateLabel(d.label, lang) }}
+            <span class="bill-src">({{ billMonth }}월 고지서)</span>
+          </span>
+          <span class="rcpt-amount minus">−{{ formatMoney(d.amount, lang) }}</span>
+        </div>
+      </template>
 
       <div v-for="(a, i) in data.advances" :key="'a' + i" class="rcpt-row">
         <span class="rcpt-label">
@@ -51,9 +70,11 @@
 
       <div class="rcpt-row net">
         <span class="rcpt-label">{{ t(lang, 'netPay') }}</span>
-        <span class="rcpt-amount">{{ formatMoney(data.netPay, lang) }}</span>
+        <span class="rcpt-amount">{{ formatMoney(netPreview, lang) }}</span>
       </div>
     </div>
+
+    <p v-if="editableVariable" class="var-hint">⚡ 변동 공제는 이번 {{ billMonth }}월 정산에만 적용됩니다. 그 달 고지서 금액을 입력 후 승인해 주세요.</p>
 
     <!-- 박제 안내 -->
     <p v-if="data.frozen" class="immutable-note">
@@ -78,22 +99,14 @@
         v-if="data.canApprove"
         class="btn-primary"
         :disabled="busy"
-        @click="tryApprove"
+        @click="approve"
       >{{ busy ? '…' : t(lang, 'approve') }}</button>
     </div>
-
-    <VariableDeductionModal
-      v-if="showVarModal && data"
-      :items="data.variableDeductions"
-      :month-label="billMonth + '월'"
-      @submit="approve"
-      @cancel="showVarModal = false"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { SettlementResponse } from '../types/worker-payroll.types'
@@ -105,7 +118,6 @@ import {
   shortMD,
   translateLabel,
 } from '../i18n/payroll-i18n'
-import VariableDeductionModal from './VariableDeductionModal.vue'
 
 const props = defineProps<{
   workerId: string
@@ -119,7 +131,8 @@ const notify = useNotificationStore()
 const data = ref<SettlementResponse | null>(null)
 const period = ref<string | undefined>(props.initialPeriod)
 const busy = ref(false)
-const showVarModal = ref(false)
+// 변동 공제 인라인 입력값 (def.id → 금액)
+const variableInputs = reactive<Record<string, number>>({})
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
@@ -131,9 +144,38 @@ const billMonth = computed(() => {
   return iso ? new Date(`${iso.slice(0, 10)}T00:00:00.000Z`).getUTCMonth() + 1 : 0
 })
 
+const fixedDeductions = computed(() =>
+  (data.value?.deductions ?? []).filter((d) => d.kind !== 'variable'),
+)
+const variableDeductions = computed(() =>
+  (data.value?.deductions ?? []).filter((d) => d.kind === 'variable'),
+)
+// 관리자가 정산 확정(승인) 가능한 시점에 변동 공제 금액을 직접 입력
+const editableVariable = computed(
+  () => !!data.value?.canApprove && (data.value?.variableDeductions?.length ?? 0) > 0,
+)
+const fixedTotal = computed(() => fixedDeductions.value.reduce((s, d) => s + d.amount, 0))
+const variableInputTotal = computed(() =>
+  (data.value?.variableDeductions ?? []).reduce(
+    (s, def) => s + (Number(variableInputs[def.id]) || 0),
+    0,
+  ),
+)
+// 편집 중에는 입력값으로 실수령 미리 계산, 아니면 서버 값
+const netPreview = computed(() => {
+  if (!data.value) return 0
+  if (editableVariable.value) {
+    return data.value.grossPay - fixedTotal.value - variableInputTotal.value - data.value.advanceTotal
+  }
+  return data.value.netPay
+})
+
 async function reload() {
   data.value = await workerPayrollApi.getSettlement(props.workerId, period.value)
   emit('period-change', data.value.periodStart)
+  // 변동 입력값 초기화 (편집 가능 시 0으로)
+  for (const k of Object.keys(variableInputs)) delete variableInputs[k]
+  for (const def of data.value.variableDeductions ?? []) variableInputs[def.id] = 0
 }
 
 function go(p: string | null) {
@@ -156,18 +198,9 @@ async function request() {
   }
 }
 
-// 변동 공제가 있으면 금액 입력 모달 먼저, 없으면 바로 승인
-function tryApprove() {
-  if ((data.value?.variableDeductions?.length ?? 0) > 0) {
-    showVarModal.value = true
-  } else {
-    approve()
-  }
-}
-
-async function approve(variableAmounts?: Record<string, number>) {
+async function approve() {
   busy.value = true
-  showVarModal.value = false
+  const variableAmounts = editableVariable.value ? { ...variableInputs } : undefined
   try {
     await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart, variableAmounts)
     notify.success('일꾼 관리', '정산을 승인했습니다.')
@@ -235,6 +268,28 @@ defineExpose({ reload })
 .rcpt-row.rcpt-variable { background: var(--warning-bg); }
 .rcpt-row.rcpt-variable .rcpt-label { color: var(--warning-text); font-weight: 600; }
 .bill-src { color: var(--warning-text); font-size: var(--font-size-caption); opacity: 0.85; }
+.var-edit { display: inline-flex; align-items: center; gap: 4px; }
+.var-amt-input {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.var-amt-input:focus-visible { outline: 2px solid var(--warning); outline-offset: 1px; }
+.won-u { color: var(--warning-text); font-weight: 600; }
+.var-hint {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: var(--font-size-caption);
+}
 .rcpt-row.gross .rcpt-amount { font-size: var(--font-size-subtitle); }
 .rcpt-row.net { background: var(--accent-bg); }
 .rcpt-row.net .rcpt-label { font-weight: 800; color: var(--accent); font-size: var(--font-size-subtitle); }
