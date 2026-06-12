@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength, Matches, IsOptional, IsIn } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches, IsOptional, IsIn, IsBoolean } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -25,6 +25,11 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  /** 임시 비밀번호 발급 — 첫 로그인 시 비밀번호 변경 강제 */
+  @IsOptional()
+  @IsBoolean()
+  mustChangePassword?: boolean;
 }
 
 export class UpdateUserDto {

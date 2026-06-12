@@ -162,6 +162,7 @@ export class WorkerPayrollService {
         name: dto.name,
         role: 'farm_user',
         parentUserId: ownerId,
+        mustChangePassword: true,
       } as any);
 
       return this.dataSource.transaction(async (manager) => {

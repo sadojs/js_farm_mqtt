@@ -7,6 +7,7 @@ export interface User {
   parentUserName?: string | null
   address?: string
   status: 'active' | 'inactive'
+  mustChangePassword?: boolean
   createdAt: string
   updatedAt: string
 }

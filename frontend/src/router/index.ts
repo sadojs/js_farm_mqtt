@@ -16,6 +16,12 @@ const router = createRouter({
       redirect: '/dashboard'
     },
     {
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('../views/ChangePassword.vue'),
+      meta: { title: '비밀번호 변경', requiresAuth: true }
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/Dashboard.vue'),
@@ -130,13 +136,23 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
+  // 임시 비밀번호 계정 → 비밀번호 변경 강제 (다른 모든 가드보다 우선)
+  if (
+    authStore.isAuthenticated &&
+    authStore.user?.mustChangePassword &&
+    to.path !== '/change-password'
+  ) {
+    next('/change-password')
+    return
+  }
+
   // 일꾼 계정(farm_user + 근무 프로필 연결)은 정산 페이지만 접근 가능
   if (authStore.isAuthenticated && authStore.isFarmUser) {
     const isWorker =
       authStore.isWorkerAccount === null
         ? await authStore.resolveWorkerStatus()
         : authStore.isWorkerAccount === true
-    if (isWorker && to.path !== '/worker-payroll') {
+    if (isWorker && to.path !== '/worker-payroll' && to.path !== '/change-password') {
       next('/worker-payroll')
       return
     }

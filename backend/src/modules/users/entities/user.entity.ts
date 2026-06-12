@@ -32,6 +32,10 @@ export class User {
   @Column({ default: 'active' })
   status: 'active' | 'inactive';
 
+  /** 임시 비밀번호 발급 계정 — 첫 로그인 시 비밀번호 변경 강제 */
+  @Column({ name: 'must_change_password', default: false })
+  mustChangePassword: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

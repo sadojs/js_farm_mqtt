@@ -70,6 +70,7 @@ export class UsersService {
       role: dto.role || 'farm_admin',
       parentUserId: dto.parentUserId || null,
       address: dto.address,
+      mustChangePassword: dto.mustChangePassword ?? false,
     });
     const saved = await this.usersRepo.save(user);
     return this.sanitize(saved);
@@ -81,7 +82,11 @@ export class UsersService {
 
     if (dto.name) user.name = dto.name;
     if (dto.address !== undefined) user.address = dto.address;
-    if (dto.password) user.passwordHash = await bcrypt.hash(dto.password, 10);
+    if (dto.password) {
+      user.passwordHash = await bcrypt.hash(dto.password, 10);
+      // 본인이 비밀번호를 변경하면 변경 강제 해제
+      user.mustChangePassword = false;
+    }
 
     const saved = await this.usersRepo.save(user);
     return this.sanitize(saved);

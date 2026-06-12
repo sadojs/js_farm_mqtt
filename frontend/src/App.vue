@@ -1,7 +1,7 @@
 <template>
-  <div id="app" :class="['content-size-' + fontSize, { 'has-sidebar': isAuthenticated, 'theme-dark': theme === 'dark' }]">
+  <div id="app" :class="['content-size-' + fontSize, { 'has-sidebar': showShell, 'theme-dark': theme === 'dark' }]">
     <!-- 데스크탑 사이드바 -->
-    <aside v-if="isAuthenticated" class="sidebar">
+    <aside v-if="showShell" class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-icon-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><path d="M12 6v6l4 2"/></svg>
@@ -134,7 +134,7 @@
     </aside>
 
     <!-- 모바일 헤더 -->
-    <header v-if="isAuthenticated" class="mobile-header">
+    <header v-if="showShell" class="mobile-header">
       <button class="hamburger" @click="isDrawerOpen = true" aria-label="메뉴 열기">
         <span></span>
         <span></span>
@@ -153,14 +153,14 @@
 
     <!-- 모바일 드로어 오버레이 -->
     <div
-      v-if="isAuthenticated && isDrawerOpen"
+      v-if="showShell && isDrawerOpen"
       class="drawer-overlay"
       @click="isDrawerOpen = false"
     ></div>
 
     <!-- 모바일 드로어 -->
     <aside
-      v-if="isAuthenticated"
+      v-if="showShell"
       class="drawer"
       :class="{ open: isDrawerOpen }"
     >
@@ -287,7 +287,7 @@
 
     <ConfirmDialog />
     <ToastContainer />
-    <VoiceAssistant v-if="isAuthenticated" />
+    <VoiceAssistant v-if="showShell" />
     <UserSettingsModal
       v-if="showSettings"
       :fontSize="fontSize"
@@ -325,6 +325,9 @@ const isAdmin = computed(() => authStore.isAdmin)
 const isFarmUser = computed(() => authStore.isFarmUser)
 const isFarmAdmin = computed(() => authStore.isFarmAdmin)
 const isWorker = computed(() => authStore.isWorker)
+// 임시 비밀번호 변경 강제 중에는 사이드바/헤더 숨김(로그인처럼 단독 화면)
+const mustChangePassword = computed(() => authStore.user?.mustChangePassword === true)
+const showShell = computed(() => isAuthenticated.value && !mustChangePassword.value)
 
 const { feature: cropFeature, fetchFeature: fetchCropFeature, setFeature: setCropFeature } = useCropFeature()
 const showSettings = ref(false)

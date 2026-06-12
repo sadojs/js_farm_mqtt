@@ -62,6 +62,7 @@ export class AuthService {
         role: user.role,
         parentUserId: user.parentUserId || null,
         address: user.address,
+        mustChangePassword: user.mustChangePassword,
       },
     };
   }
@@ -132,6 +133,7 @@ export class AuthService {
       role: user.role,
       parentUserId: user.parentUserId || null,
       address: user.address,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 

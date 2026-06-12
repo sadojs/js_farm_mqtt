@@ -269,8 +269,10 @@ onMounted(async () => {
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
 @media (max-width: 768px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .worker-list { flex-direction: row; overflow-x: auto; }
-  .worker-item { min-width: 180px; flex-shrink: 0; }
+  /* 가로 스크롤 대신 줄바꿈 — "일꾼 등록" 버튼이 화면 밖으로 밀리지 않도록 */
+  .worker-list { flex-direction: row; flex-wrap: wrap; }
+  .worker-item { flex: 1 1 160px; min-width: 0; }
+  .worker-add { flex: 1 1 100%; }
   .tabs { flex-wrap: wrap; }
 }
 </style>
