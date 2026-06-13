@@ -67,7 +67,13 @@ const router = createRouter({
       path: '/activity-log',
       name: 'activity-log',
       component: () => import('../views/ActivityLog.vue'),
-      meta: { title: '작업 내역', requiresAuth: true }
+      meta: { title: '동작 이력', requiresAuth: true }
+    },
+    {
+      path: '/work-log',
+      name: 'work-log',
+      component: () => import('../modules/work-log/WorkLogView.vue'),
+      meta: { title: '농작업 일정', requiresAuth: true, denyFarmUser: true }
     },
     {
       path: '/config-deploy',

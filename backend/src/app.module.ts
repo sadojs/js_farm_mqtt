@@ -31,6 +31,7 @@ import { RainOverrideModule } from './modules/rain-override/rain-override.module
 import { FallbackConfigModule } from './modules/fallback-config/fallback-config.module';
 import { SprayScheduleModule } from './modules/spray-schedule/spray-schedule.module';
 import { WorkerPayrollModule } from './modules/worker-payroll/worker-payroll.module';
+import { WorkLogModule } from './modules/work-log/work-log.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
@@ -76,6 +77,7 @@ import { RetentionService } from './common/retention.service';
     FallbackConfigModule,
     SprayScheduleModule,
     WorkerPayrollModule,
+    WorkLogModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
