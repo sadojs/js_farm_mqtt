@@ -36,6 +36,7 @@
         @prev="changeMonth(-1)"
         @next="changeMonth(1)"
         @chip-click="onChipClick"
+        @move="onChipMove"
       />
       <TaskTypesManager
         v-else-if="tab === 'types'"
@@ -92,7 +93,7 @@ import TaskTypesManager from './components/TaskTypesManager.vue'
 import QuickLogModal from './components/QuickLogModal.vue'
 import AddTaskTypeModal from './components/AddTaskTypeModal.vue'
 import EditLogModal from './components/EditLogModal.vue'
-import { todayYmd } from './utils/work-log.utils'
+import { todayYmd, ymd } from './utils/work-log.utils'
 
 const groupStore = useGroupStore()
 const authStore = useAuthStore()
@@ -185,6 +186,20 @@ function onChipClick(logId: string) {
   if (!log) return
   editingLog.value = log
   showEdit.value = true
+}
+
+/** 달력 드래그앤드롭 — 기록을 다른 날짜로 이동 */
+async function onChipMove(logId: string, date: string) {
+  const log = monthLogs.value.find((l) => l.id === logId)
+  if (!log || ymd(new Date(log.doneAt)) === date) return
+  try {
+    const [y, m, d] = date.split('-').map(Number)
+    const doneAt = new Date(y, m - 1, d, 12, 0, 0).toISOString()
+    await workLogApi.updateLog(logId, { doneAt })
+    await refreshAfterLog()
+  } catch {
+    alert('날짜 이동에 실패했습니다.')
+  }
 }
 
 async function refreshAfterLog() {

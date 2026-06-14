@@ -35,7 +35,14 @@
               class="data-cell"
               @click="$emit('cell-click', z.id, t.id)"
             >
-              <CellChip :last-done-at="board[`${z.id}:${t.id}`]?.lastDoneAt" />
+              <div
+                class="cell-chip"
+                :class="cell(z.id, t.id).tone"
+                :style="{ background: cell(z.id, t.id).bg, color: cell(z.id, t.id).color }"
+              >
+                <span class="cell-days">{{ cell(z.id, t.id).text }}</span>
+                <span class="cell-sub">{{ cell(z.id, t.id).sub }}</span>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -46,7 +53,6 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h } from 'vue'
 import type { BoardCell, WorkTaskType } from '../types/work-log.types'
 import { TONE_COLORS, elapsedDays, elapsedTone } from '../utils/work-log.utils'
 
@@ -60,40 +66,29 @@ defineEmits<{
   (e: 'cell-click', zoneId: string, taskTypeId: string): void
 }>()
 
+/** 한 칸의 표시 정보 (tone/색/텍스트) */
+function cell(zoneId: string, taskTypeId: string) {
+  const days = elapsedDays(props.board[`${zoneId}:${taskTypeId}`]?.lastDoneAt ?? null)
+  const tone = elapsedTone(days)
+  const c = TONE_COLORS[tone]
+  return {
+    tone,
+    bg: c.bg,
+    color: c.text,
+    text: days == null ? '—' : `${days}일`,
+    sub: days == null ? '기록 없음' : '전',
+  }
+}
+
 /** 구역별 '점검 필요'(15일+ 또는 미실시) 칸 수 */
 function inspectCount(zoneId: string): number {
   let n = 0
   for (const t of props.taskTypes) {
-    const days = elapsedDays(props.board[`${zoneId}:${t.id}`]?.lastDoneAt ?? null)
-    const tone = elapsedTone(days)
+    const tone = elapsedTone(elapsedDays(props.board[`${zoneId}:${t.id}`]?.lastDoneAt ?? null))
     if (tone === 'red' || tone === 'none') n += 1
   }
   return n
 }
-
-const CellChip = defineComponent({
-  props: { lastDoneAt: { type: String, default: null } },
-  setup(p) {
-    return () => {
-      const days = elapsedDays(p.lastDoneAt as any)
-      const tone = elapsedTone(days)
-      const c = TONE_COLORS[tone]
-      const text = days == null ? '—' : `${days}일`
-      const sub = days == null ? '기록 없음' : '전'
-      return h(
-        'div',
-        {
-          class: ['cell-chip', tone],
-          style: { background: c.bg, color: c.text },
-        },
-        [
-          h('span', { class: 'cell-days' }, text),
-          h('span', { class: 'cell-sub' }, sub),
-        ],
-      )
-    }
-  },
-})
 </script>
 
 <style scoped>
@@ -148,7 +143,7 @@ const CellChip = defineComponent({
   padding-left: 20px;
   background: var(--bg-card);
 }
-.task-col { min-width: 110px; }
+.task-col { width: 116px; }
 .task-emoji {
   display: inline-flex;
   align-items: center;
@@ -184,7 +179,7 @@ const CellChip = defineComponent({
 .zone-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 .data-cell {
-  padding: 8px;
+  padding: 8px 6px;
   border-bottom: 1px solid var(--border-light);
   text-align: center;
   cursor: pointer;
@@ -197,11 +192,10 @@ const CellChip = defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
+  width: 92px;
+  height: 54px;
   border-radius: 10px;
   font-variant-numeric: tabular-nums;
-  width: 88px;
-  min-height: 52px;
   line-height: 1.1;
   box-sizing: border-box;
 }
@@ -222,10 +216,10 @@ const CellChip = defineComponent({
 
 @media (max-width: 768px) {
   .board-table { font-size: 12px; }
-  .task-col { min-width: 96px; }
+  .task-col { width: 100px; }
   .zone-cell { padding: 10px; }
   .data-cell { padding: 6px 4px; }
-  .cell-chip { width: 80px; padding: 4px 6px; }
+  .cell-chip { width: 84px; height: 52px; }
   .cell-days { font-size: 18px; }
 }
 </style>

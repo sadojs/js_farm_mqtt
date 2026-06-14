@@ -1,51 +1,61 @@
 <template>
-  <div class="calendar-wrap">
-    <div class="cal-header">
-      <button class="nav-btn" @click="$emit('prev')">‹</button>
-      <h3>{{ title }}</h3>
-      <button class="nav-btn" @click="$emit('next')">›</button>
+  <div class="work-calendar">
+    <!-- 상단 네비 -->
+    <div class="cal-toolbar">
+      <div class="month-nav">
+        <button class="nav-btn" @click="$emit('prev')" aria-label="이전 달">‹</button>
+        <span class="month-label">{{ title }}</span>
+        <button class="nav-btn" @click="$emit('next')" aria-label="다음 달">›</button>
+      </div>
     </div>
 
-    <div class="legend">
+    <!-- 작업종류 범례 -->
+    <div v-if="topTypes.length" class="legend">
       <span v-for="t in topTypes" :key="t.id" class="legend-item">
-        <span class="dot" :style="{ background: t.color }"></span>
-        {{ t.emoji }} {{ t.label }}
+        <span class="dot" :style="{ background: t.color }"></span>{{ t.emoji }} {{ t.label }}
       </span>
     </div>
 
-    <div class="cal-grid">
-      <div v-for="d in ['일','월','화','수','목','금','토']" :key="d" class="dow">{{ d }}</div>
+    <!-- 월 그리드 -->
+    <div class="grid-head">
+      <span v-for="(d, i) in weekdays" :key="d" :class="{ sun: i === 0, sat: i === 6 }">{{ d }}</span>
+    </div>
+    <div class="grid">
       <div
-        v-for="(cell, idx) in cells"
-        :key="idx"
-        :class="['day-cell', { other: !cell.inMonth, today: cell.isToday, blank: cell.day === 0 }]"
+        v-for="cell in cells"
+        :key="cell.date"
+        class="cell"
+        :class="{ muted: cell.month !== curMonth, today: cell.date === today }"
+        @dragover.prevent
+        @drop="onDrop(cell.date)"
       >
-        <template v-if="cell.day > 0">
-          <div class="day-num">{{ cell.day }}</div>
-          <div class="chips">
-            <span
-              v-for="c in cell.chips.slice(0, 3)"
-              :key="c.id"
-              class="day-chip"
-              :style="{ background: c.color + '22', color: c.color }"
-              :title="c.title + ' (클릭하여 수정)'"
-              @click="$emit('chip-click', c.id)"
-            >
-              <span class="chip-dot" :style="{ background: c.color }"></span>
-              <span>{{ c.text }}</span>
-            </span>
-            <span v-if="cell.chips.length > 3" class="more-chip">+{{ cell.chips.length - 3 }}건</span>
+        <div class="cell-head">
+          <span class="day-num" :class="{ sun: cell.dow === 0, sat: cell.dow === 6 }">{{ cell.day }}</span>
+        </div>
+        <div class="cell-events">
+          <div
+            v-for="c in cell.chips.slice(0, 3)"
+            :key="c.id"
+            class="event-chip"
+            :style="{ background: c.color + '22', borderLeftColor: c.color }"
+            draggable="true"
+            @dragstart="onDragStart(c.id)"
+            @click="$emit('chip-click', c.id)"
+            :title="c.title + ' (드래그로 날짜 이동 · 클릭하여 수정)'"
+          >
+            <span class="chip-text">{{ c.text }}</span>
           </div>
-        </template>
+          <span v-if="cell.chips.length > 3" class="more-chip">+{{ cell.chips.length - 3 }}건</span>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { WorkLog, WorkTaskType } from '../types/work-log.types'
-import { todayYmd } from '../utils/work-log.utils'
+import { todayYmd, ymd } from '../utils/work-log.utils'
 
 const props = defineProps<{
   month: string             // 'YYYY-MM'
@@ -54,7 +64,16 @@ const props = defineProps<{
   zones: Record<string, { id: string; name: string }>
 }>()
 
-defineEmits<{ (e: 'prev'): void; (e: 'next'): void; (e: 'chip-click', logId: string): void }>()
+const emit = defineEmits<{
+  (e: 'prev'): void
+  (e: 'next'): void
+  (e: 'chip-click', logId: string): void
+  (e: 'move', logId: string, date: string): void
+}>()
+
+const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+const today = todayYmd()
+const curMonth = computed(() => Number(props.month.split('-')[1]))
 
 const title = computed(() => {
   const [y, m] = props.month.split('-').map(Number)
@@ -62,166 +81,142 @@ const title = computed(() => {
 })
 
 const topTypes = computed(() => {
-  // 사용된 타입 + 표준 우선
-  const used = new Set(props.logs.map(l => l.taskTypeId))
-  const types = Object.values(props.taskTypes).filter(t => used.has(t.id))
+  const used = new Set(props.logs.map((l) => l.taskTypeId))
+  const types = Object.values(props.taskTypes).filter((t) => used.has(t.id))
   if (types.length === 0) return Object.values(props.taskTypes).slice(0, 6)
   return types.slice(0, 8)
 })
 
-interface DayCell {
-  day: number
-  inMonth: boolean
-  isToday: boolean
-  chips: { id: string; color: string; text: string; title: string }[]
+function shortName(name: string): string {
+  if (!name) return '?'
+  const parts = name.split(/\s+/)
+  return parts[parts.length - 1] || name
 }
 
-const cells = computed<DayCell[]>(() => {
+interface Chip { id: string; color: string; text: string; title: string }
+interface Cell { date: string; day: number; month: number; dow: number; chips: Chip[] }
+
+const cells = computed<Cell[]>(() => {
   const [y, m] = props.month.split('-').map(Number)
-  const first = new Date(y, m - 1, 1)
-  const lastDay = new Date(y, m, 0).getDate()
-  const startWeekday = first.getDay()
-  const today = todayYmd()
-  const todayYM = today.slice(0, 7)
-  const todayD = Number(today.slice(8))
-
-  // 일별 logs
-  const byDay: Record<number, WorkLog[]> = {}
+  // 일별 logs (로컬 날짜 기준)
+  const byDate: Record<string, WorkLog[]> = {}
   for (const log of props.logs) {
-    const d = new Date(log.doneAt)
-    if (d.getFullYear() === y && d.getMonth() === m - 1) {
-      const dn = d.getDate()
-      if (!byDay[dn]) byDay[dn] = []
-      byDay[dn].push(log)
-    }
+    const key = ymd(new Date(log.doneAt))
+    ;(byDate[key] ||= []).push(log)
   }
 
-  const result: DayCell[] = []
-  for (let i = 0; i < startWeekday; i++) {
-    result.push({ day: 0, inMonth: false, isToday: false, chips: [] })
-  }
-  for (let d = 1; d <= lastDay; d++) {
-    const dayLogs = byDay[d] || []
-    const chips = dayLogs.map(log => {
+  // 6주(42칸) 균일 그리드 — 일요일 시작
+  const first = new Date(y, m - 1, 1)
+  const startDow = first.getDay()
+  const out: Cell[] = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(y, m - 1, 1 - startDow + i)
+    const key = ymd(d)
+    const chips: Chip[] = (byDate[key] || []).map((log) => {
       const t = props.taskTypes[log.taskTypeId]
       const z = props.zones[log.zoneId]
-      const zoneShort = z ? shortName(z.name) : '?'
-      const taskLabel = t?.label || '?'
       const color = t?.color || '#94a3b8'
       return {
         id: log.id,
         color,
-        text: `${zoneShort} ${taskLabel}`,
-        title: `${z?.name ?? '?'} · ${taskLabel}`,
+        text: `${z ? shortName(z.name) : '?'} ${t?.label || '?'}`,
+        title: `${z?.name ?? '?'} · ${t?.label ?? '?'}`,
       }
     })
-    result.push({
-      day: d,
-      inMonth: true,
-      isToday: props.month === todayYM && d === todayD,
-      chips,
-    })
+    out.push({ date: key, day: d.getDate(), month: d.getMonth() + 1, dow: d.getDay(), chips })
   }
-  // 6주 채우기
-  while (result.length % 7 !== 0) result.push({ day: 0, inMonth: false, isToday: false, chips: [] })
-  return result
+  return out
 })
 
-function shortName(name: string): string {
-  if (!name) return '?'
-  // "석문리 1호" → "1호", "둔내 A동" → "A동"
-  const parts = name.split(/\s+/)
-  return parts[parts.length - 1] || name
+// ── 드래그앤드롭 (날짜 이동) ──
+const dragging = ref<string | null>(null)
+function onDragStart(logId: string) {
+  dragging.value = logId
+}
+function onDrop(date: string) {
+  if (dragging.value) {
+    emit('move', dragging.value, date)
+  }
+  dragging.value = null
 }
 </script>
 
 <style scoped>
-.calendar-wrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: 14px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
+.work-calendar { display: flex; flex-direction: column; gap: 12px; }
+.cal-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.month-nav {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card); border: 1px solid var(--border-card);
+  border-radius: 10px; padding: 6px 10px;
 }
-
-.cal-header {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  margin-bottom: 12px;
-}
-.cal-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary); }
 .nav-btn {
-  width: 32px; height: 32px;
-  border: 1px solid var(--border-color);
-  background: transparent; color: var(--text-primary);
-  border-radius: 8px;
-  font-size: 18px;
-  cursor: pointer;
+  width: 32px; height: 32px; border: none;
+  background: var(--bg-hover); border-radius: 8px;
+  color: var(--text-secondary); font-size: 18px; cursor: pointer;
 }
-.nav-btn:hover { background: var(--bg-hover); }
+.nav-btn:hover { background: var(--border-light); }
+.month-label { font-weight: 700; color: var(--text-primary); min-width: 110px; text-align: center; }
 
-.legend {
-  display: flex; flex-wrap: wrap; gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-light);
-  margin-bottom: 12px;
-}
-.legend-item {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--text-secondary); font-weight: 600;
-}
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 0 4px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-caption); color: var(--text-secondary); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-.cal-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 0;
+.grid-head, .grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.grid-head span {
+  text-align: center; font-size: var(--font-size-caption);
+  font-weight: 600; color: var(--text-muted); padding: 4px 0;
+}
+.grid-head .sun { color: var(--danger); }
+.grid-head .sat { color: var(--text-info-banner); }
+
+.cell {
+  min-width: 0;
+  min-height: 104px;
+  background: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: 10px;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   overflow: hidden;
 }
-.dow {
-  background: var(--bg-hover);
-  text-align: center;
-  padding: 8px;
-  font-size: 12px; font-weight: 700;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-light);
-}
-.day-cell {
-  min-height: 92px;
-  padding: 6px 8px;
-  border-right: 1px solid var(--border-light);
-  border-bottom: 1px solid var(--border-light);
-  background: var(--bg-card);
-}
-.day-cell:nth-child(7n) { border-right: none; }
-.day-cell.blank { background: var(--bg-hover); opacity: 0.4; }
-.day-cell.today { background: var(--accent-bg); }
-.day-num { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
-.day-cell.today .day-num { color: var(--accent); }
+.cell.muted { background: var(--bg-primary); opacity: 0.55; }
+.cell.today { border-color: var(--accent); }
+.cell-head { display: flex; align-items: center; }
+.day-num { font-size: var(--font-size-caption); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.day-num.sun { color: var(--danger); }
+.day-num.sat { color: var(--text-info-banner); }
 
-.chips { display: flex; flex-direction: column; gap: 3px; }
-.day-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 6px;
-  border-radius: 6px;
+.cell-events { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.event-chip {
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: grab;
   font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.3;
+  min-width: 0;
+  overflow: hidden;
+}
+.event-chip:active { cursor: grabbing; }
+.chip-text {
+  display: block;
+  font-weight: 700;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+  white-space: nowrap;
 }
-.day-chip:hover { filter: brightness(0.95); }
-.chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.more-chip {
-  display: inline-block;
-  padding: 2px 6px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
+.more-chip { font-size: 10px; color: var(--text-muted); padding-left: 2px; }
 
 @media (max-width: 768px) {
-  .day-cell { min-height: 64px; padding: 4px; }
-  .day-chip { font-size: 10px; padding: 1px 4px; }
+  .cell { min-height: 72px; padding: 4px; }
+  .day-num { font-size: 11px; }
+  .event-chip { font-size: 10px; padding: 2px 4px; }
 }
 </style>
