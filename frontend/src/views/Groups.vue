@@ -66,6 +66,17 @@
           </div>
           <div class="group-header-actions">
             <span class="device-count-badge">{{ getGroupSensors(group).length + getGroupActuators(group).length + getGroupOpenerGroups(group).length }}개 장치</span>
+            <button
+              class="btn-memo"
+              :class="{ 'has-notes': noteCount(group.id) > 0 }"
+              @click="openZoneNotes(group)"
+              title="구역 메모"
+              aria-label="구역 메모"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span class="memo-text">메모</span>
+              <span v-if="noteCount(group.id) > 0" class="memo-count">{{ noteCount(group.id) }}</span>
+            </button>
             <button v-if="!isFarmUser" class="btn-icon" @click="openEnvConfig(group)" title="환경설정" aria-label="환경설정">⚙</button>
             <button v-if="!isFarmUser" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
             <button v-if="!isFarmUser" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
@@ -363,6 +374,14 @@
       @close="showEnvConfigModal = false"
     />
 
+    <ZoneNotesPanel
+      :show="showZoneNotes"
+      :zone-id="zoneNotesGroup?.id || ''"
+      :zone-name="zoneNotesGroup?.name || ''"
+      @close="showZoneNotes = false"
+      @changed="loadNoteCounts"
+    />
+
     <RemoveDeviceModal
       :show="showRemoveDeviceModal"
       :target-group="removeTargetGroup"
@@ -429,6 +448,8 @@ import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vu
 import EmptyState from '@/components/common/EmptyState.vue'
 import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
+import ZoneNotesPanel from '@/components/groups/ZoneNotesPanel.vue'
+import { zoneNotesApi } from '@/api/zone-notes.api'
 import RemoveDeviceModal from '@/components/groups/RemoveDeviceModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
@@ -641,6 +662,7 @@ onMounted(async () => {
     loadGateways(),
   ])
   automationStore.fetchIrrigationStatus()
+  loadNoteCounts()
   const envConfigGroupId = route.query.envConfig as string | undefined
   if (envConfigGroupId) {
     const target = groupStore.groups.find(g => g.id === envConfigGroupId)
@@ -1177,8 +1199,29 @@ function openEnvConfig(group: HouseGroup) {
   showEnvConfigModal.value = true
 }
 
+// ── 구역 메모 ──
+const showZoneNotes = ref(false)
+const zoneNotesGroup = ref<HouseGroup | null>(null)
+const noteCounts = ref<Record<string, number>>({})
+
+function noteCount(zoneId: string): number {
+  return noteCounts.value[zoneId] || 0
+}
+function openZoneNotes(group: HouseGroup) {
+  zoneNotesGroup.value = group
+  showZoneNotes.value = true
+}
+async function loadNoteCounts() {
+  try {
+    const res = await zoneNotesApi.counts()
+    noteCounts.value = res.data
+  } catch {
+    /* 무시 — 배지 미표시 */
+  }
+}
+
 // 모달 열림 시 배경 스크롤 차단
-const anyModalOpen = computed(() => showAddDeviceModal.value || showEnvConfigModal.value || showIrrigationStatusModal.value || showRemoveDeviceModal.value)
+const anyModalOpen = computed(() => showAddDeviceModal.value || showEnvConfigModal.value || showIrrigationStatusModal.value || showRemoveDeviceModal.value || showZoneNotes.value)
 watch(anyModalOpen, (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
 })
@@ -1386,6 +1429,43 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
   white-space: nowrap;
 }
+
+/* 구역 메모 버튼 — 메모 있으면 초록, 없으면 회색. 고정 점 없음. */
+.btn-memo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: #f4f4f6;
+  color: var(--text-secondary);
+  font-size: calc(13px * var(--content-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-memo svg { width: 17px; height: 17px; }
+.btn-memo:hover { background: var(--bg-active); }
+.btn-memo.has-notes { background: #e8f5e9; color: #2e7d32; }
+.btn-memo .memo-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+#app.theme-dark .btn-memo { background: var(--bg-hover); color: var(--text-secondary); }
+#app.theme-dark .btn-memo.has-notes { background: var(--accent-bg); color: var(--accent); }
 
 .btn-icon {
   width: 36px;

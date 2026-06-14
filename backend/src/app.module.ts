@@ -32,6 +32,7 @@ import { FallbackConfigModule } from './modules/fallback-config/fallback-config.
 import { SprayScheduleModule } from './modules/spray-schedule/spray-schedule.module';
 import { WorkerPayrollModule } from './modules/worker-payroll/worker-payroll.module';
 import { WorkLogModule } from './modules/work-log/work-log.module';
+import { ZoneNotesModule } from './modules/zone-notes/zone-notes.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
@@ -76,6 +77,7 @@ import { RetentionService } from './common/retention.service';
     RainOverrideModule,
     FallbackConfigModule,
     SprayScheduleModule,
+    ZoneNotesModule,
     WorkerPayrollModule,
     WorkLogModule,
   ],
