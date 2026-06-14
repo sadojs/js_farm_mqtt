@@ -35,6 +35,7 @@
         :month="currentMonth"
         @prev="changeMonth(-1)"
         @next="changeMonth(1)"
+        @chip-click="onChipClick"
       />
       <TaskTypesManager
         v-else-if="tab === 'types'"
@@ -66,6 +67,17 @@
       @close="closeTypeModal"
       @saved="onTypeSaved"
     />
+
+    <EditLogModal
+      v-if="showEdit && editingLog"
+      :log="editingLog"
+      :zones="zones"
+      :task-types="visibleTaskTypes"
+      :workers="workers"
+      @close="showEdit = false; editingLog = null"
+      @saved="onLogEdited"
+      @deleted="onLogEdited"
+    />
   </div>
 </template>
 
@@ -80,6 +92,8 @@ import CalendarView from './components/CalendarView.vue'
 import TaskTypesManager from './components/TaskTypesManager.vue'
 import QuickLogModal from './components/QuickLogModal.vue'
 import AddTaskTypeModal from './components/AddTaskTypeModal.vue'
+import EditLogModal from './components/EditLogModal.vue'
+import { workerPayrollApi } from '../worker-payroll/api/worker-payroll.api'
 import { todayYmd } from './utils/work-log.utils'
 
 const groupStore = useGroupStore()
@@ -99,6 +113,10 @@ const quickPresetTaskTypeId = ref<string | null>(null)
 
 const showTypeModal = ref(false)
 const editingType = ref<WorkTaskType | null>(null)
+
+const showEdit = ref(false)
+const editingLog = ref<WorkLog | null>(null)
+const workers = ref<Array<{ id: string; name: string }>>([])
 
 const isAdmin = computed(() => authStore.user?.role !== 'farm_user')
 const zones = computed(() => groupStore.groups)
@@ -124,6 +142,13 @@ async function loadAll() {
     board.value = bd.data
     palette.value = p.data
     await loadMonth(currentMonth.value)
+    // 작업자 목록(일꾼 관리) — best-effort
+    try {
+      const ws = await workerPayrollApi.listWorkers()
+      workers.value = ws.map((w) => ({ id: w.id, name: w.name }))
+    } catch {
+      workers.value = []
+    }
   } finally {
     loading.value = false
   }
@@ -147,15 +172,45 @@ function openQuickLog(zoneId?: string, taskTypeId?: string) {
   showQuick.value = true
 }
 
-function onCellClick(zoneId: string, taskTypeId: string) {
+async function onCellClick(zoneId: string, taskTypeId: string) {
+  // 기존 기록이 있는 칸 → 가장 최근 기록 수정, 없으면 빠른 기록(오늘)
+  const cell = boardMap.value[`${zoneId}:${taskTypeId}`]
+  if (cell?.lastDoneAt) {
+    try {
+      const res = await workLogApi.listLogs({ zoneId, taskTypeId, limit: 1 })
+      if (res.data.length) {
+        editingLog.value = res.data[0]
+        showEdit.value = true
+        return
+      }
+    } catch {
+      /* 조회 실패 시 빠른 기록으로 폴백 */
+    }
+  }
   openQuickLog(zoneId, taskTypeId)
+}
+
+function onChipClick(logId: string) {
+  const log = monthLogs.value.find((l) => l.id === logId)
+  if (!log) return
+  editingLog.value = log
+  showEdit.value = true
+}
+
+async function refreshAfterLog() {
+  const [bd] = await Promise.all([workLogApi.board(), loadMonth(currentMonth.value)])
+  board.value = bd.data
 }
 
 async function onLogSaved() {
   showQuick.value = false
-  // 보드 + 이번 달 갱신
-  const [bd] = await Promise.all([workLogApi.board(), loadMonth(currentMonth.value)])
-  board.value = bd.data
+  await refreshAfterLog()
+}
+
+async function onLogEdited() {
+  showEdit.value = false
+  editingLog.value = null
+  await refreshAfterLog()
 }
 
 function openAddType() {

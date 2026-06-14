@@ -2,6 +2,7 @@ import apiClient from '@/api/client'
 import type {
   BoardCell,
   CreateLogDto,
+  UpdateLogDto,
   Palette,
   UpsertTaskTypeDto,
   WorkLog,
@@ -24,6 +25,7 @@ export const workLogApi = {
   listByMonth: (month: string) =>
     apiClient.get<WorkLog[]>('/work-log/logs/by-month', { params: { month } }),
   createLog: (dto: CreateLogDto) => apiClient.post<WorkLog>('/work-log/logs', dto),
+  updateLog: (id: string, dto: UpdateLogDto) => apiClient.put<WorkLog>(`/work-log/logs/${id}`, dto),
   deleteLog: (id: string) => apiClient.delete<{ ok: true }>(`/work-log/logs/${id}`),
   board: () => apiClient.get<BoardCell[]>('/work-log/board'),
 }

@@ -23,7 +23,10 @@
         <tbody>
           <tr v-for="z in zones" :key="z.id">
             <td class="zone-cell">
-              <div class="zone-name">{{ z.name }}</div>
+              <div class="zone-head">
+                <span class="zone-name">{{ z.name }}</span>
+                <span v-if="inspectCount(z.id) > 0" class="inspect-badge">점검 {{ inspectCount(z.id) }}</span>
+              </div>
               <div class="zone-sub">{{ (z as any).description || '' }}</div>
             </td>
             <td
@@ -47,7 +50,7 @@ import { defineComponent, h } from 'vue'
 import type { BoardCell, WorkTaskType } from '../types/work-log.types'
 import { TONE_COLORS, elapsedDays, elapsedTone } from '../utils/work-log.utils'
 
-defineProps<{
+const props = defineProps<{
   zones: Array<{ id: string; name: string }>
   taskTypes: WorkTaskType[]
   board: Record<string, BoardCell>
@@ -56,6 +59,17 @@ defineProps<{
 defineEmits<{
   (e: 'cell-click', zoneId: string, taskTypeId: string): void
 }>()
+
+/** 구역별 '점검 필요'(15일+ 또는 미실시) 칸 수 */
+function inspectCount(zoneId: string): number {
+  let n = 0
+  for (const t of props.taskTypes) {
+    const days = elapsedDays(props.board[`${zoneId}:${t.id}`]?.lastDoneAt ?? null)
+    const tone = elapsedTone(days)
+    if (tone === 'red' || tone === 'none') n += 1
+  }
+  return n
+}
 
 const CellChip = defineComponent({
   props: { lastDoneAt: { type: String, default: null } },
@@ -156,7 +170,17 @@ const CellChip = defineComponent({
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-light);
 }
+.zone-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .zone-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.inspect-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--danger-badge-text);
+  background: var(--danger-badge-bg);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
 .zone-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 .data-cell {
@@ -174,17 +198,19 @@ const CellChip = defineComponent({
   align-items: center;
   justify-content: center;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-variant-numeric: tabular-nums;
   min-width: 72px;
+  min-height: 52px;
+  line-height: 1.1;
 }
 .cell-chip.none {
   background: #f1f4f7 !important;
   color: #94a3b8 !important;
   border: 1px dashed #cbd5e1;
 }
-.cell-days { font-size: 14px; font-weight: 700; }
-.cell-sub { font-size: 10px; font-weight: 500; }
+.cell-days { font-size: 19px; font-weight: 800; }
+.cell-sub { font-size: 11.5px; font-weight: 500; margin-top: 1px; }
 
 .hint {
   font-size: 12px;

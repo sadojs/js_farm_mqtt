@@ -48,6 +48,15 @@ export interface CreateLogDto {
   qty?: number
 }
 
+export interface UpdateLogDto {
+  zoneId?: string
+  taskTypeId?: string
+  workerId?: string | null
+  doneAt?: string
+  note?: string
+  qty?: number
+}
+
 export interface Palette {
   emoji: string[]
   color: string[]

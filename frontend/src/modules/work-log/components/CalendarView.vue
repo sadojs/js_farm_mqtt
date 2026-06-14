@@ -28,7 +28,8 @@
               :key="c.id"
               class="day-chip"
               :style="{ background: c.color + '22', color: c.color }"
-              :title="c.title"
+              :title="c.title + ' (클릭하여 수정)'"
+              @click="$emit('chip-click', c.id)"
             >
               <span class="chip-dot" :style="{ background: c.color }"></span>
               <span>{{ c.text }}</span>
@@ -53,7 +54,7 @@ const props = defineProps<{
   zones: Record<string, { id: string; name: string }>
 }>()
 
-defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
+defineEmits<{ (e: 'prev'): void; (e: 'next'): void; (e: 'chip-click', logId: string): void }>()
 
 const title = computed(() => {
   const [y, m] = props.month.split('-').map(Number)
@@ -208,7 +209,9 @@ function shortName(name: string): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
 }
+.day-chip:hover { filter: brightness(0.95); }
 .chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .more-chip {
   display: inline-block;

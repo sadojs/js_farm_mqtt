@@ -10,6 +10,7 @@ import { WorkTaskType } from './entities/work-task-type.entity';
 import { WorkLog } from './entities/work-log.entity';
 import {
   CreateWorkLogDto,
+  UpdateWorkLogDto,
   UpsertWorkTaskTypeDto,
   WorkLogListQueryDto,
 } from './dto/work-log.dto';
@@ -170,6 +171,34 @@ export class WorkLogService {
       note: dto.note ?? null,
       qty: dto.qty ?? null,
     });
+    return this.logRepo.save(row);
+  }
+
+  /** 기록 수정 — 날짜/구역/작업종류/작업자/메모 변경 (날짜 변경 시 달력에서 이동) */
+  async updateLog(
+    user: { id: string; role: string; parentUserId?: string | null },
+    id: string,
+    dto: UpdateWorkLogDto,
+  ): Promise<WorkLog> {
+    const uid = effectiveUserId(user);
+    const row = await this.logRepo.findOne({ where: { id, userId: uid } });
+    if (!row) throw new NotFoundException('기록을 찾을 수 없습니다');
+
+    if (dto.zoneId !== undefined) {
+      const zone = await this.groupRepo.findOne({ where: { id: dto.zoneId, userId: uid } });
+      if (!zone) throw new NotFoundException('구역을 찾을 수 없습니다');
+      row.zoneId = dto.zoneId;
+    }
+    if (dto.taskTypeId !== undefined) {
+      const tt = await this.taskTypeRepo.findOne({ where: { id: dto.taskTypeId, userId: uid } });
+      if (!tt) throw new NotFoundException('작업 종류를 찾을 수 없습니다');
+      row.taskTypeId = dto.taskTypeId;
+    }
+    if (dto.workerId !== undefined) row.workerId = dto.workerId ?? null;
+    if (dto.doneAt !== undefined) row.doneAt = new Date(dto.doneAt);
+    if (dto.note !== undefined) row.note = dto.note ?? null;
+    if (dto.qty !== undefined) row.qty = dto.qty ?? null;
+
     return this.logRepo.save(row);
   }
 

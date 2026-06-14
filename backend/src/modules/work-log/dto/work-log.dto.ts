@@ -70,6 +70,34 @@ export class CreateWorkLogDto {
   qty?: number;
 }
 
+export class UpdateWorkLogDto {
+  @IsOptional()
+  @IsUUID()
+  zoneId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  taskTypeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  workerId?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  doneAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  note?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  qty?: number;
+}
+
 export class WorkLogListQueryDto {
   @IsOptional()
   @IsUUID()

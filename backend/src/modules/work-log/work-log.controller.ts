@@ -18,6 +18,7 @@ import {
   CreateWorkLogDto,
   MonthQueryDto,
   ToggleHiddenDto,
+  UpdateWorkLogDto,
   UpsertWorkTaskTypeDto,
   WorkLogListQueryDto,
 } from './dto/work-log.dto';
@@ -83,6 +84,15 @@ export class WorkLogController {
   @Post('logs')
   createLog(@CurrentUser() user: any, @Body() dto: CreateWorkLogDto) {
     return this.svc.createLog(user, dto);
+  }
+
+  @Put('logs/:id')
+  updateLog(
+    @CurrentUser() user: any,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateWorkLogDto,
+  ) {
+    return this.svc.updateLog(user, id, dto);
   }
 
   @Delete('logs/:id')
