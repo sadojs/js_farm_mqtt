@@ -67,6 +67,7 @@ const props = defineProps<{
   board: Record<string, BoardCell>
   presetZoneId?: string | null
   presetTaskTypeId?: string | null
+  presetDate?: string | null
 }>()
 
 const emit = defineEmits<{ (e: 'close'): void; (e: 'saved'): void }>()
@@ -90,10 +91,17 @@ async function save() {
   if (!canSave.value) return
   saving.value = true
   try {
+    // 특정 날짜 지정 시 정오로 고정(없으면 서버 now())
+    let doneAt: string | undefined
+    if (props.presetDate) {
+      const [y, m, d] = props.presetDate.split('-').map(Number)
+      doneAt = new Date(y, m - 1, d, 12, 0, 0).toISOString()
+    }
     await workLogApi.createLog({
       zoneId: zoneId.value!,
       taskTypeId: taskTypeId.value!,
       note: note.value.trim() || undefined,
+      doneAt,
     })
     emit('saved')
   } catch (err: any) {

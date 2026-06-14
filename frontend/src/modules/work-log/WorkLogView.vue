@@ -35,7 +35,7 @@
         :month="currentMonth"
         @prev="changeMonth(-1)"
         @next="changeMonth(1)"
-        @chip-click="onChipClick"
+        @day-click="onDayClick"
         @move="onChipMove"
       />
       <TaskTypesManager
@@ -57,8 +57,20 @@
       :board="boardMap"
       :preset-zone-id="quickPresetZoneId"
       :preset-task-type-id="quickPresetTaskTypeId"
+      :preset-date="quickPresetDate"
       @close="showQuick = false"
       @saved="onLogSaved"
+    />
+
+    <DayLogsModal
+      v-if="showDay"
+      :date="dayDate"
+      :logs="dayLogs"
+      :task-types="taskTypesById"
+      :zones="zonesById"
+      @close="showDay = false"
+      @edit="onDayEdit"
+      @add="onDayAdd"
     />
 
     <AddTaskTypeModal
@@ -93,6 +105,7 @@ import TaskTypesManager from './components/TaskTypesManager.vue'
 import QuickLogModal from './components/QuickLogModal.vue'
 import AddTaskTypeModal from './components/AddTaskTypeModal.vue'
 import EditLogModal from './components/EditLogModal.vue'
+import DayLogsModal from './components/DayLogsModal.vue'
 import { todayYmd, ymd } from './utils/work-log.utils'
 
 const groupStore = useGroupStore()
@@ -109,6 +122,10 @@ const currentMonth = ref(todayYmd().slice(0, 7))
 const showQuick = ref(false)
 const quickPresetZoneId = ref<string | null>(null)
 const quickPresetTaskTypeId = ref<string | null>(null)
+const quickPresetDate = ref<string | null>(null)
+
+const showDay = ref(false)
+const dayDate = ref<string>(todayYmd())
 
 const showTypeModal = ref(false)
 const editingType = ref<WorkTaskType | null>(null)
@@ -157,10 +174,30 @@ function changeMonth(delta: number) {
   loadMonth(currentMonth.value)
 }
 
-function openQuickLog(zoneId?: string, taskTypeId?: string) {
+const dayLogs = computed(() =>
+  monthLogs.value.filter((l) => ymd(new Date(l.doneAt)) === dayDate.value),
+)
+
+function openQuickLog(zoneId?: string, taskTypeId?: string, date?: string) {
   quickPresetZoneId.value = zoneId ?? null
   quickPresetTaskTypeId.value = taskTypeId ?? null
+  quickPresetDate.value = date ?? null
   showQuick.value = true
+}
+
+// 달력 날짜(셀) 클릭 → 그 날의 모든 작업 목록 모달
+function onDayClick(date: string) {
+  dayDate.value = date
+  showDay.value = true
+}
+function onDayEdit(log: WorkLog) {
+  showDay.value = false
+  editingLog.value = log
+  showEdit.value = true
+}
+function onDayAdd(date: string) {
+  showDay.value = false
+  openQuickLog(undefined, undefined, date)
 }
 
 async function onCellClick(zoneId: string, taskTypeId: string) {
@@ -181,13 +218,6 @@ async function onCellClick(zoneId: string, taskTypeId: string) {
   openQuickLog(zoneId, taskTypeId)
 }
 
-function onChipClick(logId: string) {
-  const log = monthLogs.value.find((l) => l.id === logId)
-  if (!log) return
-  editingLog.value = log
-  showEdit.value = true
-}
-
 /** 달력 드래그앤드롭 — 기록을 다른 날짜로 이동 */
 async function onChipMove(logId: string, date: string) {
   const log = monthLogs.value.find((l) => l.id === logId)
@@ -197,8 +227,8 @@ async function onChipMove(logId: string, date: string) {
     const doneAt = new Date(y, m - 1, d, 12, 0, 0).toISOString()
     await workLogApi.updateLog(logId, { doneAt })
     await refreshAfterLog()
-  } catch {
-    alert('날짜 이동에 실패했습니다.')
+  } catch (err: any) {
+    alert(err.response?.data?.message || '날짜 이동에 실패했습니다.')
   }
 }
 

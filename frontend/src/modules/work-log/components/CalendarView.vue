@@ -26,6 +26,7 @@
         :key="cell.date"
         class="cell"
         :class="{ muted: cell.month !== curMonth, today: cell.date === today }"
+        @click="$emit('day-click', cell.date)"
         @dragover.prevent
         @drop="onDrop(cell.date)"
       >
@@ -40,8 +41,7 @@
             :style="{ background: c.color + '22', borderLeftColor: c.color }"
             draggable="true"
             @dragstart="onDragStart(c.id)"
-            @click="$emit('chip-click', c.id)"
-            :title="c.title + ' (드래그로 날짜 이동 · 클릭하여 수정)'"
+            :title="c.title + ' (드래그로 날짜 이동 · 클릭하면 그 날의 전체 기록)'"
           >
             <span class="chip-text">{{ c.text }}</span>
           </div>
@@ -67,7 +67,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'prev'): void
   (e: 'next'): void
-  (e: 'chip-click', logId: string): void
+  (e: 'day-click', date: string): void
   (e: 'move', logId: string, date: string): void
 }>()
 
@@ -184,7 +184,9 @@ function onDrop(date: string) {
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  cursor: pointer;
 }
+.cell:hover { border-color: var(--accent); }
 .cell.muted { background: var(--bg-primary); opacity: 0.55; }
 .cell.today { border-color: var(--accent); }
 .cell-head { display: flex; align-items: center; }

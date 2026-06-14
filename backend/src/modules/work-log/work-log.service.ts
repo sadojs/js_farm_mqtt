@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -152,6 +153,28 @@ export class WorkLogService {
   }
 
   // ───── logs ─────
+
+  /** 같은 날(한국 시간 기준)·같은 구역·같은 작업 중복 기록 존재 여부 */
+  private async hasSameDayDuplicate(
+    uid: string,
+    zoneId: string,
+    taskTypeId: string,
+    doneAt: Date,
+    excludeId?: string,
+  ): Promise<boolean> {
+    const qb = this.logRepo
+      .createQueryBuilder('l')
+      .where('l.user_id = :uid', { uid })
+      .andWhere('l.zone_id = :zoneId', { zoneId })
+      .andWhere('l.task_type_id = :taskTypeId', { taskTypeId })
+      .andWhere(
+        "date_trunc('day', l.done_at AT TIME ZONE 'Asia/Seoul') = date_trunc('day', :doneAt::timestamptz AT TIME ZONE 'Asia/Seoul')",
+        { doneAt: doneAt.toISOString() },
+      );
+    if (excludeId) qb.andWhere('l.id <> :excludeId', { excludeId });
+    return (await qb.getCount()) > 0;
+  }
+
   async createLog(
     user: { id: string; role: string; parentUserId?: string | null },
     dto: CreateWorkLogDto,
@@ -162,12 +185,16 @@ export class WorkLogService {
     if (!zone) throw new NotFoundException('구역을 찾을 수 없습니다');
     const tt = await this.taskTypeRepo.findOne({ where: { id: dto.taskTypeId, userId: uid } });
     if (!tt) throw new NotFoundException('작업 종류를 찾을 수 없습니다');
+    const doneAt = dto.doneAt ? new Date(dto.doneAt) : new Date();
+    if (await this.hasSameDayDuplicate(uid, dto.zoneId, dto.taskTypeId, doneAt)) {
+      throw new ConflictException('이미 같은 날 같은 구역·작업이 기록되어 있습니다.');
+    }
     const row = this.logRepo.create({
       userId: uid,
       zoneId: dto.zoneId,
       taskTypeId: dto.taskTypeId,
       workerId: dto.workerId ?? null,
-      doneAt: dto.doneAt ? new Date(dto.doneAt) : new Date(),
+      doneAt,
       note: dto.note ?? null,
       qty: dto.qty ?? null,
     });
@@ -198,6 +225,11 @@ export class WorkLogService {
     if (dto.doneAt !== undefined) row.doneAt = new Date(dto.doneAt);
     if (dto.note !== undefined) row.note = dto.note ?? null;
     if (dto.qty !== undefined) row.qty = dto.qty ?? null;
+
+    // 변경 결과가 같은 날·구역·작업 중복이 되면 차단(자기 자신 제외)
+    if (await this.hasSameDayDuplicate(uid, row.zoneId, row.taskTypeId, row.doneAt, row.id)) {
+      throw new ConflictException('해당 날짜에 같은 구역·작업 기록이 이미 있습니다.');
+    }
 
     return this.logRepo.save(row);
   }
