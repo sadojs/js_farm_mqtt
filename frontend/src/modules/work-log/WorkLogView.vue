@@ -73,7 +73,6 @@
       :log="editingLog"
       :zones="zones"
       :task-types="visibleTaskTypes"
-      :workers="workers"
       @close="showEdit = false; editingLog = null"
       @saved="onLogEdited"
       @deleted="onLogEdited"
@@ -93,7 +92,6 @@ import TaskTypesManager from './components/TaskTypesManager.vue'
 import QuickLogModal from './components/QuickLogModal.vue'
 import AddTaskTypeModal from './components/AddTaskTypeModal.vue'
 import EditLogModal from './components/EditLogModal.vue'
-import { workerPayrollApi } from '../worker-payroll/api/worker-payroll.api'
 import { todayYmd } from './utils/work-log.utils'
 
 const groupStore = useGroupStore()
@@ -116,7 +114,6 @@ const editingType = ref<WorkTaskType | null>(null)
 
 const showEdit = ref(false)
 const editingLog = ref<WorkLog | null>(null)
-const workers = ref<Array<{ id: string; name: string }>>([])
 
 const isAdmin = computed(() => authStore.user?.role !== 'farm_user')
 const zones = computed(() => groupStore.groups)
@@ -142,13 +139,6 @@ async function loadAll() {
     board.value = bd.data
     palette.value = p.data
     await loadMonth(currentMonth.value)
-    // 작업자 목록(일꾼 관리) — best-effort
-    try {
-      const ws = await workerPayrollApi.listWorkers()
-      workers.value = ws.map((w) => ({ id: w.id, name: w.name }))
-    } catch {
-      workers.value = []
-    }
   } finally {
     loading.value = false
   }

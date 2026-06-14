@@ -40,15 +40,6 @@
           </div>
         </div>
 
-        <!-- 작업자 -->
-        <div class="field">
-          <label>작업자</label>
-          <select v-model="workerId" class="inp">
-            <option value="">(미지정)</option>
-            <option v-for="w in workers" :key="w.id" :value="w.id">{{ w.name }}</option>
-          </select>
-        </div>
-
         <!-- 메모 -->
         <div class="field">
           <label>메모 <span class="opt">(선택)</span></label>
@@ -76,7 +67,6 @@ const props = defineProps<{
   log: WorkLog
   zones: Array<{ id: string; name: string }>
   taskTypes: WorkTaskType[]
-  workers: Array<{ id: string; name: string }>
 }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'saved'): void; (e: 'deleted'): void }>()
 
@@ -89,7 +79,6 @@ const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); ret
 const date = ref(localYmd(new Date(props.log.doneAt)))
 const zoneId = ref(props.log.zoneId)
 const taskTypeId = ref(props.log.taskTypeId)
-const workerId = ref(props.log.workerId ?? '')
 const note = ref(props.log.note ?? '')
 const busy = ref(false)
 
@@ -106,7 +95,6 @@ async function onSave() {
     await workLogApi.updateLog(props.log.id, {
       zoneId: zoneId.value,
       taskTypeId: taskTypeId.value,
-      workerId: workerId.value || null,
       doneAt,
       note: note.value,
     })

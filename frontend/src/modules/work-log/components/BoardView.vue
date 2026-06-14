@@ -197,20 +197,21 @@ const CellChip = defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 10px;
   font-variant-numeric: tabular-nums;
-  min-width: 72px;
+  width: 88px;
   min-height: 52px;
   line-height: 1.1;
+  box-sizing: border-box;
 }
 .cell-chip.none {
   background: #f1f4f7 !important;
   color: #94a3b8 !important;
   border: 1px dashed #cbd5e1;
 }
-.cell-days { font-size: 19px; font-weight: 800; }
-.cell-sub { font-size: 11.5px; font-weight: 500; margin-top: 1px; }
+.cell-days { font-size: 19px; font-weight: 800; white-space: nowrap; }
+.cell-sub { font-size: 11.5px; font-weight: 500; margin-top: 1px; white-space: nowrap; }
 
 .hint {
   font-size: 12px;
@@ -221,8 +222,10 @@ const CellChip = defineComponent({
 
 @media (max-width: 768px) {
   .board-table { font-size: 12px; }
-  .task-col { min-width: 80px; }
+  .task-col { min-width: 96px; }
   .zone-cell { padding: 10px; }
-  .cell-chip { min-width: 56px; padding: 4px 8px; }
+  .data-cell { padding: 6px 4px; }
+  .cell-chip { width: 80px; padding: 4px 6px; }
+  .cell-days { font-size: 18px; }
 }
 </style>
