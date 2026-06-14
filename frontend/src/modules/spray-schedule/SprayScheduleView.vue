@@ -38,6 +38,7 @@
         <p class="mini-line">날짜: {{ shortDate(selected.date) }}</p>
         <p v-if="selected.note" class="mini-line">메모: {{ selected.note }}</p>
         <div class="modal-actions">
+          <button class="btn-secondary" @click="openShift">일정 연기/당기기</button>
           <button class="btn-danger" @click="deleteSelected">일정 삭제</button>
           <button class="btn-ghost" @click="selected = null">닫기</button>
         </div>
@@ -50,6 +51,13 @@
       :target-date="moveTarget.date"
       @apply="applyMove"
       @cancel="moveTarget = null"
+    />
+
+    <ShiftEventModal
+      v-if="shiftTarget"
+      :event="shiftTarget"
+      @apply="applyShift"
+      @cancel="shiftTarget = null"
     />
 
     <ManualEventModal
@@ -77,6 +85,7 @@ import { shortDate } from './utils/spray-schedule.utils'
 import SpraySetup from './components/SpraySetup.vue'
 import SprayCalendar from './components/SprayCalendar.vue'
 import MoveEventModal from './components/MoveEventModal.vue'
+import ShiftEventModal from './components/ShiftEventModal.vue'
 import ManualEventModal from './components/ManualEventModal.vue'
 
 const authStore = useAuthStore()
@@ -90,6 +99,7 @@ const setupRef = ref<InstanceType<typeof SpraySetup> | null>(null)
 
 const selected = ref<SprayEvent | null>(null)
 const moveTarget = ref<{ ev: SprayEvent; date: string } | null>(null)
+const shiftTarget = ref<SprayEvent | null>(null)
 const showManual = ref(false)
 const manualDate = ref<string | undefined>(undefined)
 
@@ -142,6 +152,26 @@ async function createManual(payload: CreateManualEventPayload) {
     notify.error('방재일정', '단건 일정 추가에 실패했습니다.')
   } finally {
     showManual.value = false
+  }
+}
+
+function openShift() {
+  if (!selected.value) return
+  shiftTarget.value = selected.value
+  selected.value = null
+}
+
+async function applyShift(payload: { newDate: string; mode: MoveMode }) {
+  if (!shiftTarget.value) return
+  const ev = shiftTarget.value
+  try {
+    await sprayScheduleApi.moveEvent(ev.id, payload.newDate, payload.mode)
+    notify.success('방재일정', payload.mode === 'following' ? '이 일정과 이후 일정을 함께 조정했습니다.' : '일정을 조정했습니다.')
+    await reloadCalendar()
+  } catch {
+    notify.error('방재일정', '일정 조정에 실패했습니다.')
+  } finally {
+    shiftTarget.value = null
   }
 }
 
@@ -243,4 +273,14 @@ onMounted(reloadCalendar)
   cursor: pointer;
   font-weight: 600;
 }
+.btn-secondary {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-secondary:hover { filter: brightness(0.97); }
 </style>
