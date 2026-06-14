@@ -75,7 +75,14 @@ const mode = ref<MoveMode>('single')
 .opt.active { border-color: var(--accent); background: var(--accent-bg); }
 .opt span { display: flex; flex-direction: column; gap: 2px; }
 .opt small { color: var(--text-muted); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.modal-actions > button { white-space: nowrap; flex: 0 0 auto; }
 .btn-ghost {
   background: var(--bg-hover);
   border: none;
@@ -95,4 +102,10 @@ const mode = ref<MoveMode>('single')
   font-weight: 600;
 }
 .btn-primary:hover { background: var(--accent-hover); }
+
+@media (max-width: 480px) {
+  .modal { max-width: 100%; padding: 18px; }
+  .modal-actions { flex-direction: column-reverse; gap: 8px; }
+  .modal-actions > button { width: 100%; padding: 12px 16px; }
+}
 </style>

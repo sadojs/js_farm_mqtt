@@ -203,7 +203,14 @@ function apply() {
 .opt span { display: flex; flex-direction: column; gap: 2px; }
 .opt small { color: var(--text-muted); }
 
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.modal-actions > button { white-space: nowrap; flex: 0 0 auto; }
 .btn-ghost {
   background: var(--bg-hover);
   border: none;
@@ -224,4 +231,14 @@ function apply() {
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 모바일 — 모달 전체 폭 + 버튼 세로 + 빠른칩 줄바꿈 */
+@media (max-width: 480px) {
+  .modal { max-width: 100%; padding: 18px; }
+  .modal-actions { flex-direction: column-reverse; gap: 8px; }
+  .modal-actions > button { width: 100%; padding: 12px 16px; }
+  .quick-chip { padding: 8px 10px; font-size: 13px; }
+  .num-input { width: 64px; }
+  .dir-btn { font-size: 14px; padding: 10px 8px; }
+}
 </style>

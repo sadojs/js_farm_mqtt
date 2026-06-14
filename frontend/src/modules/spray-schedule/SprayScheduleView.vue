@@ -254,7 +254,17 @@ onMounted(reloadCalendar)
 }
 .modal-title { font-size: var(--font-size-subtitle); font-weight: 700; color: var(--text-primary); }
 .mini-line { color: var(--text-secondary); font-size: var(--font-size-label); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.modal-actions > button {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
 .btn-ghost {
   background: var(--bg-hover);
   border: none;
@@ -283,4 +293,20 @@ onMounted(reloadCalendar)
   font-weight: 600;
 }
 .btn-secondary:hover { filter: brightness(0.97); }
+
+/* 모바일: 모달 폭 확보 + 버튼 가로 전체 사용 */
+@media (max-width: 480px) {
+  .mini-modal {
+    max-width: 100%;
+    padding: 18px;
+  }
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal-actions > button {
+    width: 100%;
+    padding: 12px 16px;
+  }
+}
 </style>

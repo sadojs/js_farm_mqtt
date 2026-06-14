@@ -117,4 +117,10 @@ function submit() {
 }
 .btn-primary:disabled { opacity: 0.5; cursor: default; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+@media (max-width: 480px) {
+  .modal { max-width: 100%; padding: 18px; }
+  .modal-actions { flex-direction: column-reverse; gap: 8px; flex-wrap: wrap; }
+  .modal-actions > button { width: 100%; padding: 12px 16px; white-space: nowrap; }
+}
 </style>
