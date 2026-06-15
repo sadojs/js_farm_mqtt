@@ -121,10 +121,10 @@ function inspectCount(zoneId: string): number {
   box-shadow: var(--shadow-card);
 }
 .board-table {
-  width: 100%;
+  /* 칸 수가 적어도 구역열이 늘어나 빈 공간이 생기지 않도록 내용 너비로 고정 */
+  width: auto;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 720px;
 }
 .board-table thead th {
   background: var(--bg-hover);
@@ -142,7 +142,9 @@ function inspectCount(zoneId: string): number {
   text-align: left;
   padding-left: 20px;
   background: var(--bg-card);
+  width: 200px;
 }
+.zone-cell, .data-cell { white-space: nowrap; }
 .task-col { width: 116px; }
 .task-emoji {
   display: inline-flex;
@@ -216,10 +218,13 @@ function inspectCount(zoneId: string): number {
 
 @media (max-width: 768px) {
   .board-table { font-size: 12px; }
-  .task-col { width: 100px; }
-  .zone-cell { padding: 10px; }
+  .board-table thead th.zone-col { width: 130px; padding-left: 12px; }
+  .task-col { width: 92px; }
+  .zone-cell { padding: 10px 12px; }
+  .zone-name { font-size: 13px; }
   .data-cell { padding: 6px 4px; }
-  .cell-chip { width: 84px; height: 52px; }
-  .cell-days { font-size: 18px; }
+  .cell-chip { width: 80px; height: 50px; }
+  .cell-days { font-size: 17px; }
+  .cell-sub { font-size: 11px; }
 }
 </style>
