@@ -45,6 +45,7 @@
         :key="cell.date"
         class="cell"
         :class="{ muted: cell.month !== month, today: cell.date === today }"
+        @click="$emit('day-click', cell.date)"
         @dragover.prevent
         @drop="onDrop(cell.date)"
       >
@@ -65,7 +66,7 @@
             :style="{ background: tint(ev.color), borderLeftColor: ev.zoneColor || ev.color || '#888' }"
             draggable="true"
             @dragstart="onDragStart(ev)"
-            @click="$emit('select', ev)"
+            @click.stop="$emit('select', ev)"
             :title="chipTitle(ev)"
           >
             <span class="chip-line1">
@@ -105,6 +106,7 @@ const emit = defineEmits<{
   (e: 'move', ev: SprayEvent, date: string): void
   (e: 'select', ev: SprayEvent): void
   (e: 'add-single', date: string): void
+  (e: 'day-click', date: string): void
 }>()
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']

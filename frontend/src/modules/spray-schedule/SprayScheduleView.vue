@@ -23,6 +23,7 @@
         @move="onMoveRequest"
         @select="onSelect"
         @add-single="openManual"
+        @day-click="onDayClick"
       />
     </section>
 
@@ -67,11 +68,20 @@
       @create="createManual"
       @cancel="showManual = false"
     />
+
+    <DaySprayEventsModal
+      v-if="showDay"
+      :date="dayDate"
+      :events="dayEvents"
+      @close="showDay = false"
+      @select="onDaySelect"
+      @add="onDayAdd"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth.store'
 import { useNotificationStore } from '../../stores/notification.store'
 import { sprayScheduleApi } from './api/spray-schedule.api'
@@ -87,6 +97,7 @@ import SprayCalendar from './components/SprayCalendar.vue'
 import MoveEventModal from './components/MoveEventModal.vue'
 import ShiftEventModal from './components/ShiftEventModal.vue'
 import ManualEventModal from './components/ManualEventModal.vue'
+import DaySprayEventsModal from './components/DaySprayEventsModal.vue'
 
 const authStore = useAuthStore()
 const notify = useNotificationStore()
@@ -102,6 +113,11 @@ const moveTarget = ref<{ ev: SprayEvent; date: string } | null>(null)
 const shiftTarget = ref<SprayEvent | null>(null)
 const showManual = ref(false)
 const manualDate = ref<string | undefined>(undefined)
+const showDay = ref(false)
+const dayDate = ref<string>('')
+const dayEvents = computed(() =>
+  events.value.filter((ev) => ev.date === dayDate.value),
+)
 
 async function reloadCalendar() {
   const [evs, mks] = await Promise.all([
@@ -153,6 +169,27 @@ async function createManual(payload: CreateManualEventPayload) {
   } finally {
     showManual.value = false
   }
+}
+
+function onDayClick(date: string) {
+  // 그 날짜의 일정이 1개라도 있으면 모달 표시. 0건이면 단건 추가 모달로 바로
+  const has = events.value.some((ev) => ev.date === date)
+  if (has) {
+    dayDate.value = date
+    showDay.value = true
+  } else {
+    openManual(date)
+  }
+}
+
+function onDaySelect(ev: SprayEvent) {
+  showDay.value = false
+  selected.value = ev
+}
+
+function onDayAdd(date: string) {
+  showDay.value = false
+  openManual(date)
 }
 
 function openShift() {
