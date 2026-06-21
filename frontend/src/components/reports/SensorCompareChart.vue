@@ -104,7 +104,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 Chart.register(...registerables)
 
 const groupStore = useGroupStore()
-const groups = computed(() => groupStore.groups)
+const groups = computed(() => groupStore.iotGroups)
 
 const group1Id = ref('')
 const group2Id = ref('')

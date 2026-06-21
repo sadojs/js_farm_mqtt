@@ -8,6 +8,7 @@ export interface HouseGroup {
   manager?: string
   enableGroupControl: boolean
   enableAutomation: boolean
+  iotEnabled: boolean
   houses: House[]
   devices: Device[]
   createdAt: string
@@ -23,8 +24,20 @@ export interface House {
   description?: string
   area?: number
   status: 'active' | 'inactive'
+  iotEnabled: boolean
   createdAt: string
   updatedAt: string
+}
+
+export interface IotRelatedCounts {
+  totals: { device: number; rule: number; gateway: number }
+  perHouse: Array<{
+    id: string
+    name: string
+    device: number
+    rule: number
+    gateway: number
+  }>
 }
 
 export interface CreateGroupRequest {

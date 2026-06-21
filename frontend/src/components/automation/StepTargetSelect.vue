@@ -6,12 +6,12 @@
     </div>
 
     <div v-if="groupStore.loading" class="loading-msg">구역 로딩 중...</div>
-    <div v-else-if="groupStore.groups.length === 0" class="empty-msg">
+    <div v-else-if="groupStore.iotGroups.length === 0" class="empty-msg">
       등록된 구역이 없습니다. 먼저 구역을 만들어주세요.
     </div>
     <div v-else class="group-list" role="radiogroup" aria-label="구역 선택">
       <button
-        v-for="group in groupStore.groups"
+        v-for="group in groupStore.iotGroups"
         :key="group.id"
         type="button"
         class="group-card"

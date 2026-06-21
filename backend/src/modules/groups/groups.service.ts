@@ -23,13 +23,26 @@ export class GroupsService {
     @Optional() @Inject(MqttService) private mqttService?: MqttService,
   ) {}
 
-  async findAllGroups(userId: string, role?: string) {
+  async findAllGroups(
+    userId: string,
+    role?: string,
+    opts: { iotOnly?: boolean } = {},
+  ) {
     const isAdmin = role === 'admin';
     const groups = await this.groupsRepo.find({
       where: isAdmin ? {} : { userId },
       relations: ['houses', 'devices'],
       order: { createdAt: 'DESC' },
     });
+
+    let filtered = groups;
+    if (opts.iotOnly) {
+      // group 자체가 iot_enabled=false 면 제외. group 은 true 라도 내부 houses 중 false 는 제외.
+      filtered = groups.filter((g) => g.iotEnabled !== false);
+      for (const g of filtered) {
+        g.houses = (g.houses ?? []).filter((h) => h.iotEnabled !== false);
+      }
+    }
 
     // Also include devices from gateways assigned to houses in these groups
     const houseIds = groups.flatMap(g => g.houses.map(h => h.id));
@@ -67,18 +80,18 @@ export class GroupsService {
       }
     }
 
-    if (isAdmin && groups.length > 0) {
-      const userIds = [...new Set(groups.map(g => g.userId))];
+    if (isAdmin && filtered.length > 0) {
+      const userIds = [...new Set(filtered.map(g => g.userId))];
       const users = await this.usersRepo.find({ where: { id: In(userIds) } });
       const userMap = new Map(users.map(u => [u.id, u]));
-      return groups.map(g => ({
+      return filtered.map(g => ({
         ...g,
         ownerName: userMap.get(g.userId)?.name ?? '',
         ownerUsername: userMap.get(g.userId)?.username ?? '',
       }));
     }
 
-    return groups;
+    return filtered;
   }
 
   async assignGatewayToGroup(groupId: string, userId: string, gatewayId: string) {
@@ -124,11 +137,140 @@ export class GroupsService {
     return this.groupsRepo.findOne({ where: { id: saved.id }, relations: ['houses'] });
   }
 
-  async findAllHouses(userId: string) {
+  async findAllHouses(userId: string, opts: { iotOnly?: boolean } = {}) {
+    const where: any = { userId };
+    if (opts.iotOnly) where.iotEnabled = true;
     return this.housesRepo.find({
-      where: { userId },
+      where,
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * 토글 단위는 HouseGroup (사용자가 화면에서 보는 "구역" 카드).
+   * group iot_enabled 변경 시 휘하 houses 도 동일하게 맞춰서 일관성 유지.
+   */
+  async bulkUpdateIotEnabled(
+    userId: string,
+    role: string | undefined,
+    updates: Array<{ id: string; enabled: boolean }>,
+  ) {
+    if (!updates.length) return { updated: 0 };
+    const isAdmin = role === 'admin';
+    const ids = updates.map((u) => u.id);
+    const groups = await this.groupsRepo.find({
+      where: { id: In(ids) },
+      relations: ['houses'],
+    });
+
+    if (!isAdmin) {
+      const denied = groups.find((g) => g.userId !== userId);
+      if (denied) throw new ForbiddenException('권한이 없는 구역이 포함되어 있습니다.');
+    }
+
+    const byId = new Map(updates.map((u) => [u.id, u.enabled]));
+    const housesToSave: House[] = [];
+    for (const g of groups) {
+      const next = byId.get(g.id);
+      if (next === undefined) continue;
+      g.iotEnabled = next;
+      for (const h of g.houses ?? []) {
+        if (h.iotEnabled !== next) {
+          h.iotEnabled = next;
+          housesToSave.push(h);
+        }
+      }
+    }
+    await this.groupsRepo.save(groups);
+    if (housesToSave.length) await this.housesRepo.save(housesToSave);
+    return { updated: groups.length };
+  }
+
+  /**
+   * group(구역) 단위 영향 카운트 — 그 group 에 매핑된 device / 자동화 룰 / 게이트웨이.
+   */
+  async getIotRelatedCounts(
+    userId: string,
+    role: string | undefined,
+    groupIds: string[],
+  ) {
+    const empty = { totals: { device: 0, rule: 0, gateway: 0 }, perHouse: [] as any[] };
+    if (!groupIds.length) return empty;
+
+    const isAdmin = role === 'admin';
+    const groups = await this.groupsRepo.find({
+      where: { id: In(groupIds) },
+      relations: ['houses', 'devices'],
+    });
+    const scoped = isAdmin ? groups : groups.filter((g) => g.userId === userId);
+    if (!scoped.length) return empty;
+
+    const houseIds = scoped.flatMap((g) => (g.houses ?? []).map((h) => h.id));
+    const gws = houseIds.length
+      ? await this.gatewayRepo.find({ where: { houseId: In(houseIds) } })
+      : [];
+    const houseToGroup = new Map<string, string>();
+    for (const g of scoped) for (const h of g.houses ?? []) houseToGroup.set(h.id, g.id);
+    const gwCntByGroup = new Map<string, number>();
+    const gwIdsByGroup = new Map<string, string[]>();
+    for (const gw of gws) {
+      const gId = houseToGroup.get(gw.houseId!);
+      if (!gId) continue;
+      gwCntByGroup.set(gId, (gwCntByGroup.get(gId) ?? 0) + 1);
+      const arr = gwIdsByGroup.get(gId) ?? [];
+      arr.push(gw.id);
+      gwIdsByGroup.set(gId, arr);
+    }
+
+    const allGwIds = gws.map((g) => g.id);
+    const devices = allGwIds.length
+      ? await this.devicesRepo.find({
+          where: { gatewayId: In(allGwIds) },
+          select: ['id', 'gatewayId'],
+        })
+      : [];
+    const gwToHouse = new Map(gws.map((g) => [g.id, g.houseId!]));
+    const deviceCntByGroup = new Map<string, number>();
+    for (const d of devices) {
+      const hId = gwToHouse.get(d.gatewayId);
+      const gId = hId ? houseToGroup.get(hId) : undefined;
+      if (!gId) continue;
+      deviceCntByGroup.set(gId, (deviceCntByGroup.get(gId) ?? 0) + 1);
+    }
+    // group_devices (M:N) 도 합산 — 게이트웨이 경로 외에 그룹에 수동 할당된 장치
+    for (const g of scoped) {
+      const extra = (g.devices ?? []).filter((d) => !devices.some((dx) => dx.id === d.id));
+      if (extra.length) {
+        deviceCntByGroup.set(g.id, (deviceCntByGroup.get(g.id) ?? 0) + extra.length);
+      }
+    }
+
+    const rules = await this.rulesRepo.find({
+      where: { groupId: In(scoped.map((g) => g.id)) } as any,
+      select: ['id', 'groupId'] as any,
+    });
+    const ruleCntByGroup = new Map<string, number>();
+    for (const r of rules as any[]) {
+      if (!r.groupId) continue;
+      ruleCntByGroup.set(r.groupId, (ruleCntByGroup.get(r.groupId) ?? 0) + 1);
+    }
+
+    const perHouse = scoped.map((g) => ({
+      id: g.id,
+      name: g.name,
+      device: deviceCntByGroup.get(g.id) ?? 0,
+      rule: ruleCntByGroup.get(g.id) ?? 0,
+      gateway: gwCntByGroup.get(g.id) ?? 0,
+    }));
+    const totals = perHouse.reduce(
+      (acc, x) => ({
+        device: acc.device + x.device,
+        rule: acc.rule + x.rule,
+        gateway: acc.gateway + x.gateway,
+      }),
+      { device: 0, rule: 0, gateway: 0 },
+    );
+    return { totals, perHouse };
   }
 
   async createHouse(userId: string, data: { name: string; location?: string; description?: string; area?: number; groupId?: string }) {

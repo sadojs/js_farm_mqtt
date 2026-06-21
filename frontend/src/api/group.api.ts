@@ -1,9 +1,19 @@
 import apiClient from './client'
-import type { HouseGroup, House, CreateGroupRequest, CreateHouseRequest, GroupDependenciesResponse, HouseGroupWithOwner, FarmAdmin } from '../types/group.types'
+import type { HouseGroup, House, CreateGroupRequest, CreateHouseRequest, GroupDependenciesResponse, HouseGroupWithOwner, FarmAdmin, IotRelatedCounts } from '../types/group.types'
 
 export const groupApi = {
-  getGroups: () =>
-    apiClient.get<HouseGroup[]>('/groups'),
+  getGroups: (opts?: { iotOnly?: boolean }) =>
+    apiClient.get<HouseGroup[]>('/groups', {
+      params: opts?.iotOnly ? { iotOnly: 'true' } : {},
+    }),
+
+  bulkUpdateIotEnabled: (updates: Array<{ id: string; enabled: boolean }>) =>
+    apiClient.patch<{ updated: number }>('/groups/houses/iot-enabled', { updates }),
+
+  getIotRelatedCounts: (ids: string[]) =>
+    apiClient.get<IotRelatedCounts>('/groups/houses/iot-related-counts', {
+      params: ids.length ? { ids: ids.join(',') } : {},
+    }),
 
   createGroup: (data: CreateGroupRequest) =>
     apiClient.post<HouseGroup>('/groups', data),

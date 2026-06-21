@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,8 +20,12 @@ export class GroupsController {
   }
 
   @Get()
-  findAllGroups(@CurrentUser() user: any) {
-    return this.groupsService.findAllGroups(this.getEffectiveUserId(user), user.role);
+  findAllGroups(@CurrentUser() user: any, @Query('iotOnly') iotOnly?: string) {
+    return this.groupsService.findAllGroups(
+      this.getEffectiveUserId(user),
+      user.role,
+      { iotOnly: iotOnly === 'true' },
+    );
   }
 
   @Get(':id/dependencies')
@@ -68,8 +72,43 @@ export class GroupsController {
   }
 
   @Get('houses')
-  findAllHouses(@CurrentUser() user: any) {
-    return this.groupsService.findAllHouses(this.getEffectiveUserId(user));
+  findAllHouses(@CurrentUser() user: any, @Query('iotOnly') iotOnly?: string) {
+    return this.groupsService.findAllHouses(this.getEffectiveUserId(user), {
+      iotOnly: iotOnly === 'true',
+    });
+  }
+
+  @Get('houses/iot-related-counts')
+  getIotRelatedCounts(@CurrentUser() user: any, @Query('ids') ids?: string) {
+    const list = (ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    return this.groupsService.getIotRelatedCounts(
+      this.getEffectiveUserId(user),
+      user.role,
+      list,
+    );
+  }
+
+  @Patch('houses/iot-enabled')
+  @Roles('admin', 'farm_admin')
+  async bulkUpdateIotEnabled(
+    @CurrentUser() user: any,
+    @Body() body: { updates: Array<{ id: string; enabled: boolean }> },
+  ) {
+    const result = await this.groupsService.bulkUpdateIotEnabled(
+      this.getEffectiveUserId(user),
+      user.role,
+      body?.updates ?? [],
+    );
+    this.activityLog.log({
+      userId: user.id,
+      userName: user.name || user.username,
+      action: 'zone.iot_visibility.changed',
+      targetType: 'house',
+      targetId: '',
+      targetName: '',
+      details: { menu: '구역 표시 설정', updates: body?.updates ?? [] },
+    });
+    return result;
   }
 
   @Post('houses')

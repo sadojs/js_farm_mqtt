@@ -34,6 +34,9 @@ export class House {
   @Column({ default: 'active' })
   status: 'active' | 'inactive';
 
+  @Column({ name: 'iot_enabled', type: 'boolean', default: true })
+  iotEnabled: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -28,6 +28,9 @@ export class HouseGroup {
   @Column({ name: 'enable_automation', default: false })
   enableAutomation: boolean;
 
+  @Column({ name: 'iot_enabled', type: 'boolean', default: true })
+  iotEnabled: boolean;
+
   @OneToMany(() => House, house => house.group)
   houses: House[];
 

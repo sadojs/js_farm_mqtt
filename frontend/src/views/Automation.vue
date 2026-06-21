@@ -349,8 +349,8 @@ interface ZoneGroup {
 }
 const rulesGroupedByZone = computed<ZoneGroup[]>(() => {
   const buckets = new Map<string, ZoneGroup>()
-  // groupStore 순서를 유지하기 위해 사전 등록
-  for (const g of groupStore.groups) {
+  // 활성 IoT 구역 순서로 표시. 비활성 구역에 연결된 룰은 "미지정" 으로 떨어짐 — 룰 자체는 유지.
+  for (const g of groupStore.iotGroups) {
     buckets.set(g.id, { key: g.id, label: g.name, rules: [], activeCount: 0 })
   }
   const unassignedKey = '__unassigned__'

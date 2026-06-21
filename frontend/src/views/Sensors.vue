@@ -237,7 +237,7 @@ interface SensorGroupView {
 }
 
 const sensorGroups = computed<SensorGroupView[]>(() => {
-  return groupStore.groups
+  return groupStore.iotGroups
     .map(group => {
       const groupSensorIds = (group.devices || [])
         .filter(d => d.deviceType === 'sensor')

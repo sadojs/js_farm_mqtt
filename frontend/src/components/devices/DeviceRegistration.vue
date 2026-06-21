@@ -172,13 +172,13 @@
             <div class="wizard-ask-buttons">
               <button
                 class="btn-wizard-option"
-                :class="{ disabled: groupStore.groups.length === 0 }"
-                :disabled="groupStore.groups.length === 0"
+                :class="{ disabled: groupStore.iotGroups.length === 0 }"
+                :disabled="groupStore.iotGroups.length === 0"
                 @click="wizardSubStep = 'existing'"
               >
                 <span class="wizard-option-icon">📁</span>
                 <span class="wizard-option-label">기존 구역에 추가</span>
-                <span v-if="groupStore.groups.length === 0" class="wizard-option-hint">구역 없음</span>
+                <span v-if="groupStore.iotGroups.length === 0" class="wizard-option-hint">구역 없음</span>
               </button>
               <button class="btn-wizard-option" @click="wizardSubStep = 'create'">
                 <span class="wizard-option-icon">➕</span>
@@ -196,7 +196,7 @@
             </div>
             <div class="group-list">
               <label
-                v-for="group in groupStore.groups"
+                v-for="group in groupStore.iotGroups"
                 :key="group.id"
                 class="group-radio-item"
                 :class="{ selected: selectedGroupId === group.id }"

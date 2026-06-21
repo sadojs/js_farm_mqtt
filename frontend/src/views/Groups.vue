@@ -7,6 +7,15 @@
       </div>
       <div class="header-actions">
         <!-- MQTT에서는 실시간 동기화됨 -->
+        <button
+          class="btn-secondary btn-visibility"
+          @click="showVisibilityModal = true"
+          :title="isFarmUser ? '관리자에게 문의' : 'IoT 화면에서 보이는 구역을 설정합니다'"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          구역 표시 설정
+          <span v-if="hiddenZoneCount > 0" class="badge-hidden">· 숨김 {{ hiddenZoneCount }}</span>
+        </button>
         <button v-if="!isFarmUser" class="btn-primary" @click="showGroupCreationModal = true">+ 구역 추가</button>
       </div>
     </header>
@@ -339,6 +348,20 @@
       </div>
     </div>
 
+    <!-- 숨김 안내 배너 -->
+    <div v-if="hiddenZoneCount > 0 && !loading" class="hidden-banner">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      <span>IoT 미사용 구역 <strong>{{ hiddenZoneCount }}개</strong>가 숨겨져 있습니다 (방재·농작업 일정에는 계속 표시됨).</span>
+      <button class="link-btn" @click="showVisibilityModal = true">구역 표시 설정에서 변경</button>
+    </div>
+
+    <ZoneVisibilityModal
+      v-if="showVisibilityModal"
+      :groups="allGroups"
+      :can-edit="!isFarmUser"
+      @close="showVisibilityModal = false"
+    />
+
     <GroupCreation
       :show="showGroupCreationModal"
       @close="showGroupCreationModal = false"
@@ -451,6 +474,7 @@ import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
 import ZoneNotesPanel from '@/components/groups/ZoneNotesPanel.vue'
 import { zoneNotesApi } from '@/api/zone-notes.api'
 import RemoveDeviceModal from '@/components/groups/RemoveDeviceModal.vue'
+import ZoneVisibilityModal from '@/components/groups/ZoneVisibilityModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
@@ -582,8 +606,12 @@ const blockingModal = ref<{
   targetName: '',
   rules: [],
 })
-const groups = computed(() => groupStore.groups)
+// 메인 그리드는 IoT 활성 구역만 노출. 비활성 구역은 우측 상단 "구역 표시 설정" 모달에서 관리.
+const groups = computed(() => groupStore.iotGroups)
+const allGroups = computed(() => groupStore.groups)
+const hiddenZoneCount = computed(() => groupStore.hiddenZoneCount)
 const loading = computed(() => groupStore.loading)
+const showVisibilityModal = ref(false)
 
 const collapsedGroups = ref(new Set<string>())
 
@@ -1288,6 +1316,37 @@ onBeforeUnmount(() => {
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-visibility {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 12px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-weight: 600; font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-visibility:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--text-primary); }
+.badge-hidden { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+
+.hidden-banner {
+  margin-top: 14px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-card);
+  border-radius: 10px;
+  color: var(--text-secondary); font-size: 13px;
+}
+.hidden-banner svg { color: var(--text-muted); flex-shrink: 0; }
+.hidden-banner strong { color: var(--text-primary); }
+.link-btn {
+  background: none; border: none; padding: 0;
+  color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline;
+  margin-left: auto;
+}
 
 .btn-outline {
   padding: 12px 24px; background: var(--bg-secondary); color: var(--text-primary);

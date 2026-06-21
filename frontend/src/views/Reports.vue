@@ -236,7 +236,7 @@ const endDate = ref('')
 const loadingData = ref(false)
 const envWarning = ref(false)
 
-const groups = computed(() => groupStore.groups)
+const groups = computed(() => groupStore.iotGroups)
 
 const periodOptions = [
   { value: '12h', label: '12시간' },
@@ -658,9 +658,9 @@ watch([selectedGroup, selectedSensorType], () => {
 
 onMounted(async () => {
   if (groupStore.groups.length === 0) await groupStore.fetchGroups()
-  // 기본: 첫 번째 그룹 자동 선택
-  if (groupStore.groups.length > 0) {
-    selectedGroup.value = groupStore.groups[0].id
+  // 기본: 첫 번째 IoT 활성 그룹 자동 선택
+  if (groupStore.iotGroups.length > 0) {
+    selectedGroup.value = groupStore.iotGroups[0].id
     checkEnvWarning(selectedGroup.value)
   }
   updateDateRange()

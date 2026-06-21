@@ -66,7 +66,7 @@ const emit = defineEmits<{
 const groupStore = useGroupStore()
 
 const sortedGroups = computed(() => {
-  const all = groupStore.groups
+  const all = groupStore.iotGroups
   const filtered = props.farmUserId
     ? all.filter(g => (g as any).userId === props.farmUserId)
     : all
