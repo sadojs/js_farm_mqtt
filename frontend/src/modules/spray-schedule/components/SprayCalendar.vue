@@ -66,7 +66,6 @@
             :style="{ background: tint(ev.color), borderLeftColor: ev.zoneColor || ev.color || '#888' }"
             draggable="true"
             @dragstart="onDragStart(ev)"
-            @click.stop="$emit('select', ev)"
             :title="chipTitle(ev)"
           >
             <span class="chip-line1">
@@ -164,7 +163,7 @@ function zoneAbbr(ev: SprayEvent): string {
   return ev.zoneName ?? ''
 }
 function chipTitle(ev: SprayEvent): string {
-  return `${ev.zoneName ?? ''} · ${ev.pest ?? ''} ${ev.isManual ? '(단건)' : ev.round + '차'} · ${ev.product ?? ''} · ${shortDate(ev.date)}`
+  return `${ev.zoneName ?? ''} · ${ev.pest ?? ''} ${ev.isManual ? '(단건)' : ev.round + '차'} · ${ev.product ?? ''} · ${shortDate(ev.date)} (드래그로 날짜 이동 · 클릭하면 그 날의 전체 일정)`
 }
 function tint(hex: string | null): string {
   return hex ? `${hex}1f` : 'var(--bg-hover)'
