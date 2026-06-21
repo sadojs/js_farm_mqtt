@@ -200,7 +200,7 @@ function onDrop(date: string) {
   border-radius: 4px;
   padding: 3px 6px;
   cursor: grab;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   line-height: 1.3;
   min-width: 0;
   overflow: hidden;
@@ -214,11 +214,11 @@ function onDrop(date: string) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.more-chip { font-size: 10px; color: var(--text-muted); padding-left: 2px; }
+.more-chip { font-size: calc(10px * var(--content-scale, 1)); color: var(--text-muted); padding-left: 2px; }
 
 @media (max-width: 768px) {
   .cell { min-height: 72px; padding: 4px; }
-  .day-num { font-size: 11px; }
-  .event-chip { font-size: 10px; padding: 2px 4px; }
+  .day-num { font-size: calc(11px * var(--content-scale, 1)); }
+  .event-chip { font-size: calc(10px * var(--content-scale, 1)); padding: 2px 4px; }
 }
 </style>
