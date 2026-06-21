@@ -25,10 +25,14 @@ export class SprayScheduleController {
     return user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
   }
 
-  /** 농장 관리자(또는 플랫폼 관리자)만 접근 — 농장 사용자 차단 */
-  private assertManager(user: any): void {
-    if (user.role !== 'admin' && user.role !== 'farm_admin') {
-      throw new ForbiddenException('농장 관리자만 접근 가능합니다.');
+  /** 농장 구성원(플랫폼/농장 관리자 + 농장 사용자)만 접근 — 일꾼(worker) 등 차단 */
+  private assertFarmAccess(user: any): void {
+    if (
+      user.role !== 'admin' &&
+      user.role !== 'farm_admin' &&
+      user.role !== 'farm_user'
+    ) {
+      throw new ForbiddenException('접근 권한이 없습니다.');
     }
   }
 
@@ -36,26 +40,26 @@ export class SprayScheduleController {
 
   @Get('zones')
   getZones(@CurrentUser() user: any) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.listZones(this.effectiveUserId(user));
   }
 
   @Post('zones')
   saveZone(@CurrentUser() user: any, @Body() dto: SaveZoneConfigDto) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.saveZoneConfig(this.effectiveUserId(user), dto);
   }
 
   @Delete('zones/:id')
   async deleteZone(@CurrentUser() user: any, @Param('id') id: string) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     await this.service.deleteZone(this.effectiveUserId(user), id);
     return { ok: true };
   }
 
   @Get('zones/markers')
   getZoneMarkers(@CurrentUser() user: any) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.getZoneMarkers(this.effectiveUserId(user));
   }
 
@@ -67,13 +71,13 @@ export class SprayScheduleController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.getEvents(this.effectiveUserId(user), from, to);
   }
 
   @Post('events')
   createManualEvent(@CurrentUser() user: any, @Body() dto: CreateManualEventDto) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.createManualEvent(this.effectiveUserId(user), dto);
   }
 
@@ -83,13 +87,13 @@ export class SprayScheduleController {
     @Param('id') id: string,
     @Body() dto: MoveEventDto,
   ) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     return this.service.moveEvent(this.effectiveUserId(user), id, dto);
   }
 
   @Delete('events/:id')
   async deleteEvent(@CurrentUser() user: any, @Param('id') id: string) {
-    this.assertManager(user);
+    this.assertFarmAccess(user);
     await this.service.deleteEvent(this.effectiveUserId(user), id);
     return { ok: true };
   }

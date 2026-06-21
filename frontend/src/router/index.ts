@@ -73,7 +73,7 @@ const router = createRouter({
       path: '/work-log',
       name: 'work-log',
       component: () => import('../modules/work-log/WorkLogView.vue'),
-      meta: { title: '농작업 일정', requiresAuth: true, denyFarmUser: true }
+      meta: { title: '농작업 일정', requiresAuth: true }
     },
     {
       path: '/config-deploy',
@@ -103,7 +103,7 @@ const router = createRouter({
       path: '/spray-schedule',
       name: 'spray-schedule',
       component: () => import('../modules/spray-schedule/SprayScheduleView.vue'),
-      meta: { title: '방재일정', requiresAuth: true, denyFarmUser: true }
+      meta: { title: '방재일정', requiresAuth: true }
     },
     {
       path: '/worker-payroll',
