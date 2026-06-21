@@ -712,7 +712,8 @@ onUnmounted(() => {
 /* ── 게이지 그리드 ── */
 .gauge-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, 1fr) — 자식 min-content 가 viewport 폭을 넘기는 흔한 grid 함정 차단 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -724,6 +725,8 @@ onUnmounted(() => {
   background: var(--bg-secondary, var(--bg-hover));
   border: 1px solid var(--border-light);
   border-radius: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 .gauge-tile.out-of-range {
   border-color: #fcd9a8;
@@ -892,9 +895,9 @@ onUnmounted(() => {
 
 /* ── 반응형 ── */
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 10px 8px; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
-  .gauge-grid { grid-template-columns: repeat(2, 1fr); }
+  .gauge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .env-card-body { padding: 0 12px 16px; }
   .env-card-header { padding: 14px 14px; gap: 12px; }
   .sensor-row {

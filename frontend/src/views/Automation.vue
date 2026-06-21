@@ -655,7 +655,7 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
 
 /* ── 모바일 (≤768px) — 동일 패턴, 행 세로 풀기 ── */
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 10px 8px; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
   .page-description { font-size: calc(13px * var(--content-scale, 1)); }
   .btn-primary { padding: 10px 16px; font-size: calc(14px * var(--content-scale, 1)); }

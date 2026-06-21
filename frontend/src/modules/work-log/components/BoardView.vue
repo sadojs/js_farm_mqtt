@@ -143,9 +143,24 @@ function inspectCount(zoneId: string): number {
   padding-left: 20px;
   background: var(--bg-card);
   width: 200px;
+  /* 좌측 sticky — 가로 스크롤 시 구역열이 따라다님 (top + left 교차 → z 가장 위) */
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.08);
 }
 .zone-cell, .data-cell { white-space: nowrap; }
 .task-col { width: 116px; }
+
+/* 본문 행의 첫 칸(구역 셀)도 좌측 sticky — 헤더와 동일하게 따라다님 */
+.zone-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-card);
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.08);
+}
 .task-emoji {
   display: inline-flex;
   align-items: center;
