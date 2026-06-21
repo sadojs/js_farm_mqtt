@@ -279,7 +279,7 @@ function onDrop(date: string) {
 .day-num.sat { color: var(--text-info-banner); }
 .plant-badge {
   color: #fff;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   border-radius: 6px;
   padding: 1px 6px;
@@ -295,14 +295,14 @@ function onDrop(date: string) {
   border-radius: 4px;
   padding: 3px 6px;
   cursor: grab;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   line-height: 1.3;
   min-width: 0;
   overflow: hidden;
 }
 .event-chip:active { cursor: grabbing; }
 .chip-line1 { display: block; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip-line2 { display: block; color: var(--text-secondary); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-line2 { display: block; color: var(--text-secondary); font-size: calc(10px * var(--content-scale, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manual-mark { color: var(--accent); font-weight: 700; }
 .bee-tag {
   display: inline-block;
@@ -311,7 +311,7 @@ function onDrop(date: string) {
   border-radius: 4px;
   background: var(--warning-bg);
   color: var(--warning-text);
-  font-size: 9px;
+  font-size: calc(9px * var(--content-scale, 1));
   font-weight: 700;
 }
 .time-tag {
@@ -321,15 +321,15 @@ function onDrop(date: string) {
   border-radius: 4px;
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 9px;
+  font-size: calc(9px * var(--content-scale, 1));
   font-weight: 700;
 }
 @media (max-width: 768px) {
   .cell { min-height: 64px; padding: 4px; }
   .btn-add-single { margin-left: 0; }
   .cal-toolbar { gap: 8px; }
-  .day-num { font-size: 11px; }
-  .plant-badge { font-size: 9px; padding: 1px 4px; }
-  .event-chip { font-size: 10px; padding: 2px 4px; }
+  .day-num { font-size: calc(11px * var(--content-scale, 1)); }
+  .plant-badge { font-size: calc(9px * var(--content-scale, 1)); padding: 1px 4px; }
+  .event-chip { font-size: calc(10px * var(--content-scale, 1)); padding: 2px 4px; }
 }
 </style>
