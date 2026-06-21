@@ -100,16 +100,21 @@ export class SprayScheduleService {
       });
       zone = await manager.save(zone);
 
-      // 기존 프로그램/약품 전량 교체
-      const oldPrograms = await manager.find(SprayProgram, {
+      // 기존 프로그램/약품 — id 기준 업서트(재사용)로 productId를 안정적으로 유지.
+      // (전량 삭제·재생성하면 productId가 매번 바뀌어 이동(고정)한 일정과의 연결이 끊기고
+      //  재생성 시 중복이 생긴다.)
+      const existingPrograms = await manager.find(SprayProgram, {
         where: { zoneId: zone.id },
       });
-      if (oldPrograms.length > 0) {
-        await manager.delete(SprayProduct, {
-          programId: In(oldPrograms.map((p) => p.id)),
-        });
-        await manager.delete(SprayProgram, { zoneId: zone.id });
-      }
+      const existingProducts = existingPrograms.length
+        ? await manager.find(SprayProduct, {
+            where: { programId: In(existingPrograms.map((p) => p.id)) },
+          })
+        : [];
+      const progById = new Map(existingPrograms.map((p) => [p.id, p]));
+      const prodById = new Map(existingProducts.map((p) => [p.id, p]));
+      const keptProgramIds = new Set<string>();
+      const keptProductIds = new Set<string>();
 
       const savedPrograms: Array<{
         program: SprayProgram;
@@ -117,36 +122,52 @@ export class SprayScheduleService {
       }> = [];
       let pIdx = 0;
       for (const pi of dto.programs) {
-        const program = await manager.save(
-          manager.create(SprayProgram, {
-            userId,
-            zoneId: zone.id,
-            pest: pi.pest,
-            color: pi.color ?? '#e53935',
-            sortOrder: pi.sortOrder ?? pIdx,
-          }),
-        );
+        let program =
+          pi.id && progById.has(pi.id)
+            ? progById.get(pi.id)!
+            : manager.create(SprayProgram, { userId, zoneId: zone.id });
+        program.pest = pi.pest;
+        program.color = pi.color ?? '#e53935';
+        program.sortOrder = pi.sortOrder ?? pIdx;
+        program = await manager.save(program);
+        keptProgramIds.add(program.id);
         pIdx += 1;
+
         const products: SprayProduct[] = [];
         const sorted = [...pi.products].sort((a, b) => a.rank - b.rank);
         for (const pr of sorted) {
-          products.push(
-            await manager.save(
-              manager.create(SprayProduct, {
-                userId,
-                programId: program.id,
-                rank: pr.rank,
-                name: pr.name,
-                startDate: pr.startDate,
-                intervalDays: pr.intervalDays,
-                count: pr.count,
-                hasBees: pr.hasBees ?? false,
-                timeOfDay: pr.timeOfDay === 'am' ? 'am' : 'pm',
-              }),
-            ),
-          );
+          let product =
+            pr.id && prodById.has(pr.id)
+              ? prodById.get(pr.id)!
+              : manager.create(SprayProduct, { userId });
+          product.programId = program.id;
+          product.rank = pr.rank;
+          product.name = pr.name;
+          product.startDate = pr.startDate;
+          product.intervalDays = pr.intervalDays;
+          product.count = pr.count;
+          product.hasBees = pr.hasBees ?? false;
+          product.timeOfDay = pr.timeOfDay === 'am' ? 'am' : 'pm';
+          product = await manager.save(product);
+          keptProductIds.add(product.id);
+          products.push(product);
         }
         savedPrograms.push({ program, products });
+      }
+
+      // 설정에서 제거된 약품/프로그램과 그 이벤트(고정 포함) 정리
+      const removedProductIds = existingProducts
+        .filter((p) => !keptProductIds.has(p.id))
+        .map((p) => p.id);
+      if (removedProductIds.length > 0) {
+        await manager.delete(SprayEvent, { productId: In(removedProductIds) });
+        await manager.delete(SprayProduct, { id: In(removedProductIds) });
+      }
+      const removedProgramIds = existingPrograms
+        .filter((p) => !keptProgramIds.has(p.id))
+        .map((p) => p.id);
+      if (removedProgramIds.length > 0) {
+        await manager.delete(SprayProgram, { id: In(removedProgramIds) });
       }
 
       await this.regenerateEvents(manager, userId, zone, savedPrograms);
@@ -166,13 +187,43 @@ export class SprayScheduleService {
     zone: SprayZone,
     programs: Array<{ program: SprayProgram; products: SprayProduct[] }>,
   ) {
+    // 비고정 자동 일정만 삭제 (사용자가 옮긴 '고정' 일정은 보존)
     await manager.delete(SprayEvent, {
       zoneId: zone.id,
       isManual: false,
       pinned: false,
     });
 
-    const rows: Partial<SprayEvent>[] = [];
+    // 보존된 고정 일정 — (약품·회차·종류) 키로 매핑해 중복 생성을 막는다.
+    const pinnedExisting = await manager.find(SprayEvent, {
+      where: { zoneId: zone.id, isManual: false, pinned: true },
+    });
+    const pinnedByKey = new Map<string, SprayEvent>();
+    for (const ev of pinnedExisting) {
+      if (ev.productId) pinnedByKey.set(`${ev.productId}:${ev.round}:${ev.kind}`, ev);
+    }
+
+    const fresh: Partial<SprayEvent>[] = [];
+    const updates: SprayEvent[] = [];
+
+    // 같은 일정이 이미 고정(이동)되어 있으면: 날짜는 그대로 두고 메타데이터만 최신화.
+    // 없으면: 설정대로 새 일정 생성.
+    const apply = (key: string, spec: Partial<SprayEvent>) => {
+      const pinned = pinnedByKey.get(key);
+      if (pinned) {
+        pinned.programId = spec.programId ?? null;
+        pinned.pest = spec.pest ?? null;
+        pinned.product = spec.product ?? null;
+        pinned.color = spec.color ?? null;
+        pinned.bee = spec.bee ?? false;
+        pinned.timeOfDay = spec.timeOfDay ?? null;
+        updates.push(pinned);
+        pinnedByKey.delete(key); // 매칭됨 → 남은 것은 orphan
+      } else {
+        fresh.push(spec);
+      }
+    };
+
     for (const { program, products } of programs) {
       for (const product of products) {
         const bee = !!product.hasBees;
@@ -180,9 +231,10 @@ export class SprayScheduleService {
         // 벌문 개방 시점: 오전 방재 +2일, 오후 방재 +3일 (모두 오전 개방)
         const beeOffset = timeOfDay === 'am' ? 2 : 3;
         for (let i = 0; i < product.count; i++) {
+          const round = i + 1;
           const sprayDate = addDays(product.startDate, product.intervalDays * i);
           // 방재 이벤트 (벌 사용 시 bee=true → 벌문 닫기 표시)
-          rows.push({
+          apply(`${product.id}:${round}:spray`, {
             userId,
             zoneId: zone.id,
             programId: program.id,
@@ -191,7 +243,7 @@ export class SprayScheduleService {
             pest: program.pest,
             product: product.name,
             color: program.color,
-            round: i + 1,
+            round,
             kind: 'spray',
             bee,
             timeOfDay,
@@ -200,16 +252,16 @@ export class SprayScheduleService {
           });
           // 벌 사용 시: 방재 후 '벌문 개방' 이벤트 생성 (오전 개방)
           if (bee) {
-            rows.push({
+            apply(`${product.id}:${round}:bee_open`, {
               userId,
               zoneId: zone.id,
               programId: program.id,
               productId: product.id,
               date: addDays(sprayDate, beeOffset),
               pest: '벌문 개방',
-              product: `${program.pest} ${i + 1}차(${timeOfDay === 'am' ? '오전' : '오후'}) 방재 후`,
+              product: `${program.pest} ${round}차(${timeOfDay === 'am' ? '오전' : '오후'}) 방재 후`,
               color: BEE_GATE_COLOR,
-              round: i + 1,
+              round,
               kind: 'bee_open',
               bee: true,
               timeOfDay: 'am',
@@ -220,8 +272,16 @@ export class SprayScheduleService {
         }
       }
     }
-    if (rows.length > 0) {
-      await manager.save(SprayEvent, rows.map((r) => manager.create(SprayEvent, r)));
+    if (fresh.length > 0) {
+      await manager.save(SprayEvent, fresh.map((r) => manager.create(SprayEvent, r)));
+    }
+    if (updates.length > 0) {
+      await manager.save(SprayEvent, updates);
+    }
+    // 설정에서 더 이상 생성되지 않는 회차/벌문(고정 일정)은 제거
+    const orphanIds = [...pinnedByKey.values()].map((e) => e.id);
+    if (orphanIds.length > 0) {
+      await manager.delete(SprayEvent, { id: In(orphanIds) });
     }
   }
 
