@@ -12,8 +12,20 @@
         </div>
       </div>
 
+      <!-- role 미확정 (farm_user 의 worker 여부 확인 중) — NAV 깜빡임 방지 -->
+      <nav
+        v-if="isAuthenticated && !roleResolved"
+        class="sidebar-nav sidebar-nav-loading"
+        aria-busy="true"
+        aria-label="메뉴 불러오는 중"
+      >
+        <div class="nav-loading-skeleton">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </nav>
+
       <!-- 관리자 메뉴 -->
-      <nav v-if="isAdmin" class="sidebar-nav">
+      <nav v-else-if="isAdmin" class="sidebar-nav">
         <div class="nav-section-label">플랫폼 운영</div>
         <router-link to="/users" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -124,8 +136,8 @@
         </router-link>
       </nav>
 
-      <!-- 농장 사용자 메뉴 -->
-      <nav v-else class="sidebar-nav">
+      <!-- 농장 사용자 메뉴 (worker 가 아닌 farm_user) -->
+      <nav v-else-if="isFarmUser" class="sidebar-nav">
         <div class="nav-section-label">모니터링</div>
         <router-link to="/sensors" class="sidebar-link">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
@@ -222,8 +234,20 @@
         <button class="drawer-close" @click="isDrawerOpen = false" aria-label="메뉴 닫기">✕</button>
       </div>
 
+      <!-- role 미확정 (worker 여부 확인 중) — 깜빡임 방지 -->
+      <nav
+        v-if="isAuthenticated && !roleResolved"
+        class="sidebar-nav sidebar-nav-loading"
+        aria-busy="true"
+        aria-label="메뉴 불러오는 중"
+      >
+        <div class="nav-loading-skeleton">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </nav>
+
       <!-- 관리자 메뉴 (모바일) -->
-      <nav v-if="isAdmin" class="sidebar-nav">
+      <nav v-else-if="isAdmin" class="sidebar-nav">
         <div class="nav-section-label">플랫폼 운영</div>
         <router-link to="/users" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -334,8 +358,8 @@
         </router-link>
       </nav>
 
-      <!-- 농장 사용자 메뉴 (모바일) -->
-      <nav v-else class="sidebar-nav">
+      <!-- 농장 사용자 메뉴 (모바일, worker 가 아닌 farm_user) -->
+      <nav v-else-if="isFarmUser" class="sidebar-nav">
         <div class="nav-section-label">모니터링</div>
         <router-link to="/sensors" class="sidebar-link" @click="isDrawerOpen = false">
           <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
@@ -401,9 +425,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth.store'
+import { useNoDoubleTapZoom } from './composables/useNoDoubleTapZoom'
 import { useNotificationStore } from './stores/notification.store'
 import { useWebSocket } from './composables/useWebSocket'
 import ConfirmDialog from './components/common/ConfirmDialog.vue'
@@ -414,14 +439,24 @@ import UserSettingsModal from './components/common/UserSettingsModal.vue'
 import { useCropFeature } from './modules/crop-management/composables/useCropFeature'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
 const { connect, disconnect } = useWebSocket()
 
+useNoDoubleTapZoom()
+
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const isFarmAdmin = computed(() => authStore.isFarmAdmin)
+const isFarmUser = computed(() => authStore.isFarmUser)
 const isWorker = computed(() => authStore.isWorker)
+// farm_user 는 worker 여부 확정(`isWorkerAccount` !== null) 후에만 NAV 분기 표시
+const roleResolved = computed(() =>
+  authStore.isAdmin
+  || authStore.isFarmAdmin
+  || (authStore.isFarmUser && authStore.isWorkerAccount !== null),
+)
 // 임시 비밀번호 변경 강제 중에는 사이드바/헤더 숨김(로그인처럼 단독 화면)
 const mustChangePassword = computed(() => authStore.user?.mustChangePassword === true)
 const showShell = computed(() => isAuthenticated.value && !mustChangePassword.value)
@@ -483,6 +518,14 @@ onMounted(() => {
   updateClock()
   clockTimer = setInterval(updateClock, 10000)
 })
+
+// 라우트 이동 시 모바일 drawer 자동 닫기 — 메뉴 항목 클릭 후 본문이 가려지는 문제 방지
+watch(
+  () => route.fullPath,
+  () => {
+    if (isDrawerOpen.value) isDrawerOpen.value = false
+  },
+)
 
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)

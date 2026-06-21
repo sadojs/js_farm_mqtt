@@ -141,7 +141,7 @@
       <!-- 온도 및 습도 추이 차트 -->
       <div class="chart-card">
         <h3 class="chart-title">{{ chartTitle }}</h3>
-        <div class="chart-container">
+        <div class="chart-container allow-zoom">
           <Line v-if="sensorChartData" :data="sensorChartData" :options="lineChartOptions" />
         </div>
       </div>
@@ -149,7 +149,7 @@
       <!-- 장치 가동 현황 차트 -->
       <div class="chart-card">
         <h3 class="chart-title">장치 가동 현황</h3>
-        <div class="chart-container">
+        <div class="chart-container allow-zoom">
           <Bar v-if="actuatorChartData" :data="actuatorChartData" :options="barChartOptions" />
         </div>
       </div>

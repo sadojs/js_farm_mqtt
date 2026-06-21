@@ -204,3 +204,59 @@
   --device-sensor: #9c27b0;
   --device-other: #607d8b;
 }
+
+/* ─── 모바일 더블탭 확대 방지 + 앱 느낌 ─── */
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.04);
+}
+body {
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+/* iOS 가 input 포커스 시 자동 확대(<16px) 방지 — 시각 크기는 padding 으로 조정 */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+/* 사용자가 의도적으로 확대해야 하는 영역은 예외 */
+.allow-zoom,
+.allow-zoom * {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* ─── 사이드바 NAV 로딩 스켈레톤 ─── */
+.sidebar-nav-loading {
+  padding: 16px;
+}
+.nav-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nav-loading-skeleton span {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-hover, #f0f0f0) 0%,
+    var(--border-light, #e0e0e0) 50%,
+    var(--bg-hover, #f0f0f0) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s linear infinite;
+}
+.nav-loading-skeleton span:nth-child(1) { width: 60%; }
+.nav-loading-skeleton span:nth-child(2) { width: 90%; }
+.nav-loading-skeleton span:nth-child(3) { width: 70%; }
+.nav-loading-skeleton span:nth-child(4) { width: 80%; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

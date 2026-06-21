@@ -41,7 +41,7 @@
     </div>
 
     <!-- 차트 -->
-    <div v-if="chartData" class="compare-chart-wrap">
+    <div v-if="chartData" class="compare-chart-wrap allow-zoom">
       <canvas ref="chartCanvas"></canvas>
     </div>
 

@@ -62,7 +62,14 @@ export const useAuthStore = defineStore('auth', () => {
       // refreshToken은 백엔드가 httpOnly 쿠키로 설정 → JS에서 접근 불가
       accessToken.value = data.accessToken
       user.value = data.user
-      isWorkerAccount.value = null
+      // farm_user 는 worker 여부를 미리 결정해야 사이드바 NAV 분기가 깜빡이지 않음.
+      // 다른 role 은 즉시 확정 — false 로 명시.
+      if (user.value?.role === 'farm_user') {
+        isWorkerAccount.value = null
+        await resolveWorkerStatus()
+      } else {
+        isWorkerAccount.value = false
+      }
       startSilentRefreshTimer()
     } finally {
       loading.value = false
@@ -111,6 +118,12 @@ export const useAuthStore = defineStore('auth', () => {
       accessToken.value = data.accessToken
       await fetchUser()
       if (user.value) {
+        // 새로고침 케이스도 farm_user 면 worker 확정 후 mount → NAV 깜빡임 방지
+        if (user.value.role === 'farm_user') {
+          await resolveWorkerStatus()
+        } else {
+          isWorkerAccount.value = false
+        }
         startSilentRefreshTimer()
       }
     } catch {
