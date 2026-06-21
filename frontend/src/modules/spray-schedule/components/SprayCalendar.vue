@@ -69,13 +69,19 @@
             :title="chipTitle(ev)"
           >
             <span class="chip-line1">
-              <span v-if="ev.isManual" class="manual-mark">✚</span>
-              <template v-if="ev.kind === 'bee_open'">{{ zoneAbbr(ev) }} · 🐝 {{ ev.pest }}</template>
-              <template v-else>
-                {{ zoneAbbr(ev) }} · {{ ev.pest }} <template v-if="!ev.isManual">{{ ev.round }}차</template>
-                <span v-if="ev.timeOfDay" class="time-tag">{{ ev.timeOfDay === 'am' ? '오전' : '오후' }}</span>
-                <span v-if="ev.bee" class="bee-tag">🐝 벌문닫기</span>
-              </template>
+              <!-- 선두 아이콘: 좁은 모바일 칸에서도 잘리지 않도록 별도 요소로 분리 -->
+              <span
+                v-if="ev.kind === 'bee_open' || ev.isManual"
+                class="chip-icon"
+              >{{ ev.kind === 'bee_open' ? '🐝' : '✚' }}</span>
+              <span class="chip-main">
+                <template v-if="ev.kind === 'bee_open'">{{ zoneAbbr(ev) }} · {{ ev.pest }}</template>
+                <template v-else>
+                  {{ zoneAbbr(ev) }} · {{ ev.pest }}<template v-if="!ev.isManual"> {{ ev.round }}차</template>
+                  <span v-if="ev.timeOfDay" class="time-tag">{{ ev.timeOfDay === 'am' ? '오전' : '오후' }}</span>
+                  <span v-if="ev.bee" class="bee-tag">🐝 벌문닫기</span>
+                </template>
+              </span>
             </span>
             <span class="chip-line2">{{ ev.product }}</span>
           </div>
@@ -300,9 +306,10 @@ function onDrop(date: string) {
   overflow: hidden;
 }
 .event-chip:active { cursor: grabbing; }
-.chip-line1 { display: block; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-line1 { display: flex; align-items: center; gap: 3px; font-weight: 700; color: var(--text-primary); min-width: 0; }
+.chip-icon { flex: 0 0 auto; line-height: 1; }
+.chip-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-line2 { display: block; color: var(--text-secondary); font-size: calc(10px * var(--content-scale, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.manual-mark { color: var(--accent); font-weight: 700; }
 .bee-tag {
   display: inline-block;
   margin-left: 3px;
