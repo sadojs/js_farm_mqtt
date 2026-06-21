@@ -31,9 +31,28 @@ export class AuthController {
   @SkipThrottle()
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.[REFRESH_COOKIE];
-    const result = await this.authService.refresh(token);
-    res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
-    return { accessToken: result.accessToken };
+    try {
+      const result = await this.authService.refresh(token);
+      res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
+      return { accessToken: result.accessToken };
+    } catch (err) {
+      // 만료/무효 토큰 — 쿠키 즉시 정리 (iOS Safari 가 httpOnly 쿠키 영구 보관해
+      // 사용자가 수동으로 쿠키 삭제할 때까지 로그인 못 하는 문제 해결)
+      res.clearCookie(REFRESH_COOKIE, { path: '/' });
+      throw err;
+    }
+  }
+
+  /**
+   * 쿠키 정리 전용 — 인증 불필요 (public).
+   * Login 페이지 진입 시 클라이언트가 호출하여 만료된 refresh 쿠키를 안전하게 비운다.
+   * 보안상 다른 정보는 노출/조작 안 함.
+   */
+  @Post('clear-cookie')
+  @SkipThrottle()
+  async clearCookie(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie(REFRESH_COOKIE, { path: '/' });
+    return { ok: true };
   }
 
   @Post('logout')

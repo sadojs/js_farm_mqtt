@@ -12,6 +12,10 @@ export const authApi = {
   logout: () =>
     apiClient.post('/auth/logout'),
 
+  /** 만료된 refresh 쿠키 강제 정리 — public (no auth required) */
+  clearCookie: () =>
+    apiClient.post('/auth/clear-cookie'),
+
   me: () =>
     apiClient.get<User>('/auth/me'),
 }

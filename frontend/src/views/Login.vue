@@ -66,12 +66,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
+import { authApi } from '../api/auth.api'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 진입 시 만료된 refresh 쿠키 강제 정리 — iOS Safari 등이 무효 httpOnly 쿠키를
+// 영구 보관해 로그인을 막는 문제를 방지하는 안전망. 실패해도 무시.
+onMounted(async () => {
+  try { await authApi.clearCookie() } catch { /* 무시 */ }
+})
 
 interface LoginData {
   username: string
@@ -99,7 +106,12 @@ const handleLogin = async () => {
     // 로그인 성공은 라우팅으로 즉시 인지 가능 — 별도 알림 노출하지 않음
     router.push('/dashboard')
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || '사용자명 또는 비밀번호가 올바르지 않습니다.'
+    const status = err.response?.status
+    if (status === 429) {
+      errorMessage.value = '로그인 시도가 너무 많습니다. 60초 후 다시 시도해 주세요.'
+    } else {
+      errorMessage.value = err.response?.data?.message || '사용자명 또는 비밀번호가 올바르지 않습니다.'
+    }
   } finally {
     isLoading.value = false
   }

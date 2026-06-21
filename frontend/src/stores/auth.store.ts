@@ -130,6 +130,9 @@ export const useAuthStore = defineStore('auth', () => {
       // 유효한 세션 없음 → 로그인 필요 (logout API 호출 없이 상태만 초기화)
       user.value = null
       accessToken.value = null
+      // iOS Safari 등이 만료된 httpOnly refresh 쿠키를 영구 보관해 다음 로그인을 방해하는 문제 방지 —
+      // 백엔드에 명시적으로 쿠키 정리 요청 (안전망; 백엔드도 refresh 401 시 자동 정리함)
+      try { await authApi.clearCookie() } catch { /* 무시 */ }
     }
   }
 
