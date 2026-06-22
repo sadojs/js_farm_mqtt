@@ -63,7 +63,7 @@
             <div class="tabs">
               <button :class="['tab', { active: tab === 'calendar' }]" :disabled="!selectedId" @click="tab = 'calendar'">근무 달력</button>
               <button :class="['tab', { active: tab === 'settlement' }]" :disabled="!selectedId" @click="tab = 'settlement'">월 정산</button>
-              <button :class="['tab', { active: tab === 'settings' }]" @click="tab = 'settings'">{{ creating ? '계정 등록' : '설정' }}</button>
+              <button :class="['tab', { active: tab === 'settings' }]" @click="tab = 'settings'">{{ creating ? '계정 등록' : '근무·임금' }}</button>
             </div>
 
             <WorkerCalendar

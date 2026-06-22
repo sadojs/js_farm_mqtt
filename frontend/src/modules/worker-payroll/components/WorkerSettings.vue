@@ -79,7 +79,7 @@
           <span class="ded-title">변동 공제</span>
           <span class="badge-var">매달 입력</span>
         </div>
-        <p class="var-note">설정에는 항목만 등록하고, 금액은 정산할 때 그 달 고지서 값을 입력합니다.</p>
+        <p class="var-note">여기서는 항목만 등록하고, 금액은 정산할 때 그 달 고지서 값을 입력합니다.</p>
         <div v-for="(d, i) in form.variableDeductions" :key="'v' + i" class="line-row">
           <input v-model="d.label" class="inp flex" placeholder="항목 (예: 전기 · 수도 · 가스)" />
           <span class="var-amount">정산월마다 금액 입력</span>
@@ -89,7 +89,7 @@
       </div>
     </div>
 
-    <!-- ③ 가불 내역 -->
+    <!-- ④ 가불 내역 -->
     <div class="card">
       <h3 class="card-title">④ 가불 내역</h3>
       <template v-if="workerId">
@@ -232,19 +232,32 @@ async function save() {
 }
 
 async function addAdvance() {
-  if (!props.workerId || !newAdvance.amount) return
+  if (!props.workerId) {
+    notify.warning('일꾼 관리', '먼저 일꾼을 저장해 주세요.')
+    return
+  }
+  if (!newAdvance.date) {
+    notify.warning('일꾼 관리', '날짜를 선택해 주세요.')
+    return
+  }
+  const amt = Number(newAdvance.amount)
+  if (!amt || Number.isNaN(amt) || amt <= 0) {
+    notify.warning('일꾼 관리', '가불 금액을 입력해 주세요.')
+    return
+  }
   try {
     await workerPayrollApi.addAdvance(props.workerId, {
       date: newAdvance.date,
-      amount: newAdvance.amount,
+      amount: amt,
       note: newAdvance.note.trim() || undefined,
     })
     advances.value = await workerPayrollApi.listAdvances(props.workerId)
+    newAdvance.date = new Date().toISOString().slice(0, 10)
     newAdvance.amount = 0
     newAdvance.note = ''
     notify.success('일꾼 관리', '가불을 추가했습니다.')
-  } catch {
-    notify.error('일꾼 관리', '가불 추가에 실패했습니다.')
+  } catch (e: any) {
+    notify.error('일꾼 관리', e?.response?.data?.message ?? '가불 추가에 실패했습니다.')
   }
 }
 
