@@ -31,6 +31,11 @@ export class DeductionInputDto {
   @Min(0)
   amount: number;
 
+  /** 일할 계산 적용(고정공제만 의미). 기본 true. */
+  @IsOptional()
+  @IsBoolean()
+  prorate?: boolean;
+
   @IsOptional()
   @IsInt()
   sortOrder?: number;
@@ -70,6 +75,11 @@ export class SaveWorkerDto {
   // ── 근무 조건 ──
   @IsDateString()
   startDate: string;
+
+  /** 퇴사일 (선택). 빈 문자열·null 보내면 재직중으로 설정. */
+  @IsOptional()
+  @IsDateString()
+  endDate?: string | null;
 
   @IsInt()
   @Min(0)

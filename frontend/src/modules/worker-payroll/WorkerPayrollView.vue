@@ -45,7 +45,10 @@
           >
             <span class="w-avatar">{{ w.name.charAt(0) }}</span>
             <span class="w-info">
-              <span class="w-name">{{ w.name }}</span>
+              <span class="w-name">
+                {{ w.name }}
+                <span v-if="w.endDate" class="badge-terminated">{{ t(lang, 'terminated') }} {{ shortMD(w.endDate) }}</span>
+              </span>
               <span class="w-sub">{{ w.username ? '@' + w.username : '' }} · {{ w.hourlyWage.toLocaleString() }}원/h</span>
             </span>
           </button>
@@ -100,7 +103,7 @@ import { useAuthStore } from '../../stores/auth.store'
 import { useNotificationStore } from '../../stores/notification.store'
 import { workerPayrollApi } from './api/worker-payroll.api'
 import type { Worker } from './types/worker-payroll.types'
-import { LANG_OPTIONS, type PayrollLang } from './i18n/payroll-i18n'
+import { LANG_OPTIONS, t, shortMD, type PayrollLang } from './i18n/payroll-i18n'
 import WorkerCalendar from './components/WorkerCalendar.vue'
 import WorkerSettlement from './components/WorkerSettlement.vue'
 import WorkerSettings from './components/WorkerSettings.vue'
@@ -267,6 +270,17 @@ onMounted(async () => {
 .tab.active { background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-card); }
 .tab:disabled { opacity: 0.4; cursor: default; }
 .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.badge-terminated {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--danger-badge-bg, #fee2e2);
+  color: var(--danger-badge-text, #b91c1c);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
 @media (max-width: 768px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   /* 가로 스크롤 대신 줄바꿈 — "일꾼 등록" 버튼이 화면 밖으로 밀리지 않도록 */

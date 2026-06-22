@@ -29,6 +29,10 @@ export class WorkerDeduction {
   @Column({ name: 'amount', type: 'int', default: 0 })
   amount: number;
 
+  /** 일할 계산 적용 여부 — 고정공제만 의미. 변동공제는 무시. */
+  @Column({ name: 'prorate', type: 'boolean', default: true })
+  prorate: boolean;
+
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 

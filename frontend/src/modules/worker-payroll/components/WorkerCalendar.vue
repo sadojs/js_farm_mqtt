@@ -39,7 +39,7 @@
         v-for="cell in cells"
         :key="cell.date"
         class="cell"
-        :class="{ blank: !cell.day, 'next-month': cell.nextMonth, tappable: cell.day && !cell.beforeStart && (isMobile || !editable) }"
+        :class="{ blank: !cell.day, 'next-month': cell.nextMonth, terminated: cell.terminated, tappable: cell.day && !cell.beforeStart && !cell.terminated && (isMobile || !editable) }"
         @click="onCellClick(cell)"
       >
         <template v-if="cell.day">
@@ -52,6 +52,7 @@
           </div>
 
           <div v-if="cell.beforeStart" class="muted-cell"></div>
+          <div v-else-if="cell.terminated" class="muted-cell terminated-label">{{ t(lang, 'terminated') }}</div>
           <template v-else>
             <div v-if="cell.status === 'off'" class="holiday-cell">
               <span class="holiday-label">{{ t(lang, 'holiday') }}</span>
@@ -183,7 +184,7 @@ function setWork(cell: CalendarDay) {
 }
 
 function onCellClick(cell: any) {
-  if (!cell.day || cell.beforeStart) return
+  if (!cell.day || cell.beforeStart || cell.terminated) return
   // 데스크탑 + 편집가능 = 인라인 컨트롤 사용 (모달 안 띄움)
   if (props.editable && !isMobile.value) return
   modalCell.value = cell
@@ -291,6 +292,11 @@ defineExpose({ reload })
   padding: 1px 6px;
 }
 .muted-cell { flex: 1; }
+.cell.terminated { background: var(--bg-hover); opacity: 0.55; cursor: default; }
+.terminated-label {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text-muted); font-weight: 600;
+}
 .holiday-cell {
   flex: 1;
   display: flex;

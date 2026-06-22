@@ -30,6 +30,10 @@ export class Worker {
   @Column({ name: 'start_date', type: 'date' })
   startDate: string;
 
+  /** 퇴사일. NULL=재직중. 그 일자까지 근무, 다음날부터 정산/달력 제외. */
+  @Column({ name: 'end_date', type: 'date', nullable: true })
+  endDate: string | null;
+
   /** 시급(원) */
   @Column({ name: 'hourly_wage', type: 'int', default: 0 })
   hourlyWage: number;

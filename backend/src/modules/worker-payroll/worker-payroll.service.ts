@@ -34,6 +34,65 @@ function todayStr(): string {
 function num(v: any): number {
   return typeof v === 'number' ? v : parseFloat(v ?? 0) || 0;
 }
+function daysBetween(start: string, end: string): number {
+  return Math.round(
+    (parseDate(end).getTime() - parseDate(start).getTime()) / 86400000,
+  );
+}
+
+/**
+ * 고정공제 일할 계산.
+ * - prorate=false → 그대로
+ * - 그 달 1일~말일 전체와 실제 근무 가능 일수(입사·퇴사·정산기간 교집합) 비율
+ * - prorationReason 은 JSON 직렬화 — 프론트에서 i18n 으로 조합
+ */
+function prorateAmount(
+  baseAmount: number,
+  prorate: boolean,
+  periodStart: string,
+  periodEnd: string,
+  worker: { startDate: string; endDate: string | null },
+): { amount: number; prorationReason: string | null } {
+  if (!prorate) return { amount: baseAmount, prorationReason: null };
+
+  const ps = parseDate(periodStart);
+  const monthStart = fmt(
+    new Date(Date.UTC(ps.getUTCFullYear(), ps.getUTCMonth(), 1)),
+  );
+  const monthEnd = fmt(
+    new Date(Date.UTC(ps.getUTCFullYear(), ps.getUTCMonth() + 1, 0)),
+  );
+  const monthDays = daysBetween(monthStart, monthEnd) + 1;
+
+  const wStart = worker.startDate.slice(0, 10);
+  const wEnd = worker.endDate ? worker.endDate.slice(0, 10) : null;
+  const effStart = wStart > monthStart ? wStart : monthStart;
+  const effEnd = wEnd && wEnd < monthEnd ? wEnd : monthEnd;
+
+  if (effStart > effEnd) {
+    // 그 달에 근무 일자가 전혀 없음 (퇴사 후 정산 시도 등)
+    return {
+      amount: 0,
+      prorationReason: JSON.stringify({ key: 'prorationReason', noOverlap: true }),
+    };
+  }
+  const effDays = daysBetween(effStart, effEnd) + 1;
+  if (effDays >= monthDays) {
+    return { amount: baseAmount, prorationReason: null };
+  }
+  const amount = Math.round((baseAmount * effDays) / monthDays);
+  return {
+    amount,
+    prorationReason: JSON.stringify({
+      key: 'prorationReason',
+      base: baseAmount,
+      days: effDays,
+      total: monthDays,
+      entryInMonth: effStart > monthStart ? effStart : null,
+      exitInMonth: effEnd < monthEnd ? effEnd : null,
+    }),
+  };
+}
 
 const MANAGER_ROLES = ['admin', 'farm_admin'];
 
@@ -170,6 +229,7 @@ export class WorkerPayrollService {
             name: dto.name,
             phone: dto.phone ?? null,
             startDate: dto.startDate,
+            endDate: dto.endDate || null,
             hourlyWage: dto.hourlyWage,
             dailyHours: dto.dailyHours,
             isActive: true,
@@ -189,6 +249,8 @@ export class WorkerPayrollService {
         name: dto.name,
         phone: dto.phone ?? found.phone,
         startDate: dto.startDate,
+        // endDate 는 '' 또는 null 이면 명시적으로 해제, undefined 면 기존 유지
+        endDate: dto.endDate === undefined ? found.endDate : (dto.endDate || null),
         hourlyWage: dto.hourlyWage,
         dailyHours: dto.dailyHours,
         isActive: dto.isActive ?? true,
@@ -220,6 +282,8 @@ export class WorkerPayrollService {
           kind,
           // 변동 공제는 금액을 미리 정하지 않음(정산 시 입력)
           amount: kind === 'variable' ? 0 : d.amount,
+          // 일할 옵션 — 고정공제만 의미. 변동은 false 로 고정(어차피 매달 입력)
+          prorate: kind === 'variable' ? false : d.prorate !== false,
           sortOrder: d.sortOrder ?? idx,
         }),
       );
@@ -364,8 +428,10 @@ export class WorkerPayrollService {
     let cursor = meta.periodStart;
     let workDays = 0;
     let totalHours = 0;
+    const workerEnd = worker.endDate ? worker.endDate.slice(0, 10) : null;
     while (cursor <= meta.periodEnd) {
       const beforeStart = cursor < worker.startDate;
+      const afterEnd = !!workerEnd && cursor > workerEnd;
       const row = dayMap.get(cursor);
       let status = 'work';
       let hours = base;
@@ -374,15 +440,16 @@ export class WorkerPayrollService {
         hours = num(row.hours);
       }
       if (status === 'off') hours = 0;
-      const effective = beforeStart ? 0 : hours;
-      if (!beforeStart && status === 'work') {
+      const effective = beforeStart || afterEnd ? 0 : hours;
+      if (!beforeStart && !afterEnd && status === 'work') {
         workDays += 1;
         totalHours += effective;
       }
       days.push({
         date: cursor,
         beforeStart,
-        status: beforeStart ? 'none' : status,
+        terminated: afterEnd,
+        status: beforeStart || afterEnd ? 'none' : status,
         hours: effective,
         advance: advMap.get(cursor) ?? 0,
       });
@@ -407,6 +474,7 @@ export class WorkerPayrollService {
       id: worker.id,
       name: worker.name,
       startDate: worker.startDate,
+      endDate: worker.endDate,
       hourlyWage: worker.hourlyWage,
       dailyHours: num(worker.dailyHours),
     };
@@ -426,8 +494,10 @@ export class WorkerPayrollService {
     let workDays = 0;
     let totalHours = 0;
     let cursor = meta.periodStart;
+    const workerEnd = worker.endDate ? worker.endDate.slice(0, 10) : null;
     while (cursor <= meta.periodEnd) {
       const beforeStart = cursor < worker.startDate;
+      const afterEnd = !!workerEnd && cursor > workerEnd;
       const row = dayMap.get(cursor);
       let status = 'work';
       let hours = base;
@@ -435,7 +505,7 @@ export class WorkerPayrollService {
         status = row.status;
         hours = num(row.hours);
       }
-      if (!beforeStart && status === 'work') {
+      if (!beforeStart && !afterEnd && status === 'work') {
         workDays += 1;
         totalHours += hours;
       }
@@ -450,12 +520,23 @@ export class WorkerPayrollService {
     });
     const deductions = deductionRows.map((d) => {
       const kind = d.kind === 'variable' ? 'variable' : 'fixed';
-      // 변동 공제는 정산 시 입력값 사용(없으면 0), 고정은 설정 금액
-      const amount =
-        kind === 'variable'
-          ? Math.max(0, Math.round(variableAmounts?.[d.id] ?? 0))
-          : d.amount;
-      return { label: d.label, kind, amount };
+      if (kind === 'variable') {
+        return {
+          label: d.label,
+          kind,
+          amount: Math.max(0, Math.round(variableAmounts?.[d.id] ?? 0)),
+          prorationReason: null as string | null,
+        };
+      }
+      // fixed — 일할 옵션 적용
+      const { amount, prorationReason } = prorateAmount(
+        d.amount,
+        d.prorate !== false,
+        meta.periodStart,
+        meta.periodEnd,
+        { startDate: worker.startDate, endDate: worker.endDate },
+      );
+      return { label: d.label, kind, amount, prorationReason };
     });
     const deductionTotal = deductions.reduce((s, d) => s + d.amount, 0);
 

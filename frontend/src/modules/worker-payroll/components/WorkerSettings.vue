@@ -42,6 +42,19 @@
           <input v-model="form.startDate" type="date" class="inp" />
         </label>
         <label class="field">
+          <span>퇴사일</span>
+          <div class="end-date-row">
+            <input
+              v-model="form.endDate"
+              type="date"
+              class="inp"
+              :min="form.startDate || undefined"
+            />
+            <button v-if="form.endDate" type="button" class="btn-ghost-sm" @click="form.endDate = ''" title="퇴사일 지우기">✕</button>
+          </div>
+          <span class="hint inline">비워두면 재직 중</span>
+        </label>
+        <label class="field">
           <span>시급 (원)</span>
           <input v-model.number="form.hourlyWage" type="number" min="0" step="100" class="inp" />
         </label>
@@ -64,13 +77,18 @@
       <!-- 고정 공제 -->
       <div class="ded-section">
         <div class="ded-head"><span class="ded-title">고정 공제</span><span class="ded-sub">매달 동일 · 자동 차감</span></div>
-        <div v-for="(d, i) in form.fixedDeductions" :key="'f' + i" class="line-row">
+        <div v-for="(d, i) in form.fixedDeductions" :key="'f' + i" class="line-row deduction-row">
           <input v-model="d.label" class="inp flex" placeholder="항목 (예: 숙소비)" />
           <input v-model.number="d.amount" type="number" min="0" step="1000" class="inp amount" placeholder="금액" />
+          <label class="prorate-toggle" title="입사·퇴사 달은 사용일수 비율로 차감됩니다">
+            <input type="checkbox" v-model="d.prorate" />
+            <span>일할</span>
+          </label>
           <button class="btn-icon danger" @click="form.fixedDeductions.splice(i, 1)">−</button>
         </div>
-        <button class="btn-add" @click="form.fixedDeductions.push({ label: '', amount: 0 })">+ 고정 항목 추가</button>
+        <button class="btn-add" @click="form.fixedDeductions.push({ label: '', amount: 0, prorate: true })">+ 고정 항목 추가</button>
         <div class="sum-row">매월 고정 공제 합계 <strong>{{ fixedTotal.toLocaleString() }}원</strong></div>
+        <p class="hint">💡 <b>일할</b> 체크 시 입사·퇴사 달은 사용일수 비율로 자동 차감됩니다 (예: 숙소비·식비). 4대보험처럼 매달 정액인 항목은 체크 해제.</p>
       </div>
 
       <!-- 변동 공제 -->
@@ -134,9 +152,10 @@ const form = reactive({
   password: '',
   phone: '',
   startDate: new Date().toISOString().slice(0, 10),
+  endDate: '',
   hourlyWage: 12000,
   dailyHours: 8,
-  fixedDeductions: [] as { id?: string; label: string; amount: number }[],
+  fixedDeductions: [] as { id?: string; label: string; amount: number; prorate: boolean }[],
   variableDeductions: [] as { id?: string; label: string }[],
 })
 
@@ -158,6 +177,7 @@ async function load() {
     form.password = ''
     form.phone = ''
     form.startDate = new Date().toISOString().slice(0, 10)
+    form.endDate = ''
     form.hourlyWage = 12000
     form.dailyHours = 8
     form.fixedDeductions = []
@@ -170,12 +190,13 @@ async function load() {
   form.name = w.name
   form.phone = w.phone ?? ''
   form.startDate = w.startDate.slice(0, 10)
+  form.endDate = w.endDate ? w.endDate.slice(0, 10) : ''
   form.hourlyWage = w.hourlyWage
   form.dailyHours = Number(w.dailyHours)
   const deds = w.deductions ?? []
   form.fixedDeductions = deds
     .filter((d) => (d.kind ?? 'fixed') !== 'variable')
-    .map((d) => ({ id: d.id, label: d.label, amount: d.amount }))
+    .map((d) => ({ id: d.id, label: d.label, amount: d.amount, prorate: d.prorate !== false }))
   form.variableDeductions = deds
     .filter((d) => d.kind === 'variable')
     .map((d) => ({ id: d.id, label: d.label }))
@@ -202,6 +223,10 @@ async function save() {
       return
     }
   }
+  if (form.endDate && form.endDate < form.startDate) {
+    notify.warning('일꾼 관리', '퇴사일은 입사일 이후여야 합니다.')
+    return
+  }
   saving.value = true
   try {
     const saved = await workerPayrollApi.saveWorker({
@@ -211,12 +236,19 @@ async function save() {
       password: isNew ? form.password : undefined,
       phone: form.phone.trim() || undefined,
       startDate: form.startDate,
+      endDate: form.endDate?.trim() || null,
       hourlyWage: form.hourlyWage,
       dailyHours: form.dailyHours,
       deductions: [
         ...form.fixedDeductions
           .filter((d) => d.label.trim())
-          .map((d) => ({ id: d.id, label: d.label.trim(), kind: 'fixed' as const, amount: Number(d.amount) || 0 })),
+          .map((d) => ({
+            id: d.id,
+            label: d.label.trim(),
+            kind: 'fixed' as const,
+            amount: Number(d.amount) || 0,
+            prorate: d.prorate !== false,
+          })),
         ...form.variableDeductions
           .filter((d) => d.label.trim())
           .map((d) => ({ id: d.id, label: d.label.trim(), kind: 'variable' as const, amount: 0 })),
@@ -374,7 +406,41 @@ async function removeAdvance(id: string) {
   font-weight: 600;
   cursor: pointer;
 }
+/* 퇴사일 입력란 — date input + 지우기 버튼 */
+.end-date-row { display: flex; align-items: center; gap: 6px; }
+.end-date-row .inp { flex: 1 1 auto; }
+.btn-ghost-sm {
+  background: var(--bg-hover);
+  border: none;
+  border-radius: 6px;
+  width: 28px; height: 28px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.btn-ghost-sm:hover { background: var(--border-light); color: var(--text-primary); }
+.hint.inline { display: block; margin-top: 4px; }
+
+/* 고정공제 행 일할 토글 */
+.prorate-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-hover);
+  border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.prorate-toggle input[type="checkbox"] { margin: 0; cursor: pointer; }
+.prorate-toggle:hover { background: var(--border-light); }
+
 @media (max-width: 768px) {
   .grid2 { grid-template-columns: 1fr; }
+  .deduction-row .inp { flex: 1 1 100%; }
+  .deduction-row .amount { flex: 1 1 60%; }
+  .deduction-row .prorate-toggle { flex: 0 0 auto; }
 }
 </style>

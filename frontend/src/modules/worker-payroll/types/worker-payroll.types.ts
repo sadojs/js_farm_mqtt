@@ -5,6 +5,8 @@ export interface Deduction {
   label: string
   kind?: DeductionKind
   amount: number
+  /** 일할 계산 적용 — 고정공제만 의미. 기본 true. 변동공제는 무시. */
+  prorate?: boolean
   sortOrder?: number
 }
 
@@ -18,6 +20,7 @@ export interface Worker {
   name: string
   phone?: string | null
   startDate: string
+  endDate?: string | null
   hourlyWage: number
   dailyHours: number
   isActive: boolean
@@ -34,6 +37,7 @@ export interface SaveWorkerPayload {
   password?: string
   phone?: string
   startDate: string
+  endDate?: string | null
   hourlyWage: number
   dailyHours: number
   deductions?: Deduction[]
@@ -51,6 +55,7 @@ export type DayStatus = 'work' | 'off' | 'none'
 export interface CalendarDay {
   date: string
   beforeStart: boolean
+  terminated?: boolean
   status: DayStatus
   hours: number
   advance: number
@@ -68,6 +73,7 @@ export interface WorkerBrief {
   id: string
   name: string
   startDate: string
+  endDate?: string | null
   hourlyWage: number
   dailyHours: number
 }
@@ -91,7 +97,7 @@ export interface SettlementResponse extends PeriodMeta {
   totalHours: number
   hourlyWage: number
   grossPay: number
-  deductions: { label: string; amount: number; kind?: DeductionKind }[]
+  deductions: { label: string; amount: number; kind?: DeductionKind; prorationReason?: string | null }[]
   deductionTotal: number
   advances: { date: string; amount: number; note: string | null }[]
   advanceTotal: number

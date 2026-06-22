@@ -27,8 +27,11 @@
       </div>
 
       <!-- 고정 공제 -->
-      <div v-for="(d, i) in fixedDeductions" :key="'f' + i" class="rcpt-row">
-        <span class="rcpt-label">{{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}</span>
+      <div v-for="(d, i) in fixedDeductions" :key="'f' + i" class="rcpt-row deduction-line">
+        <span class="rcpt-label">
+          {{ t(lang, 'deduction') }} · {{ translateLabel(d.label, lang) }}
+          <span v-if="d.prorationReason" class="proration-reason">{{ formatProrationReason(d.prorationReason, lang) }}</span>
+        </span>
         <span class="rcpt-amount minus">−{{ formatMoney(d.amount, lang) }}</span>
       </div>
 
@@ -217,6 +220,32 @@ watch(() => props.workerId, () => { period.value = props.initialPeriod; reload()
 watch(() => props.initialPeriod, (p) => { if (p !== period.value) { period.value = p; reload() } })
 onMounted(reload)
 defineExpose({ reload })
+
+/**
+ * 백엔드가 보낸 JSON 형태의 prorationReason 을 현재 언어로 조합.
+ * 예: 월 80,000원 × 15/31일 (5/17 입사)
+ */
+function formatProrationReason(json: string | null | undefined, lng: PayrollLang): string {
+  if (!json) return ''
+  try {
+    const d = JSON.parse(json)
+    if (d.noOverlap) return ''
+    const base = (d.base ?? 0).toLocaleString()
+    let txt = t(lng, 'prorationLineMain')
+      .replace('{base}', base)
+      .replace('{days}', String(d.days))
+      .replace('{total}', String(d.total))
+    if (d.entryInMonth) {
+      txt += ' ' + t(lng, 'entryNote').replace('{date}', shortMD(d.entryInMonth))
+    }
+    if (d.exitInMonth) {
+      txt += ' ' + t(lng, 'exitNote').replace('{date}', shortMD(d.exitInMonth))
+    }
+    return txt
+  } catch {
+    return ''
+  }
+}
 </script>
 
 <style scoped>
@@ -318,4 +347,14 @@ defineExpose({ reload })
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.6; }
+
+/* 일할 계산 사유 — 공제 항목 라벨 아래에 보조 텍스트로 작게 */
+.proration-reason {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  line-height: 1.35;
+}
 </style>

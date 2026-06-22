@@ -41,6 +41,16 @@ type LabelKey =
   | 'approve'
   | 'waitingApproval'
   | 'variable'
+  | 'startDate'
+  | 'endDate'
+  | 'endDateHelp'
+  | 'prorate'
+  | 'prorateHint'
+  | 'prorationLineMain'
+  | 'entryNote'
+  | 'exitNote'
+  | 'terminated'
+  | 'clear'
 
 export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
   ko: {
@@ -73,6 +83,16 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     approve: '정산 승인',
     waitingApproval: '관리자 승인 대기 중',
     variable: '변동',
+    startDate: '입사일',
+    endDate: '퇴사일',
+    endDateHelp: '비워두면 재직 중',
+    prorate: '일할 계산',
+    prorateHint: '입사·퇴사 달은 사용일수 비율로 차감됩니다.',
+    prorationLineMain: '월 {base}원 × {days}/{total}일',
+    entryNote: '({date} 입사)',
+    exitNote: '({date} 퇴사)',
+    terminated: '퇴사',
+    clear: '지우기',
   },
   tl: {
     workDays: 'Araw ng trabaho',
@@ -104,6 +124,16 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     approve: 'Aprubahan',
     waitingApproval: 'Naghihintay ng pag-apruba',
     variable: 'Variable',
+    startDate: 'Petsa ng pagsisimula',
+    endDate: 'Petsa ng pagtatapos',
+    endDateHelp: 'Iwanang blanko kung kasalukuyang nagtatrabaho',
+    prorate: 'Hatiin sa araw',
+    prorateHint: 'Sa buwan ng pagsisimula/pagtatapos ay ibabawas batay sa bilang ng araw na natrabaho.',
+    prorationLineMain: '{base} kada buwan × {days}/{total} araw',
+    entryNote: '(Nagsimula {date})',
+    exitNote: '(Nagtapos {date})',
+    terminated: 'Tapos na',
+    clear: 'Burahin',
   },
   th: {
     workDays: 'วันทำงาน',
@@ -135,6 +165,16 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     approve: 'อนุมัติ',
     waitingApproval: 'รออนุมัติจากผู้ดูแล',
     variable: 'ผันแปร',
+    startDate: 'วันเริ่มงาน',
+    endDate: 'วันสิ้นสุด',
+    endDateHelp: 'เว้นว่างหากยังทำงานอยู่',
+    prorate: 'คำนวณรายวัน',
+    prorateHint: 'เดือนเริ่มงาน/สิ้นสุดจะหักตามจำนวนวันที่ใช้งานจริง',
+    prorationLineMain: '{base} ต่อเดือน × {days}/{total} วัน',
+    entryNote: '(เริ่ม {date})',
+    exitNote: '(สิ้นสุด {date})',
+    terminated: 'สิ้นสุด',
+    clear: 'ล้าง',
   },
   lo: {
     workDays: 'ມື້ເຮັດວຽກ',
@@ -166,6 +206,16 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     approve: 'ອະນຸມັດ',
     waitingApproval: 'ລໍຖ້າການອະນຸມັດ',
     variable: 'ປ່ຽນແປງ',
+    startDate: 'ວັນເລີ່ມຕົ້ນ',
+    endDate: 'ວັນສິ້ນສຸດ',
+    endDateHelp: 'ປະປ່ອຍຫວ່າງຖ້າຍັງເຮັດວຽກຢູ່',
+    prorate: 'ຄິດໄລ່ຕາມມື້',
+    prorateHint: 'ໃນເດືອນເລີ່ມຕົ້ນ/ສິ້ນສຸດຈະຫັກຕາມຈຳນວນມື້ທີ່ໃຊ້ຈິງ.',
+    prorationLineMain: '{base} ຕໍ່ເດືອນ × {days}/{total} ມື້',
+    entryNote: '(ເລີ່ມ {date})',
+    exitNote: '(ສິ້ນສຸດ {date})',
+    terminated: 'ສິ້ນສຸດ',
+    clear: 'ລ້າງ',
   },
 }
 
