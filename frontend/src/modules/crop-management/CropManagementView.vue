@@ -424,4 +424,8 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   cursor: pointer;
   padding: 2px 4px;
 }
+
+@media (max-width: 768px) {
+  .page-container { padding: 6px 8px; }
+}
 </style>

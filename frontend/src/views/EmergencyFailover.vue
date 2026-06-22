@@ -324,4 +324,10 @@ function fmt(d: string | null) {
   background: var(--primary, #4caf50); color: #fff;
 }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  /* 다른 페이지와 동일한 좌우 여백 */
+  .page-container { padding: 6px 8px; }
+  .page-header { margin-bottom: 14px; }
+}
 </style>

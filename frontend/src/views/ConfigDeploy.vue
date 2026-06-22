@@ -937,4 +937,8 @@ onMounted(() => {
   margin-top: 16px; padding: 0; background: transparent;
   border-top: 1px dashed var(--color-border, #cbd5e0);
 }
+
+@media (max-width: 768px) {
+  .page-container { padding: 6px 8px; }
+}
 </style>

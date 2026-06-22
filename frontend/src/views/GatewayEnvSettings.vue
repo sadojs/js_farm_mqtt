@@ -1900,4 +1900,8 @@ onMounted(loadAllDevices)
 .legend-item .pin-circle {
   width: 16px; height: 16px; font-size: 10px;
 }
+
+@media (max-width: 768px) {
+  .page-container { padding: 6px 8px; }
+}
 </style>

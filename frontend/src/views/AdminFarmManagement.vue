@@ -376,8 +376,10 @@ onMounted(loadAll)
 .btn-link { color: #6366f1; font-size: 13px; text-decoration: none; display: block; margin-top: 8px; }
 .btn-link:hover { text-decoration: underline; }
 
-@media (max-width: 640px) {
-  .two-panel { flex-direction: column; }
+@media (max-width: 768px) {
+  /* 다른 페이지(.page-container)와 동일한 좌우 여백 */
+  .admin-farm-page { padding: 6px 8px; }
+  .two-panel { flex-direction: column; gap: 12px; }
   .farm-list-panel { width: 100%; }
 }
 </style>
