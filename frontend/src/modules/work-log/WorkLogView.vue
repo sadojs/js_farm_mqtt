@@ -335,7 +335,7 @@ onMounted(loadAll)
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 6px 8px; }
   .header-actions { width: 100%; }
   .tab-switch { flex: 1; }
   .tab-btn { flex: 1; padding: 9px 8px; }

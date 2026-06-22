@@ -318,6 +318,6 @@ function getIrrigationRange(log: any): string {
 .btn-more:hover { background: var(--bg-hover); }
 
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 6px 8px; }
 }
 </style>

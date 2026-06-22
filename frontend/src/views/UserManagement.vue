@@ -1410,7 +1410,7 @@ void openNewGatewayModal
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 6px 8px; }
   .detail-pane { padding: 18px; }
   .profile-grid { grid-template-columns: 1fr; }
   .child-grid { grid-template-columns: 1fr; }

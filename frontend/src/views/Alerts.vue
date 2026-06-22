@@ -898,7 +898,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 16px; }
+  .page-container { padding: 6px 8px; }
   .page-header { flex-direction: column; gap: 12px; }
   .tab-item { padding: 10px 12px; font-size: 0.82em; }
   .sensor-grid { grid-template-columns: 1fr; }
