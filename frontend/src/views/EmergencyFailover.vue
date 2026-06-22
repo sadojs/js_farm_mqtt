@@ -299,7 +299,7 @@ function fmt(d: string | null) {
 
 .events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .events-table th, .events-table td {
-  padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border-color, #eee);
+  padding: 4px 0; text-align: left; border-bottom: 1px solid var(--border-color, #eee);
 }
 .events-table code { font-size: 11px; }
 .badge-event {
@@ -327,7 +327,7 @@ function fmt(d: string | null) {
 
 @media (max-width: 768px) {
   /* 다른 페이지와 동일한 좌우 여백 */
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .page-header { margin-bottom: 14px; }
 }
 </style>

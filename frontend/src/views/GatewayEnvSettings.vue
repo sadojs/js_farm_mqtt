@@ -1632,7 +1632,7 @@ onMounted(loadAllDevices)
   width: 80px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 4px 0;
   font-size: 15px;
   text-align: center;
   background: var(--bg-input);
@@ -1902,6 +1902,6 @@ onMounted(loadAllDevices)
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
 }
 </style>

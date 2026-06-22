@@ -1956,7 +1956,7 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 
 @media (max-width: 768px) {
   /* 모바일은 좌우 여백 압축 — 화면을 가능한 한 카드에 양보 */
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
   /* minmax(0, 1fr) — 1fr 만으로는 자식 min-content 가 viewport 폭을 넘기는 흔한 함정 */
   .device-sub-grid { grid-template-columns: minmax(0, 1fr); }

@@ -869,7 +869,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .stats-grid { grid-template-columns: 1fr; }
   /* 모바일에서 차트 높이 증가 */
   .chart-container { height: 280px; }

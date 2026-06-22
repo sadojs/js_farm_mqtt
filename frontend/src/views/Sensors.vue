@@ -895,7 +895,7 @@ onUnmounted(() => {
 
 /* ── 반응형 ── */
 @media (max-width: 768px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
   .gauge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .env-card-body { padding: 0 12px 16px; }

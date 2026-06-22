@@ -408,7 +408,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .page-header { margin-bottom: 12px; }
   /* 모바일: 날씨 + 요약 세로 스택 */
   .hero-row {

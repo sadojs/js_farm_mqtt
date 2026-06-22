@@ -426,6 +426,6 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
 }
 </style>

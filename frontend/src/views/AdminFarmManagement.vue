@@ -378,7 +378,7 @@ onMounted(loadAll)
 
 @media (max-width: 768px) {
   /* 다른 페이지(.page-container)와 동일한 좌우 여백 */
-  .admin-farm-page { padding: 6px 8px; }
+  .admin-farm-page { padding: 4px 0; }
   .two-panel { flex-direction: column; gap: 12px; }
   .farm-list-panel { width: 100%; }
 }

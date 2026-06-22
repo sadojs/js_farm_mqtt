@@ -1297,7 +1297,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 
 /* 반응형 */
 @media (max-width: 600px) {
-  .page-container { padding: 6px 8px; }
+  .page-container { padding: 4px 0; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar-right { justify-content: space-between; }
   .search-box { max-width: 100%; }
