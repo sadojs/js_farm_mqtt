@@ -2003,8 +2003,10 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .btn-sm { padding: 0 18px; line-height: 1.8; }
   .btn-status-sm { padding: 0 18px; line-height: 1.8; }
   .type-tag { padding: 0 18px; line-height: 1.8; }
+  /* 카드 안쪽 콘텐츠 = 페이지 헤더(H2) = 모두 좌측 8px 동일 정렬.
+     카드 내부 좌우 padding 0 — 위·아래 padding 만 유지. */
   .group-card { padding: 0; }
-  .group-header { padding: 14px; }
-  .group-body { padding: 0 14px 14px; }
+  .group-header { padding: 14px 0; }
+  .group-body { padding: 0 0 14px; }
 }
 </style>
