@@ -51,8 +51,8 @@
         </label>
       </div>
       <p class="hint">
-        정산은 근무시작일 기준 매월 같은 날 마감됩니다.
-        <template v-if="form.startDate">({{ anchorDay }}일 시작 → 매월 {{ anchorDay }}일 정산)</template>
+        정산은 매월 1일~말일 기준으로 마감됩니다(다음 달 1일 정산).
+        <template v-if="form.startDate">(첫 달은 {{ startMD }}~말일, 이후 매월 1일~말일)</template>
       </p>
     </div>
 
@@ -147,8 +147,8 @@ const newAdvance = reactive({ date: new Date().toISOString().slice(0, 10), amoun
 const fixedTotal = computed(() =>
   form.fixedDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0),
 )
-const anchorDay = computed(() =>
-  form.startDate ? Number(form.startDate.slice(8, 10)) : 0,
+const startMD = computed(() =>
+  form.startDate ? `${Number(form.startDate.slice(5, 7))}/${Number(form.startDate.slice(8, 10))}` : '',
 )
 
 async function load() {

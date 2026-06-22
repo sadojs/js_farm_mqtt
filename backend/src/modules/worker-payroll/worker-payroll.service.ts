@@ -28,9 +28,6 @@ function addDays(s: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return fmt(d);
 }
-function daysInMonth(y: number, m1: number): number {
-  return new Date(Date.UTC(y, m1, 0)).getUTCDate();
-}
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -292,36 +289,36 @@ export class WorkerPayrollService {
 
   // ──── 정산 주기 계산 ────
 
+  /**
+   * 정산 주기 = 매월 1일 ~ 말일 (달력 월 기준).
+   * - 입사한 달(첫 정산): 입사일 ~ 그 달 말일 (예: 5/16 입사 → 5/16~5/31, 6/1부터 정산).
+   * - 그 이후: 매월 1일 ~ 말일 (6/1~6/30, 7/1~7/31 …).
+   *
+   * ref 날짜가 속한 정산 기간의 '시작일'을 반환.
+   */
   private currentPeriodStart(startDate: string, ref: string): string {
-    const anchorDay = parseDate(startDate).getUTCDate();
+    const s = parseDate(startDate);
     const r = parseDate(ref);
-    let y = r.getUTCFullYear();
-    let m = r.getUTCMonth() + 1;
-    const dim = daysInMonth(y, m);
-    const anchorThisMonth = Math.min(anchorDay, dim);
-    if (r.getUTCDate() >= anchorThisMonth) {
-      return fmt(new Date(Date.UTC(y, m - 1, anchorThisMonth)));
+    // 입사월(입사일과 같은 연·월)이면 입사일이 시작, 그 외엔 해당 월 1일
+    if (
+      r.getUTCFullYear() === s.getUTCFullYear() &&
+      r.getUTCMonth() === s.getUTCMonth()
+    ) {
+      return fmt(s);
     }
-    m -= 1;
-    if (m === 0) {
-      m = 12;
-      y -= 1;
-    }
-    const prevAnchor = Math.min(anchorDay, daysInMonth(y, m));
-    return fmt(new Date(Date.UTC(y, m - 1, prevAnchor)));
+    return fmt(new Date(Date.UTC(r.getUTCFullYear(), r.getUTCMonth(), 1)));
   }
 
-  private nextAnchor(startDate: string, periodStart: string): string {
-    const anchorDay = parseDate(startDate).getUTCDate();
+  /** 정산일(= 다음 기간 시작) = 기간 시작이 속한 달의 '다음 달 1일'. */
+  private nextAnchor(periodStart: string): string {
     const p = parseDate(periodStart);
     let y = p.getUTCFullYear();
-    let m = p.getUTCMonth() + 1 + 1;
+    let m = p.getUTCMonth() + 1 + 1; // periodStart 월의 다음 달 (1-based)
     if (m === 13) {
       m = 1;
       y += 1;
     }
-    const day = Math.min(anchorDay, daysInMonth(y, m));
-    return fmt(new Date(Date.UTC(y, m - 1, day)));
+    return fmt(new Date(Date.UTC(y, m - 1, 1)));
   }
 
   private resolvePeriod(worker: Worker, periodStart?: string) {
@@ -332,7 +329,7 @@ export class WorkerPayrollService {
     const firstPeriod = this.currentPeriodStart(worker.startDate, worker.startDate);
     if (parseDate(ps).getTime() < parseDate(firstPeriod).getTime()) ps = firstPeriod;
 
-    const settleDate = this.nextAnchor(worker.startDate, ps);
+    const settleDate = this.nextAnchor(ps);
     const periodEnd = addDays(settleDate, -1);
     const prevPeriodStart = this.currentPeriodStart(worker.startDate, addDays(ps, -1));
     const isFirst = parseDate(ps).getTime() <= parseDate(firstPeriod).getTime();
