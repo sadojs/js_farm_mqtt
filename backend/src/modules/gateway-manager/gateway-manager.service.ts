@@ -230,16 +230,27 @@ export class GatewayManagerService {
     }
 
     gw.houseId = house.id;
+    // 게이트웨이 소유자도 그룹 소유자(농장)로 함께 이관 — 자동제어룰 wizard 등에서
+    // user_id 필터로 인해 디바이스가 안 보이는 문제 방지.
+    // (이전: admin 으로 등록 후 다른 농장에 할당하면 devices.user_id 가 admin 으로 남아
+    //  대상 농장이 로그인해도 자신의 device 로 인식 못 함.)
+    const previousOwnerId = gw.userId;
+    gw.userId = group.userId;
     await this.gatewayRepo.save(gw);
 
-    // onboard device들의 house_id 동기화 — 새 zone(house)에 자동 매핑되어 구역관리/위저드에 즉시 표시
+    // onboard device들의 house_id + user_id 동기화 — 새 zone(house) 매핑 + 새 농장으로 이관
     // (devices.gateway_id / house_id 가 varchar이므로 명시적 cast)
     await this.gatewayRepo.manager.query(
-      `UPDATE devices SET house_id = $1::text WHERE gateway_id = $2::text AND source = 'onboard'`,
-      [house.id, gw.id],
+      `UPDATE devices SET house_id = $1::text, user_id = $2 WHERE gateway_id = $3::text AND source = 'onboard'`,
+      [house.id, group.userId, gw.id],
     ).catch((e) => {
-      this.logger.warn(`onboard device house_id sync 실패 (gateway=${gw.gatewayId}): ${e.message}`);
+      this.logger.warn(`onboard device sync 실패 (gateway=${gw.gatewayId}): ${e.message}`);
     });
+    if (previousOwnerId !== group.userId) {
+      this.logger.log(
+        `게이트웨이 소유자 이관 ${gw.gatewayId}: ${previousOwnerId} → ${group.userId} (그룹 ${group.id})`,
+      );
+    }
 
     return { ...gw, groupId: group.id, groupName: group.name };
   }

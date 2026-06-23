@@ -70,7 +70,7 @@
                     v-for="gw in unassignedFarmGateways(zone.id)"
                     :key="gw.id"
                     :value="gw.id"
-                  >{{ gw.name }} ({{ gw.agentStatus === 'online' ? '온라인' : '오프라인' }})</option>
+                  >{{ gw.name }} ({{ gw.agentStatus === 'online' ? '온라인' : '오프라인' }}){{ gw.userId !== selectedFarmId ? ` — 현 소유: ${ownerLabelOf(gw.userId)}` : '' }}</option>
                 </select>
                 <button class="btn-sm btn-danger" @click="removeZone(zone)">삭제</button>
               </div>
@@ -144,10 +144,6 @@ const selectedZones = computed(() =>
   allZones.value.filter(z => z.userId === selectedFarmId.value)
 )
 
-const farmGateways = computed(() =>
-  allGateways.value.filter(gw => gw.userId === selectedFarmId.value)
-)
-
 function zoneCountOf(farmId: string) {
   return allZones.value.filter(z => z.userId === farmId).length
 }
@@ -156,8 +152,17 @@ function gatewaysOfZone(zoneId: string): GatewayItem[] {
   return allGateways.value.filter(gw => gw.groupId === zoneId)
 }
 
+function ownerLabelOf(userId: string): string {
+  const fa = farmAdmins.value.find(f => f.id === userId)
+  if (fa) return fa.name || fa.username || ''
+  return '플랫폼 관리자'
+}
+
 function unassignedFarmGateways(_zoneId: string): GatewayItem[] {
-  return farmGateways.value.filter(gw => !gw.groupId)
+  // 미할당된 모든 게이트웨이 노출 — 다른 농장(또는 admin) 소유라도 가능.
+  // 할당 시 assignZone() 이 user_id 도 자동으로 새 농장으로 이관함.
+  // (이전: gw.userId === selectedFarmId 만 필터 → admin 등록 게이트웨이가 안 보이는 문제)
+  return allGateways.value.filter(gw => !gw.groupId)
 }
 
 async function loadAll() {
