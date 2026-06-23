@@ -70,6 +70,10 @@
         </span>
         <span class="rcpt-amount minus">−{{ formatMoney(a.amount, lang) }}</span>
       </div>
+      <div v-if="data.advances.length > 0" class="rcpt-row subtotal">
+        <span class="rcpt-label">{{ t(lang, 'advanceTotal') }}</span>
+        <span class="rcpt-amount minus">−{{ formatMoney(data.advanceTotal, lang) }}</span>
+      </div>
 
       <div class="rcpt-row net">
         <span class="rcpt-label">{{ t(lang, 'netPay') }}</span>
@@ -347,6 +351,14 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.6; }
+
+/* 가불 소계 — 가불 행들 다음에 굵게 표시 */
+.rcpt-row.subtotal {
+  background: var(--bg-hover);
+  font-weight: 700;
+}
+.rcpt-row.subtotal .rcpt-label,
+.rcpt-row.subtotal .rcpt-amount { font-weight: 700; }
 
 /* 일할 계산 사유 — 공제 항목 라벨 아래에 보조 텍스트로 작게 */
 .proration-reason {

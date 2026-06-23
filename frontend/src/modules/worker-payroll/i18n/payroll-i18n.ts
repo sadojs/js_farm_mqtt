@@ -51,6 +51,7 @@ type LabelKey =
   | 'exitNote'
   | 'terminated'
   | 'clear'
+  | 'advanceTotal'
 
 export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
   ko: {
@@ -93,6 +94,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     exitNote: '({date} 퇴사)',
     terminated: '퇴사',
     clear: '지우기',
+    advanceTotal: '가불 합계',
   },
   tl: {
     workDays: 'Araw ng trabaho',
@@ -134,6 +136,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     exitNote: '(Nagtapos {date})',
     terminated: 'Tapos na',
     clear: 'Burahin',
+    advanceTotal: 'Kabuuang paunang bayad',
   },
   th: {
     workDays: 'วันทำงาน',
@@ -175,6 +178,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     exitNote: '(สิ้นสุด {date})',
     terminated: 'สิ้นสุด',
     clear: 'ล้าง',
+    advanceTotal: 'รวมเบิกล่วงหน้า',
   },
   lo: {
     workDays: 'ມື້ເຮັດວຽກ',
@@ -216,6 +220,7 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     exitNote: '(ສິ້ນສຸດ {date})',
     terminated: 'ສິ້ນສຸດ',
     clear: 'ລ້າງ',
+    advanceTotal: 'ລວມເບີກລ່ວງໜ້າ',
   },
 }
 
