@@ -14,9 +14,23 @@
           </svg>
           새로고침
         </button>
+        <!--
+          [게이트웨이 수동(사전) 등록 버튼 — 2026-06 숨김 처리]
+          게이트웨이는 Pi 첫 부팅 시 자동 등록됩니다.
+          (백엔드 first-boot bootstrap: POST /api/config-deploy/register-tunnel-key →
+           machineId 기준으로 새 게이트웨이 자동 생성, config-deploy.service.ts 참고)
+          어차피 Pi를 켜고 설치 명령을 실행해야 사용이 시작되므로, 슬롯을 미리 만들어 둘
+          실익이 거의 없어 수동 등록 진입점을 가립니다.
+            • 자동 등록된 게이트웨이의 이름·소유 농장·연결 구역은
+              카드 케밥(⋮) → "편집"에서 수정합니다(아래 등록/편집 모달을 그대로 재사용).
+            • 향후 "사전 프로비저닝"(특정 gatewayId·농장·구역을 미리 배정)이 다시 필요하면
+              아래 버튼 주석만 해제하면 복구됩니다.
+              (showAddModal/editTarget/saveGateway 및 등록 모달 로직은 모두 보존되어 있음.)
+
         <button class="btn-primary" @click="showAddModal = true">
           <span class="plus-sign">+</span> 게이트웨이 등록
         </button>
+        -->
       </div>
     </header>
 
