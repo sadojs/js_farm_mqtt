@@ -14,6 +14,15 @@ const COOKIE_OPTIONS = {
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
   path: '/',
 };
+// 쿠키 삭제는 '설정 때와 동일한 속성'(httpOnly/secure/sameSite/path)을 줘야 한다.
+// 특히 iOS Safari 는 속성이 다르면 쿠키를 실제로 지우지 않아, 만료된 rft 가 남아
+// 다음 로그인을 방해(누적)한다 → 사용자가 수동으로 쿠키 삭제할 때까지 로그인 실패.
+const CLEAR_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
 
 @Controller('auth')
 export class AuthController {
@@ -38,7 +47,7 @@ export class AuthController {
     } catch (err) {
       // 만료/무효 토큰 — 쿠키 즉시 정리 (iOS Safari 가 httpOnly 쿠키 영구 보관해
       // 사용자가 수동으로 쿠키 삭제할 때까지 로그인 못 하는 문제 해결)
-      res.clearCookie(REFRESH_COOKIE, { path: '/' });
+      res.clearCookie(REFRESH_COOKIE, CLEAR_COOKIE_OPTIONS);
       throw err;
     }
   }
@@ -51,7 +60,7 @@ export class AuthController {
   @Post('clear-cookie')
   @SkipThrottle()
   async clearCookie(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(REFRESH_COOKIE, { path: '/' });
+    res.clearCookie(REFRESH_COOKIE, CLEAR_COOKIE_OPTIONS);
     return { ok: true };
   }
 
@@ -65,7 +74,7 @@ export class AuthController {
   ) {
     const token = req.cookies?.[REFRESH_COOKIE];
     await this.authService.logout(userId, token);
-    res.clearCookie(REFRESH_COOKIE, { path: '/' });
+    res.clearCookie(REFRESH_COOKIE, CLEAR_COOKIE_OPTIONS);
     return { ok: true };
   }
 
