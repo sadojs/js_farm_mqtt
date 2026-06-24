@@ -840,6 +840,9 @@ body {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+  /* 사이드바 메뉴를 끝까지 스크롤해도 본문(window)으로 스크롤이 전파되지 않도록 차단
+     (scroll chaining 방지 — 사이드바 위에서 스크롤하면 사이드바 안에서만 동작) */
+  overscroll-behavior: contain;
 }
 
 .sidebar-link {
