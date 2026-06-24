@@ -3,10 +3,14 @@ export type ElapsedTone = 'fresh' | 'mild' | 'amber' | 'red' | 'none'
 
 export function elapsedDays(lastDoneAt: string | null | undefined): number | null {
   if (!lastDoneAt) return null
-  const t = new Date(lastDoneAt).getTime()
-  if (isNaN(t)) return null
-  const now = Date.now()
-  return Math.floor((now - t) / 86400000)
+  const d = new Date(lastDoneAt)
+  if (isNaN(d.getTime())) return null
+  // 24시간 단위가 아니라 '달력 날짜(로컬 자정)' 기준으로 경과 일수를 센다.
+  // 어제 한 작업이면 오늘 몇 시든 1일, 오늘이면 0일. (자정이 지나면 +1)
+  const startOfLocalDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diff = startOfLocalDay(new Date()) - startOfLocalDay(d)
+  return Math.max(0, Math.round(diff / 86400000))
 }
 
 export function elapsedTone(days: number | null): ElapsedTone {

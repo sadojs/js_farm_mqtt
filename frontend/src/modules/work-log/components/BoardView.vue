@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
 import type { BoardCell, WorkTaskType } from '../types/work-log.types'
 import { TONE_COLORS, elapsedDays, elapsedTone } from '../utils/work-log.utils'
 
@@ -66,8 +67,25 @@ defineEmits<{
   (e: 'cell-click', zoneId: string, taskTypeId: string): void
 }>()
 
+// 경과일은 '지금'에 따라 바뀌므로, 탭 복귀·포커스·주기적으로 재계산을 트리거.
+// (화면을 열어둔 채 자정이 지나도 재로그인 없이 일수가 갱신되도록)
+const nowTick = ref(0)
+function bumpTick() { nowTick.value++ }
+let tickTimer: number | undefined
+onMounted(() => {
+  document.addEventListener('visibilitychange', bumpTick)
+  window.addEventListener('focus', bumpTick)
+  tickTimer = window.setInterval(bumpTick, 60000)
+})
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', bumpTick)
+  window.removeEventListener('focus', bumpTick)
+  if (tickTimer) clearInterval(tickTimer)
+})
+
 /** 한 칸의 표시 정보 (tone/색/텍스트) */
 function cell(zoneId: string, taskTypeId: string) {
+  void nowTick.value // 재계산 의존성(자정 경과·탭 복귀 시 갱신)
   const days = elapsedDays(props.board[`${zoneId}:${taskTypeId}`]?.lastDoneAt ?? null)
   const tone = elapsedTone(days)
   const c = TONE_COLORS[tone]
