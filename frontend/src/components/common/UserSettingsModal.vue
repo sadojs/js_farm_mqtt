@@ -57,7 +57,33 @@
             </button>
           </div>
 
-          <!-- 추후 기능 추가 시 여기에 삽입 -->
+          <!-- 부가기능: 농작업 일정 · 방재 일정 · 일꾼 관리 -->
+          <div
+            v-for="f in featureMeta"
+            :key="f.key"
+            class="feature-row"
+            :class="{ disabled: featureFlags[f.key]?.lockedByAdmin }"
+          >
+            <div class="feature-info">
+              <span class="feature-icon">{{ f.icon }}</span>
+              <div>
+                <span class="feature-name">{{ f.label }}</span>
+                <span v-if="featureFlags[f.key]?.lockedByAdmin" class="feature-locked">
+                  플랫폼 관리자에 의해 비활성화됨
+                </span>
+                <span v-else class="feature-desc">{{ f.desc }}</span>
+              </div>
+            </div>
+            <button
+              class="toggle-btn"
+              :class="{ on: featureFlags[f.key]?.userEnabled && !featureFlags[f.key]?.lockedByAdmin }"
+              :disabled="featureFlags[f.key]?.lockedByAdmin"
+              @click="$emit('toggle-feature', f.key)"
+              :aria-label="`${f.label} ${featureFlags[f.key]?.userEnabled ? '끄기' : '켜기'}`"
+            >
+              <span class="toggle-knob" />
+            </button>
+          </div>
         </section>
       </div>
     </div>
@@ -65,11 +91,14 @@
 </template>
 
 <script setup lang="ts">
+import { FEATURE_META, type FeatureKey, type FeatureState } from '../../composables/useFeatureFlags'
+
 defineProps<{
   fontSize: string
   theme: string
   isFarmAdmin: boolean
   cropFeature: { enabled: boolean; platformEnabled: boolean; userEnabled: boolean; lockedByAdmin: boolean }
+  featureFlags: Record<FeatureKey, FeatureState>
 }>()
 
 defineEmits<{
@@ -77,7 +106,10 @@ defineEmits<{
   'set-font': [size: 'sm' | 'md' | 'lg']
   'set-theme': [mode: 'light' | 'dark']
   'toggle-crop': []
+  'toggle-feature': [key: FeatureKey]
 }>()
+
+const featureMeta = FEATURE_META
 </script>
 
 <style scoped>

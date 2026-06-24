@@ -205,25 +205,46 @@
             <div v-else-if="selectedUser.role === 'farm_user'" class="info-note">
               소속 농장({{ selectedUser.parentUserName || '미지정' }}) 관리자의 설정을 상속합니다.
             </div>
-            <div v-else class="feature-card">
-              <div class="feature-info">
-                <span class="feature-icon" aria-hidden="true">🌱</span>
-                <div class="feature-text">
-                  <span class="feature-title">생육관리</span>
-                  <span class="feature-desc">GDD 생육 추적 모듈</span>
+            <template v-else>
+              <div class="feature-card">
+                <div class="feature-info">
+                  <span class="feature-icon" aria-hidden="true">🌱</span>
+                  <div class="feature-text">
+                    <span class="feature-title">생육관리</span>
+                    <span class="feature-desc">GDD 생육 추적 모듈</span>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  class="toggle-btn"
+                  :class="{ on: cropFeatureMap[selectedUser.id] !== false }"
+                  @click="toggleUserCropFeature(selectedUser)"
+                  :aria-pressed="cropFeatureMap[selectedUser.id] !== false"
+                  :title="cropFeatureMap[selectedUser.id] !== false ? '끄기' : '켜기'"
+                >
+                  <span class="toggle-knob" />
+                </button>
               </div>
-              <button
-                type="button"
-                class="toggle-btn"
-                :class="{ on: cropFeatureMap[selectedUser.id] !== false }"
-                @click="toggleUserCropFeature(selectedUser)"
-                :aria-pressed="cropFeatureMap[selectedUser.id] !== false"
-                :title="cropFeatureMap[selectedUser.id] !== false ? '끄기' : '켜기'"
-              >
-                <span class="toggle-knob" />
-              </button>
-            </div>
+              <div v-for="f in featureMeta" :key="f.key" class="feature-card">
+                <div class="feature-info">
+                  <span class="feature-icon" aria-hidden="true">{{ f.icon }}</span>
+                  <div class="feature-text">
+                    <span class="feature-title">{{ f.label }}</span>
+                    <span class="feature-desc">{{ f.desc }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="toggle-btn"
+                  :class="{ on: userFeatureStates[f.key]?.userEnabled !== false }"
+                  @click="toggleUserFeature(selectedUser.id, f.key)"
+                  :aria-pressed="userFeatureStates[f.key]?.userEnabled !== false"
+                  :title="userFeatureStates[f.key]?.userEnabled !== false ? '끄기' : '켜기'"
+                >
+                  <span class="toggle-knob" />
+                </button>
+              </div>
+            </template>
           </div>
 
           <!-- 소속 농장 사용자 (farm_admin) -->
@@ -375,6 +396,7 @@ import { userApi } from '../api/user.api'
 import { gatewayApi } from '../api/gateway.api'
 import { useAuthStore } from '../stores/auth.store'
 import apiClient from '../api/client'
+import { FEATURE_META, type FeatureKey, type FeatureState } from '../composables/useFeatureFlags'
 
 const cropFeatureMap = ref<Record<string, boolean>>({})
 
@@ -395,6 +417,29 @@ async function toggleUserCropFeature(user: { id: string }) {
     cropFeatureMap.value = { ...cropFeatureMap.value, [user.id]: next }
   } catch (err) {
     console.error('생육관리 설정 변경 실패:', err)
+  }
+}
+
+// ── 부가기능(농작업·방재·일꾼) 사용자별 권한 ──
+const featureMeta = FEATURE_META
+const userFeatureStates = ref<Record<string, FeatureState>>({})
+
+async function loadUserFeatureStates(userId: string) {
+  try {
+    const { data } = await apiClient.get<Record<string, FeatureState>>(`/features/users/${userId}`)
+    userFeatureStates.value = data
+  } catch {
+    userFeatureStates.value = {}
+  }
+}
+async function toggleUserFeature(userId: string, feature: FeatureKey) {
+  const current = userFeatureStates.value[feature]?.userEnabled !== false
+  const next = !current
+  try {
+    await apiClient.patch(`/features/${feature}/users/${userId}`, { enabled: next })
+    await loadUserFeatureStates(userId)
+  } catch (err) {
+    console.error('기능 설정 변경 실패:', err)
   }
 }
 
@@ -657,6 +702,12 @@ const childrenOfSelected = computed<User[]>(() => {
   if (!selectedUser.value) return []
   return users.value.filter(u => u.parentUserId === selectedUser.value!.id)
 })
+
+// 선택된 농장 관리자의 부가기능 권한 상태 로드
+watch(selectedUser, (u) => {
+  if (u && u.role === 'farm_admin') loadUserFeatureStates(u.id)
+  else userFeatureStates.value = {}
+}, { immediate: true })
 
 const userGateways = computed<any[]>(() => {
   if (!selectedUser.value) return []

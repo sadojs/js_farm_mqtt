@@ -33,6 +33,7 @@ import { SprayScheduleModule } from './modules/spray-schedule/spray-schedule.mod
 import { WorkerPayrollModule } from './modules/worker-payroll/worker-payroll.module';
 import { WorkLogModule } from './modules/work-log/work-log.module';
 import { ZoneNotesModule } from './modules/zone-notes/zone-notes.module';
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { RetentionService } from './common/retention.service';
 
 @Module({
@@ -78,6 +79,7 @@ import { RetentionService } from './common/retention.service';
     FallbackConfigModule,
     SprayScheduleModule,
     ZoneNotesModule,
+    FeatureFlagsModule,
     WorkerPayrollModule,
     WorkLogModule,
   ],
