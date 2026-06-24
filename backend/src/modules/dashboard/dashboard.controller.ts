@@ -14,7 +14,7 @@ export class DashboardController {
   @Get('weather')
   getWeather(@CurrentUser() user: any) {
     const effectiveUserId = user.role === 'farm_user' && user.parentUserId ? user.parentUserId : user.id;
-    return this.dashboardService.getWeatherForUser(effectiveUserId);
+    return this.dashboardService.getWeatherCached(effectiveUserId);
   }
 
   @Get('widgets')

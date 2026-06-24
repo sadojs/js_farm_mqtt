@@ -19,6 +19,8 @@ export interface DashboardWeatherResponse {
     condition: string
   }
   fetchedAt: string
+  /** true면 KMA 실시간 호출 실패로 마지막 저장값(지연 데이터)을 표시 중 */
+  stale?: boolean
   source: {
     baseDate: string
     baseTime: string

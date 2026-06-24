@@ -7,6 +7,7 @@ import * as path from 'path';
 import { User } from '../users/entities/user.entity';
 import { Device } from '../devices/entities/device.entity';
 import { SensorData } from '../sensors/entities/sensor-data.entity';
+import { WeatherData } from '../weather/weather-data.entity';
 
 interface PositionEntry {
   code: string;
@@ -35,6 +36,8 @@ export class DashboardService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Device)
     private readonly devicesRepo: Repository<Device>,
+    @InjectRepository(WeatherData)
+    private readonly weatherRepo: Repository<WeatherData>,
     private readonly dataSource: DataSource,
   ) {
     const filePath = path.join(process.cwd(), 'src/modules/dashboard/position.json');
@@ -109,6 +112,88 @@ export class DashboardService {
         baseDate,
         baseTime,
         endpoint: 'getUltraSrtNcst',
+      },
+    };
+  }
+
+  /**
+   * 대시보드용 날씨 조회 — DB 캐시 우선 (KMA 직접 호출 최소화 + 429/타임아웃에도 500 안 남).
+   *  1) 최근(90분 이내) 저장된 WeatherData가 있으면 그대로 반환 → KMA 호출 안 함.
+   *  2) 없거나 오래됐으면 KMA 실시간 호출 후 그 값 반환 (수집기가 시간별로 별도 저장).
+   *  3) 실시간 호출이 429/타임아웃 등으로 실패하면 → 저장된 마지막 값으로 폴백(stale=true).
+   *     저장값조차 없으면 503(안내 메시지). 주소 미설정 등 설정성 오류(404)는 그대로 전달.
+   */
+  async getWeatherCached(userId: string) {
+    const FRESH_MS = 90 * 60 * 1000;
+
+    const latest = await this.weatherRepo.findOne({
+      where: { userId },
+      order: { time: 'DESC' },
+    });
+
+    const isFresh =
+      !!latest && Date.now() - new Date(latest.time).getTime() <= FRESH_MS;
+
+    if (isFresh) {
+      return this.buildResponseFromStored(userId, latest!, false);
+    }
+
+    try {
+      return await this.getWeatherForUser(userId);
+    } catch (err) {
+      // 주소 미설정/좌표 없음/키 미설정 등은 일시 오류가 아니므로 그대로 안내
+      if (err instanceof NotFoundException) throw err;
+
+      if (latest) {
+        this.logger.warn(
+          `날씨 실시간 조회 실패 → 저장값으로 폴백 [${userId}]: ${err?.message ?? err}`,
+        );
+        return this.buildResponseFromStored(userId, latest, true);
+      }
+      this.logger.warn(
+        `날씨 조회 실패, 캐시 없음 [${userId}]: ${err?.message ?? err}`,
+      );
+      throw new ServiceUnavailableException(
+        '날씨 정보를 일시적으로 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    }
+  }
+
+  /** 저장된 WeatherData 한 행을 대시보드 응답 형태로 변환 */
+  private async buildResponseFromStored(
+    userId: string,
+    row: WeatherData,
+    stale: boolean,
+  ) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    const address = user?.address ?? '';
+    const position = address ? this.findBestPosition(address) : null;
+
+    return {
+      location: {
+        address,
+        level1: position?.level1 ?? '',
+        level2: position?.level2 ?? '',
+        level3: position?.level3 ?? '',
+        nx: row.nx ?? position?.nx ?? 0,
+        ny: row.ny ?? position?.ny ?? 0,
+        longitude: position?.longitude ?? 0,
+        latitude: position?.latitude ?? 0,
+      },
+      weather: {
+        temperature: row.temperature != null ? Number(row.temperature) : null,
+        humidity: row.humidity != null ? Number(row.humidity) : null,
+        precipitation:
+          row.precipitation != null ? Number(row.precipitation) : null,
+        windSpeed: row.windSpeed != null ? Number(row.windSpeed) : null,
+        condition: row.condition ?? 'clear',
+      },
+      fetchedAt: new Date(row.time).toISOString(),
+      stale,
+      source: {
+        baseDate: '',
+        baseTime: '',
+        endpoint: 'weather_data(cache)',
       },
     };
   }
