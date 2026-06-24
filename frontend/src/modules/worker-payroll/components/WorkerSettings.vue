@@ -111,13 +111,27 @@
     <div class="card">
       <h3 class="card-title">④ 가불 내역</h3>
       <template v-if="workerId">
-        <div v-for="adv in advances" :key="adv.id" class="line-row">
-          <input :value="adv.date" type="date" class="inp" disabled />
-          <input :value="adv.amount.toLocaleString()" class="inp amount" disabled />
-          <span class="adv-note">{{ adv.note || '—' }}</span>
-          <button class="btn-icon danger" @click="removeAdvance(adv.id)">−</button>
+        <p v-if="advances.length === 0" class="hint">아직 가불 내역이 없습니다.</p>
+
+        <!-- 월별 그룹 (접기/펼치기) — 최근 달이 위, 기본은 최근 달만 펼침 -->
+        <div v-for="grp in advanceMonths" :key="grp.month" class="adv-month">
+          <button type="button" class="adv-month-head" @click="toggleMonth(grp.month)">
+            <span class="adv-caret">{{ isMonthOpen(grp.month) ? '▾' : '▸' }}</span>
+            <span class="adv-month-label">{{ grp.label }}</span>
+            <span class="adv-month-meta">{{ grp.items.length }}건 · {{ grp.total.toLocaleString() }}원</span>
+          </button>
+          <div v-show="isMonthOpen(grp.month)" class="adv-month-body">
+            <div v-for="adv in grp.items" :key="adv.id" class="line-row">
+              <input :value="adv.date" type="date" class="inp" disabled />
+              <input :value="adv.amount.toLocaleString()" class="inp amount" disabled />
+              <span class="adv-note">{{ adv.note || '—' }}</span>
+              <button class="btn-icon danger" @click="removeAdvance(adv.id)">−</button>
+            </div>
+          </div>
         </div>
-        <div class="line-row">
+
+        <!-- 가불 추가 -->
+        <div class="line-row adv-add-row">
           <input v-model="newAdvance.date" type="date" class="inp" />
           <input v-model.number="newAdvance.amount" type="number" min="0" step="10000" class="inp amount" placeholder="금액" />
           <input v-model="newAdvance.note" class="inp flex" placeholder="메모 (예: 병원비)" />
@@ -170,6 +184,47 @@ const startMD = computed(() =>
   form.startDate ? `${Number(form.startDate.slice(5, 7))}/${Number(form.startDate.slice(8, 10))}` : '',
 )
 
+// ── 가불 내역 월별 그룹 + 접기/펼치기 ──
+const expandedMonths = ref<Set<string>>(new Set())
+
+const advanceMonths = computed(() => {
+  const groups: Record<string, Advance[]> = {}
+  for (const a of advances.value) {
+    const m = (a.date || '').slice(0, 7)
+    if (!m) continue
+    ;(groups[m] ||= []).push(a)
+  }
+  return Object.keys(groups)
+    .sort((a, b) => (a < b ? 1 : -1)) // 최근 달 먼저
+    .map((month) => {
+      const items = groups[month]
+        .slice()
+        .sort((a, b) => (a.date < b.date ? 1 : -1)) // 달 안에서도 최근 날짜 먼저
+      const [y, mm] = month.split('-')
+      return {
+        month,
+        label: `${Number(y)}년 ${Number(mm)}월`,
+        items,
+        total: items.reduce((s, a) => s + (Number(a.amount) || 0), 0),
+      }
+    })
+})
+
+function isMonthOpen(month: string): boolean {
+  return expandedMonths.value.has(month)
+}
+function toggleMonth(month: string) {
+  const next = new Set(expandedMonths.value)
+  if (next.has(month)) next.delete(month)
+  else next.add(month)
+  expandedMonths.value = next
+}
+/** 기본 펼침: 가장 최근 달만 */
+function defaultExpandLatest() {
+  const months = [...new Set(advances.value.map((a) => (a.date || '').slice(0, 7)).filter(Boolean))].sort()
+  expandedMonths.value = months.length ? new Set([months[months.length - 1]]) : new Set()
+}
+
 async function load() {
   if (!props.workerId) {
     form.name = ''
@@ -184,6 +239,7 @@ async function load() {
     form.variableDeductions = []
     accountUsername.value = null
     advances.value = []
+    expandedMonths.value = new Set()
     return
   }
   const w = await workerPayrollApi.getWorker(props.workerId)
@@ -202,6 +258,7 @@ async function load() {
     .map((d) => ({ id: d.id, label: d.label }))
   accountUsername.value = w.username ?? null
   advances.value = await workerPayrollApi.listAdvances(props.workerId)
+  defaultExpandLatest()
 }
 
 watch(() => props.workerId, load)
@@ -277,6 +334,7 @@ async function addAdvance() {
     notify.warning('일꾼 관리', '가불 금액을 입력해 주세요.')
     return
   }
+  const addedMonth = newAdvance.date.slice(0, 7)
   try {
     await workerPayrollApi.addAdvance(props.workerId, {
       date: newAdvance.date,
@@ -284,6 +342,8 @@ async function addAdvance() {
       note: newAdvance.note.trim() || undefined,
     })
     advances.value = await workerPayrollApi.listAdvances(props.workerId)
+    // 방금 추가한 달은 펼쳐서 바로 보이게
+    expandedMonths.value = new Set(expandedMonths.value).add(addedMonth)
     newAdvance.date = new Date().toISOString().slice(0, 10)
     newAdvance.amount = 0
     newAdvance.note = ''
@@ -339,6 +399,21 @@ async function removeAdvance(id: string) {
 .flex { flex: 1 1 120px; min-width: 0; }
 .line-row .amount { flex: 0 1 130px; text-align: right; font-variant-numeric: tabular-nums; }
 .adv-note { flex: 1 1 120px; min-width: 0; color: var(--text-secondary); font-size: var(--font-size-caption); }
+
+/* 가불 내역 월별 그룹 (접기/펼치기) */
+.adv-month { border: 1px solid var(--border-input); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.adv-month-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 12px; border: none; background: var(--bg-hover);
+  cursor: pointer; text-align: left; color: var(--text-primary);
+  font-size: var(--font-size-label); font-weight: 700;
+}
+.adv-month-head:hover { background: var(--bg-active); }
+.adv-caret { width: 14px; flex: 0 0 auto; color: var(--text-muted); font-size: 12px; }
+.adv-month-label { flex: 1 1 auto; }
+.adv-month-meta { flex: 0 0 auto; font-size: var(--font-size-caption); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.adv-month-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+.adv-add-row { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-input); }
 .btn-icon {
   width: 32px;
   height: 36px;
