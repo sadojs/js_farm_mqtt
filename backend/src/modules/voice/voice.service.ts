@@ -7,6 +7,9 @@ import { DevicesService } from '../devices/devices.service';
 import { AutomationService } from '../automation/automation.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { SensorAlertsService } from '../sensor-alerts/sensor-alerts.service';
+import { SprayScheduleService } from '../spray-schedule/spray-schedule.service';
+import { WorkLogService } from '../work-log/work-log.service';
+import { GroupsService } from '../groups/groups.service';
 import { MidForecastService } from './mid-forecast.service';
 
 interface AuthUser {
@@ -34,6 +37,9 @@ export class VoiceService {
     private automationService: AutomationService,
     private dashboardService: DashboardService,
     private sensorAlertsService: SensorAlertsService,
+    private sprayScheduleService: SprayScheduleService,
+    private workLogService: WorkLogService,
+    private groupsService: GroupsService,
     private midForecast: MidForecastService,
   ) {}
 
@@ -195,6 +201,18 @@ export class VoiceService {
       ? context.recentAlerts.map((a) => `  - ${a.time} | ${a.deviceName} | ${a.sensorType} | ${a.alertType} | ${a.severity} | ${a.message}${a.resolved ? ' (해결됨)' : ''}`).join('\n')
       : '  (최근 알림 없음)';
 
+    const sprayInfo = (context.spraySchedule || []).length > 0
+      ? context.spraySchedule.map((s: any) => {
+          if (s.kind === 'bee_open') return `  - ${s.date} | ${s.zoneName ?? '-'} | 🐝 벌문 개방`;
+          const tod = s.timeOfDay === 'am' ? '오전' : s.timeOfDay === 'pm' ? '오후' : '';
+          return `  - ${s.date} | ${s.zoneName ?? '-'} | ${s.pest ?? ''}${s.round ? ' ' + s.round + '차' : ''}${tod ? ' (' + tod + ')' : ''}${s.product ? ' | ' + s.product : ''}`;
+        }).join('\n')
+      : '  (오늘~7일 내 방재일정 없음)';
+
+    const workInfo = (context.workBoard || []).length > 0
+      ? context.workBoard.map((w: any) => `  - ${w.task} | ${w.zoneName} | ${w.elapsedDays}일 전 (마지막 ${w.lastDoneAt})`).join('\n')
+      : '  (농작업 기록 없음)';
+
     const now = new Date();
     const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const currentTime = `${kstTime.getUTCFullYear()}-${String(kstTime.getUTCMonth() + 1).padStart(2, '0')}-${String(kstTime.getUTCDate()).padStart(2, '0')} ${String(kstTime.getUTCHours()).padStart(2, '0')}:${String(kstTime.getUTCMinutes()).padStart(2, '0')} KST`;
@@ -228,6 +246,12 @@ ${alertInfo}
 
 오늘 자동화 실행 로그:
 ${logInfo}
+
+방재일정 (오늘~7일, 약품/벌문 개방):
+${sprayInfo}
+
+농작업 상태 (구역별 작업 마지막 경과일, 오래된 순):
+${workInfo}
 
 === 실행 규칙 ===
 
@@ -264,6 +288,16 @@ ${logInfo}
 
 과거형 = 이력 질문:
 - "돌렸어?", "켰어?" → 오늘 로그 확인. 절대 제어 명령 아님.
+
+방재일정 질문 (위 '방재일정' 데이터로 chat 답변):
+- "오늘 방재 있어?", "이번주 방재 언제야?", "벌문 언제 열어?" → 날짜·구역·약품을 알려줌
+- 데이터에 없으면 "예정된 방재일정이 없다"고 답해
+
+농작업 질문 (위 '농작업 상태' 데이터로 chat 답변):
+- "순지르기(하엽 제거 등) 가장 오래된 구역 어디야?", "어느 구역이 작업한 지 제일 오래됐어?"
+  → 해당 작업의 경과일이 가장 큰 구역을 알려줌 (목록은 오래된 순 정렬됨)
+- "현호하우스 마지막 점검 언제야?" → 그 구역·작업의 경과일/날짜로 답
+- 전부 chat 액션으로만 답한다(이 기능들은 제어/생성 액션 없음).
 
 === AI 조언 역할 ===
 
@@ -608,6 +642,51 @@ ${logInfo}
       (f: any) => f.skyAm || f.minTemp != null,
     );
 
+    // ── 방재일정(spray) + 농작업 상태(work board) 수집 (KST 기준) ──
+    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const ymd = (d: Date) =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    const todayKst = ymd(kstNow);
+    const weekKst = ymd(new Date(kstNow.getTime() + 7 * 86400000));
+    const kstDayNum = (iso: string) => {
+      const k = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
+      return Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate());
+    };
+    const todayDayNum = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
+
+    const workUser = { id: effectiveUserId, role: 'admin' as const };
+    const [sprayRaw, boardRows, taskTypes, groups] = await Promise.all([
+      this.sprayScheduleService.getEvents(effectiveUserId, todayKst, weekKst).catch(() => [] as any[]),
+      this.workLogService.boardMatrix(workUser).catch(() => [] as any[]),
+      this.workLogService.listTaskTypes(workUser).catch(() => [] as any[]),
+      this.groupsService.findAllGroups(effectiveUserId).catch(() => [] as any[]),
+    ]);
+
+    const spraySchedule = (sprayRaw || []).map((e: any) => ({
+      date: e.date,
+      zoneName: e.zoneName,
+      pest: e.pest,
+      product: e.product,
+      kind: e.kind, // 'spray' | 'bee_open'
+      round: e.round,
+      timeOfDay: e.timeOfDay, // 'am' | 'pm'
+    }));
+
+    const taskMap: Record<string, string> = Object.fromEntries(
+      (taskTypes || []).map((t: any) => [t.id, t.label]),
+    );
+    const zoneMap: Record<string, string> = Object.fromEntries(
+      (groups || []).map((g: any) => [g.id, g.name]),
+    );
+    const workBoard = (boardRows || [])
+      .map((r: any) => ({
+        zoneName: zoneMap[r.zoneId] || '(구역)',
+        task: taskMap[r.taskTypeId] || '(작업)',
+        lastDoneAt: (r.lastDoneAt || '').slice(0, 10),
+        elapsedDays: Math.max(0, Math.round((todayDayNum - kstDayNum(r.lastDoneAt)) / 86400000)),
+      }))
+      .sort((a, b) => b.elapsedDays - a.elapsedDays); // 오래된 작업 먼저
+
     // 최근 알림 가공
     const recentAlerts = (alertsResult.data || []).slice(0, 10).map((a: any) => ({
       time: new Date(a.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -630,6 +709,8 @@ ${logInfo}
       midForecast: midForecasts,
       todayLogs,
       recentAlerts,
+      spraySchedule,
+      workBoard,
       aliases: this.formatAliases(user?.voiceAliases),
     };
   }

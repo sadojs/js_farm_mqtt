@@ -13,5 +13,6 @@ import { SprayScheduleController } from './spray-schedule.controller';
   ],
   controllers: [SprayScheduleController],
   providers: [SprayScheduleService],
+  exports: [SprayScheduleService],
 })
 export class SprayScheduleModule {}

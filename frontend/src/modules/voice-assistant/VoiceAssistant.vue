@@ -109,7 +109,7 @@ const panelOpen = ref(false)
 const textInput = ref('')
 const isSpeaking = ref(false)
 const messagesEl = ref<HTMLElement | null>(null)
-const fabCollapsed = ref(false)
+const fabCollapsed = ref(true) // 기본은 접힌 상태(아이콘만) — 탭하면 펼쳐짐
 
 // 스와이프 접기
 let touchStartX = 0
