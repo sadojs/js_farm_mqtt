@@ -117,7 +117,8 @@ const emit = defineEmits<{
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const today = todayStr()
 
-const cursor = ref(props.initialDate ? parseDate(props.initialDate) : new Date())
+// 기본 표시 월은 '로컬 오늘' 기준 (new Date()를 getUTC*로 읽으면 KST 새벽에 월이 틀어질 수 있음)
+const cursor = ref(parseDate(props.initialDate ? props.initialDate : todayStr()))
 const year = computed(() => cursor.value.getUTCFullYear())
 const month = computed(() => cursor.value.getUTCMonth() + 1)
 const monthFirst = computed(() => fmt(new Date(Date.UTC(year.value, month.value - 1, 1))))

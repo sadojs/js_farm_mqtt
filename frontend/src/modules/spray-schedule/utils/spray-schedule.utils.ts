@@ -12,8 +12,10 @@ export function addDays(s: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days)
   return fmt(d)
 }
+/** 오늘(로컬 달력 날짜) 'YYYY-MM-DD'. toISOString(UTC)을 쓰면 KST 새벽엔 하루 전이 됨 */
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 /** 약품 마지막 방재일 = 시작일 + 간격×(횟수-1) */
