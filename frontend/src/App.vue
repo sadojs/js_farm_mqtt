@@ -1183,6 +1183,12 @@ body {
 
 #app.has-sidebar .main-content {
   margin-left: 260px;
+  /* app-shell: 사이드바는 고정(position:fixed)이고 본문만 독립 스크롤.
+     본문을 자체 스크롤 영역으로 만들어, 본문 위에서 휠 시 항상 본문이 스크롤되고
+     사이드바 스크롤과 서로 간섭(전파)하지 않도록 한다. */
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* ========== 모바일 헤더 ========== */
@@ -1212,6 +1218,9 @@ body {
   #app.has-sidebar .main-content {
     margin-left: 0;
     padding-top: 60px;
+    /* 모바일은 사이드바가 없으므로 본문 pane 스크롤을 해제하고 일반 페이지(window) 스크롤 사용 */
+    height: auto;
+    overflow-y: visible;
   }
 
   .mobile-header {
