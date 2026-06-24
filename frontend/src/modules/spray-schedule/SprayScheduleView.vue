@@ -16,15 +16,22 @@
         <p>아직 방재 구역이 없습니다.</p>
         <button class="btn-primary" @click="tab = 'setup'">방재일정 설정하기</button>
       </div>
-      <SprayCalendar
-        v-else
-        :events="events"
-        :markers="markers"
-        @move="onMoveRequest"
-        @select="onSelect"
-        @add-single="openManual"
-        @day-click="onDayClick"
-      />
+      <template v-else>
+        <div class="brief-bar">
+          <button class="btn-brief" @click="speakBriefing" :disabled="briefing">
+            <span class="brief-ico">📢</span>{{ briefing ? '브리핑 중…' : '3일 브리핑 듣기' }}
+          </button>
+          <span class="brief-hint">오늘·내일·모레 방재/벌문 개방 음성 안내</span>
+        </div>
+        <SprayCalendar
+          :events="events"
+          :markers="markers"
+          @move="onMoveRequest"
+          @select="onSelect"
+          @add-single="openManual"
+          @day-click="onDayClick"
+        />
+      </template>
     </section>
 
     <section v-show="tab === 'setup'">
@@ -118,6 +125,60 @@ const dayDate = ref<string>('')
 const dayEvents = computed(() =>
   events.value.filter((ev) => ev.date === dayDate.value),
 )
+
+// ── 3일 브리핑 (오늘·내일·모레) 음성 안내 ──
+const briefing = ref(false)
+
+/** offset일 뒤 로컬 날짜 'YYYY-MM-DD' (이벤트 date 포맷과 동일) */
+function localYmd(offsetDays: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function describeEvent(e: SprayEvent): string {
+  const zone = e.zoneName ?? '구역'
+  if (e.kind === 'bee_open') return `${zone} 벌문 개방`
+  const tod = e.timeOfDay === 'am' ? '오전' : e.timeOfDay === 'pm' ? '오후' : ''
+  const round = e.isManual ? '' : `${e.round}차`
+  return `${zone} ${e.pest ?? ''} ${round} ${tod} 방재`.replace(/\s+/g, ' ').trim()
+}
+
+function buildBriefing(): string {
+  const labels = ['오늘', '내일', '모레']
+  const lines: string[] = []
+  for (let i = 0; i < 3; i++) {
+    const ds = localYmd(i)
+    const [, mm, dd] = ds.split('-')
+    const dayLabel = `${labels[i]} ${Number(mm)}월 ${Number(dd)}일`
+    const evs = events.value
+      .filter((e) => e.date === ds)
+      .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'spray' ? -1 : 1))
+    if (evs.length === 0) {
+      lines.push(`${dayLabel}은 예정된 방재가 없습니다.`)
+    } else {
+      lines.push(`${dayLabel}은 ${evs.map(describeEvent).join(', ')} 예정입니다.`)
+    }
+  }
+  return `방재 3일 브리핑입니다. ${lines.join(' ')}`
+}
+
+function speakBriefing() {
+  const text = buildBriefing()
+  notify.info('방재 브리핑', text)
+  if (!('speechSynthesis' in window)) {
+    notify.warning('방재 브리핑', '이 브라우저는 음성 안내를 지원하지 않습니다. 위 알림 내용을 확인하세요.')
+    return
+  }
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'ko-KR'
+  u.rate = 1.0
+  briefing.value = true
+  u.onend = () => { briefing.value = false }
+  u.onerror = () => { briefing.value = false }
+  window.speechSynthesis.speak(u)
+}
 
 async function reloadCalendar() {
   const [evs, mks] = await Promise.all([
@@ -267,6 +328,35 @@ onMounted(reloadCalendar)
   padding: 10px 20px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* 3일 브리핑 바 */
+.brief-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.btn-brief {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: var(--font-size-label);
+  cursor: pointer;
+}
+.btn-brief:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.btn-brief:disabled { opacity: 0.6; cursor: default; }
+.brief-ico { font-size: 16px; }
+.brief-hint { color: var(--text-muted); font-size: var(--font-size-caption); }
+@media (max-width: 480px) {
+  .brief-hint { flex: 1 1 100%; }
 }
 .modal-overlay {
   position: fixed;
