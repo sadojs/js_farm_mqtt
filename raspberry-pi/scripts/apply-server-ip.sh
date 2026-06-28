@@ -22,13 +22,16 @@ mkdir -p /var/log/smart-farm /etc/smartfarm
 
 emit() { printf '%s\n' "$1"; exit 0; }
 
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-  emit '{"ok":false,"status":"failed","detail":"usage: apply-server-ip.sh <server-ip-or-fqdn> [bootstrap-token]"}'
+if [ "$#" -lt 1 ] || [ "$#" -gt 4 ]; then
+  emit '{"ok":false,"status":"failed","detail":"usage: apply-server-ip.sh <server-ip-or-fqdn> [bootstrap-token] [ssid] [psk]"}'
 fi
 
 NEW="$1"
 # 선택: 새 서버용 bootstrap 토큰 (서버마다 BOOTSTRAP_TOKEN 다름 → 재등록 401 방지)
 NEW_TOKEN="${2:-}"
+# 선택: 새 망 WiFi (HQ/개발망 → 농장/프로덕션망 전환 시 함께 변경)
+SSID="${3:-}"
+PSK="${4:-}"
 # IPv4 또는 FQDN 검증
 IPV4_RE='^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$'
 FQDN_RE='^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
@@ -41,6 +44,15 @@ if [ -f /etc/smartfarm/server-ip ]; then
   OLD="$(cat /etc/smartfarm/server-ip 2>/dev/null || true)"
 fi
 echo "=== $(date -Iseconds) server-ip ${OLD} -> ${NEW} ===" >&2
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# 0. (선택) WiFi 동시 변경 — HQ/개발망 → 농장/프로덕션망 전환 시 새 망으로 먼저 붙어야
+#    새 서버에 등록이 가능하다. ssid/psk 가 함께 오면 apply-wifi.sh 로 적용(실패해도 진행).
+if [ -n "$SSID" ] && [ -n "$PSK" ] && [ -x "${SELF_DIR}/apply-wifi.sh" ]; then
+  echo "==> WiFi 변경: ${SSID}" >&2
+  timeout 90 bash "${SELF_DIR}/apply-wifi.sh" "$SSID" "$PSK" >&2 || echo "apply-wifi 실패/타임아웃(계속 진행)" >&2
+fi
 
 # 1. 마커
 echo -n "$NEW" > /etc/smartfarm/server-ip
@@ -56,6 +68,10 @@ fi
 #      리셋해 깨끗이 자동 등록되게 한다. (같은 서버면 register 가 machineId 로 기존 레코드를 찾아
 #      기존 ID 를 그대로 반환하므로 안전)
 echo -n "lgw-default" > /etc/smartfarm/gateway-id
+
+# 1-d. 배포(config) agent 등록 상태 초기화 — first-boot 마커 제거.
+#      새 서버에선 미등록이므로 '처음 등록'처럼 취급되어야 한다.
+rm -f /var/lib/smartfarm/.first-boot-done
 
 # 2. Z2M configuration.yaml — mqtt.server 치환
 Z2M_CFG="/opt/zigbee2mqtt/data/configuration.yaml"

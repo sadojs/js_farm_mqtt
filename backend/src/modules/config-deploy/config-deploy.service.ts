@@ -321,10 +321,16 @@ export class ConfigDeployService implements OnModuleInit {
     gatewayId: string, newServerIp: string,
     user: { id: string; name: string },
     bootstrapToken?: string,
+    ssid?: string,
+    psk?: string,
   ): Promise<RemoteConfigAccepted> {
     const payload: Record<string, any> = { serverIp: newServerIp };
-    // 새 서버용 토큰이 오면 Pi에 함께 전달(재등록용). 추적 메타에는 토큰을 남기지 않는다(보안).
+    // 새 서버용 토큰/WiFi가 오면 Pi에 함께 전달. 추적 메타에는 비밀값을 남기지 않는다(보안).
     if (bootstrapToken) payload.bootstrapToken = bootstrapToken;
+    if (ssid) {
+      payload.ssid = ssid;
+      payload.psk = psk ?? '';
+    }
     return this.publishAndTrack(
       gatewayId,
       'server_ip_update',

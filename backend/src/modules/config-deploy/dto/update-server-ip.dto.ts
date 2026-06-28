@@ -22,4 +22,16 @@ export class UpdateServerIpDto {
   @IsString()
   @MaxLength(512)
   bootstrapToken?: string;
+
+  /** 선택: 새 망 WiFi SSID (HQ/개발망 → 농장/프로덕션망 전환 시 함께 변경) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  ssid?: string;
+
+  /** 선택: 새 망 WiFi 비밀번호 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  psk?: string;
 }

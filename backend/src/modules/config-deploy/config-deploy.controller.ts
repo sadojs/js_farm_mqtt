@@ -206,6 +206,8 @@ export class ConfigDeployController {
       gatewayId, dto.newServerIp,
       { id: req.user.id, name: req.user.username ?? req.user.name ?? 'unknown' },
       dto.bootstrapToken,
+      dto.ssid,
+      dto.psk,
     );
   }
 

@@ -112,9 +112,12 @@ export function useRemoteConfig(gatewayId: string) {
     }
   }
 
-  async function applyServerIp(newServerIp: string, bootstrapToken?: string) {
+  async function applyServerIp(
+    newServerIp: string,
+    opts?: { bootstrapToken?: string; ssid?: string; psk?: string },
+  ) {
     try {
-      const { data } = await configDeployApi.updateServerIp(gatewayId, newServerIp, bootstrapToken)
+      const { data } = await configDeployApi.updateServerIp(gatewayId, newServerIp, opts)
       markRequested('server_ip_update', data.requestId)
       return data
     } catch (err: any) {

@@ -117,9 +117,13 @@ export const configDeployApi = {
       { name },
     ),
 
-  updateServerIp: (gatewayId: string, newServerIp: string, bootstrapToken?: string) =>
+  updateServerIp: (
+    gatewayId: string,
+    newServerIp: string,
+    opts?: { bootstrapToken?: string; ssid?: string; psk?: string },
+  ) =>
     apiClient.post<RemoteConfigAccepted>(
       `/config-deploy/${gatewayId}/server-ip`,
-      bootstrapToken ? { newServerIp, bootstrapToken } : { newServerIp },
+      { newServerIp, ...(opts || {}) },
     ),
 }

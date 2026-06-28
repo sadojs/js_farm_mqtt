@@ -87,6 +87,22 @@
             :disabled="isPending('server_ip_update')"
           />
         </div>
+        <div class="sys-row__form">
+          <input
+            v-model="form.serverSsid"
+            type="text"
+            autocomplete="off"
+            placeholder="새 망 WiFi SSID (망도 함께 바뀔 때만, 선택)"
+            :disabled="isPending('server_ip_update')"
+          />
+          <input
+            v-model="form.serverPsk"
+            type="password"
+            autocomplete="off"
+            placeholder="새 망 WiFi 비밀번호"
+            :disabled="isPending('server_ip_update')"
+          />
+        </div>
         <p class="warning">
           ⚠ MQTT 서버 + Reverse Tunnel 서버 + Z2M / agent 모두 새 IP로 재연결됩니다.
           개발 ↔ 프로덕션처럼 <b>다른 서버</b>로 바꿀 땐 그 서버의 <b>BOOTSTRAP_TOKEN</b>을 입력해야
@@ -130,6 +146,8 @@ const form = reactive({
   newGatewayId: '',
   serverIp: '',
   serverBootstrapToken: '', // 다른 서버 전환 시 새 서버 재등록용(선택)
+  serverSsid: '',           // 다른 망 전환 시 새 WiFi(선택)
+  serverPsk: '',
 })
 
 const { states, applyWifi, applyGatewayId, applyServerIp, applyIdentity } =
@@ -191,8 +209,13 @@ async function onApplyServerIp() {
     message: `MQTT/Tunnel 서버를 "${form.serverIp}" 로 변경합니다. Pi의 모든 서비스가 새 IP로 재연결됩니다.`,
     confirmText: '변경',
   })) return
-  await applyServerIp(form.serverIp.trim(), form.serverBootstrapToken.trim() || undefined)
+  await applyServerIp(form.serverIp.trim(), {
+    bootstrapToken: form.serverBootstrapToken.trim() || undefined,
+    ssid: form.serverSsid.trim() || undefined,
+    psk: form.serverSsid.trim() ? form.serverPsk : undefined,
+  })
   form.serverBootstrapToken = ''
+  form.serverPsk = ''
 }
 </script>
 
