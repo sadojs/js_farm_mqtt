@@ -79,16 +79,18 @@
             class="zone-name-input"
             :placeholder="getZoneLabel(zone.zone)"
           />
-          <select
-            v-if="editableMapping"
-            class="switch-select"
-            :value="getZoneSwitch(zone.zone)"
-            @change="updateZoneSwitch(zone.zone, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" disabled>-- 선택 --</option>
-            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
-          </select>
-          <span v-else class="switch-hint">{{ getZoneSwitch(zone.zone) }}</span>
+          <template v-if="showChannelMapping">
+            <select
+              v-if="editableMapping"
+              class="switch-select"
+              :value="getZoneSwitch(zone.zone)"
+              @change="updateZoneSwitch(zone.zone, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="" disabled>-- 선택 --</option>
+              <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+            </select>
+            <span v-else class="switch-hint">{{ getZoneSwitch(zone.zone) }}</span>
+          </template>
         </div>
         <div class="setting-fields">
           <div class="field-group">
@@ -117,13 +119,15 @@
       <div class="setting-row compact">
         <div class="zone-header-row">
           <span class="setting-name fixed">교반기</span>
-          <select v-if="editableMapping" class="switch-select"
-            :value="effectiveMapping['mixer']"
-            @change="updateFnSwitch('mixer', ($event.target as HTMLSelectElement).value)">
-            <option value="" disabled>-- 선택 --</option>
-            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
-          </select>
-          <span v-else class="switch-hint">{{ effectiveMapping['mixer'] }}</span>
+          <template v-if="showChannelMapping">
+            <select v-if="editableMapping" class="switch-select"
+              :value="effectiveMapping['mixer']"
+              @change="updateFnSwitch('mixer', ($event.target as HTMLSelectElement).value)">
+              <option value="" disabled>-- 선택 --</option>
+              <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+            </select>
+            <span v-else class="switch-hint">{{ effectiveMapping['mixer'] }}</span>
+          </template>
         </div>
         <div class="setting-fields">
           <!-- 사용자 요구: 교반기는 액비모터에 종속 — 액비 ON 시 자동 ON / OFF 시 자동 OFF / 토글 비활성 -->
@@ -142,13 +146,15 @@
       <div class="setting-row zone-row">
         <div class="zone-header-row">
           <span class="setting-name fixed">액비모터</span>
-          <select v-if="editableMapping" class="switch-select"
-            :value="effectiveMapping['fertilizer_motor']"
-            @change="updateFnSwitch('fertilizer_motor', ($event.target as HTMLSelectElement).value)">
-            <option value="" disabled>-- 선택 --</option>
-            <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
-          </select>
-          <span v-else class="switch-hint">{{ effectiveMapping['fertilizer_motor'] }}</span>
+          <template v-if="showChannelMapping">
+            <select v-if="editableMapping" class="switch-select"
+              :value="effectiveMapping['fertilizer_motor']"
+              @change="updateFnSwitch('fertilizer_motor', ($event.target as HTMLSelectElement).value)">
+              <option value="" disabled>-- 선택 --</option>
+              <option v-for="sw in AVAILABLE_SWITCH_CODES" :key="sw" :value="sw">{{ sw }}</option>
+            </select>
+            <span v-else class="switch-hint">{{ effectiveMapping['fertilizer_motor'] }}</span>
+          </template>
         </div>
         <div class="setting-fields">
           <template v-if="form.fertilizer.enabled">
@@ -180,8 +186,8 @@
       </div>
     </div>
 
-    <!-- 3. 채널 매핑 (admin/farm_admin + editableMapping 시에만 표시) -->
-    <div v-if="editableMapping" class="section">
+    <!-- 3. 채널 매핑 — 게이트웨이 환경설정에서 별도 관리하므로 룰 수정 화면에선 숨김 -->
+    <div v-if="editableMapping && showChannelMapping" class="section">
       <label class="section-label">원격제어 구역 설정</label>
       <p class="mapping-desc">각 기능에 연결된 물리 스위치 구역을 설정합니다.</p>
 
@@ -244,6 +250,10 @@ const emit = defineEmits<{
 }>()
 
 const effectiveMapping = computed(() => props.channelMapping ?? DEFAULT_CHANNEL_MAPPING)
+
+// 채널(릴레이) 스위치 맵핑은 게이트웨이 환경설정 > Zigbee 장치 페이지에서 별도 관리한다.
+// 자동제어룰 수정 화면에는 맵핑 항목을 노출하지 않음 (stale/오값 표시 혼란 방지).
+const showChannelMapping = false
 
 const AVAILABLE_SWITCH_CODES = computed(() => {
   const values = Object.values(effectiveMapping.value).filter((v): v is string => !!v)
