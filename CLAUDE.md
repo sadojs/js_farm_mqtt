@@ -3,6 +3,10 @@
 Zigbee2MQTT 기반 스마트팜 모니터링/제어 플랫폼.
 Raspberry Pi(Zigbee 게이트웨이) → MQTT Broker → NestJS Backend → Vue 3 Frontend.
 
+> **배포 절차**: 같은 맥미니에 `smartfarm` 서비스와 함께 호스팅. 통합 배포 가이드는
+> `/Users/jeongseok/Projects/smart-farm-platform/CLAUDE.md` "프로덕션 서버" 섹션 참조.
+> 사용자 요청: `smartfarm_mqtt pull 배포 빌드` → 한 번에 완료.
+
 ## Tech Stack
 
 - **Backend:** NestJS 10 + TypeORM 0.3 + TypeScript 5.3
