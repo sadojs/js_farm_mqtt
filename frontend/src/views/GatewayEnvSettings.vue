@@ -128,6 +128,7 @@
                 <span class="pin-label">CH</span>
                 <select class="pin-select" :value="slot.code"
                   @change="updateZigbeeMapping(dev, slot.key, ($event.target as HTMLSelectElement).value)">
+                  <option value="">미사용</option>
                   <option v-for="sw in zigbeeAvailableSwitchesFor(dev, slot.key)" :key="sw" :value="sw">{{ sw }}</option>
                 </select>
               </div>
@@ -829,7 +830,9 @@ function zigbeeAnyActive(dev: ZigbeeDevice): boolean {
 
 function zigbeeAvailableSwitchesFor(dev: ZigbeeDevice, currentKey: string): string[] {
   const count = zigbeeChannelCountFor(dev)
-  const all = count === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH
+  // onboard 전용 코드(switch_usb1/2)는 zigbee 매핑 옵션에서 제외
+  const all = (count === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH)
+    .filter(sw => sw !== 'switch_usb1' && sw !== 'switch_usb2')
   // 다른 슬롯이 이미 사용 중인 코드는 제외 (현재 슬롯이 쓰는 건 유지)
   const mapping = (dev.channelMapping ?? {}) as Record<string, string>
   const used = new Set<string>()
@@ -1042,7 +1045,8 @@ const activeMappingSlots = computed(() =>
 )
 
 const mappingSwitchCodes = computed(() =>
-  mappingChannelCount.value === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH
+  (mappingChannelCount.value === 12 ? AVAILABLE_SWITCH_CODES_12CH : AVAILABLE_SWITCH_CODES_8CH)
+    .filter(sw => sw !== 'switch_usb1' && sw !== 'switch_usb2')
 )
 
 function startEdit(id: string, name: string) {
