@@ -205,6 +205,7 @@ export class ConfigDeployController {
     return this.configDeployService.requestServerIp(
       gatewayId, dto.newServerIp,
       { id: req.user.id, name: req.user.username ?? req.user.name ?? 'unknown' },
+      dto.bootstrapToken,
     );
   }
 

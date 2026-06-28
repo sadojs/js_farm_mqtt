@@ -22,11 +22,13 @@ mkdir -p /var/log/smart-farm /etc/smartfarm
 
 emit() { printf '%s\n' "$1"; exit 0; }
 
-if [ "$#" -ne 1 ]; then
-  emit '{"ok":false,"status":"failed","detail":"usage: apply-server-ip.sh <server-ip-or-fqdn>"}'
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  emit '{"ok":false,"status":"failed","detail":"usage: apply-server-ip.sh <server-ip-or-fqdn> [bootstrap-token]"}'
 fi
 
 NEW="$1"
+# 선택: 새 서버용 bootstrap 토큰 (서버마다 BOOTSTRAP_TOKEN 다름 → 재등록 401 방지)
+NEW_TOKEN="${2:-}"
 # IPv4 또는 FQDN 검증
 IPV4_RE='^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$'
 FQDN_RE='^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
@@ -42,6 +44,18 @@ echo "=== $(date -Iseconds) server-ip ${OLD} -> ${NEW} ===" >&2
 
 # 1. 마커
 echo -n "$NEW" > /etc/smartfarm/server-ip
+
+# 1-b. 새 서버용 bootstrap 토큰이 함께 오면 교체 (개발→프로덕션 전환 시 토큰이 달라 401 나는 것 방지)
+if [ -n "$NEW_TOKEN" ]; then
+  printf '%s' "$NEW_TOKEN" > /etc/smartfarm/bootstrap.token
+  chmod 600 /etc/smartfarm/bootstrap.token
+  echo "bootstrap.token 교체(새 서버용)" >&2
+fi
+
+# 1-c. 다른 서버로 전환하면 이 게이트웨이가 그 서버엔 미등록 상태 → gateway-id 를 lgw-default 로
+#      리셋해 깨끗이 자동 등록되게 한다. (같은 서버면 register 가 machineId 로 기존 레코드를 찾아
+#      기존 ID 를 그대로 반환하므로 안전)
+echo -n "lgw-default" > /etc/smartfarm/gateway-id
 
 # 2. Z2M configuration.yaml — mqtt.server 치환
 Z2M_CFG="/opt/zigbee2mqtt/data/configuration.yaml"
@@ -109,6 +123,19 @@ if [ -s "$TOKEN_FILE" ] && [ -s "$PUBKEY_FILE" ]; then
     -H "X-Smartfarm-Bootstrap-Token: $TOKEN" \
     -X POST -d "$BODY" "$URL" 2>&1 || echo "")
   echo "응답: $RESP" >&2
+  # 서버가 부여/확인한 gateway-id 적용 (MQTT 토픽 일치에 필수 — 이게 없으면 등록은 돼도
+  # config-agent 가 옛 토픽으로 publish 해 게이트웨이가 안 보임). apply-gateway-id 는
+  # config-agent 를 직접 재시작하지 않으므로(=handler 가 응답 후 지연 재시작) 여기서 호출해도 안전.
+  ASSIGNED=$(echo "$RESP" | jq -r '.gatewayId // empty' 2>/dev/null || true)
+  if [ -n "$ASSIGNED" ] && [ "$ASSIGNED" != "null" ]; then
+    CUR="$(cat /etc/smartfarm/gateway-id 2>/dev/null || true)"
+    if [ "$ASSIGNED" != "$CUR" ]; then
+      SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+      echo "서버 부여 gateway-id=${ASSIGNED} → apply-gateway-id 적용" >&2
+      timeout 60 bash "${SELF_DIR}/apply-gateway-id.sh" "$ASSIGNED" >&2 \
+        || echo "apply-gateway-id 실패(수동 확인 필요)" >&2
+    fi
+  fi
   # tunnel 정보 추출 → tunnel.env 재작성
   if echo "$RESP" | jq -e '.tunnel' >/dev/null 2>&1; then
     T_HOST=$(echo "$RESP" | jq -r '.tunnel.serverHost')

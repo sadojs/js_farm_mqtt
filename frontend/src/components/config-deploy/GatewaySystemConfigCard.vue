@@ -78,9 +78,19 @@
           <input v-model="form.serverIp" type="text" placeholder="175.206.245.234" :disabled="isPending('server_ip_update')" />
           <button class="btn btn--danger" :disabled="!canApplyServerIp" @click="onApplyServerIp">적용</button>
         </div>
+        <div class="sys-row__form">
+          <input
+            v-model="form.serverBootstrapToken"
+            type="password"
+            autocomplete="off"
+            placeholder="새 서버 BOOTSTRAP_TOKEN (다른 서버 전환 시 필수)"
+            :disabled="isPending('server_ip_update')"
+          />
+        </div>
         <p class="warning">
           ⚠ MQTT 서버 + Reverse Tunnel 서버 + Z2M / agent 모두 새 IP로 재연결됩니다.
-          개발 ↔ 프로덕션 전환 시에만 사용하세요.
+          개발 ↔ 프로덕션처럼 <b>다른 서버</b>로 바꿀 땐 그 서버의 <b>BOOTSTRAP_TOKEN</b>을 입력해야
+          게이트웨이가 새 서버에 자동 등록(lgw-default → 새 ID)됩니다. (같은 서버 IP만 바뀌면 토큰은 비워도 됩니다.)
         </p>
       </section>
     </div>
@@ -119,6 +129,7 @@ const form = reactive({
   psk: '',
   newGatewayId: '',
   serverIp: '',
+  serverBootstrapToken: '', // 다른 서버 전환 시 새 서버 재등록용(선택)
 })
 
 const { states, applyWifi, applyGatewayId, applyServerIp, applyIdentity } =
@@ -180,7 +191,8 @@ async function onApplyServerIp() {
     message: `MQTT/Tunnel 서버를 "${form.serverIp}" 로 변경합니다. Pi의 모든 서비스가 새 IP로 재연결됩니다.`,
     confirmText: '변경',
   })) return
-  await applyServerIp(form.serverIp.trim())
+  await applyServerIp(form.serverIp.trim(), form.serverBootstrapToken.trim() || undefined)
+  form.serverBootstrapToken = ''
 }
 </script>
 

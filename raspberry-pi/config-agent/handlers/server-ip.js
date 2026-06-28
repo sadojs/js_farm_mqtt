@@ -8,7 +8,10 @@ async function handleServerIp(request) {
   if (!newIp) {
     return { ok: false, status: 'failed', detail: 'serverIp 누락' };
   }
-  const result = await runScript('apply-server-ip.sh', [newIp], 120_000);
+  // 선택: 새 서버용 bootstrap 토큰 (서버 전환 시 재등록에 필요). 없으면 기존 토큰 유지.
+  const newToken = (request && request.bootstrapToken) || '';
+  const args = newToken ? [newIp, newToken] : [newIp];
+  const result = await runScript('apply-server-ip.sh', args, 120_000);
   // 응답 전송 후 config-agent 자신을 재시작 (새 MQTT_SERVER로 재연결)
   if (result && result.ok) {
     setTimeout(() => {
