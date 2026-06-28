@@ -651,6 +651,11 @@ export class DevicesService {
               await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName,
                 this.normalizeForZ2m({ [bContactSwitch]: true }, device.zigbeeModel));
             }
+            // 페어 B접점 ON 을 낙관적 캐시에 기록 — UI(Groups)는 switchStates로 판정하므로
+            // 미기록 시 실제 ON인데 OFF로 표시됨. (아래 메인 publish가 spread로 보존 + 저장)
+            const pairSettings: any = device.deviceSettings || {};
+            pairSettings.switchStates = { ...(pairSettings.switchStates || {}), [bContactSwitch]: true };
+            device.deviceSettings = pairSettings;
           }
         } else if (remoteCmd.value === false) {
           // 원격제어 OFF → 모든 관수 스위치 강제 OFF (페어인 B접점 포함)

@@ -844,9 +844,13 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
         notify.info('자동 제어 비활성화', `자동 제어 설정 ${bulkResult.disabledCount}개가 비활성화되었습니다`)
       }
     }
-    // 관주 상태 갱신
+    // 관주 상태 갱신 + 페어 B접점 등 최신 switchStates 재조회
+    // (원격제어는 fertilizer_b_contact와 페어로 동작 — 토글만으론 페어 스위치 표시가 안 바뀜)
     if (isRemoteControl) {
-      await automationStore.fetchIrrigationStatus()
+      await Promise.all([
+        automationStore.fetchIrrigationStatus(),
+        deviceStore.fetchDevices(),
+      ])
     }
   } catch (err: any) {
     console.error('관주 장치 제어 실패:', err)
