@@ -647,9 +647,9 @@ export class DevicesService {
               // onboard 관수: relay_XXX switchCode → slot lookup → publishGpioRelay
               await this.publishOnboardRelay(gateway.gatewayId, gateway.id, bContactSwitch, true);
             } else {
-              await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, {
-                [bContactSwitch]: true,
-              });
+              // TS0601 다채널은 switch_N → state_lN 변환 필요 (raw 발행 시 무시됨)
+              await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName,
+                this.normalizeForZ2m({ [bContactSwitch]: true }, device.zigbeeModel));
             }
           }
         } else if (remoteCmd.value === false) {
@@ -663,7 +663,9 @@ export class DevicesService {
           } else {
             const offPayload: Record<string, any> = {};
             for (const sw of allSwitches) offPayload[sw] = false;
-            await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, offPayload);
+            // TS0601 다채널은 switch_N → state_lN 변환 필요 (raw 발행 시 무시됨)
+            await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName,
+              this.normalizeForZ2m(offPayload, device.zigbeeModel));
             this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
           }
           // 원격제어 OFF → 현재 진행 중인 관수 timeline만 중단 (룰 자체는 enabled 유지)
@@ -777,7 +779,9 @@ export class DevicesService {
     }
 
     // MQTT 커맨드 변환 (Tuya 형식 → Zigbee2MQTT 형식)
-    const mqttCommand = this.buildMqttCommand(commands);
+    // 다채널 컨트롤러(관수/controller)는 switch_1 축약 금지 — normalizeForZ2m가 state_l1로 변환해야 함
+    const isMultiChannel = device.equipmentType === 'irrigation' || device.equipmentType === 'controller';
+    const mqttCommand = this.buildMqttCommand(commands, isMultiChannel);
     // TS0601 multi-channel은 switch_N → state_lN 으로 키 변환 + "ON"/"OFF" 문자열 강제
     const mqttCommandForZ2m = this.normalizeForZ2m(mqttCommand, device.zigbeeModel);
     await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommandForZ2m);
@@ -848,10 +852,12 @@ export class DevicesService {
   }
 
   /** Tuya 커맨드 형식 → Zigbee2MQTT 커맨드 변환 */
-  private buildMqttCommand(commands: { code: string; value: any }[]): object {
+  private buildMqttCommand(commands: { code: string; value: any }[], isMultiChannel = false): object {
     const result: Record<string, any> = {};
     for (const cmd of commands) {
-      if (cmd.code === 'switch' || cmd.code === 'switch_1') {
+      // 단일채널(팬/개폐기)만 switch_1 → state 축약. 다채널 컨트롤러(관수)는 switch_1을
+      // 그대로 두어 normalizeForZ2m가 state_l1로 변환하게 함 (TS0601 다채널은 state 키 무시).
+      if (!isMultiChannel && (cmd.code === 'switch' || cmd.code === 'switch_1')) {
         result.state = cmd.value ? 'ON' : 'OFF';
       } else if (cmd.code === 'percent_control') {
         result.position = Number(cmd.value);
