@@ -163,6 +163,9 @@ export class SensorAlertsService {
     // 액추에이터 오프라인 감지
     await this.checkActuatorOffline();
 
+    // 센서 오프라인 감지 (online 플래그 기반 — staleness 스윕이 online=false 유지)
+    await this.checkSensorOffline();
+
     // 조건이 정상으로 복귀한 알림 자동 해제
     await this.autoResolveAlerts(standbySet);
 
@@ -241,6 +244,78 @@ export class SensorAlertsService {
       });
       await this.alertRepo.save(alert);
       this.logger.warn(`[Actuator Offline] ${actuator.name}: offline for ${Math.round(minutesAgo)} minutes (${severity})`);
+    }
+  }
+
+  /**
+   * 센서 오프라인 감지 — online 플래그 기반 (staleness 스윕이 10분 무응답 시 online=false 설정).
+   * 센서는 주기적으로 보고하므로 offline=즉시 알림(액추에이터와 달리 60분 대기 안 함).
+   * online 복귀 시 자동 해제, 60분 이상 지속 시 critical 로 승격.
+   */
+  private async checkSensorOffline() {
+    const sensors = await this.deviceRepo.find({
+      where: { deviceType: 'sensor' },
+      select: ['id', 'userId', 'name', 'online', 'lastSeen'],
+    });
+
+    for (const sensor of sensors) {
+      if (sensor.online) {
+        // 온라인 복귀 → 기존 미해결 오프라인 알림 자동 해제
+        const existingAlerts = await this.alertRepo.find({
+          where: {
+            deviceId: sensor.id,
+            alertType: 'no_data' as any,
+            sensorType: 'sensor_offline',
+            resolved: false,
+          },
+        });
+        for (const alert of existingAlerts) {
+          await this.alertRepo.update(
+            { id: alert.id },
+            { resolved: true, resolvedAt: new Date() },
+          );
+          this.logger.log(`[Auto-Resolve] 센서 ${sensor.name} 온라인 복귀 — 오프라인 알림 해제`);
+        }
+        continue;
+      }
+
+      if (!sensor.lastSeen) continue;
+      const minutesAgo = (Date.now() - new Date(sensor.lastSeen).getTime()) / 60000;
+
+      const existing = await this.alertRepo.findOne({
+        where: {
+          deviceId: sensor.id,
+          alertType: 'no_data' as any,
+          sensorType: 'sensor_offline',
+          resolved: false,
+        },
+      });
+
+      if (existing) {
+        // 60분 이상 지속 → critical 승격
+        if (minutesAgo >= 60 && existing.severity === 'warning') {
+          await this.alertRepo.update(
+            { id: existing.id },
+            { severity: 'critical', message: `센서 ${sensor.name} ${Math.round(minutesAgo / 60)}시간 동안 오프라인` },
+          );
+          this.logger.warn(`[Sensor Offline] ${sensor.name}: severity → critical`);
+        }
+        continue;
+      }
+
+      const severity: 'warning' | 'critical' = minutesAgo >= 60 ? 'critical' : 'warning';
+      const alert = this.alertRepo.create({
+        userId: sensor.userId,
+        deviceId: sensor.id,
+        deviceName: sensor.name,
+        sensorType: 'sensor_offline',
+        alertType: 'no_data' as any,
+        severity,
+        message: `센서 ${sensor.name} ${minutesAgo >= 60 ? Math.round(minutesAgo / 60) + '시간' : Math.round(minutesAgo) + '분'} 동안 오프라인`,
+        threshold: '오프라인',
+      });
+      await this.alertRepo.save(alert);
+      this.logger.warn(`[Sensor Offline] ${sensor.name}: offline ${Math.round(minutesAgo)}분 (${severity})`);
     }
   }
 
