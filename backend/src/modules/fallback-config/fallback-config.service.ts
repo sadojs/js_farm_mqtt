@@ -47,10 +47,22 @@ export class FallbackConfigService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
+    // 미등록 gateway(예: rename된 옛 gateway_id) 앞으로 온 fallback 메시지는 skip.
+    // 그대로 저장 시 fallback_* FK 위반(UnhandledRejection) 발생하므로 가드로 차단.
+    const guard =
+      (fn: (gw: string, payload: Buffer) => Promise<void>) =>
+      async (gw: string, payload: Buffer) => {
+        const known = await this.gatewayRepo.count({ where: { gatewayId: gw } });
+        if (!known) {
+          this.logger.warn(`fallback: 미등록 gateway '${gw}' 메시지 skip (rename 잔재 가능)`);
+          return;
+        }
+        return fn(gw, payload);
+      };
     this.mqtt.setFallbackHandlers({
-      mode: (gw, payload) => this.handleModeMessage(gw, payload),
-      events: (gw, payload) => this.handleEventsMessage(gw, payload),
-      ack: (gw, payload) => this.handleAckMessage(gw, payload),
+      mode: guard((gw, payload) => this.handleModeMessage(gw, payload)),
+      events: guard((gw, payload) => this.handleEventsMessage(gw, payload)),
+      ack: guard((gw, payload) => this.handleAckMessage(gw, payload)),
     });
   }
 
