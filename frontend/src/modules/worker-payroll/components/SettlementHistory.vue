@@ -28,6 +28,7 @@
             <th class="num">근무</th>
             <th class="num">지급액</th>
             <th class="num">공제</th>
+            <th class="num">가불</th>
             <th class="num">실수령</th>
             <th>상태</th>
           </tr>
@@ -40,6 +41,7 @@
             <td class="num">{{ it.snapshot.workDays }}일 · {{ fmtH(it.snapshot.totalHours) }}h</td>
             <td class="num">{{ it.snapshot.grossPay.toLocaleString() }}</td>
             <td class="num minus">−{{ it.snapshot.deductionTotal.toLocaleString() }}</td>
+            <td class="num" :class="{ minus: advOf(it) > 0 }">{{ advOf(it) > 0 ? '−' + advOf(it).toLocaleString() : '0' }}</td>
             <td class="num strong">{{ it.netPay.toLocaleString() }}</td>
             <td>
               <span class="status" :class="it.status">{{ it.status === 'confirmed' ? '확정' : '요청됨' }}</span>
@@ -73,6 +75,14 @@ const busyId = ref<string | null>(null)
 const varModal = ref<{ req: SettlementHistoryItem; items: VariableDeductionDef[]; month: number } | null>(null)
 
 const pending = computed(() => items.value.filter((i) => i.status === 'requested'))
+
+/** 스냅샷의 가불 합계. 구버전 스냅샷에 advanceTotal이 없으면 지급액−공제−실수령으로 역산(표시용, 데이터 변경 없음) */
+function advOf(it: SettlementHistoryItem): number {
+  const s = it.snapshot
+  const v = (s as any).advanceTotal
+  if (typeof v === 'number') return v
+  return Math.max(0, (s.grossPay ?? 0) - (s.deductionTotal ?? 0) - (it.netPay ?? 0))
+}
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
