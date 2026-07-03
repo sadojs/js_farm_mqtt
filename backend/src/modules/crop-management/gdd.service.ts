@@ -417,10 +417,10 @@ export class GddService {
              GREATEST(
                COALESCE(
                  CASE WHEN COALESCE(ds.hours_covered, 0) >= 12 THEN ds.avg_temp
-                      ELSE COALESCE(dw.avg_temp, ds.avg_temp) + $5
+                      ELSE COALESCE(dw.avg_temp, ds.avg_temp) + $5::numeric
                  END,
-                 COALESCE(dw.avg_temp, 0) + $5
-               ) - $4, 0
+                 COALESCE(dw.avg_temp, 0) + $5::numeric
+               ) - $4::numeric, 0
              ) AS daily_gdd
            FROM daily_sensor ds
            FULL OUTER JOIN daily_weather dw ON ds.day = dw.day
@@ -440,10 +440,10 @@ export class GddService {
                   AVG(temperature) +
                   CASE
                     WHEN $5::date IS NOT NULL AND DATE_TRUNC('day', time) < $5::date
-                    THEN $6
-                    ELSE $3
+                    THEN $6::numeric
+                    ELSE $3::numeric
                   END
-                  - $4, 0
+                  - $4::numeric, 0
                 ) AS daily_gdd
          FROM weather_data
          WHERE user_id = $1 AND time >= $2::date
