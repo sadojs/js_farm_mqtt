@@ -59,23 +59,37 @@
         :class="{ 'card-enabled': (dev.equipmentType === 'irrigation' && zigbeeAnyActive(dev)) || (dev.equipmentType === 'controller' && controllerAnyActive(dev)) }">
         <div class="card-header" :class="{ 'card-header-clickable': dev.equipmentType === 'irrigation' || dev.equipmentType === 'controller' }"
           @click="(dev.equipmentType === 'irrigation' || dev.equipmentType === 'controller') && toggleZigbeeExpand(dev.id)">
-          <div class="device-name-row">
-            <span v-if="editingId !== dev.id" class="device-name">{{ dev.name }}</span>
-            <input v-else v-model="editName" class="name-input" @click.stop @keyup.enter="saveZigbeeName(dev)" @keyup.escape="cancelEdit()" />
-            <button v-if="editingId !== dev.id" class="btn-icon" @click.stop="startEdit(dev.id, dev.name)">✏</button>
-            <template v-else>
-              <button class="btn-icon btn-save" @click.stop="saveZigbeeName(dev)">✓</button>
-              <button class="btn-icon" @click.stop="cancelEdit()">✕</button>
-            </template>
+          <div class="card-icon-wrap" :style="{ background: zbTypeMeta(dev).color + '26' }">
+            <span class="card-type-icon">{{ zbTypeMeta(dev).icon }}</span>
+          </div>
+          <div class="card-info">
+            <div class="device-name-row">
+              <span v-if="editingId !== dev.id" class="device-name">{{ dev.name }}</span>
+              <input v-else v-model="editName" class="name-input" @click.stop @keyup.enter="saveZigbeeName(dev)" @keyup.escape="cancelEdit()" />
+              <button v-if="editingId !== dev.id" class="btn-icon" @click.stop="startEdit(dev.id, dev.name)">✏</button>
+              <template v-else>
+                <button class="btn-icon btn-save" @click.stop="saveZigbeeName(dev)">✓</button>
+                <button class="btn-icon" @click.stop="cancelEdit()">✕</button>
+              </template>
+            </div>
+            <div class="card-meta">
+              <span class="type-label" :style="{ color: zbTypeMeta(dev).color }">{{ dev.equipmentType || dev.deviceType }}</span>
+              <template v-if="dev.equipmentType === 'irrigation'">
+                <span class="meta-sep">·</span>
+                <span>{{ zigbeeChannelCountFor(dev) }}채널 · 활성 {{ zigbeeActiveCount(dev) }}</span>
+              </template>
+              <template v-else-if="dev.equipmentType === 'controller'">
+                <span class="meta-sep">·</span>
+                <span>{{ controllerChildren(dev).length }}{{ controllerModeOf(dev) === 'opener' ? '쌍 개폐기' : '개 유동팬' }} · 활성 {{ controllerActiveUnitsCount(dev) }}</span>
+              </template>
+              <span class="meta-sep">·</span>
+              <span class="meta-mono">{{ dev.friendlyName }}</span>
+              <span class="meta-sep">·</span>
+              <span v-if="dev.online" class="meta-online">● 온라인</span>
+              <span v-else class="meta-offline">● 오프라인</span>
+            </div>
           </div>
           <div class="card-actions" @click.stop>
-            <!-- 관수: 활성 채널 수 표시 -->
-            <span v-if="dev.equipmentType === 'irrigation'" class="zb-meta-chip">
-              {{ zigbeeChannelCountFor(dev) }}채널 · 활성 {{ zigbeeActiveCount(dev) }}
-            </span>
-            <span v-else-if="dev.equipmentType === 'controller'" class="zb-meta-chip">
-              {{ controllerChildren(dev).length }}{{ controllerModeOf(dev) === 'opener' ? '쌍 개폐기' : '개 유동팬' }} · 활성 {{ controllerActiveUnitsCount(dev) }}
-            </span>
             <!-- 팬: 타이머 설정 버튼 -->
             <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
             <!-- 개폐기 타이머 -->
@@ -99,12 +113,6 @@
               {{ expandedZigbeeIds.has(dev.id) ? '▲' : '▼' }}
             </span>
           </div>
-        </div>
-        <div class="device-meta">
-          <span class="meta-tag">{{ dev.equipmentType || dev.deviceType }}</span>
-          <span class="meta-tag mono">{{ dev.friendlyName }}</span>
-          <span v-if="dev.online" class="meta-tag online">온라인</span>
-          <span v-else class="meta-tag offline">오프라인</span>
         </div>
         <!-- 팬/개폐기 타이머 배지 -->
         <div v-if="(dev.equipmentType === 'fan' || dev.equipmentType === 'opener_open') && (dev.deviceSettings?.operation_time || dev.deviceSettings?.standby_time)" class="timer-badge">
@@ -612,6 +620,24 @@ function controllerModeOf(parent: ZigbeeDevice): 'fan' | 'opener' | null {
   if (first.equipmentType === 'fan') return 'fan'
   if (first.equipmentType === 'opener_open' || first.equipmentType === 'opener_close') return 'opener'
   return null
+}
+
+// 온보드 카드와 통일된 타입별 아이콘/색상 (동일하진 않아도 유사한 형태)
+function zbTypeMeta(dev: ZigbeeDevice): { icon: string; color: string } {
+  const et = dev.equipmentType
+  if (et === 'irrigation') return { icon: '💧', color: '#0ea5e9' }
+  if (et === 'controller') {
+    return controllerModeOf(dev) === 'opener'
+      ? { icon: '🪟', color: '#10b981' }
+      : { icon: '🌀', color: '#f59e0b' }
+  }
+  if (et === 'fan') return { icon: '🌀', color: '#f59e0b' }
+  if (et === 'opener_open' || et === 'opener_close') return { icon: '🪟', color: '#10b981' }
+  const name = (dev.name || '').toLowerCase()
+  const model = ((dev as any).zigbeeModel || '').toLowerCase()
+  if (name.includes('우적') || name.includes('rain') || model.includes('ts0207')) return { icon: '☔', color: '#3b82f6' }
+  if (dev.deviceType === 'sensor' || et === 'other') return { icon: '🌡', color: '#8b5cf6' }
+  return { icon: '🔌', color: '#6b7280' }
 }
 
 interface OpenerPairInfo { groupName: string; openChild: ZigbeeDevice; closeChild: ZigbeeDevice }
@@ -1430,7 +1456,19 @@ onMounted(loadAllDevices)
 }
 .device-card.card-enabled { border-color: #0ea5e9; }
 
-.card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-header { display: flex; align-items: center; gap: 10px; }
+.card-icon-wrap {
+  width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.card-type-icon { font-size: 20px; line-height: 1; }
+.card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 5px; font-size: 12px; color: var(--text-secondary); }
+.card-meta .type-label { font-weight: 700; text-transform: capitalize; }
+.card-meta .meta-sep { color: var(--text-muted); }
+.card-meta .meta-mono { font-family: monospace; color: var(--text-muted); font-size: 11px; }
+.card-meta .meta-online { color: #16a34a; font-weight: 600; }
+.card-meta .meta-offline { color: var(--text-muted); }
 .card-header-clickable { cursor: pointer; user-select: none; }
 .card-header-clickable:hover { background: var(--bg-hover, rgba(0,0,0,.02)); border-radius: 6px; }
 .expand-arrow { font-size: 11px; color: var(--text-secondary, #9ca3af); margin-left: 4px; }
