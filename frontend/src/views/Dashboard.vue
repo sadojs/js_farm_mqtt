@@ -6,11 +6,23 @@
         <p class="page-description">농장의 현재 상태를 한눈에 확인하세요</p>
       </div>
       <div class="header-actions">
-        <button @click="isEditMode ? exitEditMode() : enterEditMode()" class="btn-header-sm">
-          {{ isEditMode ? '완료' : '⚙ 편집' }}
+        <button
+          @click="isEditMode ? exitEditMode() : enterEditMode()"
+          class="btn-icon-action"
+          :class="{ active: isEditMode }"
+          :title="isEditMode ? '완료' : '편집'"
+        >
+          <span class="ico">{{ isEditMode ? '✓' : '⚙' }}</span>
+          <span class="btn-label">{{ isEditMode ? '완료' : '편집' }}</span>
         </button>
-        <button @click="refreshWeather" class="btn-refresh" :disabled="loading">
-          {{ loading ? '조회 중...' : '새로고침' }}
+        <button
+          @click="refreshWeather"
+          class="btn-icon-action"
+          :disabled="loading"
+          title="새로고침"
+        >
+          <span class="ico" :class="{ spin: loading }">↻</span>
+          <span class="btn-label">{{ loading ? '조회 중...' : '새로고침' }}</span>
         </button>
       </div>
     </header>
@@ -193,7 +205,10 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.btn-header-sm {
+.btn-icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 14px;
   background: transparent;
   color: var(--text-secondary);
@@ -202,22 +217,14 @@ onMounted(() => {
   font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
-.btn-header-sm:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
-
-.btn-refresh {
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: calc(13px * var(--content-scale, 1));
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.btn-refresh:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-bg); }
-.btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-icon-action:hover:not(:disabled) { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.btn-icon-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-icon-action.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.btn-icon-action .ico { font-size: calc(15px * var(--content-scale, 1)); line-height: 1; display: inline-block; }
+.btn-icon-action .ico.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .error-banner {
   margin-bottom: 16px;
@@ -421,7 +428,11 @@ onMounted(() => {
     font-size: calc(22px * var(--content-scale, 1));
     white-space: nowrap;
   }
-  .header-actions { flex-shrink: 0; }
+  .header-actions { flex-shrink: 0; gap: 6px; }
+  /* 모바일: 편집/새로고침을 아이콘만 있는 정사각 버튼으로 (제목과 한 줄 확실히 유지) */
+  .btn-icon-action { padding: 0; width: 36px; height: 36px; justify-content: center; }
+  .btn-icon-action .btn-label { display: none; }
+  .btn-icon-action .ico { font-size: calc(17px * var(--content-scale, 1)); }
   /* 모바일: 날씨 + 요약 세로 스택 */
   .hero-row {
     grid-template-columns: 1fr;
