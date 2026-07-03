@@ -2,10 +2,13 @@
   <div class="spray-calendar">
     <!-- 상단 컨트롤 -->
     <div class="cal-toolbar">
-      <div class="month-nav">
-        <button class="nav-btn" @click="shiftMonth(-1)" aria-label="이전 달">‹</button>
-        <span class="month-label">{{ year }}년 {{ month }}월</span>
-        <button class="nav-btn" @click="shiftMonth(1)" aria-label="다음 달">›</button>
+      <div class="toolbar-top">
+        <div class="month-nav">
+          <button class="nav-btn" @click="shiftMonth(-1)" aria-label="이전 달">‹</button>
+          <span class="month-label">{{ year }}년 {{ month }}월</span>
+          <button class="nav-btn" @click="shiftMonth(1)" aria-label="다음 달">›</button>
+        </div>
+        <button class="btn-add-single" @click="$emit('add-single', monthFirst)">+ 단건 일정</button>
       </div>
 
       <div class="zone-filter">
@@ -25,14 +28,12 @@
         </button>
       </div>
 
-      <button class="btn-add-single" @click="$emit('add-single', monthFirst)">+ 단건 일정 추가</button>
-    </div>
-
-    <!-- 약종 범례 -->
-    <div v-if="legend.length" class="legend">
-      <span v-for="l in legend" :key="l.pest" class="legend-item">
-        <span class="dot" :style="{ background: l.color }"></span>{{ l.pest }}
-      </span>
+      <!-- 약종 범례 (구역 필터와 한 묶음으로 정렬) -->
+      <div v-if="legend.length" class="legend">
+        <span v-for="l in legend" :key="l.pest" class="legend-item">
+          <span class="dot" :style="{ background: l.color }"></span>{{ l.pest }}
+        </span>
+      </div>
     </div>
 
     <!-- 월 그리드 -->
@@ -193,9 +194,14 @@ function onDrop(date: string) {
 .spray-calendar { display: flex; flex-direction: column; gap: 12px; }
 .cal-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toolbar-top {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
 }
 .month-nav {
   display: flex;
@@ -244,8 +250,9 @@ function onDrop(date: string) {
   cursor: pointer;
 }
 .btn-add-single:hover { background: var(--accent-hover); }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 0 4px; }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-caption); color: var(--text-secondary); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 2px 2px 0; }
+.legend::before { content: '약종'; font-size: calc(10px * var(--content-scale, 1)); font-weight: 700; color: var(--text-muted); margin-right: 2px; }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-caption); color: var(--text-secondary); }
 .grid-head {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -333,8 +340,20 @@ function onDrop(date: string) {
 }
 @media (max-width: 768px) {
   .cell { min-height: 64px; padding: 4px; }
-  .btn-add-single { margin-left: 0; }
-  .cal-toolbar { gap: 8px; }
+  /* 상단 컨트롤 컴팩트화 — 월이동+단건추가 한 줄, 구역칩은 가로 스크롤 한 줄 */
+  .nav-btn { width: 28px; height: 28px; font-size: 16px; }
+  .month-label { min-width: 84px; font-size: var(--font-size-label); }
+  .btn-add-single { margin-left: 0; padding: 7px 12px; font-size: var(--font-size-caption); white-space: nowrap; flex-shrink: 0; }
+  .zone-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .zone-filter::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; padding: 5px 10px; }
+  .legend { gap: 10px; }
   .day-num { font-size: calc(11px * var(--content-scale, 1)); }
   .plant-badge { font-size: calc(9px * var(--content-scale, 1)); padding: 1px 4px; }
   .event-chip { font-size: calc(10px * var(--content-scale, 1)); padding: 2px 4px; }

@@ -334,29 +334,38 @@ onMounted(reloadCalendar)
 .brief-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   margin-bottom: 12px;
 }
 .btn-brief {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--accent-bg);
   color: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 10px;
-  padding: 9px 16px;
+  padding: 7px 12px;
   font-weight: 700;
-  font-size: var(--font-size-label);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
 }
 .btn-brief:hover:not(:disabled) { background: var(--accent); color: #fff; }
 .btn-brief:disabled { opacity: 0.6; cursor: default; }
-.brief-ico { font-size: 16px; }
-.brief-hint { color: var(--text-muted); font-size: var(--font-size-caption); }
-@media (max-width: 480px) {
-  .brief-hint { flex: 1 1 100%; }
+.brief-ico { font-size: 15px; }
+.brief-hint {
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .brief-hint { display: none; }
 }
 .modal-overlay {
   position: fixed;
