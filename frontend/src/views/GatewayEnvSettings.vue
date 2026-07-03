@@ -1959,8 +1959,8 @@ onMounted(loadAllDevices)
 
 @media (max-width: 768px) {
   .page-container { padding: 4px 0; }
-  /* 좁은 화면: 아이콘+정보는 1행, 액션 버튼은 아래 행 전체 폭으로 */
+  /* 좁은 화면: 아이콘+정보는 1행, 액션 버튼은 아래 행 전체 폭 우측 정렬 */
   .card-header { flex-wrap: wrap; row-gap: 10px; }
-  .card-actions { flex-basis: 100%; justify-content: flex-start; }
+  .card-actions { flex-basis: 100%; justify-content: flex-end; }
 }
 </style>
