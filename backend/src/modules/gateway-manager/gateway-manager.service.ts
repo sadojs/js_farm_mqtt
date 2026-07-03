@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Gateway } from './entities/gateway.entity';
 import { House } from '../groups/entities/house.entity';
@@ -41,7 +41,33 @@ export class GatewayManagerService {
     private sshService: SshProxyService,
     @Inject(forwardRef(() => ConfigDeployService))
     private configDeployService: ConfigDeployService,
+    private dataSource: DataSource,
   ) {}
+
+  /**
+   * 게이트웨이에 소속된 장치 + 종속 데이터를 일괄 삭제.
+   * devices.gateway_id 는 gateways.id(uuid)를 varchar로 참조하며 FK cascade가 없어,
+   * 게이트웨이 삭제 시 장치가 유령으로 남던 문제를 방지한다.
+   */
+  private async cleanupGatewayDevices(gatewayUuid: string): Promise<number> {
+    return this.dataSource.transaction(async (m) => {
+      const rows: Array<{ id: string }> = await m.query(
+        `SELECT id::text AS id FROM devices WHERE gateway_id = $1`,
+        [gatewayUuid],
+      );
+      const ids = rows.map((r) => r.id);
+      if (ids.length === 0) return 0;
+      // 생존 장치가 삭제 대상을 가리키는 self-ref 정리
+      await m.query(`UPDATE devices SET paired_device_id=NULL WHERE paired_device_id::text = ANY($1::text[])`, [ids]);
+      await m.query(`UPDATE devices SET parent_device_id=NULL WHERE parent_device_id::text = ANY($1::text[]) AND id::text <> ALL($1::text[])`, [ids]);
+      // FK가 없는 종속 테이블은 명시적으로 정리
+      for (const t of ['sensor_data', 'sensor_alerts', 'sensor_standby', 'env_mappings', 'group_devices']) {
+        await m.query(`DELETE FROM ${t} WHERE device_id::text = ANY($1::text[])`, [ids]);
+      }
+      await m.query(`DELETE FROM devices WHERE id::text = ANY($1::text[])`, [ids]);
+      return ids.length;
+    });
+  }
 
   /** mqtt-bridge.handler가 gpio/status 토픽 수신 시 호출 — 마지막 응답 시각 트래킹 */
   recordGpioStatus(gatewayCode: string) {
@@ -312,7 +338,9 @@ export class GatewayManagerService {
 
   async remove(id: string, userId: string) {
     const gw = await this.findOne(id, userId);
+    const n = await this.cleanupGatewayDevices(gw.id);
     await this.gatewayRepo.remove(gw);
+    this.logger.log(`게이트웨이 ${gw.gatewayId} 삭제 — 소속 장치 ${n}개 및 종속 데이터 정리`);
     return { message: '게이트웨이가 삭제되었습니다.' };
   }
 
@@ -320,7 +348,9 @@ export class GatewayManagerService {
   async removeByAdmin(id: string) {
     const gw = await this.gatewayRepo.findOne({ where: { id } });
     if (!gw) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
+    const n = await this.cleanupGatewayDevices(gw.id);
     await this.gatewayRepo.remove(gw);
+    this.logger.log(`게이트웨이 ${gw.gatewayId} 삭제(admin) — 소속 장치 ${n}개 및 종속 데이터 정리`);
     return { message: '게이트웨이가 삭제되었습니다.' };
   }
 
