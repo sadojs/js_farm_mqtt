@@ -77,6 +77,9 @@
                 <span class="item-name">{{ device.name }}</span>
                 <span class="item-location">{{ getDeviceLocation(device) }}</span>
               </div>
+              <span :class="['item-status', device.online ? 'running' : 'stopped']">
+                {{ device.online ? '온라인' : '오프라인' }}
+              </span>
             </div>
             <div v-if="device.sensorData && device.online" class="sensor-chip-row">
               <span
@@ -117,9 +120,6 @@
                 </span>
               </button>
             </div>
-            <span v-else :class="['item-status', device.online ? 'running' : 'stopped']">
-              {{ device.online ? '대기' : '오프라인' }}
-            </span>
           </div>
         </div>
       </div>
@@ -170,8 +170,9 @@ const SENSOR_META: Record<string, { label: string; unit: string }> = {
   dew_point: { label: '이슬점', unit: '°C' },
 }
 
-const sensorDevices = computed(() => deviceStore.sensorDevices)
-const actuatorDevices = computed(() => deviceStore.actuatorDevices)
+// 게이트웨이(환경설정)에서 활성화된 장치만 노출 (enabled === false 는 제외)
+const sensorDevices = computed(() => deviceStore.sensorDevices.filter(d => d.enabled !== false))
+const actuatorDevices = computed(() => deviceStore.actuatorDevices.filter(d => d.enabled !== false))
 const sensorCount = computed(() => sensorDevices.value.length)
 const sensorOnline = computed(() => sensorDevices.value.filter(d => d.online).length)
 const actuatorCount = computed(() => actuatorDevices.value.length)
@@ -297,7 +298,7 @@ onMounted(async () => {
 
 .detail-card-header h3 {
   flex: 1;
-  font-size: calc(18px * var(--content-scale, 1));
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -338,7 +339,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--border-light);
   transition: background 0.15s;
 }
@@ -409,6 +410,9 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
 }
+/* 온/오프라인 상태를 오른쪽 끝으로 정렬 — item-info 가 남는 공간을 차지 */
+.sensor-item-top .item-info { flex: 1; }
+.sensor-item-top .item-status { margin-left: auto; }
 
 .sensor-chip-row {
   display: flex;
@@ -511,9 +515,11 @@ onMounted(async () => {
   .detail-grid { grid-template-columns: 1fr; gap: 10px; }
   .detail-card { border-radius: 12px; }
   .detail-card-header { padding: 12px 14px; gap: 10px; }
+  .detail-card-header h3 { font-size: calc(15px * var(--content-scale, 1)); }
   .detail-icon { width: 34px; height: 34px; }
   .detail-icon svg { width: 17px; height: 17px; }
   .detail-list { max-height: 240px; }
+  .detail-item { padding: 8px 14px; }
   /* 우적 토글: 모바일에서도 한눈에 보이도록 약간 작게 + 더 명확하게 */
   .rain-toggle-btn { padding: 5px 9px 5px 7px; gap: 7px; }
   .rain-toggle-icon { font-size: 16px; }
