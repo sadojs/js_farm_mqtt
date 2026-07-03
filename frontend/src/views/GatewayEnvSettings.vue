@@ -1084,7 +1084,21 @@ async function removeZigbee(dev: ZigbeeDevice) {
     await gatewayEnvApi.removeZigbee(gatewayId, dev.id)
     zigbeeDevices.value = zigbeeDevices.value.filter(d => d.id !== dev.id)
     notif.success('삭제 완료', '장치가 삭제되었습니다.')
-  } catch { notif.error('오류', '삭제에 실패했습니다.') }
+  } catch (e: any) {
+    const data = e?.response?.data
+    const rules = data?.dependencies?.automationRules
+    // 자동화 룰에서 사용 중(409) → 먼저 룰을 삭제하도록 안내 팝업
+    if (e?.response?.status === 409 && Array.isArray(rules) && rules.length > 0) {
+      const names = rules.map((r: any) => `• ${r.name}${r.enabled === false ? ' (비활성)' : ''}`).join('\n')
+      window.alert(
+        `"${dev.name}"은(는) 아래 자동제어 룰에서 사용 중이라 삭제할 수 없습니다.\n` +
+        `먼저 자동 제어 설정에서 아래 룰을 삭제한 뒤 장치를 삭제하세요.\n\n${names}`,
+      )
+      notif.error('삭제 불가', '자동제어 룰에서 사용 중입니다. 먼저 해당 룰을 삭제하세요.')
+    } else {
+      notif.error('오류', data?.message || '삭제에 실패했습니다.')
+    }
+  }
 }
 
 function getMappingValue(dev: ZigbeeDevice, slotKey: string) {

@@ -73,6 +73,23 @@ function buildIrrigationSlots(uuid: string, short: string, groupName: string, ch
   ];
 }
 
+// 삭제 대상 device id 목록($2 = text[]) 중 하나라도 자동화 룰 action 에서 쓰이면 그 룰들을 반환.
+// (devices.service 의 단일-id DEVICE_DEPENDENCY_SQL 를 다중-id 로 확장 — controller/child cascade 포함)
+const GATEWAY_ENV_DEVICE_DEP_SQL = `
+  SELECT DISTINCT id, name, enabled FROM automation_rules
+  WHERE user_id = $1
+  AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(
+      CASE WHEN jsonb_typeof(actions) = 'array'
+           THEN actions
+           ELSE jsonb_build_array(actions)
+      END
+    ) AS action
+    WHERE action->>'targetDeviceId' = ANY($2::text[])
+       OR action->'targetDeviceIds' ?| $2::text[]
+  )
+`;
+
 @Injectable()
 export class GatewayEnvService {
   private readonly logger = new Logger(GatewayEnvService.name);
@@ -722,10 +739,35 @@ export class GatewayEnvService {
   }
 
   // ── Zigbee: 삭제 ─────────────────────────────────────────────
+  /**
+   * 삭제하려는 장치(및 함께 삭제될 controller/child 패밀리)가 자동화 룰에서 쓰이면
+   * ConflictException(409, dependencies.automationRules) 을 던진다.
+   * → 프론트가 "먼저 자동제어 룰을 삭제하세요" 팝업을 띄우도록.
+   */
+  private async assertNoAutomationDependency(device: Device, ownerId: string): Promise<void> {
+    const rootId = (device as any).parentDeviceId || device.id;
+    const family = await this.deviceRepo.find({
+      where: [{ id: rootId }, { parentDeviceId: rootId } as any],
+    });
+    const ids = Array.from(new Set([device.id, rootId, ...family.map((f) => f.id)]));
+    const rules: { id: string; name: string; enabled: boolean }[] =
+      await this.deviceRepo.query(GATEWAY_ENV_DEVICE_DEP_SQL, [ownerId, ids]);
+    if (rules.length > 0) {
+      throw new ConflictException({
+        message:
+          '자동화 룰에서 사용 중인 장비는 삭제할 수 없습니다. 먼저 해당 자동제어 룰을 삭제한 뒤 장치를 삭제해 주세요.',
+        dependencies: { automationRules: rules },
+      });
+    }
+  }
+
   async removeZigbeeDevice(gatewayId: string, id: string, userId: string, role: string): Promise<void> {
     const gw = await this.assertGatewayOwner(gatewayId, userId, role);
     const device = await this.deviceRepo.findOne({ where: { id, userId: gw.userId, gatewayId } });
     if (!device) throw new NotFoundException('장치를 찾을 수 없습니다.');
+
+    // 자동화 룰 사용 중이면 삭제 차단 (구 장치 페이지의 체크를 게이트웨이 삭제 경로에도 적용)
+    await this.assertNoAutomationDependency(device, gw.userId);
 
     // 페어링 해제
     if (device.pairedDeviceId) {
