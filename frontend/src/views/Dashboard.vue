@@ -179,12 +179,14 @@ onMounted(() => {
 
 .page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* 제목·액션 항상 한 줄 (이전: wrap → 좁으면 다음 줄로 밀림) */
   gap: 12px;
 }
+/* 제목 블록이 남는 폭을 차지하고 필요 시 줄어들도록 (액션 버튼은 고정) */
+.page-header > div:first-child { flex: 1; min-width: 0; }
 
 .page-header h2 {
   font-size: calc(28px * var(--content-scale, 1));
