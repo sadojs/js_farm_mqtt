@@ -176,7 +176,8 @@ onMounted(async () => {
 .summary-value-line {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 2px 6px;
+  flex-wrap: wrap;   /* 좁으면 sublabel 을 통째로 다음 줄로 (토큰 중간 줄바꿈 방지) */
 }
 
 .summary-number {
@@ -184,13 +185,15 @@ onMounted(async () => {
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: 1.1;
+  white-space: nowrap;   /* "5 / 5" 가 슬래시에서 안 쪼개지도록 */
 }
 
 .summary-sublabel {
   font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   font-weight: 500;
+  white-space: nowrap;   /* "규칙 켜짐" 이 중간에서 안 쪼개지도록 */
 }
 
 .summary-label {
