@@ -1464,11 +1464,11 @@ onMounted(loadAllDevices)
 .card-type-icon { font-size: 20px; line-height: 1; }
 .card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 5px; font-size: 12px; color: var(--text-secondary); }
-.card-meta .type-label { font-weight: 700; text-transform: capitalize; }
+.card-meta .type-label { font-weight: 700; text-transform: capitalize; white-space: nowrap; }
 .card-meta .meta-sep { color: var(--text-muted); }
-.card-meta .meta-mono { font-family: monospace; color: var(--text-muted); font-size: 11px; }
-.card-meta .meta-online { color: #16a34a; font-weight: 600; }
-.card-meta .meta-offline { color: var(--text-muted); }
+.card-meta .meta-mono { font-family: monospace; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.card-meta .meta-online { color: #16a34a; font-weight: 600; white-space: nowrap; }
+.card-meta .meta-offline { color: var(--text-muted); white-space: nowrap; }
 .card-header-clickable { cursor: pointer; user-select: none; }
 .card-header-clickable:hover { background: var(--bg-hover, rgba(0,0,0,.02)); border-radius: 6px; }
 .expand-arrow { font-size: 11px; color: var(--text-secondary, #9ca3af); margin-left: 4px; }
@@ -1959,5 +1959,8 @@ onMounted(loadAllDevices)
 
 @media (max-width: 768px) {
   .page-container { padding: 4px 0; }
+  /* 좁은 화면: 아이콘+정보는 1행, 액션 버튼은 아래 행 전체 폭으로 */
+  .card-header { flex-wrap: wrap; row-gap: 10px; }
+  .card-actions { flex-basis: 100%; justify-content: flex-start; }
 }
 </style>
