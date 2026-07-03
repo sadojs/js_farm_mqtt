@@ -197,7 +197,7 @@ onMounted(async () => {
 }
 
 .summary-label {
-  font-size: calc(14px * var(--content-scale, 1));
+  font-size: calc(15px * var(--content-scale, 1));
   color: var(--text-secondary);
   font-weight: 600;
 }
@@ -227,7 +227,7 @@ onMounted(async () => {
     height: 18px;
   }
 
-  .summary-label { white-space: nowrap; font-size: calc(13px * var(--content-scale, 1)); }
+  .summary-label { white-space: nowrap; font-size: calc(14px * var(--content-scale, 1)); }
   .summary-sublabel { font-size: calc(11px * var(--content-scale, 1)); }
   .summary-number { font-size: calc(22px * var(--content-scale, 1)); }
   .summary-arrow { font-size: calc(16px * var(--content-scale, 1)); }
