@@ -409,7 +409,19 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .page-container { padding: 4px 0; }
-  .page-header { margin-bottom: 12px; }
+  /* 모바일: 제목 + 편집/새로고침 버튼을 한 줄로 (세로 길이 절약) */
+  .page-header {
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .page-header > div { min-width: 0; }
+  .page-header .page-description { display: none; }  /* 한 줄 확보 위해 설명 숨김 */
+  .page-header h2 {
+    font-size: calc(22px * var(--content-scale, 1));
+    white-space: nowrap;
+  }
+  .header-actions { flex-shrink: 0; }
   /* 모바일: 날씨 + 요약 세로 스택 */
   .hero-row {
     grid-template-columns: 1fr;
