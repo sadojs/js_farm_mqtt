@@ -1980,9 +1980,13 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   }
   .group-header-actions .btn-memo {
     position: relative;          /* 배지 absolute 기준 */
-    width: 36px; height: 36px;   /* 다른 아이콘 버튼과 동일 정사각형 */
+    /* 다른 아이콘 버튼(.btn-icon)과 완전히 동일한 박스 — 크기·모양·정렬 통일 */
+    box-sizing: border-box;
+    width: 36px; height: 36px;
+    min-width: 36px; min-height: 36px;
     padding: 0;
     gap: 0;
+    border-radius: 8px;
     flex-shrink: 0;
     justify-content: center;
   }
@@ -2007,10 +2011,10 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .btn-sm { padding: 0 18px; line-height: 1.8; }
   .btn-status-sm { padding: 0 18px; line-height: 1.8; }
   .type-tag { padding: 0 18px; line-height: 1.8; }
-  /* 카드 안쪽 콘텐츠 = 페이지 헤더(H2) = 모두 좌측 8px 동일 정렬.
-     카드 내부 좌우 padding 0 — 위·아래 padding 만 유지. */
+  /* 카드 내부 좌우에 일정한 여백을 줘서 이름·설명·아이콘·본문이 카드 가장자리에
+     붙지 않고 나란히 정렬되도록 한다. */
   .group-card { padding: 0; }
-  .group-header { padding: 14px 0; }
-  .group-body { padding: 0 0 14px; }
+  .group-header { padding: 14px 16px; }
+  .group-body { padding: 0 16px 14px; }
 }
 </style>
