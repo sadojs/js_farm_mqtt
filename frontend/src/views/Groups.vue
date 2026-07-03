@@ -1403,14 +1403,16 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(99, 102, 241, 0.25);
   border-radius: 10px;
   padding: 2px 10px;
-  margin-bottom: 4px;
+  margin-right: 8px;      /* 구역 이름과 간격 */
+  vertical-align: middle;
 }
 
 .group-title h3 {
-  font-size: calc(18px * var(--content-scale, 1));
+  font-size: calc(15px * var(--content-scale, 1));  /* 농가 배지와 어울리게 축소 */
   font-weight: 600;
   color: var(--text-primary);
   display: inline;
+  vertical-align: middle;
 }
 
 .btn-rename-group {
