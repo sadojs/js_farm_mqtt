@@ -13,7 +13,7 @@ INSERT INTO crop_milestones (crop_type, seedling_type, milestone_type, gdd_thres
   -- 생육 단계
   ('cherry_tomato', 'seedling', 'stage',         500.0,  '개화착과기 진입',              '1화방 개화가 시작되는 시점입니다.', 'high'),
   ('cherry_tomato', 'seedling', 'stage',         900.0,  '과비대기 진입',                '착과 후 과실이 비대해지는 시점입니다.', 'normal'),
-  ('cherry_tomato', 'seedling', 'stage',        1100.0,  '수확 시작',                   '첫 수확이 가능한 시점입니다.', 'high'),
+  ('cherry_tomato', 'seedling', 'stage',        1200.0,  '수확 시작',                   '첫 수확이 가능한 시점입니다.', 'high'),
   -- 병해충 방제
   ('cherry_tomato', 'seedling', 'pest_control',  150.0,  '1차 역병 방제',               '정식 초기 역병 예방 방제를 권장합니다.', 'high'),
   ('cherry_tomato', 'seedling', 'pest_control',  450.0,  '진딧물 방제 확인',             '신초(새순) 부위를 집중 확인하세요.', 'normal'),
