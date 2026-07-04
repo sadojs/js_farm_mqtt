@@ -88,17 +88,17 @@
         </p>
 
         <div class="confirm-scope">
-          <div class="confirm-scope-head">✓ 대상 구역 · {{ confirm.rows.length }}곳</div>
+          <div class="confirm-scope-head">✓ 대상 구역 · {{ confirm.zones.length }}곳</div>
           <div class="confirm-chips">
-            <span v-for="r in confirm.rows" :key="r.groupName" class="confirm-chip">{{ r.groupName }}</span>
+            <span v-for="z in confirm.zones" :key="z.groupName" class="confirm-chip">{{ z.groupName }}</span>
           </div>
         </div>
 
         <div class="confirm-rows">
-          <div v-for="r in confirm.rows" :key="r.groupName" class="confirm-row">
+          <div v-for="z in confirm.zones" :key="z.groupName" class="confirm-row">
             <span class="cr-dot" :style="{ background: confirm.accent }"></span>
-            <span class="cr-name">{{ r.groupName }} · {{ confirm.kindLabel }} {{ r.count }}대</span>
-            <span class="cr-change">{{ r.from }} <span class="cr-arrow">→</span> {{ confirm.verb }}</span>
+            <span class="cr-name">{{ z.groupName }} · {{ confirm.kindLabel }} {{ z.count }}대</span>
+            <span class="cr-change">{{ z.from }} <span class="cr-arrow">→</span> {{ confirm.verb }}</span>
           </div>
         </div>
 
@@ -192,7 +192,9 @@ const openerTotal = computed(() => scopeOpeners.value.length)
 const openerOpen = computed(() => scopeOpeners.value.filter(p => p.open.switchState === true).length)
 
 // ── 확인 모달 ──
-interface ConfirmRow { groupName: string; count: number; from: string }
+interface ConfirmItem { id: string; value: boolean; name: string }
+// 구역별로 묶음 — 실행 시 구역 내는 순차(같은 회로 돌입전류 보호), 구역 간은 병렬.
+interface ConfirmZone { groupName: string; count: number; from: string; items: ConfirmItem[] }
 interface ConfirmState {
   kind: 'fan' | 'opener'
   action: 'on' | 'off' | 'open' | 'close'
@@ -202,49 +204,51 @@ interface ConfirmState {
   accent: string
   iconType: string
   count: number
-  rows: ConfirmRow[]
-  targets: { id: string; value: boolean; name: string }[]
+  zones: ConfirmZone[]
 }
 const confirm = ref<ConfirmState | null>(null)
 const executing = ref(false)
 const execDone = ref(0)
 
 function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close') {
+  const zones: ConfirmZone[] = []
   if (kind === 'fan') {
-    const rows: ConfirmRow[] = []
-    const targets: ConfirmState['targets'] = []
     const value = action === 'on'
     for (const g of scopeGroups.value) {
       const fans = fansOf(g)
       if (fans.length === 0) continue
       const running = fans.filter(f => f.switchState === true).length
-      rows.push({ groupName: g.name, count: fans.length, from: `${running}대 가동` })
-      for (const f of fans) targets.push({ id: f.id, value, name: f.name })
+      zones.push({
+        groupName: g.name, count: fans.length, from: `${running}대 가동`,
+        items: fans.map(f => ({ id: f.id, value, name: f.name })),
+      })
     }
     confirm.value = {
       kind, action, kindLabel: '유동팬', verb: action === 'on' ? '켜기' : '끄기',
       sentence: action === 'on' ? '켭니다.' : '끕니다.',
-      accent: ACCENT_FAN, iconType: 'fan', count: targets.length, rows, targets,
+      accent: ACCENT_FAN, iconType: 'fan',
+      count: zones.reduce((n, z) => n + z.items.length, 0), zones,
     }
   } else {
-    const rows: ConfirmRow[] = []
-    const targets: ConfirmState['targets'] = []
     for (const g of scopeGroups.value) {
       const pairs = openerPairsOf(g)
       if (pairs.length === 0) continue
       const openCnt = pairs.filter(p => p.open.switchState === true).length
       const from = openCnt === 0 ? '닫힘' : openCnt === pairs.length ? '열림' : '부분'
-      rows.push({ groupName: g.name, count: pairs.length, from })
-      for (const p of pairs) {
+      zones.push({
+        groupName: g.name, count: pairs.length, from,
         // 열기 → 열림 릴레이 ON, 닫기 → 닫힘 릴레이 ON. 반대편 인터록은 백엔드가 처리.
-        const target = action === 'open' ? p.open : p.close
-        targets.push({ id: target.id, value: true, name: target.name })
-      }
+        items: pairs.map(p => {
+          const t = action === 'open' ? p.open : p.close
+          return { id: t.id, value: true, name: t.name }
+        }),
+      })
     }
     confirm.value = {
       kind, action, kindLabel: '개폐기', verb: action === 'open' ? '열기' : '닫기',
       sentence: action === 'open' ? '엽니다.' : '닫습니다.',
-      accent: ACCENT_OPENER, iconType: 'opener_open', count: targets.length, rows, targets,
+      accent: ACCENT_OPENER, iconType: 'opener_open',
+      count: zones.reduce((n, z) => n + z.items.length, 0), zones,
     }
   }
 }
@@ -265,18 +269,26 @@ async function execute() {
   let ok = 0
   const failed: string[] = []
   execDone.value = 0
-  // 순차 시차 실행 — 각 호출은 단일 제어와 동일한 controlDevice 경로(인터록/타이머는 백엔드 처리).
-  for (let i = 0; i < c.targets.length; i++) {
-    if (i > 0 && gap > 0) await sleep(gap)
-    const t = c.targets[i]
-    try {
-      const res: any = await deviceStore.controlDevice(t.id, [{ code: 'switch_1', value: t.value }])
-      if (res && res.success === false) { failed.push(t.name) } else { ok++ }
-    } catch {
-      failed.push(t.name)
+  // 구역 간 병렬, 구역 내 순차 시차 — 전기시설이 구역별로 별도이므로 돌입전류는 같은 구역에서만
+  // 몰림. 서로 다른 구역은 동시에 진행 → 전체 구역 100대라도 (가장 많은 구역 대수 × 시차)로 수렴.
+  // 각 호출은 단일 제어와 동일한 controlDevice 경로(인터록/타이머는 백엔드 처리).
+  const perZone = await Promise.all(c.zones.map(async (zone) => {
+    let zok = 0
+    const zfail: string[] = []
+    for (let i = 0; i < zone.items.length; i++) {
+      if (i > 0 && gap > 0) await sleep(gap)
+      const t = zone.items[i]
+      try {
+        const res: any = await deviceStore.controlDevice(t.id, [{ code: 'switch_1', value: t.value }])
+        if (res && res.success === false) { zfail.push(t.name) } else { zok++ }
+      } catch {
+        zfail.push(t.name)
+      }
+      execDone.value++   // JS 단일 스레드 — await 사이 증가라 경쟁 없음
     }
-    execDone.value = i + 1
-  }
+    return { zok, zfail }
+  }))
+  for (const r of perZone) { ok += r.zok; failed.push(...r.zfail) }
   executing.value = false
 
   const label = `${c.kindLabel} 전체 ${c.verb}`
