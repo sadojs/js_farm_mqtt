@@ -5,9 +5,20 @@
         <h2>방재일정</h2>
         <p class="page-description">{{ farmLabel }} · 전체 구역 통합 보기</p>
       </div>
-      <div class="tabs">
-        <button :class="['tab', { active: tab === 'calendar' }]" @click="tab = 'calendar'">방재 달력</button>
-        <button :class="['tab', { active: tab === 'setup' }]" @click="tab = 'setup'">방재일정 설정</button>
+      <div class="header-right">
+        <button
+          v-if="tab === 'calendar' && markers.length > 0"
+          class="btn-brief"
+          @click="speakBriefing"
+          :disabled="briefing"
+          title="오늘·내일·모레 방재/벌문 개방 음성 안내"
+        >
+          <span class="brief-ico">📢</span>{{ briefing ? '브리핑 중…' : '3일 브리핑 듣기' }}
+        </button>
+        <div class="tabs">
+          <button :class="['tab', { active: tab === 'calendar' }]" @click="tab = 'calendar'">방재 달력</button>
+          <button :class="['tab', { active: tab === 'setup' }]" @click="tab = 'setup'">방재일정 설정</button>
+        </div>
       </div>
     </header>
 
@@ -17,12 +28,6 @@
         <button class="btn-primary" @click="tab = 'setup'">방재일정 설정하기</button>
       </div>
       <template v-else>
-        <div class="brief-bar">
-          <button class="btn-brief" @click="speakBriefing" :disabled="briefing">
-            <span class="brief-ico">📢</span>{{ briefing ? '브리핑 중…' : '3일 브리핑 듣기' }}
-          </button>
-          <span class="brief-hint">오늘·내일·모레 방재/벌문 개방 음성 안내</span>
-        </div>
         <SprayCalendar
           :events="events"
           :markers="markers"
@@ -293,13 +298,15 @@ onMounted(reloadCalendar)
 .spray-view { display: flex; flex-direction: column; gap: 18px; }
 .page-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
 .page-header h2 { font-size: var(--font-size-title); font-weight: 700; color: var(--text-primary); }
 .page-description { color: var(--text-muted); }
+/* 제목 오른쪽 그룹: 3일 브리핑 버튼 + 탭 */
+.header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .tabs { display: flex; gap: 4px; background: var(--bg-hover); border-radius: 10px; padding: 4px; }
 .tab {
   border: none;
