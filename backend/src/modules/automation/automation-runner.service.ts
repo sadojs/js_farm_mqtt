@@ -17,7 +17,7 @@ export class AutomationRunnerService {
   private readonly logger = new Logger(AutomationRunnerService.name);
 
   // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase, hysteresisAction }
-  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold' }>();
+  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold'; cycleAnchorMs?: number; directionStartMs?: number }>();
 
   constructor(
     @InjectRepository(AutomationRule)
@@ -213,10 +213,21 @@ export class AutomationRunnerService {
     }
 
     // 릴레이 모드 체크: 조건이 매칭된 시간 범위 내에서 ON/OFF 사이클 실행
-    const relayResult = this.checkRelayCycle(rule, evaluatedAt);
+    // 히스테리시스(방향: on=열기, off=닫기)를 먼저 산출 — 사이클 anchor/10분 캡의 세션 경계 판정용.
+    const hysteresisAction = this.extractHysteresisAction(conditionResult.details);
+    const prevRelay = this.lastState.get(rule.id);
+    const nowMs = evaluatedAt.getTime();
+    // 새 세션 = 최초 매칭이거나 방향이 바뀐 경우 → 사이클 anchor / 10분 타이머 리셋.
+    const newSession = !prevRelay?.matched || prevRelay?.hysteresisAction !== hysteresisAction;
+    const cycleAnchorMs = newSession ? nowMs : (prevRelay?.cycleAnchorMs ?? nowMs);
+    const directionStartMs = newSession ? nowMs : (prevRelay?.directionStartMs ?? nowMs);
+    // 사이클을 룰 활성화 시각(anchor)에 정렬 → 항상 동작(ON)부터 시작 (기존 epoch 정렬은 대기부터 시작 가능).
+    const relayResult = this.checkRelayCycle(rule, evaluatedAt, cycleAnchorMs);
     if (relayResult) {
-      // 히스테리시스 결과를 추출 — 개폐기에서 어느 페어(open/close) 장치를 펄스할지 결정
-      const hysteresisAction = this.extractHysteresisAction(conditionResult.details);
+      // 동일 방향 10분 초과 시 자동 OFF + 정지 (개폐기는 실제 ~3분이면 완전 개/폐 — 무한 반복 방지).
+      if (nowMs - directionStartMs >= 10 * 60 * 1000) {
+        relayResult.isOnPhase = false;
+      }
 
       // 비-페어 device(예: 유동팬)에서 hysteresisAction='off'는 룰 종료로 간주.
       // (페어 device는 'off' 시 반대 방향으로 라우팅하지만 단일 device는 그냥 stop)
@@ -266,7 +277,7 @@ export class AutomationRunnerService {
       // 펄스 방향이 바뀌었을 때(예: 열기 → 닫기)만 logsRepo.save 호출.
       // 같은 활성 사이클 내의 30s ON ↔ 60s OFF 펄스 토글은 발행은 하되 로그는 생략.
       const isNewActivation = !prev?.matched || directionChanged;
-      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction });
+      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction, cycleAnchorMs, directionStartMs });
       return this.executeRelayAction(rule, relayResult, hysteresisAction, isNewActivation);
     }
 
@@ -874,7 +885,7 @@ export class AutomationRunnerService {
   // 릴레이 사이클 체크: 조건에 relay=true가 있으면 ON/OFF 사이클 위상 계산
   // - relayOnSeconds/relayOffSeconds 가 있으면 초 단위 사이클 (epoch 기준)
   // - 그 외엔 기존 분 단위 사이클 (시간 범위 시작점 기준)
-  private checkRelayCycle(rule: AutomationRule, now: Date): { isOnPhase: boolean; condition: any } | null {
+  private checkRelayCycle(rule: AutomationRule, now: Date, anchorMs?: number): { isOnPhase: boolean; condition: any } | null {
     const conditions = rule.conditions;
     if (!conditions?.groups?.length) return null;
 
@@ -887,8 +898,10 @@ export class AutomationRunnerService {
           const onSec = Number(cond.relayOnSeconds) || 30;
           const offSec = Number(cond.relayOffSeconds) || 60;
           const cycleSec = onSec + offSec;
-          // epoch 기준 사이클 위상 — 룰 별 anchor 없이도 일관됨
-          const elapsedSec = Math.floor(now.getTime() / 1000);
+          // 사이클을 룰 활성화 시각(anchorMs)에 정렬 → 항상 동작(ON) 구간부터 시작.
+          // (anchor 미제공 시 epoch 기준 폴백 — 하위호환)
+          const anchorSec = anchorMs != null ? Math.floor(anchorMs / 1000) : 0;
+          const elapsedSec = Math.floor(now.getTime() / 1000) - anchorSec;
           const cyclePos = ((elapsedSec % cycleSec) + cycleSec) % cycleSec;
           const isOnPhase = cyclePos < onSec;
           return { isOnPhase, condition: cond };
