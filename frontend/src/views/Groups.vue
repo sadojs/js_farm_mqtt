@@ -1986,6 +1986,15 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   /* 모바일은 좌우 여백 압축 — 화면을 가능한 한 카드에 양보 */
   .page-container { padding: 4px 0; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
+  /* 상단 액션 버튼(일괄 제어·구역 표시·구역 추가)이 좁은 폭에서 넘치지 않도록 줄바꿈 + 컴팩트 */
+  .page-header .header-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+  .page-header .header-actions > .btn-bulk-control,
+  .page-header .header-actions > .btn-visibility,
+  .page-header .header-actions > .btn-primary {
+    padding: 10px 14px;
+    font-size: calc(13px * var(--content-scale, 1));
+    white-space: nowrap;
+  }
   /* minmax(0, 1fr) — 1fr 만으로는 자식 min-content 가 viewport 폭을 넘기는 흔한 함정 */
   .device-sub-grid { grid-template-columns: minmax(0, 1fr); }
   .group-header { flex-direction: column; align-items: flex-start; gap: 8px; }
