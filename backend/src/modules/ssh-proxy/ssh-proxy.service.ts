@@ -16,7 +16,8 @@ export class SshProxyService {
     private gatewayService: GatewayManagerService,
   ) {
     this.keyPath = process.env.SSH_TUNNEL_KEY_PATH ?? join(homedir(), '.ssh', 'id_rpi_lgw');
-    this.tunnelUser = process.env.SSH_TUNNEL_USER ?? 'lgw-dev';
+    // 기본값을 lgwadmin(통일 정책)으로 — env 미로드 시에도 올바른 계정 사용 (lgw-dev는 Pi에 미등록).
+    this.tunnelUser = process.env.SSH_TUNNEL_USER ?? 'lgwadmin';
   }
 
   private buildConnectConfig(tunnelPort: number) {

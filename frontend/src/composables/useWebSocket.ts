@@ -57,7 +57,8 @@ export function useWebSocket() {
   function connect() {
     if (socket?.connected) return
 
-    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3100'
+    // 프로덕션(nginx 8443)에선 같은 오리진 → nginx가 /socket.io/를 백엔드로 프록시.
+    const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3100')
     socket = io(wsUrl, {
       auth: { token: authStore.accessToken },
       transports: ['websocket'],

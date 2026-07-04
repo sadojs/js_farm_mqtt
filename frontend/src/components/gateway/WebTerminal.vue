@@ -45,7 +45,9 @@ let fitAddon: FitAddon | null = null
 let socket: Socket | null = null
 let resizeObserver: ResizeObserver | null = null
 
-const wsBase = import.meta.env.VITE_WS_URL || 'http://localhost:3100'
+// 프로덕션(nginx 8443)에선 같은 오리진으로 붙어 nginx가 /socket.io/를 백엔드로 프록시.
+// (localhost:3100 기본값은 원격 사용자 브라우저의 localhost로 붙어 실패했음)
+const wsBase = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3100')
 
 function initTerminal() {
   if (!terminalEl.value) return
