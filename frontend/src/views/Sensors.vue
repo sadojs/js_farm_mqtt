@@ -530,15 +530,17 @@ onUnmounted(() => {
 
 .page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* 제목·새로고침 항상 한 줄 (대시보드와 동일) */
   gap: 12px;
 }
+.page-header > div:first-child { flex: 1; min-width: 0; }
 
 .page-header h2 { font-size: calc(32px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .page-description { color: var(--text-secondary); font-size: calc(16px * var(--content-scale, 1)); margin-top: 4px; }
+.btn-refresh { flex-shrink: 0; }
 
 .btn-refresh {
   display: inline-flex;

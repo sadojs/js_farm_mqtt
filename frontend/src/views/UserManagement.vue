@@ -779,12 +779,13 @@ void openNewGatewayModal
 
 .page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* 제목·액션 항상 한 줄 (대시보드와 동일) */
 }
+.page-header > .page-title { flex: 1; min-width: 0; }
 .page-title h2 {
   font-size: calc(28px * var(--content-scale, 1));
   font-weight: 700;

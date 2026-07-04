@@ -771,11 +771,12 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 16px;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* 제목·액션 항상 한 줄 (대시보드와 동일) */
 }
+.page-header-text { flex: 1; min-width: 0; }
 .page-header-text h2 {
   margin: 0 0 4px;
   font-size: 24px;
@@ -787,7 +788,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   color: var(--text-secondary);
   margin: 0;
 }
-.page-header-actions { display: flex; gap: 8px; }
+.page-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 /* 툴바 */
 .toolbar {
