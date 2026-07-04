@@ -20,6 +20,11 @@ export function useEmergencyFailover() {
   const schedule = computed(() => full.value?.schedule ?? [])
   const status = computed(() => full.value?.status ?? null)
   const mode = computed(() => status.value?.mode ?? 'unknown')
+  // RPi가 최신 설정 버전을 적용(ACK)했는지 — lastAppliedVersion === version 이면 동기화 완료.
+  const synced = computed(() => {
+    const c = config.value
+    return !!c && c.lastAppliedVersion === c.version
+  })
 
   async function load(gid: string) {
     gatewayId.value = gid
@@ -47,6 +52,30 @@ export function useEmergencyFailover() {
     } finally {
       saving.value = false
     }
+  }
+
+  // 저장 후 RPi ACK로 lastAppliedVersion 이 version 을 따라잡을 때까지 폴링 (동기화 완료 확인용).
+  async function refetchApplied() {
+    if (!gatewayId.value) return
+    try {
+      const fresh = await emergencyFailoverApi.getFull(gatewayId.value)
+      if (full.value && fresh?.config) {
+        full.value.config.version = fresh.config.version
+        full.value.config.lastAppliedVersion = fresh.config.lastAppliedVersion
+        full.value.config.lastAppliedAt = fresh.config.lastAppliedAt
+        if (fresh.status) full.value.status = fresh.status
+      }
+    } catch { /* transient — 폴링 지속 */ }
+  }
+
+  async function waitForSync(timeoutMs = 20000, intervalMs = 1500): Promise<boolean> {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      if (synced.value) return true
+      await new Promise((r) => setTimeout(r, intervalMs))
+      await refetchApplied()
+    }
+    return synced.value
   }
 
   async function saveSchedule(month: number, dto: UpsertScheduleDto) {
@@ -150,12 +179,14 @@ export function useEmergencyFailover() {
     schedule,
     status,
     mode,
+    synced,
     events,
     loading,
     saving,
     error,
     load,
     saveConfig,
+    waitForSync,
     saveSchedule,
     disableMonth,
     loadEvents,

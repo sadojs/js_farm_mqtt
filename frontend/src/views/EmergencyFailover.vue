@@ -106,7 +106,12 @@ async function saveAll() {
     }
   }
   await fail.saveConfig(editable.value)
-  alert('저장되었습니다. 게이트웨이에 동기화 중...')
+  const ok = await fail.waitForSync()
+  if (ok) {
+    alert(`저장 및 게이트웨이 동기화 완료 (v${fail.config.value?.version}).`)
+  } else {
+    alert('저장되었습니다. 다만 게이트웨이 동기화 확인이 지연됩니다(응답 없음) — 게이트웨이 온라인 상태와 상태 카드의 동기화 배지를 확인하세요.')
+  }
 }
 
 async function resync() {

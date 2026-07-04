@@ -43,10 +43,13 @@ function fmt(d: string | null | undefined) {
       <div>
         <span class="status-label">버전</span>
         <span>v{{ config.version }}
-          <small v-if="config.lastAppliedVersion">
-            (RPi 적용 v{{ config.lastAppliedVersion }}, {{ fmt(config.lastAppliedAt) }})
+          <small v-if="config.lastAppliedVersion === config.version" class="synced">
+            ✅ 동기화됨 ({{ fmt(config.lastAppliedAt) }})
           </small>
-          <small v-else class="warn">RPi 미동기화</small>
+          <small v-else-if="config.lastAppliedVersion != null" class="warn">
+            🔄 동기화 중 (RPi v{{ config.lastAppliedVersion }} → v{{ config.version }})
+          </small>
+          <small v-else class="warn">⚠️ RPi 미동기화</small>
         </span>
       </div>
       <div>
@@ -76,6 +79,7 @@ function fmt(d: string | null | undefined) {
 .badge-fallback { background: #ffebee; color: #c62828; }
 .badge-unknown { background: #eceff1; color: #546e7a; }
 .warn { color: var(--warning, #f57c00); }
+.synced { color: var(--success, #2e7d32); }
 .btn-secondary, .btn-danger {
   padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
   border: 1px solid transparent;
