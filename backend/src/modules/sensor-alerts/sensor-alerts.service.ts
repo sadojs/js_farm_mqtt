@@ -5,6 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { SensorAlert } from './entities/sensor-alert.entity';
 import { SensorStandby } from './entities/sensor-standby.entity';
 import { Device } from '../devices/entities/device.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import {
   SENSOR_ALERT_RULES, AlertRuleParams,
   NO_DATA_WARNING_MINUTES, NO_DATA_CRITICAL_MINUTES,
@@ -20,6 +21,7 @@ export class SensorAlertsService {
     @InjectRepository(SensorAlert) private alertRepo: Repository<SensorAlert>,
     @InjectRepository(SensorStandby) private standbyRepo: Repository<SensorStandby>,
     @InjectRepository(Device) private deviceRepo: Repository<Device>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private dataSource: DataSource,
   ) {}
 
@@ -165,6 +167,9 @@ export class SensorAlertsService {
 
     // 센서 오프라인 감지 (online 플래그 기반 — staleness 스윕이 online=false 유지)
     await this.checkSensorOffline();
+
+    // 게이트웨이(라즈베리파이) 오프라인 감지
+    await this.checkGatewayOffline();
 
     // 조건이 정상으로 복귀한 알림 자동 해제
     await this.autoResolveAlerts(standbySet);
@@ -316,6 +321,82 @@ export class SensorAlertsService {
       });
       await this.alertRepo.save(alert);
       this.logger.warn(`[Sensor Offline] ${sensor.name}: offline ${Math.round(minutesAgo)}분 (${severity})`);
+    }
+  }
+
+  /**
+   * 게이트웨이(라즈베리파이) 오프라인 감지.
+   * gateway-manager 의 stale 스윕이 agent_status 를 offline 으로 내리면(5분 무응답) 여기서 알림 생성.
+   * 복구(online) 시 자동 해제, 30분 이상 지속 시 critical 승격.
+   * sensor_alerts.device_id 는 devices FK가 없어 게이트웨이 id 를 그대로 사용.
+   */
+  private async checkGatewayOffline() {
+    const gateways = await this.gatewayRepo.find({
+      select: ['id', 'userId', 'name', 'gatewayId', 'agentStatus', 'lastSeen'],
+    });
+
+    for (const gw of gateways) {
+      if (gw.agentStatus === 'online') {
+        // 온라인 복귀 → 기존 미해결 오프라인 알림 자동 해제
+        const existingAlerts = await this.alertRepo.find({
+          where: {
+            deviceId: gw.id,
+            alertType: 'no_data' as any,
+            sensorType: 'gateway_offline',
+            resolved: false,
+          },
+        });
+        for (const alert of existingAlerts) {
+          await this.alertRepo.update(
+            { id: alert.id },
+            { resolved: true, resolvedAt: new Date() },
+          );
+          this.logger.log(`[Auto-Resolve] 게이트웨이 ${gw.name} 온라인 복귀 — 오프라인 알림 해제`);
+        }
+        continue;
+      }
+
+      // 한 번도 연결된 적 없는 게이트웨이는 알림 제외 (오탐 방지)
+      if (!gw.lastSeen) continue;
+      const minutesAgo = (Date.now() - new Date(gw.lastSeen).getTime()) / 60000;
+
+      const existing = await this.alertRepo.findOne({
+        where: {
+          deviceId: gw.id,
+          alertType: 'no_data' as any,
+          sensorType: 'gateway_offline',
+          resolved: false,
+        },
+      });
+
+      if (existing) {
+        // 30분 이상 지속 → critical 승격
+        if (minutesAgo >= 30 && existing.severity === 'warning') {
+          await this.alertRepo.update(
+            { id: existing.id },
+            {
+              severity: 'critical',
+              message: `게이트웨이(라즈베리파이) ${gw.name} ${minutesAgo >= 60 ? Math.round(minutesAgo / 60) + '시간' : Math.round(minutesAgo) + '분'} 동안 연결 끊김`,
+            },
+          );
+          this.logger.warn(`[Gateway Offline] ${gw.name}: severity → critical`);
+        }
+        continue;
+      }
+
+      const severity: 'warning' | 'critical' = minutesAgo >= 30 ? 'critical' : 'warning';
+      const alert = this.alertRepo.create({
+        userId: gw.userId,
+        deviceId: gw.id,
+        deviceName: gw.name,
+        sensorType: 'gateway_offline',
+        alertType: 'no_data' as any,
+        severity,
+        message: `게이트웨이(라즈베리파이) ${gw.name} 연결이 끊겼습니다 (오프라인)`,
+        threshold: '오프라인',
+      });
+      await this.alertRepo.save(alert);
+      this.logger.warn(`[Gateway Offline] ${gw.name} (${gw.gatewayId}): offline ${Math.round(minutesAgo)}분 (${severity})`);
     }
   }
 

@@ -217,6 +217,7 @@ const SENSOR_TYPE_LABELS: Record<string, string> = {
   // 장치 상태
   sensor_offline: '센서 오프라인',
   actuator_offline: '장비 오프라인',
+  gateway_offline: '게이트웨이 오프라인',
   // 하우스 내부
   temperature: '온도',
   humidity: '습도',
