@@ -7,19 +7,21 @@
       </div>
       <div class="header-actions">
         <!-- MQTT에서는 실시간 동기화됨 -->
-        <button class="btn-bulk-control" @click="showBulkControl = true" title="선택한 구역의 유동팬·개폐기를 한 번에 제어">
-          <span class="bc-bolt">⚡</span> 일괄 제어
+        <button class="btn-bulk-control" @click="showBulkControl = true" title="일괄 제어 — 유동팬·개폐기를 한 번에 제어">
+          <span class="bc-bolt">⚡</span><span class="btn-label">일괄 제어</span>
         </button>
         <button
           class="btn-secondary btn-visibility"
           @click="showVisibilityModal = true"
-          :title="isFarmUser ? '관리자에게 문의' : 'IoT 화면에서 보이는 구역을 설정합니다'"
+          :title="isFarmUser ? '관리자에게 문의' : '구역 표시 설정 — IoT 화면에서 보이는 구역을 설정합니다'"
         >
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          구역 표시 설정
-          <span v-if="hiddenZoneCount > 0" class="badge-hidden">· 숨김 {{ hiddenZoneCount }}</span>
+          <span class="btn-label">구역 표시 설정</span>
+          <span v-if="hiddenZoneCount > 0" class="badge-hidden"><span class="hz-text">· 숨김 </span>{{ hiddenZoneCount }}</span>
         </button>
-        <button v-if="!isFarmUser" class="btn-primary" @click="showGroupCreationModal = true">+ 구역 추가</button>
+        <button v-if="!isFarmUser" class="btn-primary btn-add-zone" @click="showGroupCreationModal = true" title="구역 추가">
+          <span class="add-plus">+</span><span class="btn-label"> 구역 추가</span>
+        </button>
       </div>
     </header>
 
@@ -1986,15 +1988,27 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   /* 모바일은 좌우 여백 압축 — 화면을 가능한 한 카드에 양보 */
   .page-container { padding: 4px 0; }
   .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
-  /* 상단 액션 버튼(일괄 제어·구역 표시·구역 추가)이 좁은 폭에서 넘치지 않도록 줄바꿈 + 컴팩트 */
-  .page-header .header-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+  /* 상단 액션 버튼: 모바일은 아이콘만(글씨 제거) — 새로고침 버튼처럼 정사각 아이콘 버튼 */
+  .page-header .header-actions { flex-wrap: wrap; gap: 8px; }
+  .page-header .header-actions .btn-label { display: none; }
   .page-header .header-actions > .btn-bulk-control,
   .page-header .header-actions > .btn-visibility,
   .page-header .header-actions > .btn-primary {
-    padding: 10px 14px;
-    font-size: calc(13px * var(--content-scale, 1));
-    white-space: nowrap;
+    width: 44px; height: 44px; min-width: 44px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0;
+    position: relative; flex: 0 0 auto;
   }
+  .page-header .header-actions .btn-bulk-control .bc-bolt { font-size: calc(18px * var(--content-scale, 1)); }
+  .page-header .header-actions .btn-add-zone .add-plus { font-size: calc(24px * var(--content-scale, 1)); font-weight: 700; line-height: 1; }
+  /* 숨김 개수: 아이콘 우상단 배지로 */
+  .page-header .header-actions .badge-hidden {
+    position: absolute; top: -5px; right: -5px;
+    min-width: 17px; height: 17px; padding: 0 4px;
+    background: #ef6c00; color: #fff; border-radius: 9px;
+    font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-header .header-actions .badge-hidden .hz-text { display: none; }
   /* minmax(0, 1fr) — 1fr 만으로는 자식 min-content 가 viewport 폭을 넘기는 흔한 함정 */
   .device-sub-grid { grid-template-columns: minmax(0, 1fr); }
   .group-header { flex-direction: column; align-items: flex-start; gap: 8px; }
