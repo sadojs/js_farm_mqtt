@@ -273,11 +273,11 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
   background: var(--bg-hover);
   border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: var(--font-size-subtitle);
   cursor: pointer;
 }
 .nav-btn:disabled { opacity: 0.4; cursor: default; }
-.period-label { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.period-label { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: var(--font-size-label); }
 .receipt {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -296,7 +296,7 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
 .rcpt-row:last-child { border-bottom: none; }
 .rcpt-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rcpt-label { color: var(--text-secondary); font-size: var(--font-size-label); }
-.rcpt-amount { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rcpt-amount { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: var(--font-size-label); }
 .rcpt-amount.minus { color: var(--danger); }
 .rcpt-row.rcpt-variable { background: var(--warning-bg); }
 .rcpt-row.rcpt-variable .rcpt-label { color: var(--warning-text); font-weight: 600; }
@@ -312,9 +312,10 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  font-size: var(--font-size-label);
 }
 .var-amt-input:focus-visible { outline: 2px solid var(--warning); outline-offset: 1px; }
-.won-u { color: var(--warning-text); font-weight: 600; }
+.won-u { color: var(--warning-text); font-weight: 600; font-size: var(--font-size-label); }
 .var-hint {
   background: var(--warning-bg);
   color: var(--warning-text);
@@ -336,7 +337,7 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
   font-size: var(--font-size-caption);
 }
 .settle-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
-.status-chip { font-weight: 700; }
+.status-chip { font-weight: 700; font-size: var(--font-size-label); }
 .status-chip.done { color: var(--success-text); }
 .status-chip.pending { color: var(--warning-text); }
 .btn-primary {
@@ -346,6 +347,7 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
   border-radius: 8px;
   padding: 12px 22px;
   font-weight: 600;
+  font-size: var(--font-size-label);
   cursor: pointer;
   min-height: 44px;
 }
@@ -364,7 +366,7 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
 .proration-reason {
   display: block;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: var(--font-size-tiny);
   color: var(--text-muted);
   font-weight: 400;
   line-height: 1.35;
