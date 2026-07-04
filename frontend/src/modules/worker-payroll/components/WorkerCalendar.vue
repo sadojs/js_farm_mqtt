@@ -216,15 +216,15 @@ defineExpose({ reload })
   border: 1px solid var(--border-card);
   border-radius: 12px;
   box-shadow: var(--shadow-card);
-  padding: 16px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .kpi-label { color: var(--text-muted); font-size: var(--font-size-caption); font-weight: 600; }
-.kpi-value { font-size: 28px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
-.kpi-value small { font-size: 15px; color: var(--text-muted); margin-left: 2px; }
-.kpi-value.money { font-size: 22px; }
+.kpi-value { font-size: 22px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.kpi-value small { font-size: 13px; color: var(--text-muted); margin-left: 2px; }
+.kpi-value.money { font-size: 17px; }
 .period-nav {
   display: flex;
   align-items: center;
@@ -358,7 +358,13 @@ defineExpose({ reload })
   white-space: nowrap;
 }
 @media (max-width: 768px) {
-  .kpi-row { grid-template-columns: 1fr; }
+  /* 모바일: 세로로 쌓지 않고 한 줄(3열) 컴팩트하게 — 세로 공간 절약 */
+  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .kpi { padding: 8px 10px; }
+  .kpi-label { font-size: 11px; }
+  .kpi-value { font-size: 17px; }
+  .kpi-value small { font-size: 11px; }
+  .kpi-value.money { font-size: 13px; }
   .cell { min-height: 72px; padding: 4px; }
   .day-num { font-size: 11px; }
   .day-num.with-month { padding: 1px 4px; }
