@@ -106,7 +106,7 @@
           <button class="cf-cancel" :disabled="executing" @click="confirm = null">취소</button>
           <button class="cf-run" :disabled="executing" @click="execute">
             <span v-if="executing" class="cf-spin"></span>
-            {{ executing ? '실행 중…' : `${confirm.count}대 ${confirm.verb}` }}
+            {{ executing ? `실행 중… (${execDone}/${confirm.count})` : `${confirm.count}대 ${confirm.verb}` }}
           </button>
         </div>
       </div>
@@ -207,6 +207,7 @@ interface ConfirmState {
 }
 const confirm = ref<ConfirmState | null>(null)
 const executing = ref(false)
+const execDone = ref(0)
 
 function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close') {
   if (kind === 'fan') {
@@ -248,20 +249,33 @@ function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'cl
   }
 }
 
+// 시차 기동(staggered start) — 모터 돌입전류 합산/차단기 트립/전원 스파이크 방지.
+// 개폐기(양방향 모터 구동)·환풍기 켜기는 지연을 주고, 끄기는 돌입이 없어 지연 없음.
+function staggerMs(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close'): number {
+  if (kind === 'opener') return 800   // 열기/닫기 모두 모터 구동 + 백엔드 인터록(OFF→지연→ON) 여유
+  return action === 'on' ? 350 : 0    // 팬: 켜기만 돌입전류, 끄기는 즉시
+}
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
 async function execute() {
   if (!confirm.value || executing.value) return
   executing.value = true
   const c = confirm.value
+  const gap = staggerMs(c.kind, c.action)
   let ok = 0
   const failed: string[] = []
-  // 순차 실행 — 개폐기 인터록/타이머 타이밍 보호. 각 호출은 단일 제어와 동일한 controlDevice 경로.
-  for (const t of c.targets) {
+  execDone.value = 0
+  // 순차 시차 실행 — 각 호출은 단일 제어와 동일한 controlDevice 경로(인터록/타이머는 백엔드 처리).
+  for (let i = 0; i < c.targets.length; i++) {
+    if (i > 0 && gap > 0) await sleep(gap)
+    const t = c.targets[i]
     try {
       const res: any = await deviceStore.controlDevice(t.id, [{ code: 'switch_1', value: t.value }])
       if (res && res.success === false) { failed.push(t.name) } else { ok++ }
     } catch {
       failed.push(t.name)
     }
+    execDone.value = i + 1
   }
   executing.value = false
 
