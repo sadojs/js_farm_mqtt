@@ -7,6 +7,9 @@
       </div>
       <div class="header-actions">
         <!-- MQTT에서는 실시간 동기화됨 -->
+        <button class="btn-bulk-control" @click="showBulkControl = true" title="선택한 구역의 유동팬·개폐기를 한 번에 제어">
+          <span class="bc-bolt">⚡</span> 일괄 제어
+        </button>
         <button
           class="btn-secondary btn-visibility"
           @click="showVisibilityModal = true"
@@ -355,6 +358,12 @@
       <button class="link-btn" @click="showVisibilityModal = true">구역 표시 설정에서 변경</button>
     </div>
 
+    <BulkControlModal
+      v-if="showBulkControl"
+      :groups="groups"
+      @close="showBulkControl = false"
+    />
+
     <ZoneVisibilityModal
       v-if="showVisibilityModal"
       :groups="allGroups"
@@ -475,6 +484,7 @@ import ZoneNotesPanel from '@/components/groups/ZoneNotesPanel.vue'
 import { zoneNotesApi } from '@/api/zone-notes.api'
 import RemoveDeviceModal from '@/components/groups/RemoveDeviceModal.vue'
 import ZoneVisibilityModal from '@/components/groups/ZoneVisibilityModal.vue'
+import BulkControlModal from '@/components/groups/BulkControlModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
@@ -612,6 +622,7 @@ const allGroups = computed(() => groupStore.groups)
 const hiddenZoneCount = computed(() => groupStore.hiddenZoneCount)
 const loading = computed(() => groupStore.loading)
 const showVisibilityModal = ref(false)
+const showBulkControl = ref(false)
 
 const collapsedGroups = ref(new Set<string>())
 
@@ -1334,6 +1345,15 @@ onBeforeUnmount(() => {
 }
 .btn-visibility:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--text-primary); }
 .badge-hidden { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+.btn-bulk-control {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 12px 18px; border-radius: 8px; cursor: pointer;
+  background: #ef6c00; color: #fff; border: none;
+  font-weight: 700; font-size: calc(14px * var(--content-scale, 1));
+  transition: background 0.15s;
+}
+.btn-bulk-control:hover { background: #e65100; }
+.btn-bulk-control .bc-bolt { font-size: calc(15px * var(--content-scale, 1)); }
 
 .hidden-banner {
   margin-top: 14px;
