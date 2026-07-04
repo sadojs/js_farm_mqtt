@@ -1,5 +1,6 @@
 // controller equipment_type support added (zigbee-channel-actuator)
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -48,6 +49,35 @@ export class DevicesService {
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
   ) {}
+
+  /**
+   * 매 분: 개폐기 최대 동작시간(10분) 초과 자동 OFF — 자동제어 사이클/우적 닫힘/수동 제어 공통.
+   * 개폐기는 실제 ~3분이면 완전 개/폐되므로 같은 동작이 10분 넘게 지속되면 강제 정지.
+   * switchState=ON 이고 lastCommandAt 이 10분 초과인 개폐기를 OFF.
+   * (자동제어 사이클은 매 ON 펄스마다 lastCommandAt 갱신되어 여기엔 안 걸림 —
+   *  automation-runner의 방향별 10분 cap이 사이클을 처리. 이 cron은 우적/수동/stuck 백스톱.)
+   * cron 기반이라 백엔드 재시작에도 안전.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async autoOffStuckOpeners() {
+    const OPENER_MAX_MS = 10 * 60 * 1000;
+    const openers = await this.devicesRepo.find({
+      where: [{ equipmentType: 'opener_open' }, { equipmentType: 'opener_close' }],
+    });
+    const now = Date.now();
+    for (const dev of openers) {
+      const s: any = dev.deviceSettings || {};
+      if (s.switchState !== true) continue;
+      const lastMs = s.lastCommandAt ? new Date(s.lastCommandAt).getTime() : null;
+      if (lastMs == null || now - lastMs < OPENER_MAX_MS) continue;
+      try {
+        await this.controlDevice(dev.id, dev.userId, [{ code: 'state', value: false }], 'admin', 'automation');
+        this.logger.warn(`개폐기 최대 동작 10분 초과 → 자동 OFF: ${dev.name} (lastCommandAt=${s.lastCommandAt})`);
+      } catch (e: any) {
+        this.logger.warn(`개폐기 auto-off 실패 (${dev.name}): ${e?.message ?? e}`);
+      }
+    }
+  }
 
   /** 장치가 속한 구역(house_group) ID 조회 — rain-override 등에서 사용 */
   /**
