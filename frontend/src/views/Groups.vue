@@ -1987,9 +1987,13 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 @media (max-width: 768px) {
   /* 모바일은 좌우 여백 압축 — 화면을 가능한 한 카드에 양보 */
   .page-container { padding: 4px 0; }
-  .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
+  /* 대시보드처럼 제목줄에 아이콘 버튼 배치 — 설명 숨김 + nowrap 으로 한 줄 고정 */
+  .page-header { flex-wrap: nowrap; align-items: center; }
+  .page-header > div:first-child { flex: 1; min-width: 0; }
+  .page-header .page-description { display: none; }
+  .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); white-space: nowrap; }
   /* 상단 액션 버튼: 모바일은 아이콘만(글씨 제거) — 새로고침 버튼처럼 정사각 아이콘 버튼 */
-  .page-header .header-actions { flex-wrap: wrap; gap: 8px; }
+  .page-header .header-actions { flex-shrink: 0; gap: 8px; }
   .page-header .header-actions .btn-label { display: none; }
   .page-header .header-actions > .btn-bulk-control,
   .page-header .header-actions > .btn-visibility,
