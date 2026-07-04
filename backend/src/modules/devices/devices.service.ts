@@ -782,6 +782,23 @@ export class DevicesService {
             this.logger.log(`개폐기 인터록 (Zigbee): ${paired.name} OFF (key=${switchCode}) → 1초 대기`);
           }
           await new Promise(r => setTimeout(r, 1000));
+
+          // 반대편(페어) device의 상태도 OFF로 정리 — 안 하면 자동제어 열림 + 수동 닫힘 시
+          // 열림 device의 switchState/relayActivePhase가 stale하게 남아 UI에 둘 다 활성으로 보임.
+          const ps: any = paired.deviceSettings || {};
+          ps.switchState = false;
+          ps.switchStates = { ...(ps.switchStates || {}), state: false, switch_1: false };
+          ps.relayActivePhase = null;
+          ps.relayActiveUntil = null;
+          ps.relayActiveRuleId = null;
+          ps.lastCommandAt = new Date().toISOString();
+          paired.deviceSettings = ps;
+          await this.devicesRepo.save(paired).catch(() => undefined);
+          this.eventsGateway.broadcastDeviceSwitchUpdate(paired.userId, {
+            deviceId: paired.id,
+            switchState: false,
+            switchStates: ps.switchStates,
+          });
         }
       }
     }
