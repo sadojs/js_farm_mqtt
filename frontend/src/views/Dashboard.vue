@@ -430,11 +430,11 @@ onMounted(() => {
     font-size: calc(22px * var(--content-scale, 1));
     white-space: nowrap;
   }
-  .header-actions { flex-shrink: 0; gap: 6px; }
-  /* 모바일: 편집/새로고침을 아이콘만 있는 정사각 버튼으로 (제목과 한 줄 확실히 유지) */
-  .btn-icon-action { padding: 0; width: 36px; height: 36px; justify-content: center; }
+  .header-actions { flex-shrink: 0; gap: 8px; }
+  /* 모바일: 편집/새로고침을 아이콘만 있는 정사각 버튼으로 (구역 관리 아이콘 버튼과 동일 44px) */
+  .btn-icon-action { padding: 0; width: 44px; height: 44px; min-width: 44px; justify-content: center; }
   .btn-icon-action .btn-label { display: none; }
-  .btn-icon-action .ico { font-size: calc(17px * var(--content-scale, 1)); }
+  .btn-icon-action .ico { font-size: calc(18px * var(--content-scale, 1)); }
   /* 모바일: 날씨 + 요약 세로 스택 */
   .hero-row {
     grid-template-columns: 1fr;
