@@ -252,7 +252,7 @@ function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'cl
 // 시차 기동(staggered start) — 모터 돌입전류 합산/차단기 트립/전원 스파이크 방지.
 // 개폐기(양방향 모터 구동)·환풍기 켜기는 지연을 주고, 끄기는 돌입이 없어 지연 없음.
 function staggerMs(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close'): number {
-  if (kind === 'opener') return 800   // 열기/닫기 모두 모터 구동 + 백엔드 인터록(OFF→지연→ON) 여유
+  if (kind === 'opener') return 1000  // 열기/닫기 모두 모터 구동 + 백엔드 인터록(OFF→1초→ON) 여유
   return action === 'on' ? 350 : 0    // 팬: 켜기만 돌입전류, 끄기는 즉시
 }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))

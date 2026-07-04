@@ -977,9 +977,9 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
       }
       const storeOpposite = deviceStore.devices.find(d => d.id === oppositeDevice.id)
       if (storeOpposite) storeOpposite.switchState = false
-      // UI측 여유 대기(1.5초). 실제 '동시 ON 금지' 인터록은 백엔드가 ON 명령마다
+      // UI측 여유 대기(1초). 실제 '동시 ON 금지' 인터록은 백엔드가 ON 명령마다
       // 반대쪽 OFF→1초→타겟 ON 으로 서버측에서 강제하므로, 이 값과 무관하게 안전.
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
     // 타겟 ON
     const result = await deviceStore.controlDevice(targetDevice.id, [{ code: 'switch_1', value: true }])
