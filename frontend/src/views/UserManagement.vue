@@ -12,14 +12,14 @@
             <polyline points="1 20 1 14 7 14"/>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
-          새로고침
+          <span class="btn-label">새로고침</span>
         </button>
-        <button class="btn-primary" @click="openNewUser">
+        <button class="btn-primary" @click="openNewUser" title="새 사용자 추가">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          새 사용자 추가
+          <span class="btn-label">새 사용자 추가</span>
         </button>
       </div>
     </header>
@@ -1462,6 +1462,16 @@ void openNewGatewayModal
 
 @media (max-width: 768px) {
   .page-container { padding: 4px 0; }
+  /* 새로고침·새 사용자 추가를 제목줄 아이콘 버튼으로 (대시보드와 동일) */
+  .page-header { flex-wrap: nowrap; align-items: center; }
+  .page-header > .page-title { flex: 1; min-width: 0; }
+  .page-header .page-description { display: none; }
+  .page-title h2 { font-size: calc(24px * var(--content-scale, 1)); white-space: nowrap; }
+  .header-actions { flex-shrink: 0; gap: 8px; }
+  .header-actions .btn-ghost,
+  .header-actions .btn-primary { width: 44px; height: 44px; min-width: 44px; padding: 0; justify-content: center; }
+  .header-actions .btn-ghost .btn-label,
+  .header-actions .btn-primary .btn-label { display: none; }
   .detail-pane { padding: 18px; }
   .profile-grid { grid-template-columns: 1fr; }
   .child-grid { grid-template-columns: 1fr; }

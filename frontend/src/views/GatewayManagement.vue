@@ -7,12 +7,12 @@
         <p class="page-description">농장별로 라즈베리파이 게이트웨이를 관리합니다</p>
       </div>
       <div class="page-header-actions">
-        <button class="btn-ghost" @click="refreshGateways" :disabled="loading" aria-label="새로고침">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="btn-ghost" @click="refreshGateways" :disabled="loading" title="새로고침" aria-label="새로고침">
+          <svg class="btn-ico" :class="{ spin: loading }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
           </svg>
-          새로고침
+          <span class="btn-label">새로고침</span>
         </button>
         <!--
           [게이트웨이 수동(사전) 등록 버튼 — 2026-06 숨김 처리]
@@ -1198,6 +1198,20 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 }
 .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
 .btn-ghost:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-ghost .btn-ico { flex-shrink: 0; }
+.btn-ghost .btn-ico.spin { animation: gm-spin 0.8s linear infinite; }
+@keyframes gm-spin { to { transform: rotate(360deg); } }
+
+/* 모바일: 새로고침을 제목줄 아이콘 버튼으로 (대시보드와 동일) */
+@media (max-width: 768px) {
+  .page-header { flex-wrap: nowrap; align-items: center; }
+  .page-header-text { flex: 1; min-width: 0; }
+  .page-header-text .page-description { display: none; }
+  .page-header-text h2 { white-space: nowrap; }
+  .page-header-actions { flex-shrink: 0; gap: 8px; }
+  .page-header-actions .btn-ghost { width: 44px; height: 44px; min-width: 44px; padding: 0; justify-content: center; }
+  .page-header-actions .btn-ghost .btn-label { display: none; }
+}
 
 .btn-secondary {
   background: var(--bg-card);

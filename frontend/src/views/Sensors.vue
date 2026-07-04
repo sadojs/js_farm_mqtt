@@ -5,8 +5,12 @@
         <h2>농장 환경</h2>
         <p class="page-description">농장 환경을 종합적으로 확인합니다</p>
       </div>
-      <button class="btn-refresh" @click="refreshAll" :disabled="refreshing">
-        {{ refreshing ? '새로고침 중...' : '새로고침' }}
+      <button class="btn-refresh" @click="refreshAll" :disabled="refreshing" title="새로고침">
+        <svg class="btn-ico" :class="{ spin: refreshing }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        <span class="btn-label">{{ refreshing ? '새로고침 중...' : '새로고침' }}</span>
       </button>
     </header>
 
@@ -537,6 +541,9 @@ onUnmounted(() => {
 .page-description { color: var(--text-secondary); font-size: calc(16px * var(--content-scale, 1)); margin-top: 4px; }
 
 .btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 12px 24px;
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -549,6 +556,9 @@ onUnmounted(() => {
 }
 .btn-refresh:hover:not(:disabled) { background: var(--border-color); }
 .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-refresh .btn-ico { flex-shrink: 0; }
+.btn-refresh .btn-ico.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .loading-state {
   text-align: center;
@@ -896,7 +906,13 @@ onUnmounted(() => {
 /* ── 반응형 ── */
 @media (max-width: 768px) {
   .page-container { padding: 4px 0; }
-  .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); }
+  /* 새로고침을 제목줄 아이콘 버튼으로 (대시보드와 동일) */
+  .page-header { flex-wrap: nowrap; align-items: center; }
+  .page-header > div:first-child { flex: 1; min-width: 0; }
+  .page-header .page-description { display: none; }
+  .page-header h2 { font-size: calc(24px * var(--content-scale, 1)); white-space: nowrap; }
+  .btn-refresh { width: 44px; height: 44px; min-width: 44px; padding: 0; justify-content: center; flex-shrink: 0; }
+  .btn-refresh .btn-label { display: none; }
   .gauge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .env-card-body { padding: 0 12px 16px; }
   .env-card-header { padding: 14px 14px; gap: 12px; }
