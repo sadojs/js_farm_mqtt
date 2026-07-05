@@ -502,7 +502,7 @@ import type { AutomationRule } from '../types/automation.types'
 import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
 
 const route = useRoute()
-useRouter()
+const router = useRouter()
 const groupStore = useGroupStore()
 const deviceStore = useDeviceStore()
 const automationStore = useAutomationStore()
@@ -966,6 +966,26 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
       } else if (v.actualValue !== undefined) {
         notify.warning('상태 미변경', '명령은 전달되었으나 장치 상태가 변경되지 않았습니다')
         if (storeTarget) storeTarget.switchState = v.actualValue
+      }
+      // 열림·닫힘 둘 다 OFF(중립) 진입 + 활성 자동제어 룰 존재 → 곧 자동 재제어됨을 안내
+      // (백엔드가 이 경우 수동 우회를 해제하므로, 다음 tick 에 룰이 다시 개폐기를 제어함)
+      const oppLive = deviceStore.devices.find(d => d.id === oppositeDevice.id)
+      const bothOff = v.verified && !oppLive?.switchState
+      if (bothOff) {
+        const openRule = deviceStore.devices.find(d => d.id === group.openDevice.id)?.ruleIntendedState
+        const closeRule = deviceStore.devices.find(d => d.id === group.closeDevice.id)?.ruleIntendedState
+        const ruleActive = openRule != null || closeRule != null
+        if (ruleActive) {
+          const go = await confirm({
+            title: '자동제어 룰이 동작 중입니다',
+            message:
+              `${group.groupName} 개폐기를 모두 껐지만, 이 구역에 동작 중인 자동제어 룰이 있어 곧 다시 자동으로 제어됩니다.\n` +
+              `완전히 멈추려면 자동 제어에서 해당 룰을 꺼야 합니다.\n\n자동 제어 페이지로 이동할까요?`,
+            confirmText: '자동 제어로 이동',
+            cancelText: '닫기',
+          })
+          if (go) router.push('/automation')
+        }
       }
       return
     }
