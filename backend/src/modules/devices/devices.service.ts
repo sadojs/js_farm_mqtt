@@ -567,8 +567,43 @@ export class DevicesService {
       const intent: boolean | null = settings.ruleIntendedState ?? null;
       const isOnCmd = commands.some(c => c.value === true || c.value === 'ON' || c.value === 1);
       const isOffCmd = commands.some(c => c.value === false || c.value === 'OFF' || c.value === 0);
+
+      // ── 개폐기(페어) 중립 해제 ──
+      // 열림·닫힘 채널을 모두 OFF(중립)로 만들면 → 자동제어 복귀(양쪽 userOverride 해제).
+      // 활성 채널을 끄면 결과가 '둘 다 OFF' 이므로, 이 경우는 pin 대신 release 로 처리한다.
+      // (반대 방향을 ON 으로 몰면 '둘 다 OFF'가 아니므로 기존 pin 로직이 그대로 적용되어 수동 우선 유지)
+      const isOpenerDev = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+      let handledByOpenerNeutral = false;
+      if (isOpenerDev && isOffCmd && !isOnCmd && device.pairedDeviceId) {
+        const paired = await this.devicesRepo.findOne({ where: { id: device.pairedDeviceId } });
+        const pairedOn = !!((paired?.deviceSettings as any)?.switchState);
+        if (!pairedOn) {
+          handledByOpenerNeutral = true;
+          let released = false;
+          if (settings.userOverride) {
+            settings.userOverride = false;
+            device.deviceSettings = settings;
+            await this.devicesRepo.save(device).catch(() => undefined);
+            released = true;
+          }
+          if (paired) {
+            const ps: any = paired.deviceSettings || {};
+            if (ps.userOverride) {
+              ps.userOverride = false;
+              paired.deviceSettings = ps;
+              await this.devicesRepo.save(paired).catch(() => undefined);
+              released = true;
+            }
+          }
+          if (released) {
+            this.logger.log(`[manual-release] ${device.name} 개폐기 열림·닫힘 둘 다 OFF → 자동제어 복귀`);
+            this.eventEmitter.emit('device.manual.released', { deviceId: device.id });
+          }
+        }
+      }
+
       // 단일 ON/OFF 명령만 처리 (관수의 다중 switch는 ruleIntendedState 적용 안 함)
-      if (intent != null && (isOnCmd || isOffCmd)) {
+      if (!handledByOpenerNeutral && intent != null && (isOnCmd || isOffCmd)) {
         const newValue = isOnCmd;
         if (settings.userOverride && newValue === intent) {
           settings.userOverride = false;
