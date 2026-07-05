@@ -8,7 +8,11 @@
     </header>
 
     <!-- ━━━━━━━━━━━━ 워크플로우 A: N대 일괄 배포 ━━━━━━━━━━━━ -->
-    <div class="workflow-group workflow-a">
+    <!-- [2026-07 숨김] Z2M 공통 설정 일괄 편집·배포 UI 숨김.
+         사용 빈도 낮고 Zigbee channel 일괄 변경 등 위험 옵션이 있어 UI만 감춤.
+         백엔드 config-deploy(agent-archive/agent-update/롤백)·API 는 그대로 보존.
+         복구: 아래 div 의 v-if="false" 제거. -->
+    <div v-if="false" class="workflow-group workflow-a">
       <header class="workflow-group-header">
         <h2>📦 Zigbee2MQTT 설정 일괄 배포 <span class="workflow-scope">(N대 동시)</span></h2>
         <p class="workflow-description">
@@ -130,7 +134,7 @@
           <strong>{{ result.gatewayId }}</strong> - {{ result.gatewayName }}
           <span :class="['status-badge', result.status]">{{ statusLabel(result.status) }}</span>
         </div>
-        <div v-if="result.diff && result.diff.length > 0" class="diff-list">
+        <div v-if="(result.diff?.length ?? 0) > 0" class="diff-list">
           <div v-for="d in result.diff" :key="d.field" :class="['diff-item', { protected: d.protected }]">
             <span class="diff-field">{{ d.field }}</span>
             <span v-if="d.protected" class="diff-protected">보호됨</span>
@@ -159,8 +163,8 @@
           <span class="result-duration">{{ result.duration }}ms</span>
         </div>
         <div v-if="result.error" class="result-error">{{ result.error }}</div>
-        <div v-if="result.changedFields && result.changedFields.length > 0" class="result-changes">
-          변경: {{ result.changedFields.join(', ') }}
+        <div v-if="(result.changedFields?.length ?? 0) > 0" class="result-changes">
+          변경: {{ result.changedFields?.join(', ') }}
         </div>
         <div v-if="result.serviceRestarted" class="result-restart">Zigbee2MQTT 재시작됨</div>
       </div>
