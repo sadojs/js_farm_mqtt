@@ -1,6 +1,7 @@
 export type FallbackMode = 'online' | 'fallback' | 'unknown'
 export type OpenerScheduleMode = 'time' | 'always-open'
 export type FanTriggerType = 'temperature' | 'humidity'
+export type OpenerTriggerType = FanTriggerType
 
 export interface FallbackConfig {
   gatewayId: string
@@ -15,6 +16,10 @@ export interface FallbackConfig {
   fanTriggerType: FanTriggerType
   fanOnTemp: number
   fanOffTemp: number
+  openerTriggerType: OpenerTriggerType
+  openerOnValue: number
+  openerOffValue: number
+  sensorTimeoutSeconds: number
   version: number
   lastAppliedAt: string | null
   lastAppliedVersion: number | null
@@ -67,6 +72,10 @@ export interface UpdateConfigDto {
   fanTriggerType?: FanTriggerType
   fanOnTemp?: number
   fanOffTemp?: number
+  openerTriggerType?: OpenerTriggerType
+  openerOnValue?: number
+  openerOffValue?: number
+  sensorTimeoutSeconds?: number
 }
 
 export interface UpsertScheduleDto {

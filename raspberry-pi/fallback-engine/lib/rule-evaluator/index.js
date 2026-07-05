@@ -9,6 +9,7 @@ const opener = require('./opener');
 const irrigation = require('./irrigation');
 const fertilizer = require('./fertilizer');
 const fan = require('./fan');
+const { SensorWatchdog } = require('../sensor-watchdog');
 
 class RuleEvaluator {
   constructor({ store, queue, rain, relayBridge, gatewayId }) {
@@ -18,11 +19,16 @@ class RuleEvaluator {
     this.relay = relayBridge;
     this.gatewayId = gatewayId;
 
+    // 온습도계 신선도 감시 (개폐기 primary(온습도) vs backup(스케줄) 분기용)
+    this.sensorWatchdog = new SensorWatchdog();
+
     // 공유 상태
     this.state = {
       channels: {},        // { channel: { state, onSince } }
       lastTemperature: null,
       lastHumidity: null,
+      lastTemperatureAt: null,  // ms epoch — 온습도계 stale 판정용
+      lastHumidityAt: null,
       rainActive: false,
       fanState: false,
       openerIntent: null,  // 'open' | 'closed' | null
@@ -40,10 +46,12 @@ class RuleEvaluator {
 
   ingestSensor(deviceName, data) {
     if (!data || typeof data !== 'object') return;
+    const now = Date.now();
     const tempKeys = ['temperature', 'temp', 'air_temperature'];
     for (const key of tempKeys) {
       if (typeof data[key] === 'number') {
         this.state.lastTemperature = data[key];
+        this.state.lastTemperatureAt = now;
         break;
       }
     }
@@ -51,6 +59,7 @@ class RuleEvaluator {
     for (const key of humidityKeys) {
       if (typeof data[key] === 'number') {
         this.state.lastHumidity = data[key];
+        this.state.lastHumidityAt = now;
         break;
       }
     }
@@ -116,6 +125,7 @@ class RuleEvaluator {
       now,
       relay: this.relay,
       queue: this.queue,
+      sensorWatchdog: this.sensorWatchdog,
     };
     fertilizer.evaluate(args);
     irrigation.evaluate(args);

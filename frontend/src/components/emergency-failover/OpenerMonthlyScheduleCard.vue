@@ -24,7 +24,11 @@ const scheduleByMonth = computed(() => {
 
 <template>
   <section class="card">
-    <h3>2. 개폐기 (월별)</h3>
+    <h3>개폐기 백업 스케줄 <span class="backup-badge">온습도계 이상 시</span></h3>
+    <p class="hint" style="margin: 0 0 12px;">
+      ⓘ 온습도계가 정상일 때는 위 「개폐기 온습도 조건」이 우선합니다.
+      온습도계가 동작하지 않을 때(측정값 없음/오래됨)만 아래 월별 시간 스케줄이 백업으로 동작합니다.
+    </p>
     <div class="toggle-row">
       <label>
         <input
@@ -75,7 +79,16 @@ const scheduleByMonth = computed(() => {
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; }
+.card h3 { margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.backup-badge {
+  font-size: 11px; font-weight: 700; color: var(--warning-text, #b45309);
+  background: var(--warning-bg, #fff8ec); border: 1px solid var(--warning-border, #fde3b0);
+  border-radius: 6px; padding: 2px 8px;
+}
+.hint {
+  background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
+  font-size: 13px; color: var(--text-secondary, #555); line-height: 1.5;
+}
 .toggle-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
 .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .month-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }

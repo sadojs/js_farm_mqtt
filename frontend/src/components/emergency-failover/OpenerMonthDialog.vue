@@ -85,7 +85,7 @@ function save() {
         </div>
 
         <p class="hint">
-          ⓘ 통신 단절 시에만 이 스케줄이 동작합니다. 정상 통신 중에는 서버 자동화 룰을 따릅니다.
+          ⓘ 통신 단절 <strong>+ 온습도계 이상</strong> 시 백업으로 이 스케줄이 동작합니다. 정상 통신 중에는 서버 자동화 룰을 따릅니다.
         </p>
       </div>
       <footer class="modal-footer">

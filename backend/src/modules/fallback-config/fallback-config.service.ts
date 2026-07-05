@@ -152,6 +152,19 @@ export class FallbackConfigService implements OnModuleInit {
       }
     }
 
+    // 개폐기 온습도: 개방 임계 > 닫힘 임계 (측정값이 높으면 개방)
+    if (next.openerOnValue <= next.openerOffValue) {
+      const unit = next.openerTriggerType === 'humidity' ? '%' : '°C';
+      throw new BadRequestException(
+        `개폐기 개방 임계값(${next.openerOnValue}${unit})은 닫힘 임계값(${next.openerOffValue}${unit})보다 커야 합니다`,
+      );
+    }
+    if (next.openerTriggerType === 'humidity') {
+      if (next.openerOnValue < 0 || next.openerOnValue > 100 || next.openerOffValue < 0 || next.openerOffValue > 100) {
+        throw new BadRequestException('개폐기 습도 임계값은 0~100% 범위여야 합니다');
+      }
+    }
+
     Object.assign(config, dto);
     config.version = (config.version ?? 1) + 1;
     await this.configRepo.save(config);
@@ -336,6 +349,10 @@ export class FallbackConfigService implements OnModuleInit {
         fanTriggerType: config.fanTriggerType,
         fanOnTemp: config.fanOnTemp,
         fanOffTemp: config.fanOffTemp,
+        openerTriggerType: config.openerTriggerType,
+        openerOnValue: config.openerOnValue,
+        openerOffValue: config.openerOffValue,
+        sensorTimeoutSeconds: config.sensorTimeoutSeconds,
       },
       schedule: schedule.map((s) => ({
         month: s.month,

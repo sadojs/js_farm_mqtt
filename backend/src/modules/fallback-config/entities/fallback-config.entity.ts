@@ -46,6 +46,22 @@ export class FallbackConfig {
   @Column({ name: 'fan_off_temp', type: 'numeric', precision: 5, scale: 2, default: 28.0, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
   fanOffTemp!: number;
 
+  /** 개폐기 온습도 트리거 종류 — 'temperature'(°C) | 'humidity'(%) (유동팬과 동일 방식) */
+  @Column({ name: 'opener_trigger_type', type: 'varchar', length: 20, default: 'temperature' })
+  openerTriggerType!: 'temperature' | 'humidity';
+
+  /** 개방 임계값 — 측정값이 이 값을 넘으면 개방 (°C 또는 %) */
+  @Column({ name: 'opener_on_value', type: 'numeric', precision: 5, scale: 2, default: 30.0, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
+  openerOnValue!: number;
+
+  /** 닫힘 임계값 — 측정값이 이 값 아래면 닫힘 (°C 또는 %) */
+  @Column({ name: 'opener_off_value', type: 'numeric', precision: 5, scale: 2, default: 25.0, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
+  openerOffValue!: number;
+
+  /** 온습도계 최근값 유효시간(초). 초과 시 온습도계 이상으로 보고 월별 시간 스케줄(백업)로 동작 */
+  @Column({ name: 'sensor_timeout_seconds', type: 'int', default: 600 })
+  sensorTimeoutSeconds!: number;
+
   @Column({ name: 'version', type: 'int', default: 1 })
   version!: number;
 

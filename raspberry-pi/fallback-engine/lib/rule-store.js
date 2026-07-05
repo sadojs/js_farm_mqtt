@@ -29,6 +29,11 @@ const DEFAULT_RULES = {
     fanTriggerType: 'temperature',
     fanOnTemp: 35,
     fanOffTemp: 28,
+    // 개폐기 온습도 조건(primary) + 온습도계 stale 타임아웃. 미수신 시 월별 스케줄(backup) 사용.
+    openerTriggerType: 'temperature',
+    openerOnValue: 30,
+    openerOffValue: 25,
+    sensorTimeoutSeconds: 600,
   },
   channelMapping: null,
   schedule: [

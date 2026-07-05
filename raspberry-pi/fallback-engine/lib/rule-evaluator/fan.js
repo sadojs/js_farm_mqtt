@@ -1,5 +1,7 @@
 'use strict';
 
+const { evaluateHysteresis } = require('./hysteresis');
+
 /**
  * 환기팬/유동팬 평가 (동일 장치). 히스테리시스.
  * - cfg.fanEnabled=false: 동작 없음
@@ -25,12 +27,7 @@ function evaluate({ cfg, store, state, relay, queue }) {
   const onValue = cfg.fanOnTemp;
   const offValue = cfg.fanOffTemp;
 
-  let target;
-  if (state.fanState) {
-    target = reading < offValue ? false : true;
-  } else {
-    target = reading > onValue ? true : false;
-  }
+  const target = evaluateHysteresis(state.fanState, reading, onValue, offValue);
 
   if (target !== state.fanState) {
     for (const ch of channels) {

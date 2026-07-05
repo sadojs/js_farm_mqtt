@@ -5,12 +5,13 @@ import { useEmergencyFailover } from '../composables/useEmergencyFailover'
 import OpenerMonthDialog from '../components/emergency-failover/OpenerMonthDialog.vue'
 import FailoverStatusCard from '../components/emergency-failover/FailoverStatusCard.vue'
 import HeartbeatSettingsCard from '../components/emergency-failover/HeartbeatSettingsCard.vue'
+import OpenerEnvCard from '../components/emergency-failover/OpenerEnvCard.vue'
 import OpenerMonthlyScheduleCard from '../components/emergency-failover/OpenerMonthlyScheduleCard.vue'
 import IrrigationFailoverCard from '../components/emergency-failover/IrrigationFailoverCard.vue'
 import FertilizerFailoverCard from '../components/emergency-failover/FertilizerFailoverCard.vue'
 import FanFailoverCard from '../components/emergency-failover/FanFailoverCard.vue'
 import type { Gateway } from '../types/device.types'
-import type { OpenerSchedule, UpsertScheduleDto, FanTriggerType } from '../types/emergency-failover.types'
+import type { OpenerSchedule, UpsertScheduleDto, FanTriggerType, OpenerTriggerType } from '../types/emergency-failover.types'
 import { eventTypeLabel, eventPayloadSummary, eventBadgeClass } from '../utils/fallback-event-humanizer'
 
 const gateways = ref<Gateway[]>([])
@@ -34,6 +35,10 @@ const editable = ref({
   fanTriggerType: 'temperature' as FanTriggerType,
   fanOnTemp: 35,
   fanOffTemp: 28,
+  openerTriggerType: 'temperature' as OpenerTriggerType,
+  openerOnValue: 30,
+  openerOffValue: 25,
+  sensorTimeoutSeconds: 600,
 })
 
 const fanValid = computed(() => {
@@ -41,6 +46,15 @@ const fanValid = computed(() => {
   if (editable.value.fanTriggerType === 'humidity') {
     const { fanOnTemp, fanOffTemp } = editable.value
     if (fanOnTemp < 0 || fanOnTemp > 100 || fanOffTemp < 0 || fanOffTemp > 100) return false
+  }
+  return true
+})
+
+const openerValid = computed(() => {
+  if (editable.value.openerOnValue <= editable.value.openerOffValue) return false
+  if (editable.value.openerTriggerType === 'humidity') {
+    const { openerOnValue, openerOffValue } = editable.value
+    if (openerOnValue < 0 || openerOnValue > 100 || openerOffValue < 0 || openerOffValue > 100) return false
   }
   return true
 })
@@ -80,6 +94,10 @@ watch(selectedGatewayId, async (gid) => {
       fanTriggerType: (fail.config.value.fanTriggerType ?? 'temperature') as FanTriggerType,
       fanOnTemp: Number(fail.config.value.fanOnTemp),
       fanOffTemp: Number(fail.config.value.fanOffTemp),
+      openerTriggerType: (fail.config.value.openerTriggerType ?? 'temperature') as OpenerTriggerType,
+      openerOnValue: Number(fail.config.value.openerOnValue ?? 30),
+      openerOffValue: Number(fail.config.value.openerOffValue ?? 25),
+      sensorTimeoutSeconds: Number(fail.config.value.sensorTimeoutSeconds ?? 600),
     }
   }
 })
@@ -98,6 +116,10 @@ async function onSaveSchedule(dto: UpsertScheduleDto) {
 async function saveAll() {
   if (!fanValid.value) {
     alert('환기팬 ON 임계값은 OFF 임계값보다 커야 합니다')
+    return
+  }
+  if (!openerValid.value) {
+    alert('개폐기 개방 임계값은 닫힘 임계값보다 커야 합니다')
     return
   }
   if (allCriticalDisabled.value) {
@@ -185,6 +207,13 @@ function fmt(d: string | null) {
         v-model:recoveryGraceSeconds="editable.recoveryGraceSeconds"
       />
 
+      <OpenerEnvCard
+        v-model:openerTriggerType="editable.openerTriggerType"
+        v-model:openerOnValue="editable.openerOnValue"
+        v-model:openerOffValue="editable.openerOffValue"
+        v-model:sensorTimeoutSeconds="editable.sensorTimeoutSeconds"
+      />
+
       <OpenerMonthlyScheduleCard
         v-model:openerEnabled="editable.openerEnabled"
         v-model:openerRainOverride="editable.openerRainOverride"
@@ -213,7 +242,7 @@ function fmt(d: string | null) {
         <h3>ℹ️ 폴백 모드 측정값 소스</h3>
         <p>
           폴백 모드(서버 단절) 동안 라즈베리파이는 이 게이트웨이에 연결된
-          <strong>모든 온/습도 측정기</strong> 의 가장 최근 수신 값을 사용합니다.
+          <strong>모든 온/습도 측정기</strong> 의 가장 최근 수신 값을 <strong>유동팬·개폐기</strong> 제어에 사용합니다.
           (<code>구역 관리 → 센서 환경 설정</code> 의 내부 온/습도 매핑과는 <strong>별개</strong> —
           오프라인 상태에서 매핑 정보 조회가 불가능하기 때문)
         </p>
@@ -250,7 +279,7 @@ function fmt(d: string | null) {
       </section>
 
       <footer class="page-footer">
-        <button class="btn-primary" :disabled="fail.saving.value || !fanValid" @click="saveAll">
+        <button class="btn-primary" :disabled="fail.saving.value || !fanValid || !openerValid" @click="saveAll">
           {{ fail.saving.value ? '저장 중...' : '저장 (게이트웨이에 동기화)' }}
         </button>
       </footer>

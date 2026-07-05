@@ -70,7 +70,11 @@ export function eventPayloadSummary(event: FallbackEvent): string {
       const to = String(p.to ?? '')
       const reasonRaw = String(p.reason ?? '')
       const reason =
-        reasonRaw === 'rain-override-active' ? '강우 감지' :
+        reasonRaw === 'rain-active' || reasonRaw === 'rain-override-active' ? '강우 감지' :
+        reasonRaw.startsWith('env-temperature') ? '온도 조건' :
+        reasonRaw.startsWith('env-humidity') ? '습도 조건' :
+        reasonRaw.startsWith('backup-') && reasonRaw.includes('always-open') ? '백업 24시간 개방' :
+        reasonRaw.startsWith('backup-') ? '백업 스케줄' :
         reasonRaw === 'schedule-time' ? '월별 스케줄' :
         reasonRaw === 'always-open' ? '항시 개방' :
         reasonRaw || ''
