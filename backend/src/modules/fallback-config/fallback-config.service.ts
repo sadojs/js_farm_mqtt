@@ -166,7 +166,7 @@ export class FallbackConfigService implements OnModuleInit {
     }
 
     Object.assign(config, dto);
-    config.version = (config.version ?? 1) + 1;
+    config.version = this.nextVersion(config);
     await this.configRepo.save(config);
 
     await this.publishSync(gatewayId);
@@ -327,8 +327,27 @@ export class FallbackConfigService implements OnModuleInit {
 
   // ───────── 동기화 publish ─────────
 
+  /**
+   * 다음 sync version 계산 — DB version 과 Pi 가 마지막으로 적용한 version(lastAppliedVersion)
+   * 중 큰 값 + 1. DB 롤백/복원 등으로 서버 version 이 후퇴해도, Pi 로컬 version 이하가 발행되어
+   * 'already applied'로 무시되는 드리프트를 자가치유한다(Pi 게이트 조건: payload.version <= local).
+   */
+  private nextVersion(config: {
+    version?: number | null;
+    lastAppliedVersion?: number | null;
+  }): number {
+    return Math.max(config.version ?? 0, config.lastAppliedVersion ?? 0) + 1;
+  }
+
   private async bumpVersionAndSync(gatewayId: string) {
-    await this.configRepo.increment({ gatewayId }, 'version', 1);
+    const config = await this.configRepo.findOne({ where: { gatewayId } });
+    if (config) {
+      config.version = this.nextVersion(config);
+      await this.configRepo.save(config);
+    } else {
+      // 설정 행이 없으면 기존 동작 유지 (publishSync 가 기본값 생성 시 처리)
+      await this.configRepo.increment({ gatewayId }, 'version', 1);
+    }
     await this.publishSync(gatewayId);
   }
 
