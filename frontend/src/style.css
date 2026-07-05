@@ -102,15 +102,18 @@
   }
 }
 
-/* ─── 글로벌 모바일 page-header 수정 ─── */
+/* ─── 글로벌 모바일 page-header 수정 ───
+ * flex-wrap 은 !important 를 쓰지 않는다 — 페이지별 스코프 규칙(제목+아이콘 버튼을
+ * 한 줄로 두는 nowrap)이 이길 수 있어야 함. 제목 블록도 100% 폭을 강제하지 않는다
+ * (100% 로 두면 액션 버튼이 항상 다음 줄로 밀려남). */
 @media (max-width: 768px) {
   .page-header {
-    flex-wrap: wrap !important;
+    flex-wrap: wrap;
     gap: 8px !important;
   }
 
   .page-header > div:first-child {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
     min-width: 0;
   }
 
