@@ -33,7 +33,8 @@ const DEFAULT_RULES = {
     openerTriggerType: 'temperature',
     openerOnValue: 30,
     openerOffValue: 25,
-    sensorTimeoutSeconds: 600,
+    // 온습도계 보고주기(관찰 ~14분/840초)보다 넉넉히. 짧으면 매 주기 stale 오판 → primary↔backup flip-flop.
+    sensorTimeoutSeconds: 1200,
   },
   channelMapping: null,
   schedule: [

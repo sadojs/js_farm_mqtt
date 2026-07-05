@@ -59,7 +59,7 @@ export class FallbackConfig {
   openerOffValue!: number;
 
   /** 온습도계 최근값 유효시간(초). 초과 시 온습도계 이상으로 보고 월별 시간 스케줄(백업)로 동작 */
-  @Column({ name: 'sensor_timeout_seconds', type: 'int', default: 600 })
+  @Column({ name: 'sensor_timeout_seconds', type: 'int', default: 1200 })
   sensorTimeoutSeconds!: number;
 
   @Column({ name: 'version', type: 'int', default: 1 })
