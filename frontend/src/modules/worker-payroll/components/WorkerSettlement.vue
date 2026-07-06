@@ -18,7 +18,11 @@
     <div class="receipt">
       <div class="rcpt-row gross">
         <div class="rcpt-main">
-          <span class="rcpt-label">
+          <span v-if="data.salaryType === 'fixed_monthly'" class="rcpt-label">
+            {{ t(lang, 'fixedSalary') }}
+            <span v-if="data.grossProrationReason" class="proration-reason">{{ data.grossProrationReason }}</span>
+          </span>
+          <span v-else class="rcpt-label">
             {{ t(lang, 'work') }} {{ data.workDays }}{{ t(lang, 'daysUnit') }} ·
             {{ fmtH(data.totalHours) }}{{ t(lang, 'hoursUnit') }} × {{ formatMoney(data.hourlyWage, lang) }}
           </span>
@@ -85,7 +89,12 @@
 
     <!-- 박제 안내 -->
     <p v-if="data.frozen" class="immutable-note">
-      이 정산은 당시 시급 {{ data.hourlyWage.toLocaleString() }}원 기준으로 보존됩니다 — 현재 시급으로 재계산되지 않습니다.
+      <template v-if="data.salaryType === 'fixed_monthly'">
+        이 정산은 당시 고정 월급 {{ (data.fixedMonthlySalary ?? 0).toLocaleString() }}원 기준으로 보존됩니다 — 이후 설정 변경과 무관합니다.
+      </template>
+      <template v-else>
+        이 정산은 당시 시급 {{ data.hourlyWage.toLocaleString() }}원 기준으로 보존됩니다 — 현재 시급으로 재계산되지 않습니다.
+      </template>
     </p>
 
     <!-- 상태/액션 -->

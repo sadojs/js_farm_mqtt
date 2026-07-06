@@ -230,7 +230,10 @@ export class WorkerPayrollService {
             phone: dto.phone ?? null,
             startDate: dto.startDate,
             endDate: dto.endDate || null,
+            salaryType: dto.salaryType ?? 'hourly',
             hourlyWage: dto.hourlyWage,
+            fixedMonthlySalary: dto.fixedMonthlySalary ?? 0,
+            settlementCycleType: dto.settlementCycleType ?? 'calendar_month',
             dailyHours: dto.dailyHours,
             isActive: true,
           }),
@@ -251,7 +254,10 @@ export class WorkerPayrollService {
         startDate: dto.startDate,
         // endDate 는 '' 또는 null 이면 명시적으로 해제, undefined 면 기존 유지
         endDate: dto.endDate === undefined ? found.endDate : (dto.endDate || null),
+        salaryType: dto.salaryType ?? found.salaryType,
         hourlyWage: dto.hourlyWage,
+        fixedMonthlySalary: dto.fixedMonthlySalary ?? found.fixedMonthlySalary,
+        settlementCycleType: dto.settlementCycleType ?? found.settlementCycleType,
         dailyHours: dto.dailyHours,
         isActive: dto.isActive ?? true,
       });
@@ -385,17 +391,69 @@ export class WorkerPayrollService {
     return fmt(new Date(Date.UTC(y, m - 1, 1)));
   }
 
+  /** 해당 연·월(0-based)에서 day 를 말일로 클램프 (예: 2월 31 → 28/29) */
+  private clampDayInMonth(year: number, monthIdx0: number, day: number): number {
+    const last = new Date(Date.UTC(year, monthIdx0 + 1, 0)).getUTCDate();
+    return Math.min(day, last);
+  }
+
+  /**
+   * anniversary 정산: 입사일의 '일(day)'을 앵커로, ref 가 속한 기간의 시작일 반환.
+   * 예) 입사 5/6 → 앵커 6일. ref 6/3 → 5/6 시작, ref 6/6 → 6/6 시작.
+   */
+  private anniversaryPeriodStart(startDate: string, ref: string): string {
+    const anchor = parseDate(startDate).getUTCDate();
+    const r = parseDate(ref);
+    let y = r.getUTCFullYear();
+    let m = r.getUTCMonth();
+    const thisMonthAnchor = this.clampDayInMonth(y, m, anchor);
+    if (r.getUTCDate() >= thisMonthAnchor) {
+      return fmt(new Date(Date.UTC(y, m, thisMonthAnchor)));
+    }
+    m -= 1;
+    if (m < 0) {
+      m = 11;
+      y -= 1;
+    }
+    return fmt(new Date(Date.UTC(y, m, this.clampDayInMonth(y, m, anchor))));
+  }
+
+  /** anniversary 정산: periodStart 의 다음 앵커(= 정산일). periodStart + 1개월(앵커 day). */
+  private anniversaryNextAnchor(startDate: string, periodStart: string): string {
+    const anchor = parseDate(startDate).getUTCDate();
+    const p = parseDate(periodStart);
+    let y = p.getUTCFullYear();
+    let m = p.getUTCMonth() + 1;
+    if (m > 11) {
+      m -= 12;
+      y += 1;
+    }
+    return fmt(new Date(Date.UTC(y, m, this.clampDayInMonth(y, m, anchor))));
+  }
+
+  private periodStartFor(worker: Worker, ref: string): string {
+    return worker.settlementCycleType === 'anniversary'
+      ? this.anniversaryPeriodStart(worker.startDate, ref)
+      : this.currentPeriodStart(worker.startDate, ref);
+  }
+
+  private nextAnchorFor(worker: Worker, periodStart: string): string {
+    return worker.settlementCycleType === 'anniversary'
+      ? this.anniversaryNextAnchor(worker.startDate, periodStart)
+      : this.nextAnchor(periodStart);
+  }
+
   private resolvePeriod(worker: Worker, periodStart?: string) {
     let ps = periodStart
-      ? this.currentPeriodStart(worker.startDate, periodStart)
-      : this.currentPeriodStart(worker.startDate, todayStr());
+      ? this.periodStartFor(worker, periodStart)
+      : this.periodStartFor(worker, todayStr());
 
-    const firstPeriod = this.currentPeriodStart(worker.startDate, worker.startDate);
+    const firstPeriod = this.periodStartFor(worker, worker.startDate);
     if (parseDate(ps).getTime() < parseDate(firstPeriod).getTime()) ps = firstPeriod;
 
-    const settleDate = this.nextAnchor(ps);
+    const settleDate = this.nextAnchorFor(worker, ps);
     const periodEnd = addDays(settleDate, -1);
-    const prevPeriodStart = this.currentPeriodStart(worker.startDate, addDays(ps, -1));
+    const prevPeriodStart = this.periodStartFor(worker, addDays(ps, -1));
     const isFirst = parseDate(ps).getTime() <= parseDate(firstPeriod).getTime();
     return {
       periodStart: ps,
@@ -456,6 +514,16 @@ export class WorkerPayrollService {
       cursor = addDays(cursor, 1);
     }
 
+    const grossPay =
+      worker.salaryType === 'fixed_monthly'
+        ? this.prorateFixedSalary(
+            worker.fixedMonthlySalary,
+            meta.periodStart,
+            meta.periodEnd,
+            worker,
+          ).amount
+        : Math.round(totalHours * worker.hourlyWage);
+
     return {
       worker: this.workerBrief(worker),
       canEdit,
@@ -463,7 +531,7 @@ export class WorkerPayrollService {
       kpi: {
         workDays,
         totalHours,
-        grossPay: Math.round(totalHours * worker.hourlyWage),
+        grossPay,
       },
       days,
     };
@@ -477,6 +545,33 @@ export class WorkerPayrollService {
       endDate: worker.endDate,
       hourlyWage: worker.hourlyWage,
       dailyHours: num(worker.dailyHours),
+      salaryType: worker.salaryType,
+      fixedMonthlySalary: worker.fixedMonthlySalary,
+      settlementCycleType: worker.settlementCycleType,
+    };
+  }
+
+  /**
+   * 고정 월급 일할 계산 — periodStart~periodEnd 중 실제 재직일 비율.
+   * 입·퇴사로 기간이 잘리지 않으면 전액. (달력월/anniversary 공통으로 기간 자체 기준)
+   */
+  private prorateFixedSalary(
+    baseAmount: number,
+    periodStart: string,
+    periodEnd: string,
+    worker: { startDate: string; endDate: string | null },
+  ): { amount: number; prorationReason: string | null } {
+    const totalDays = daysBetween(periodStart, periodEnd) + 1;
+    const wStart = worker.startDate.slice(0, 10);
+    const wEnd = worker.endDate ? worker.endDate.slice(0, 10) : null;
+    const effStart = wStart > periodStart ? wStart : periodStart;
+    const effEnd = wEnd && wEnd < periodEnd ? wEnd : periodEnd;
+    if (effStart > effEnd) return { amount: 0, prorationReason: '재직 기간 아님' };
+    const effDays = daysBetween(effStart, effEnd) + 1;
+    if (effDays >= totalDays) return { amount: baseAmount, prorationReason: null };
+    return {
+      amount: Math.round((baseAmount * effDays) / totalDays),
+      prorationReason: `${effDays}/${totalDays}일 일할`,
     };
   }
 
@@ -512,7 +607,21 @@ export class WorkerPayrollService {
       cursor = addDays(cursor, 1);
     }
 
-    const grossPay = Math.round(totalHours * worker.hourlyWage);
+    // 급여: 시급(시간×시급) 또는 고정 월급(부분 기간은 일할)
+    let grossPay: number;
+    let grossProrationReason: string | null = null;
+    if (worker.salaryType === 'fixed_monthly') {
+      const r = this.prorateFixedSalary(
+        worker.fixedMonthlySalary,
+        meta.periodStart,
+        meta.periodEnd,
+        worker,
+      );
+      grossPay = r.amount;
+      grossProrationReason = r.prorationReason;
+    } else {
+      grossPay = Math.round(totalHours * worker.hourlyWage);
+    }
 
     const deductionRows = await this.deductionRepo.find({
       where: { workerId: worker.id },
@@ -557,6 +666,9 @@ export class WorkerPayrollService {
       workDays,
       totalHours,
       hourlyWage: worker.hourlyWage,
+      salaryType: worker.salaryType,
+      fixedMonthlySalary: worker.fixedMonthlySalary,
+      grossProrationReason,
       grossPay,
       deductions,
       deductionTotal,

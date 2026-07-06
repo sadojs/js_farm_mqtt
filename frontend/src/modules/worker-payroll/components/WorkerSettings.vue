@@ -55,17 +55,50 @@
           <span class="hint inline">비워두면 재직 중</span>
         </label>
         <label class="field">
-          <span>시급 (원)</span>
-          <input v-model.number="form.hourlyWage" type="number" min="0" step="100" class="inp" />
-        </label>
-        <label class="field">
           <span>기본 근무시간 (시간/일)</span>
           <input v-model.number="form.dailyHours" type="number" min="0" step="0.5" class="inp" />
         </label>
       </div>
+
+      <!-- 급여 방식 -->
+      <div class="field opt-field">
+        <span>급여 방식</span>
+        <div class="seg">
+          <button type="button" :class="['seg-btn', { active: form.salaryType === 'hourly' }]" @click="form.salaryType = 'hourly'">시급</button>
+          <button type="button" :class="['seg-btn', { active: form.salaryType === 'fixed_monthly' }]" @click="form.salaryType = 'fixed_monthly'">고정 월급</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <label v-if="form.salaryType === 'hourly'" class="field">
+          <span>시급 (원)</span>
+          <input v-model.number="form.hourlyWage" type="number" min="0" step="100" class="inp" />
+        </label>
+        <label v-else class="field">
+          <span>고정 월급 (원)</span>
+          <input v-model.number="form.fixedMonthlySalary" type="number" min="0" step="10000" class="inp" placeholder="예: 2500000" />
+        </label>
+      </div>
+      <p v-if="form.salaryType === 'fixed_monthly'" class="hint">
+        입력한 월급이 매 정산기간에 지급됩니다. 입사·퇴사로 기간이 잘리면 사용일수 비율로 일할 계산됩니다. (기본 근무시간은 달력 표시에만 사용)
+      </p>
+
+      <!-- 정산 주기 -->
+      <div class="field opt-field">
+        <span>정산 주기</span>
+        <div class="seg">
+          <button type="button" :class="['seg-btn', { active: form.settlementCycleType === 'calendar_month' }]" @click="form.settlementCycleType = 'calendar_month'">매월 1일~말일</button>
+          <button type="button" :class="['seg-btn', { active: form.settlementCycleType === 'anniversary' }]" @click="form.settlementCycleType = 'anniversary'">입사일 기준</button>
+        </div>
+      </div>
       <p class="hint">
-        정산은 매월 1일~말일 기준으로 마감됩니다(다음 달 1일 정산).
-        <template v-if="form.startDate">(첫 달은 {{ startMD }}~말일, 이후 매월 1일~말일)</template>
+        <template v-if="form.settlementCycleType === 'calendar_month'">
+          매월 1일~말일 기준으로 마감됩니다(다음 달 1일 정산).
+          <template v-if="form.startDate">(첫 달은 {{ startMD }}~말일, 이후 매월 1일~말일)</template>
+        </template>
+        <template v-else>
+          입사일 기준으로 매월 정산됩니다 — 매월 <strong>{{ startDay }}일</strong>에 마감·정산.
+          <template v-if="form.startDate">(예: {{ startMD }} 시작 → 매월 {{ startDay }}일 정산, 전월 {{ startDay }}일~당월 {{ prevDay }}일)</template>
+        </template>
       </p>
     </div>
 
@@ -167,7 +200,10 @@ const form = reactive({
   phone: '',
   startDate: new Date().toISOString().slice(0, 10),
   endDate: '',
+  salaryType: 'hourly' as 'hourly' | 'fixed_monthly',
   hourlyWage: 12000,
+  fixedMonthlySalary: 0,
+  settlementCycleType: 'calendar_month' as 'calendar_month' | 'anniversary',
   dailyHours: 8,
   fixedDeductions: [] as { id?: string; label: string; amount: number; prorate: boolean }[],
   variableDeductions: [] as { id?: string; label: string }[],
@@ -183,6 +219,8 @@ const fixedTotal = computed(() =>
 const startMD = computed(() =>
   form.startDate ? `${Number(form.startDate.slice(5, 7))}/${Number(form.startDate.slice(8, 10))}` : '',
 )
+const startDay = computed(() => (form.startDate ? Number(form.startDate.slice(8, 10)) : 0))
+const prevDay = computed(() => (startDay.value > 1 ? startDay.value - 1 : '말'))
 
 // ── 가불 내역 월별 그룹 + 접기/펼치기 ──
 const expandedMonths = ref<Set<string>>(new Set())
@@ -233,7 +271,10 @@ async function load() {
     form.phone = ''
     form.startDate = new Date().toISOString().slice(0, 10)
     form.endDate = ''
+    form.salaryType = 'hourly'
     form.hourlyWage = 12000
+    form.fixedMonthlySalary = 0
+    form.settlementCycleType = 'calendar_month'
     form.dailyHours = 8
     form.fixedDeductions = []
     form.variableDeductions = []
@@ -247,7 +288,10 @@ async function load() {
   form.phone = w.phone ?? ''
   form.startDate = w.startDate.slice(0, 10)
   form.endDate = w.endDate ? w.endDate.slice(0, 10) : ''
+  form.salaryType = w.salaryType ?? 'hourly'
   form.hourlyWage = w.hourlyWage
+  form.fixedMonthlySalary = w.fixedMonthlySalary ?? 0
+  form.settlementCycleType = w.settlementCycleType ?? 'calendar_month'
   form.dailyHours = Number(w.dailyHours)
   const deds = w.deductions ?? []
   form.fixedDeductions = deds
@@ -284,6 +328,10 @@ async function save() {
     notify.warning('일꾼 관리', '퇴사일은 입사일 이후여야 합니다.')
     return
   }
+  if (form.salaryType === 'fixed_monthly' && (!form.fixedMonthlySalary || form.fixedMonthlySalary <= 0)) {
+    notify.warning('일꾼 관리', '고정 월급 금액을 입력해 주세요.')
+    return
+  }
   saving.value = true
   try {
     const saved = await workerPayrollApi.saveWorker({
@@ -294,7 +342,10 @@ async function save() {
       phone: form.phone.trim() || undefined,
       startDate: form.startDate,
       endDate: form.endDate?.trim() || null,
+      salaryType: form.salaryType,
       hourlyWage: form.hourlyWage,
+      fixedMonthlySalary: form.salaryType === 'fixed_monthly' ? form.fixedMonthlySalary : 0,
+      settlementCycleType: form.settlementCycleType,
       dailyHours: form.dailyHours,
       deductions: [
         ...form.fixedDeductions
@@ -511,6 +562,30 @@ async function removeAdvance(id: string) {
 }
 .prorate-toggle input[type="checkbox"] { margin: 0; cursor: pointer; }
 .prorate-toggle:hover { background: var(--border-light); }
+
+/* 급여방식 / 정산주기 세그먼트 토글 */
+.opt-field { gap: 6px; }
+.seg {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 100%;
+}
+.seg-btn {
+  padding: 8px 16px;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border-input); }
+.seg-btn.active { background: var(--accent); color: #fff; }
+.seg-btn:not(.active):hover { background: var(--bg-hover); }
 
 @media (max-width: 768px) {
   .grid2 { grid-template-columns: 1fr; }

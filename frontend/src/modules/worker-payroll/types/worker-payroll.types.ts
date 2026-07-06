@@ -1,5 +1,11 @@
 export type DeductionKind = 'fixed' | 'variable'
 
+/** 급여 방식: 시급(시간×시급) | 고정 월급 */
+export type SalaryType = 'hourly' | 'fixed_monthly'
+
+/** 정산 주기: 달력월(1일~말일) | 입사일 기준(anniversary) */
+export type SettlementCycleType = 'calendar_month' | 'anniversary'
+
 export interface Deduction {
   id?: string
   label: string
@@ -21,7 +27,10 @@ export interface Worker {
   phone?: string | null
   startDate: string
   endDate?: string | null
+  salaryType: SalaryType
   hourlyWage: number
+  fixedMonthlySalary: number
+  settlementCycleType: SettlementCycleType
   dailyHours: number
   isActive: boolean
   accountUserId?: string | null
@@ -38,7 +47,10 @@ export interface SaveWorkerPayload {
   phone?: string
   startDate: string
   endDate?: string | null
+  salaryType?: SalaryType
   hourlyWage: number
+  fixedMonthlySalary?: number
+  settlementCycleType?: SettlementCycleType
   dailyHours: number
   deductions?: Deduction[]
 }
@@ -76,6 +88,9 @@ export interface WorkerBrief {
   endDate?: string | null
   hourlyWage: number
   dailyHours: number
+  salaryType?: SalaryType
+  fixedMonthlySalary?: number
+  settlementCycleType?: SettlementCycleType
 }
 
 export interface CalendarResponse extends PeriodMeta {
@@ -96,6 +111,9 @@ export interface SettlementResponse extends PeriodMeta {
   workDays: number
   totalHours: number
   hourlyWage: number
+  salaryType?: SalaryType
+  fixedMonthlySalary?: number
+  grossProrationReason?: string | null
   grossPay: number
   deductions: { label: string; amount: number; kind?: DeductionKind; prorationReason?: string | null }[]
   deductionTotal: number

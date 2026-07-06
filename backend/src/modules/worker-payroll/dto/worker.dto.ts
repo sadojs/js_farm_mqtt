@@ -81,9 +81,25 @@ export class SaveWorkerDto {
   @IsDateString()
   endDate?: string | null;
 
+  /** 급여 방식 (기본 hourly) */
+  @IsOptional()
+  @IsIn(['hourly', 'fixed_monthly'])
+  salaryType?: 'hourly' | 'fixed_monthly';
+
   @IsInt()
   @Min(0)
   hourlyWage: number;
+
+  /** 고정 월급(원) — salaryType='fixed_monthly' 일 때 사용 */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  fixedMonthlySalary?: number;
+
+  /** 정산 주기 (기본 calendar_month) */
+  @IsOptional()
+  @IsIn(['calendar_month', 'anniversary'])
+  settlementCycleType?: 'calendar_month' | 'anniversary';
 
   @IsNumber()
   @Min(0)

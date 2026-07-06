@@ -12,7 +12,12 @@
           <span class="avatar">{{ worker.name.charAt(0) }}</span>
           <div>
             <h2>내 근무</h2>
-            <p class="sub">{{ worker.name }} · 시급 {{ worker.hourlyWage.toLocaleString() }}원 · {{ Number(worker.dailyHours) }}h/일</p>
+            <p class="sub">
+              {{ worker.name }} ·
+              <template v-if="worker.salaryType === 'fixed_monthly'">{{ t(lang, 'fixedSalary') }} {{ formatMoney(worker.fixedMonthlySalary ?? 0, lang) }}</template>
+              <template v-else>{{ t(lang, 'perHour') }} {{ formatMoney(worker.hourlyWage, lang) }}</template>
+              · {{ Number(worker.dailyHours) }}h/일
+            </p>
           </div>
         </div>
         <div class="head-right">
@@ -37,7 +42,8 @@
         <div class="hero-stats">
           <div><span class="hs-label">{{ t(lang, 'workDays') }}</span><span class="hs-val">{{ settlement.workDays }}{{ t(lang, 'daysUnit') }}</span></div>
           <div><span class="hs-label">{{ t(lang, 'totalHours') }}</span><span class="hs-val">{{ fmtH(settlement.totalHours) }}h</span></div>
-          <div><span class="hs-label">{{ t(lang, 'perHour') }}</span><span class="hs-val">{{ formatMoney(settlement.hourlyWage, lang) }}</span></div>
+          <div v-if="settlement.salaryType === 'fixed_monthly'"><span class="hs-label">{{ t(lang, 'fixedSalary') }}</span><span class="hs-val">{{ formatMoney(settlement.fixedMonthlySalary ?? 0, lang) }}</span></div>
+          <div v-else><span class="hs-label">{{ t(lang, 'perHour') }}</span><span class="hs-val">{{ formatMoney(settlement.hourlyWage, lang) }}</span></div>
         </div>
       </div>
 

@@ -34,9 +34,25 @@ export class Worker {
   @Column({ name: 'end_date', type: 'date', nullable: true })
   endDate: string | null;
 
-  /** 시급(원) */
+  /** 급여 방식: 'hourly'(시급×시간) | 'fixed_monthly'(고정 월급) */
+  @Column({ name: 'salary_type', type: 'varchar', length: 20, default: 'hourly' })
+  salaryType: 'hourly' | 'fixed_monthly';
+
+  /** 시급(원) — salary_type='hourly' 일 때 사용 */
   @Column({ name: 'hourly_wage', type: 'int', default: 0 })
   hourlyWage: number;
+
+  /** 고정 월급(원) — salary_type='fixed_monthly' 일 때 사용. 부분 기간(입·퇴사)은 일할 계산. */
+  @Column({ name: 'fixed_monthly_salary', type: 'int', default: 0 })
+  fixedMonthlySalary: number;
+
+  /**
+   * 정산 주기:
+   * - 'calendar_month'(기본): 매월 1일~말일 (첫 정산만 입사일~말일)
+   * - 'anniversary': 입사일의 '일(day)'을 앵커로 매월 (예: 5/6 입사 → 5/6~6/5, 6/6 정산)
+   */
+  @Column({ name: 'settlement_cycle_type', type: 'varchar', length: 20, default: 'calendar_month' })
+  settlementCycleType: 'calendar_month' | 'anniversary';
 
   /** 기본 근무시간(시간/일) — 0.5 단위 허용 */
   @Column({ name: 'daily_hours', type: 'decimal', precision: 4, scale: 1, default: 8 })
