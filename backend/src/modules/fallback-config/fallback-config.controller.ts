@@ -18,6 +18,7 @@ import { FallbackConfigService } from './fallback-config.service';
 import { UpdateFallbackConfigDto } from './dto/update-config.dto';
 import { UpsertOpenerScheduleDto } from './dto/upsert-opener-schedule.dto';
 import { MqttService } from '../mqtt/mqtt.service';
+import { HeartbeatService } from './heartbeat.service';
 
 @Controller('fallback-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,7 +26,23 @@ export class FallbackConfigController {
   constructor(
     private readonly service: FallbackConfigService,
     private readonly mqtt: MqttService,
+    private readonly heartbeat: HeartbeatService,
   ) {}
+
+  // ───────── 페일오버 드릴: 서버 하트비트 토글 (admin 전용) ─────────
+  // 주의: ':gatewayId' 파라미터 라우트보다 먼저 선언해야 'heartbeat' 가 gatewayId 로 매칭되지 않음.
+
+  @Get('heartbeat/status')
+  @Roles('admin')
+  getHeartbeatStatus() {
+    return this.heartbeat.getStatus();
+  }
+
+  @Post('heartbeat/toggle')
+  @Roles('admin')
+  toggleHeartbeat(@Body() body: { disabled: boolean; gatewayId?: string }) {
+    return this.heartbeat.setDisabled(!!body?.disabled, body?.gatewayId);
+  }
 
   @Get(':gatewayId')
   @Roles('admin', 'farm_admin')
