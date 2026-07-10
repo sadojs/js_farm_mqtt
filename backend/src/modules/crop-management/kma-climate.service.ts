@@ -44,7 +44,25 @@ export class KmaClimateService {
     { nx: 124, ny: 38,  id: '184', name: '제주' },
   ];
 
+  /** 동일 위치 중복 fetch 방지 (요청당 여러 번 호출되므로) */
+  private readonly inFlight = new Set<string>();
+
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+
+  /** 최근 fetch 시도가 없을 때만 백그라운드로 ASOS 정규값 수집 시도 */
+  private triggerFetch(nx: number, ny: number, reason: string): void {
+    const key = `${nx},${ny}`;
+    if (this.inFlight.has(key)) return;
+    this.inFlight.add(key);
+    this.isCached(nx, ny)
+      .then((cached) => {
+        if (cached) return; // 30일 이내 이미 시도함 → 스킵
+        this.logger.log(`기후 정규값 ASOS 수집 트리거 [${nx},${ny}] (${reason})`);
+        return this.fetchAndCacheNormals(nx, ny);
+      })
+      .catch((e) => this.logger.warn(`기후 정규값 fetch 실패 [${nx},${ny}]: ${e.message}`))
+      .finally(() => this.inFlight.delete(key));
+  }
 
   /**
    * 가장 가까운 ASOS 관측소 ID 반환
@@ -78,19 +96,21 @@ export class KmaClimateService {
    * 반환: month(1-12) → avg_temp
    */
   async getMonthlyNormals(nx: number, ny: number): Promise<Record<number, number>> {
-    const rows = await this.dataSource.query<{ month: number; avg_temp: string }[]>(
-      `SELECT month, avg_temp FROM climate_normals WHERE nx = $1 AND ny = $2 ORDER BY month`,
+    const rows = await this.dataSource.query<{ month: number; avg_temp: string; source: string }[]>(
+      `SELECT month, avg_temp, source FROM climate_normals WHERE nx = $1 AND ny = $2 ORDER BY month`,
       [nx, ny],
     );
 
     if (rows.length >= 12) {
+      // builtin(임시 내장값)만 있으면 ASOS 실측으로 업그레이드 시도 (최근 시도 없을 때만)
+      // — builtin 12행이 캐시로 간주되어 ASOS fetch 가 영영 트리거되지 않던 버그 수정
+      const builtinOnly = rows.every((r) => r.source === 'builtin');
+      if (builtinOnly) this.triggerFetch(nx, ny, 'builtin-only 업그레이드');
       return Object.fromEntries(rows.map((r) => [Number(r.month), parseFloat(r.avg_temp)]));
     }
 
     // 캐시 없으면 KMA ASOS로 fetch 시도 (비동기 백그라운드)
-    this.fetchAndCacheNormals(nx, ny).catch((e) =>
-      this.logger.warn(`기후 정규값 fetch 실패 [${nx},${ny}]: ${e.message}`),
-    );
+    this.triggerFetch(nx, ny, '캐시 없음');
 
     // 즉시: 내장 한국 중부 기준 월별 평균 기온 (°C) 반환
     return this.builtinNormals(nx, ny);
@@ -154,8 +174,15 @@ export class KmaClimateService {
     // DB 저장
     const hasData = Object.values(monthlySum).some((v) => v.count > 0);
     if (!hasData) {
-      this.logger.warn(`ASOS 데이터 없음 [${station.name}] → 내장값 저장`);
+      this.logger.warn(`ASOS 데이터 없음 [${station.name}] → 내장값 유지 (30일 쿨다운)`);
       await this.saveBuiltinNormals(nx, ny);
+      // 실패해도 meta 를 기록해 매 요청마다 재시도(hammering)하지 않도록 쿨다운
+      await this.dataSource.query(
+        `INSERT INTO climate_normals_meta (nx, ny, last_fetched, station_id)
+         VALUES ($1, $2, NOW(), $3)
+         ON CONFLICT (nx, ny) DO UPDATE SET last_fetched = NOW(), station_id = $3`,
+        [nx, ny, station.id],
+      );
       return;
     }
 

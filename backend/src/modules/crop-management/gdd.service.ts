@@ -25,6 +25,10 @@ export interface GddResult {
   sourceBadge: { color: string; emoji: string; label: string };
   dailyAvg: number;
   offsetInfo: { value: number; strategy: OffsetStrategy };
+  /** 기후 정규값으로 백필한 일수 (실측 weather_data/센서 결측 구간) */
+  backfilledDays: number;
+  /** 파종일~오늘 총 계산 일수 */
+  totalDays: number;
 }
 
 export interface MilestoneStatus {
@@ -180,15 +184,21 @@ export class GddService {
 
     let currentGdd = 0;
     let dailyAvg = 0;
+    let backfilledDays = 0;
+    let totalDays = 0;
 
     if (source === 'sensor' || source === 'sensor_with_gap_fill') {
       const result = await this.calculateFromSensor(batch, offset, source === 'sensor_with_gap_fill');
       currentGdd = result.gdd;
       dailyAvg = result.dailyAvg;
+      backfilledDays = result.backfilledDays;
+      totalDays = result.totalDays;
     } else {
       const result = await this.calculateFromWeather(batch, offset);
       currentGdd = result.gdd;
       dailyAvg = result.dailyAvg;
+      backfilledDays = result.backfilledDays;
+      totalDays = result.totalDays;
     }
 
     const stage = resolveGrowthStage(currentGdd);
@@ -203,114 +213,148 @@ export class GddService {
       sourceBadge: SOURCE_BADGE[source],
       dailyAvg: Math.round(dailyAvg * 10) / 10,
       offsetInfo: { value: Math.round(offset * 10) / 10, strategy: offsetStrategy },
+      backfilledDays,
+      totalDays,
     };
   }
 
   private async calculateFromSensor(
     batch: CropBatch,
     offset: number,
-    gapFill: boolean,
-  ): Promise<{ gdd: number; dailyAvg: number }> {
-    const deviceRows = await this.dataSource.query<{ device_id: string }[]>(
-      `SELECT em.device_id
-       FROM env_mappings em
-       WHERE em.group_id = $1
-         AND em.role_key = 'internal_temp'
-         AND em.source_type = 'sensor'
-       LIMIT 1`,
-      [batch.groupId],
-    );
-
-    if (deviceRows.length === 0) {
-      return this.calculateFromWeather(batch, offset);
-    }
-
-    const deviceId = deviceRows[0].device_id;
-    const baseTemp = batch.baseTemp ?? 10;
-
-    // 일별 센서 데이터 시간 커버리지 + 기상청 갭 채움 포함 GDD
-    const rows = await this.dataSource.query<{ day: string; gdd: string; hours_covered: string }[]>(
-      `WITH daily_sensor AS (
-         SELECT
-           DATE_TRUNC('day', time) AS day,
-           AVG(value::numeric) AS avg_temp,
-           COUNT(DISTINCT DATE_TRUNC('hour', time)) AS hours_covered
-         FROM sensor_data
-         WHERE device_id = $1
-           AND sensor_type = 'temperature'
-           AND time >= $2::date
-         GROUP BY 1
-       ),
-       daily_weather AS (
-         SELECT
-           DATE_TRUNC('day', time) AS day,
-           AVG(temperature) AS avg_temp
-         FROM weather_data
-         WHERE user_id = $3
-           AND time >= $2::date
-         GROUP BY 1
-       )
-       SELECT
-         COALESCE(ds.day, dw.day) AS day,
-         GREATEST(
-           COALESCE(
-             CASE WHEN ds.hours_covered >= 12 THEN ds.avg_temp
-                  ELSE (ds.avg_temp * ds.hours_covered + dw.avg_temp * (24 - ds.hours_covered)) / 24
-             END,
-             dw.avg_temp + $5::numeric
-           ) - $4::numeric,
-           0
-         ) AS gdd,
-         COALESCE(ds.hours_covered, 0) AS hours_covered
-       FROM daily_sensor ds
-       FULL OUTER JOIN daily_weather dw ON ds.day = dw.day
-       ORDER BY day`,
-      [deviceId, batch.sowingDate, batch.userId, baseTemp, offset],
-    );
-
-    const totalGdd = rows.reduce((sum, r) => sum + parseFloat(r.gdd), 0);
-    const dailyAvg = rows.length > 0 ? totalGdd / rows.length : 0;
-
-    // 갭 채움 여부에 따라 source 재분류
-    const hasGap = rows.some((r) => parseInt(r.hours_covered) < 12);
-    if (hasGap && !gapFill) {
-      // source를 sensor_with_gap_fill로 업데이트 필요 (호출자에서 처리)
-    }
-
-    return { gdd: totalGdd, dailyAvg };
+    _gapFill: boolean,
+  ): Promise<{ gdd: number; dailyAvg: number; backfilledDays: number; totalDays: number }> {
+    // 실내센서 > weather_data > climate_normals 우선순위로 일별 집계
+    // (센서 device 가 없으면 helper 내부에서 weather/normals 로 자동 폴백)
+    const series = await this.buildElapsedDailyGdd(batch, offset, { useSensor: true });
+    return this.reduceSeries(series);
   }
 
   private async calculateFromWeather(
     batch: CropBatch,
     offset: number,
-  ): Promise<{ gdd: number; dailyAvg: number }> {
-    const baseTemp = batch.baseTemp ?? 10;
-    // 정식일 전(육묘기): NURSERY_OFFSET, 정식일 이후: 일반 오프셋
-    // $5가 NULL이면 조건이 false가 되어 전 기간 일반 오프셋 적용
-    const transplantDate = batch.transplantDate ?? null;
+  ): Promise<{ gdd: number; dailyAvg: number; backfilledDays: number; totalDays: number }> {
+    const series = await this.buildElapsedDailyGdd(batch, offset, { useSensor: false });
+    return this.reduceSeries(series);
+  }
 
-    const rows = await this.dataSource.query<{ gdd: string }[]>(
-      `SELECT GREATEST(
-         AVG(temperature) +
-         CASE
-           WHEN $5::date IS NOT NULL AND DATE_TRUNC('day', time) < $5::date
-           THEN $6::numeric
-           ELSE $3::numeric
-         END
-         - $4::numeric, 0
-       ) AS gdd
-       FROM weather_data
-       WHERE user_id = $1
-         AND time >= $2::date
-       GROUP BY DATE_TRUNC('day', time)
-       ORDER BY 1`,
-      [batch.userId, batch.sowingDate, offset, baseTemp, transplantDate, NURSERY_OFFSET],
+  /** 일별 시리즈 → 누적 GDD / 일평균 / 백필일수 집계 */
+  private reduceSeries(
+    series: Array<{ date: string; dailyGdd: number; source: 'sensor' | 'weather' | 'normal' }>,
+  ): { gdd: number; dailyAvg: number; backfilledDays: number; totalDays: number } {
+    const totalGdd = series.reduce((sum, r) => sum + r.dailyGdd, 0);
+    const dailyAvg = series.length > 0 ? totalGdd / series.length : 0;
+    const backfilledDays = series.filter((r) => r.source === 'normal').length;
+    return { gdd: totalGdd, dailyAvg, backfilledDays, totalDays: series.length };
+  }
+
+  /**
+   * 파종일 ~ 오늘 일별 GDD 시리즈(경과분).
+   *
+   * 일별 온도 소스 우선순위:
+   *   실내센서(≥12h) > 센서+외기 블렌드(부분 커버) > weather_data(외기+오프셋)
+   *   > climate_normals 월평균(외기+오프셋)  ← 백필
+   *
+   * weather_data 시작 이전/중간 결측 구간을 기후 정규값으로 백필한다.
+   * (백필이 없으면 `time >= sowingDate` 가 데이터 시작일이 같은 서로 다른 파종일 배치에
+   *  동일 행 집합을 반환 → 누적 GDD 가 붕괴되는 문제를 해결)
+   */
+  private async buildElapsedDailyGdd(
+    batch: CropBatch,
+    offset: number,
+    opts: { useSensor: boolean },
+  ): Promise<Array<{ date: string; dailyGdd: number; source: 'sensor' | 'weather' | 'normal' }>> {
+    const baseTemp = parseFloat(String(batch.baseTemp ?? 10)) || 10;
+    const transplant = batch.transplantDate ? String(batch.transplantDate).slice(0, 10) : null;
+    const sowing = String(batch.sowingDate).slice(0, 10);
+
+    // 백필용 기후 정규값 (사용자 관측 위치 nx/ny 기준)
+    const loc = await this.dataSource.query<{ nx: number; ny: number }[]>(
+      `SELECT nx, ny FROM weather_data WHERE user_id = $1 ORDER BY time DESC LIMIT 1`,
+      [batch.userId],
     );
+    const nx = loc[0]?.nx;
+    const ny = loc[0]?.ny;
+    const normals: Record<number, number> =
+      nx != null && ny != null ? await this.climateService.getMonthlyNormals(nx, ny) : {};
 
-    const totalGdd = rows.reduce((sum, r) => sum + parseFloat(r.gdd), 0);
-    const dailyAvg = rows.length > 0 ? totalGdd / rows.length : 0;
+    // 일별 외기 평균 (weather_data)
+    const wRows = await this.dataSource.query<{ day: string; avg_temp: string }[]>(
+      `SELECT (DATE_TRUNC('day', time))::date::text AS day, AVG(temperature) AS avg_temp
+       FROM weather_data
+       WHERE user_id = $1 AND time >= $2::date
+       GROUP BY 1`,
+      [batch.userId, sowing],
+    );
+    const weatherMap = new Map<string, number>();
+    for (const r of wRows) weatherMap.set(r.day, parseFloat(r.avg_temp));
 
-    return { gdd: totalGdd, dailyAvg };
+    // 일별 실내센서 평균 + 시간 커버리지
+    const sensorMap = new Map<string, { avg: number; hours: number }>();
+    if (opts.useSensor && batch.groupId) {
+      const devRows = await this.dataSource.query<{ device_id: string }[]>(
+        `SELECT em.device_id FROM env_mappings em
+         WHERE em.group_id = $1 AND em.role_key = 'internal_temp' AND em.source_type = 'sensor'
+         LIMIT 1`,
+        [batch.groupId],
+      );
+      if (devRows.length > 0) {
+        const sRows = await this.dataSource.query<{ day: string; avg_temp: string; hours_covered: string }[]>(
+          `SELECT (DATE_TRUNC('day', time))::date::text AS day,
+                  AVG(value::numeric) AS avg_temp,
+                  COUNT(DISTINCT DATE_TRUNC('hour', time)) AS hours_covered
+           FROM sensor_data
+           WHERE device_id = $1 AND sensor_type = 'temperature' AND time >= $2::date
+           GROUP BY 1`,
+          [devRows[0].device_id, sowing],
+        );
+        for (const r of sRows) {
+          sensorMap.set(r.day, { avg: parseFloat(r.avg_temp), hours: parseInt(r.hours_covered, 10) });
+        }
+      }
+    }
+
+    // 파종일 ~ 오늘 일별 순회 (UTC 기준 달력일)
+    const series: Array<{ date: string; dailyGdd: number; source: 'sensor' | 'weather' | 'normal' }> = [];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const cur = new Date(`${sowing}T00:00:00.000Z`);
+    for (let guard = 0; guard < 2000; guard++) {
+      const dateStr = cur.toISOString().slice(0, 10);
+      if (dateStr > todayStr) break;
+      const month = cur.getUTCMonth() + 1;
+      const dayOffset = transplant && dateStr < transplant ? NURSERY_OFFSET : offset;
+
+      const s = sensorMap.get(dateStr);
+      const w = weatherMap.get(dateStr);
+      const n = normals[month];
+
+      let temp: number | null = null;
+      let src: 'sensor' | 'weather' | 'normal' = 'weather';
+      if (s && s.hours >= 12) {
+        temp = s.avg; // 실내 센서 충분 커버 → 오프셋 없이 그대로
+        src = 'sensor';
+      } else if (s && w != null) {
+        // 부분 커버: 센서 실측 + 나머지 시간은 외기(+오프셋) 추정
+        temp = (s.avg * s.hours + (w + dayOffset) * (24 - s.hours)) / 24;
+        src = 'sensor';
+      } else if (s) {
+        temp = s.avg;
+        src = 'sensor';
+      } else if (w != null) {
+        temp = w + dayOffset;
+        src = 'weather';
+      } else if (n != null) {
+        temp = n + dayOffset; // 백필: 기후 정규값 + 오프셋
+        src = 'normal';
+      } else {
+        cur.setUTCDate(cur.getUTCDate() + 1);
+        continue; // 데이터 전무한 날은 스킵
+      }
+
+      series.push({ date: dateStr, dailyGdd: Math.max(temp - baseTemp, 0), source: src });
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    return series;
   }
 
   // ──────────────────────────────────────────────────
@@ -376,96 +420,33 @@ export class GddService {
     sowingDate: string;
     targetGdd: number;
     currentGdd: number;
-    dailyPoints: Array<{ date: string; cumulativeGdd: number; dailyGdd: number }>;
+    dailyPoints: Array<{ date: string; cumulativeGdd: number; dailyGdd: number; source: 'sensor' | 'weather' | 'normal' }>;
     milestones: Array<{ gddThreshold: number; title: string; milestoneType: string; priority: string; reachedDate: string | null; estimatedDate: string | null }>;
     estimatedHarvestDate: string;
+    backfilledDays: number;
+    totalDays: number;
   }> {
     const { source, offset } = await this.resolveSource(batch);
     const targetGdd = batch.targetGdd ?? CROP_TARGET_GDD[batch.cropType] ?? 1200;
-    const baseTemp = batch.baseTemp ?? 10;
 
-    // 일별 GDD 데이터 포인트
-    let dailyRows: Array<{ day: string; daily_gdd: number }> = [];
-
-    if (source === 'sensor' || source === 'sensor_with_gap_fill') {
-      const deviceRows = await this.dataSource.query<{ device_id: string }[]>(
-        `SELECT em.device_id FROM env_mappings em
-         WHERE em.group_id = $1 AND em.role_key = 'internal_temp' AND em.source_type = 'sensor'
-         LIMIT 1`,
-        [batch.groupId],
-      );
-
-      if (deviceRows.length > 0) {
-        const deviceId = deviceRows[0].device_id;
-        const rows = await this.dataSource.query<{ day: string; daily_gdd: string }[]>(
-          `WITH daily_sensor AS (
-             SELECT DATE_TRUNC('day', time) AS day,
-                    AVG(value::numeric) AS avg_temp,
-                    COUNT(DISTINCT DATE_TRUNC('hour', time)) AS hours_covered
-             FROM sensor_data
-             WHERE device_id = $1 AND sensor_type = 'temperature' AND time >= $2::date
-             GROUP BY 1
-           ),
-           daily_weather AS (
-             SELECT DATE_TRUNC('day', time) AS day, AVG(temperature) AS avg_temp
-             FROM weather_data
-             WHERE user_id = $3 AND time >= $2::date
-             GROUP BY 1
-           )
-           SELECT
-             COALESCE(ds.day, dw.day) AS day,
-             GREATEST(
-               COALESCE(
-                 CASE WHEN COALESCE(ds.hours_covered, 0) >= 12 THEN ds.avg_temp
-                      ELSE COALESCE(dw.avg_temp, ds.avg_temp) + $5::numeric
-                 END,
-                 COALESCE(dw.avg_temp, 0) + $5::numeric
-               ) - $4::numeric, 0
-             ) AS daily_gdd
-           FROM daily_sensor ds
-           FULL OUTER JOIN daily_weather dw ON ds.day = dw.day
-           ORDER BY day`,
-          [deviceId, batch.sowingDate, batch.userId, baseTemp, offset],
-        );
-        dailyRows = rows.map(r => ({ day: r.day, daily_gdd: parseFloat(r.daily_gdd) }));
-      }
-    }
-
-    // sensor 데이터 없으면 weather fallback (육묘기 오프셋 분기 적용)
-    if (dailyRows.length === 0) {
-      const transplantDate = batch.transplantDate ?? null;
-      const rows = await this.dataSource.query<{ day: string; daily_gdd: string }[]>(
-        `SELECT DATE_TRUNC('day', time) AS day,
-                GREATEST(
-                  AVG(temperature) +
-                  CASE
-                    WHEN $5::date IS NOT NULL AND DATE_TRUNC('day', time) < $5::date
-                    THEN $6::numeric
-                    ELSE $3::numeric
-                  END
-                  - $4::numeric, 0
-                ) AS daily_gdd
-         FROM weather_data
-         WHERE user_id = $1 AND time >= $2::date
-         GROUP BY DATE_TRUNC('day', time)
-         ORDER BY day`,
-        [batch.userId, batch.sowingDate, offset, baseTemp, transplantDate, NURSERY_OFFSET],
-      );
-      dailyRows = rows.map(r => ({ day: r.day, daily_gdd: parseFloat(r.daily_gdd) }));
-    }
+    // 일별 GDD 시리즈 — 파종일부터, 결측 구간은 기후 정규값으로 백필 (calculateGdd 와 동일 경로)
+    const useSensor = source === 'sensor' || source === 'sensor_with_gap_fill';
+    const series = await this.buildElapsedDailyGdd(batch, offset, { useSensor });
 
     // 누적 GDD 계산
     let cumulative = 0;
-    const dailyPoints = dailyRows.map(r => {
-      cumulative += r.daily_gdd;
+    const dailyPoints = series.map(r => {
+      cumulative += r.dailyGdd;
       return {
-        date: r.day.toString().split('T')[0],
+        date: r.date,
         cumulativeGdd: Math.round(cumulative * 10) / 10,
-        dailyGdd: Math.round(r.daily_gdd * 10) / 10,
+        dailyGdd: Math.round(r.dailyGdd * 10) / 10,
+        source: r.source,
       };
     });
 
     const currentGdd = cumulative;
+    const backfilledDays = series.filter(r => r.source === 'normal').length;
 
     // 마일스톤 — 도달 날짜 계산
     const milestoneRows = await this.dataSource.query<{
@@ -525,6 +506,8 @@ export class GddService {
       dailyPoints,
       milestones,
       estimatedHarvestDate,
+      backfilledDays,
+      totalDays: series.length,
     };
   }
 

@@ -69,6 +69,10 @@ export interface GddResult {
   sourceBadge: { color: string; emoji: string; label: string }
   dailyAvg: number
   offsetInfo: { value: number; strategy: OffsetStrategy }
+  /** 기후 정규값으로 백필한 일수 (실측 결측 구간) */
+  backfilledDays?: number
+  /** 파종일~오늘 총 계산 일수 */
+  totalDays?: number
 }
 
 export interface MilestoneItem {
@@ -151,6 +155,8 @@ export interface TimelineDailyPoint {
   date: string
   cumulativeGdd: number
   dailyGdd: number
+  /** 그 날의 온도 출처: 실내센서 / 기상청 실측 / 기후정규값 백필 */
+  source?: 'sensor' | 'weather' | 'normal'
 }
 
 export interface TimelineMilestone {
@@ -170,4 +176,6 @@ export interface GddTimeline {
   dailyPoints: TimelineDailyPoint[]
   milestones: TimelineMilestone[]
   estimatedHarvestDate: string
+  backfilledDays?: number
+  totalDays?: number
 }

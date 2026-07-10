@@ -8,6 +8,13 @@
         <span class="source-badge" :style="{ color: gdd.sourceBadge.color }">
           {{ gdd.sourceBadge.emoji }} {{ gdd.sourceBadge.label }}
         </span>
+        <span
+          v-if="gdd.backfilledDays && gdd.backfilledDays > 0"
+          class="backfill-badge"
+          :title="`실측 데이터가 없는 ${gdd.backfilledDays}일은 기후 정규값(평년 기온)으로 추정했습니다.`"
+        >
+          📈 기후정규값 추정 {{ gdd.backfilledDays }}일
+        </span>
       </div>
 
       <!-- 오프셋 출처 안내 (커뮤니티/기본값 사용 시) -->
@@ -94,11 +101,26 @@ onMounted(async () => {
 }
 
 .source-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 6px;
 }
 
 .source-badge {
   font-size: 11px;
+}
+
+.backfill-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warning-text, #92400e);
+  background: var(--warning-bg, #fef3c7);
+  border: 1px solid var(--warning-border, #fde68a);
+  border-radius: 6px;
+  padding: 1px 6px;
+  cursor: help;
 }
 
 .stage-row {
