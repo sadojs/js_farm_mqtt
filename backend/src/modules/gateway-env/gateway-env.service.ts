@@ -1,5 +1,5 @@
 import {
-  ConflictException, ForbiddenException, Injectable, Logger, NotFoundException,
+  BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -23,6 +23,9 @@ import {
  * 8채널 = 원격제어 + B접점 + 구역 4개 + 교반기 + 액비
  * 12채널은 장치 추가 시 buildIrrigationSlots(channels=12)로 동적 생성
  */
+/** 우적센서 전용 예약 GPIO (BCM21 = 물리 40번). 다른 릴레이 슬롯이 점유할 수 없다. */
+export const RAIN_SENSOR_PIN = 21;
+
 const DEFAULT_SLOTS: Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt' | 'updatedAt' | 'operationTime' | 'standbyTime'>[] = [
   { slotKey: 'fan_1',              slotType: 'fan',                pairKey: null, name: '유동팬 1번',       enabled: true, sortOrder: 1,  gpioPin: null },
   { slotKey: 'fan_2',              slotType: 'fan',                pairKey: null, name: '유동팬 2번',       enabled: true, sortOrder: 2,  gpioPin: null },
@@ -36,6 +39,8 @@ const DEFAULT_SLOTS: Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt'
   { slotKey: 'zone_4',             slotType: 'irrigation_zone',    pairKey: null, name: '4구역 관주',       enabled: true, sortOrder: 10, gpioPin: null },
   { slotKey: 'mixer',              slotType: 'mixer',              pairKey: null, name: '교반기',           enabled: true, sortOrder: 11, gpioPin: null },
   { slotKey: 'fertilizer_motor',   slotType: 'fertilizer_motor',   pairKey: null, name: '액비',             enabled: true, sortOrder: 12, gpioPin: null },
+  // 무전압 접점 우적센서 — BCM21(물리 40번) 고정, 기본 비활성. 사용자는 활성/비활성만 선택.
+  { slotKey: 'rain_sensor',        slotType: 'rain_sensor',        pairKey: null, name: '우적센서',         enabled: false, sortOrder: 13, gpioPin: RAIN_SENSOR_PIN },
 ];
 
 /** 구버전에서 제거된 슬롯 키 (opener_* 는 지그비로만 추가) */
@@ -335,8 +340,17 @@ export class GatewayEnvService {
     if (dto.name !== undefined) device.name = dto.name;
     if (dto.operationTime !== undefined) device.operationTime = dto.operationTime;
     if (dto.standbyTime !== undefined) device.standbyTime = dto.standbyTime;
-    const pinChanged = 'gpioPin' in dto && device.gpioPin !== (dto.gpioPin ?? null);
-    if ('gpioPin' in dto) device.gpioPin = dto.gpioPin ?? null;
+
+    // 우적센서 슬롯: 핀 변경 금지(항상 BCM21 고정), enabled/name 토글만 허용
+    if (device.slotType === 'rain_sensor') {
+      device.gpioPin = RAIN_SENSOR_PIN;
+    } else if ('gpioPin' in dto && (dto.gpioPin ?? null) === RAIN_SENSOR_PIN) {
+      // 예약핀 보호: 릴레이 슬롯이 우적센서 전용 BCM21을 점유하지 못하도록 차단
+      throw new BadRequestException(`BCM${RAIN_SENSOR_PIN}(물리 40번)은 우적센서 전용 예약 핀입니다.`);
+    }
+    const pinChanged = device.slotType !== 'rain_sensor'
+      && 'gpioPin' in dto && device.gpioPin !== (dto.gpioPin ?? null);
+    if (device.slotType !== 'rain_sensor' && 'gpioPin' in dto) device.gpioPin = dto.gpioPin ?? null;
     const enabledChanged = dto.enabled !== undefined && device.enabled !== dto.enabled;
     if (dto.enabled !== undefined) {
       device.enabled = dto.enabled;
@@ -633,6 +647,65 @@ export class GatewayEnvService {
       }
     } else if (existingIrrig) {
       await this.deviceRepo.remove(existingIrrig);
+    }
+
+    // 3. 우적센서 슬롯 → sensor device + env_mappings(rain_detection) 동기화
+    const rainSlot = onboardDevices.find(s => s.slotType === 'rain_sensor');
+    if (rainSlot) await this.syncRainSensor(gw, rainSlot).catch(e =>
+      this.logger.warn(`우적센서 동기화 실패 (${gw.gatewayId}): ${e.message}`),
+    );
+  }
+
+  /**
+   * 무전압 접점 우적센서: 활성화 시 sensor device(friendlyName='rain_sensor') 와
+   * 소유자의 모든 house_groups 에 대한 env_mappings(role_key='rain_detection') 를 ensure.
+   * 비활성화 시에는 device/매핑을 유지(신호 발행만 Pi 가 중단) — 재활성화 시 즉시 복원.
+   */
+  private async syncRainSensor(gw: Gateway, slot: GatewayOnboardDevice): Promise<void> {
+    let device = await this.deviceRepo.findOne({ where: { onboardDeviceId: slot.id } });
+
+    // device 는 최초 활성화 시 생성 (비활성 상태에서 유령 센서가 목록에 뜨는 것 방지)
+    if (!device && slot.enabled) {
+      device = await this.deviceRepo.save(this.deviceRepo.create({
+        userId: gw.userId,
+        gatewayId: gw.id,
+        houseId: gw.houseId ?? undefined,
+        name: slot.name,
+        category: 'sensor',
+        deviceType: 'sensor',
+        equipmentType: 'rain',
+        source: 'onboard',
+        onboardDeviceId: slot.id,
+        friendlyName: 'rain_sensor',
+      } as Partial<Device>));
+      this.logger.log(`게이트웨이 ${gw.gatewayId}: 우적센서 device 생성 (${device.id})`);
+    } else if (device) {
+      // 이름/소유자/활성 drift 보정 (핀·friendlyName 은 고정)
+      let dirty = false;
+      if (device.name !== slot.name) { device.name = slot.name; dirty = true; }
+      if (device.userId !== gw.userId) { device.userId = gw.userId; dirty = true; }
+      if (!device.houseId && gw.houseId) { device.houseId = gw.houseId; dirty = true; }
+      // 슬롯 비활성화 → device.enabled=false 로 반영해야 구역관리/대시보드에서 숨겨진다.
+      if (device.enabled !== slot.enabled) { device.enabled = slot.enabled; dirty = true; }
+      if (dirty) await this.deviceRepo.save(device);
+    }
+
+    if (!device) return; // 아직 활성화 전
+
+    // 활성화 시 소유자의 모든 house_group 에 rain_detection 매핑 ensure (멱등)
+    if (slot.enabled) {
+      // UNIQUE(group_id, role_key) 존중 — 이미 rain_detection 매핑이 있는 구역(예: Zigbee 우적센서)은 건너뜀
+      await this.dataSource.query(
+        `INSERT INTO env_mappings (group_id, role_key, source_type, device_id, sensor_type)
+         SELECT g.id, 'rain_detection', 'sensor', $1::uuid, 'rain_detection'
+         FROM house_groups g
+         WHERE g.user_id = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM env_mappings m
+             WHERE m.group_id = g.id AND m.role_key = 'rain_detection'
+           )`,
+        [device.id, gw.userId],
+      );
     }
   }
 

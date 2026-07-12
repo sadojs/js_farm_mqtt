@@ -7,7 +7,7 @@ export type SlotType =
   | 'opener_open' | 'opener_close' | 'fan'
   | 'irrigation_zone' | 'irrigation_group' | 'remote_control'
   | 'fertilizer_contact' | 'mixer' | 'fertilizer_motor'
-  | 'vent_group';
+  | 'vent_group' | 'rain_sensor';
 
 @Entity('gateway_onboard_devices')
 export class GatewayOnboardDevice {

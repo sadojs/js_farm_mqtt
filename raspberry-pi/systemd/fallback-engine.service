@@ -10,6 +10,9 @@ Type=simple
 # /var/lib/smartfarm/fallback 디렉터리는 setup.sh에서 pi:pi로 chown.
 User=pi
 Group=pi
+# 무전압 우적센서(rain-gpio)가 /dev/gpiochip0(root:gpio) 를 gpioget 으로 읽으려면 gpio 그룹 필요.
+# (프로덕션에서는 usermod -aG gpio pi 로도 부여됨 — fresh 이미지 재현성 위해 유닛에도 명시)
+SupplementaryGroups=gpio
 WorkingDirectory=/opt/smart-farm/fallback-engine
 EnvironmentFile=/etc/smartfarm/fallback-engine.env
 ExecStart=/usr/bin/node index.js

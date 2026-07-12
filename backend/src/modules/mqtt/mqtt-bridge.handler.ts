@@ -123,11 +123,13 @@ export class MqttBridgeHandler {
             } else if (
               (device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close') &&
               !data.state &&
-              settings.relayActivePhase  // 룰 펄스 사이클 active 중
+              (settings.relayActivePhase || data.auto)  // 룰 펄스 사이클 OR durationMs 동작펄스 자동해제
             ) {
-              // 개폐기 + relay 룰 active phase 펄스 OFF는 sticky ON 유지
-              // (펄스 30s ON / 60s OFF 동안 화면이 깜박이지 않도록)
-              this.logger.debug(`[GPIO] ${device.name} 펄스 OFF skip (룰 active phase 유지)`);
+              // 개폐기 동작/대기: OFF는 "대기 phase"일 뿐 닫힘/열림 의도는 유지 → sticky ON.
+              // - relayActivePhase: 자동제어 룰 펄스 사이클(30s ON/60s OFF)
+              // - data.auto: rain-override 등 durationMs 동작펄스가 시간만료로 자동 OFF된 경우
+              // 화면 토글이 대기 phase마다 off로 깜박이지 않도록 switchState 갱신을 skip.
+              this.logger.debug(`[GPIO] ${device.name} 대기 phase OFF skip (동작 의도 유지)`);
               return;
             } else {
               // 유동팬/개폐기: 단일 switchState 저장 (frontend가 보는 키)

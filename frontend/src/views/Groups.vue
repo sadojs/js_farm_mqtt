@@ -157,6 +157,20 @@
                   </span>
                 </div>
                 <div v-else class="sub-card-value muted">{{ device.online ? '신호 대기' : '오프라인' }}</div>
+                <!-- 우적센서: 비 감지 자동 제어(강제 닫힘) on/off — 오동작 시 강제로 개폐기 열기용 -->
+                <button
+                  v-if="isRainSensor(device) && !isFarmUser"
+                  type="button"
+                  class="rain-override-btn"
+                  :class="{ 'is-on': !(device as any).rainOverrideDisabled, 'is-off': (device as any).rainOverrideDisabled }"
+                  @click.stop="toggleRainOverrideBtn(device)"
+                  :title="(device as any).rainOverrideDisabled
+                    ? '비 감지 자동 닫힘이 꺼져 있습니다. 클릭하여 다시 켜기'
+                    : '비 감지 시 개폐기를 자동으로 닫습니다. 오동작 시 끄면 강제로 열 수 있습니다.'"
+                >
+                  <span>{{ (device as any).rainOverrideDisabled ? '🌂' : '☔' }}</span>
+                  <span>비 감지 자동 제어 {{ (device as any).rainOverrideDisabled ? '꺼짐' : '켜짐' }}</span>
+                </button>
               </div>
             </div>
           </template>
@@ -201,14 +215,14 @@
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
                   <span class="control-label">열림</span>
                   <label class="toggle-switch" @click.prevent="og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
-                    <input type="checkbox" :checked="og.openDevice.switchState === true" :disabled="!og.openDevice.online || openerInterlocking" />
+                    <input type="checkbox" :checked="og.openDevice.online && og.openDevice.switchState === true" :disabled="!og.openDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.closeDevice.online }">
                   <span class="control-label">닫힘</span>
                   <label class="toggle-switch" @click.prevent="og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
-                    <input type="checkbox" :checked="og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || openerInterlocking" />
+                    <input type="checkbox" :checked="og.closeDevice.online && og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -250,14 +264,14 @@
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
                   <span class="control-label">원격제어 ON/OFF</span>
                   <label class="toggle-switch" @click.prevent="device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
-                    <input type="checkbox" :checked="device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling === device.id" />
+                    <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control disabled">
                   <span class="control-label">액비/교반기 B접점</span>
                   <label class="toggle-switch">
-                    <input type="checkbox" :checked="device.switchStates?.[getMapping(device)['fertilizer_b_contact']] === true" disabled />
+                    <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['fertilizer_b_contact']] === true" disabled />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -300,9 +314,9 @@
                   </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
-                  <span class="control-label">{{ device.switchState === true ? '가동중' : '정지' }}</span>
+                  <span class="control-label">{{ !device.online ? '오프라인' : (device.switchState === true ? '가동중' : '정지') }}</span>
                   <label class="toggle-switch" @click.prevent="device.online && handleControl(device.id, !device.switchState)">
-                    <input type="checkbox" :checked="device.switchState === true" :disabled="!device.online || controllingId === device.id" />
+                    <input type="checkbox" :checked="device.online && device.switchState === true" :disabled="!device.online || controllingId === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -471,7 +485,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
 import { useAutomationStore } from '../stores/automation.store'
@@ -493,6 +507,7 @@ import { useConfirm } from '../composables/useConfirm'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
 import { deviceApi } from '../api/device.api'
+import { automationApi } from '@/api/automation.api'
 import { gatewayApi } from '@/api/gateway.api'
 import type { HouseGroup } from '../types/group.types'
 import type { Gateway } from '../types/device.types'
@@ -502,7 +517,6 @@ import type { AutomationRule } from '../types/automation.types'
 import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
 
 const route = useRoute()
-const router = useRouter()
 const groupStore = useGroupStore()
 const deviceStore = useDeviceStore()
 const automationStore = useAutomationStore()
@@ -722,8 +736,10 @@ const toggleCollapse = (groupId: string) => {
 const getGroupSensors = (group: HouseGroup): Device[] =>
   (group.devices || []).filter(d => d.deviceType === 'sensor').map(d => {
     const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
-    return storeDevice ? { ...d, sensorData: storeDevice.sensorData, online: storeDevice.online } : d
-  })
+    return storeDevice
+      ? { ...d, sensorData: storeDevice.sensorData, online: storeDevice.online, enabled: storeDevice.enabled, rainOverrideDisabled: (storeDevice as any).rainOverrideDisabled }
+      : d
+  }).filter(d => d.enabled !== false)  // 비활성화된 측정기(우적센서 등)는 구역관리에서 숨김
 
 // 개폐기 쌍 ID (개별 표시 제외용)
 const getOpenerPairIds = (group: HouseGroup): Set<string> => {
@@ -905,6 +921,25 @@ function isRainSensor(device: any): boolean {
   return false
 }
 
+// 비 감지 자동 제어(강제 닫힘) on/off 토글 — 우적센서 오동작 시 강제로 개폐기 열기용.
+// rainOverrideDisabled=true 면 비 감지 이벤트를 무시(자동 닫힘 안 함).
+async function toggleRainOverrideBtn(device: any) {
+  const next = !device.rainOverrideDisabled
+  try {
+    await deviceApi.updateRainOverrideDisabled(device.id, next)
+    device.rainOverrideDisabled = next
+    const sd = deviceStore.devices.find(d => d.id === device.id)
+    if (sd) (sd as any).rainOverrideDisabled = next
+    notify.success(
+      next ? '비 감지 자동 제어 끔' : '비 감지 자동 제어 켬',
+      next ? '비가 와도 개폐기를 자동으로 닫지 않습니다. 강제로 열 수 있습니다.'
+           : '비 감지 시 개폐기를 자동으로 닫습니다.',
+    )
+  } catch {
+    notify.error('오류', '비 감지 자동 제어 변경에 실패했습니다.')
+  }
+}
+
 const ALLOWED_SENSOR_FIELDS = new Set(['temperature', 'humidity', 'co2', 'rainfall', 'uv', 'dew_point', 'rain_detection', 'pressure'])
 
 function getTopSensorData(sensorData: Record<string, number | null | undefined>): Record<string, number> {
@@ -942,11 +977,79 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   const targetDevice = action === 'open' ? group.openDevice : group.closeDevice
   const oppositeDevice = action === 'open' ? group.closeDevice : group.openDevice
 
+  // ── 자동제어 룰 동작 중 수동 조작 가드 ──
+  // 개폐기는 자동제어와 수동이 공존하지 않는다(듀티사이클·인터록 충돌). 활성 룰이 있으면
+  // 먼저 정지해야 수동 제어가 유지된다. 정지하지 않으면 다음 tick에 룰이 다시 제어해버림.
+  // (재개는 사용자가 자동제어 페이지에서 직접 — 룰이 여러 개일 수 있으므로 자동 재개 없음)
+  let rulesStopped = false
+  if (!isFarmUser) {
+    try {
+      const active = (await automationApi.getActiveRulesForDevice(targetDevice.id)).data
+      if (active && active.length > 0) {
+        const names = active.map(r => `• ${r.name}`).join('\n')
+        const go = await confirm({
+          title: '자동제어 룰이 동작 중입니다',
+          message:
+            `${group.groupName} 개폐기를 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
+            `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
+            `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
+          confirmText: '정지하고 수동 제어',
+          cancelText: '취소',
+          variant: 'warning',
+        })
+        if (!go) return
+        const { stopped } = (await automationApi.stopActiveRulesForDevice(targetDevice.id)).data
+        rulesStopped = stopped.length > 0
+        if (stopped.length > 0) {
+          // 룰 목록 캐시 갱신 → 구역관리 페이지의 룰 on/off 상태가 즉시 반영
+          // (미갱신 시 새로고침/재진입 전까지 활성으로 표시되던 문제)
+          await automationStore.fetchRules().catch(() => undefined)
+          notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
+        }
+      }
+    } catch (e) {
+      // 활성 룰 조회 실패해도 수동 제어 자체는 진행 (안내만 생략)
+      console.warn('활성 룰 조회/정지 실패:', e)
+    }
+  }
+
+  // ── 비 감지 자동 제어(강제 닫힘) 동작 중 수동 '열기' 가드 ──
+  // 비 감지로 개폐기가 닫혀 있을 때 수동으로 열려면 먼저 비 감지 자동 제어를 꺼야
+  // 다음 비 감지에 다시 닫히지 않는다. (자동제어 룰 팝업과 동일 패턴)
+  if (action === 'open' && !isFarmUser) {
+    const rainingSensors = deviceStore.devices.filter((d: any) =>
+      isRainSensor(d) && d.enabled !== false && !d.rainOverrideDisabled &&
+      Number((d.sensorData as any)?.rain_detection) >= 1,
+    )
+    if (rainingSensors.length > 0) {
+      const go = await confirm({
+        title: '비 감지 자동 제어가 동작 중입니다',
+        message:
+          `현재 비가 감지되어 개폐기가 자동으로 닫히고 있습니다. 수동으로 열어도 비 감지가 계속되면 다시 닫힙니다.\n\n` +
+          `비 감지 자동 제어를 끄고 여시겠습니까?\n(다시 켜려면 측정기 카드의 '비 감지 자동 제어' 버튼을 누르세요.)`,
+        confirmText: '끄고 열기',
+        cancelText: '취소',
+        variant: 'warning',
+      })
+      if (!go) return
+      for (const rs of rainingSensors) {
+        try {
+          await deviceApi.updateRainOverrideDisabled(rs.id, true)
+          ;(rs as any).rainOverrideDisabled = true
+        } catch (e) { console.warn('비 감지 자동 제어 끄기 실패:', e) }
+      }
+      notify.info('비 감지 자동 제어 끔', '비가 와도 자동으로 닫지 않습니다. 다시 켜려면 측정기 카드에서 켜세요.')
+    }
+  }
+
   openerInterlocking.value = true
   const loadingId = notify.add('info', '적용 중...', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'} 명령 전송 중`, 0)
   try {
-    // 이미 ON이면 OFF만 (자동 타이머도 취소)
-    if (targetDevice.switchState) {
+    // 이미 ON이면 OFF만 (자동 타이머도 취소).
+    // 단 방금 룰을 정지한 경우(rulesStopped)는 sticky로 남은 '가동중' 상태를 무시하고
+    // 사용자가 누른 방향을 강제로 ON 한다. (룰이 열림을 sticky ON 표시하던 중 클릭하면
+    // '이미 ON→OFF'로 뒤집혀 여는 대신 꺼지던 문제 방지 — 수동 시 동작/대기 로직 무시)
+    if (!rulesStopped && targetDevice.switchState) {
       if (openerAutoOffTimers.has(targetDevice.id)) {
         clearTimeout(openerAutoOffTimers.get(targetDevice.id))
         openerAutoOffTimers.delete(targetDevice.id)
@@ -967,26 +1070,7 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
         notify.warning('상태 미변경', '명령은 전달되었으나 장치 상태가 변경되지 않았습니다')
         if (storeTarget) storeTarget.switchState = v.actualValue
       }
-      // 열림·닫힘 둘 다 OFF(중립) 진입 + 활성 자동제어 룰 존재 → 곧 자동 재제어됨을 안내
-      // (백엔드가 이 경우 수동 우회를 해제하므로, 다음 tick 에 룰이 다시 개폐기를 제어함)
-      const oppLive = deviceStore.devices.find(d => d.id === oppositeDevice.id)
-      const bothOff = v.verified && !oppLive?.switchState
-      if (bothOff) {
-        const openRule = deviceStore.devices.find(d => d.id === group.openDevice.id)?.ruleIntendedState
-        const closeRule = deviceStore.devices.find(d => d.id === group.closeDevice.id)?.ruleIntendedState
-        const ruleActive = openRule != null || closeRule != null
-        if (ruleActive) {
-          const go = await confirm({
-            title: '자동제어 룰이 동작 중입니다',
-            message:
-              `${group.groupName} 개폐기를 모두 껐지만, 이 구역에 동작 중인 자동제어 룰이 있어 곧 다시 자동으로 제어됩니다.\n` +
-              `완전히 멈추려면 자동 제어에서 해당 룰을 꺼야 합니다.\n\n자동 제어 페이지로 이동할까요?`,
-            confirmText: '자동 제어로 이동',
-            cancelText: '닫기',
-          })
-          if (go) router.push('/automation')
-        }
-      }
+      // (활성 룰은 함수 진입 시점에 이미 정지 처리되므로, 여기서 재제어 안내 불필요)
       return
     }
     // 반대쪽이 ON이면: 먼저 OFF → 3초 대기 (릴레이 접점 아크 소멸 + 안전 간격)
@@ -2088,4 +2172,16 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .group-header { padding: 14px 16px; }
   .group-body { padding: 0 16px 14px; }
 }
+
+/* 우적센서: 비 감지 자동 제어 토글 버튼 (측정기 카드) */
+.rain-override-btn {
+  display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%;
+  margin-top: 6px; padding: 5px 8px; border-radius: 6px; cursor: pointer;
+  font-size: 11px; font-weight: 700; border: 1px solid; transition: filter 0.15s;
+}
+.rain-override-btn.is-on { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+.rain-override-btn.is-off { background: #fef3c7; border-color: #fde68a; color: #b45309; }
+.rain-override-btn:hover { filter: brightness(0.97); }
+#app.theme-dark .rain-override-btn.is-on { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.4); color: #93c5fd; }
+#app.theme-dark .rain-override-btn.is-off { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
 </style>

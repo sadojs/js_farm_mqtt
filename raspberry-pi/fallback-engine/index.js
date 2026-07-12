@@ -22,6 +22,7 @@ const CommandGate = require('./lib/command-gate');
 const EventQueue = require('./lib/event-queue');
 const RuleEvaluator = require('./lib/rule-evaluator');
 const RainOverride = require('./lib/rain-override');
+const RainGpio = require('./lib/rain-gpio');
 const RelayBridge = require('./lib/relay-bridge');
 
 // ── 환경 변수 ────────────────────────────────────────────────
@@ -66,6 +67,7 @@ let client;
 let evalTimer = null;
 let relayBridge;
 let evaluator;
+let rainGpio;
 
 // ── MQTT 연결 ────────────────────────────────────────────────
 function connect() {
@@ -83,6 +85,7 @@ function connect() {
   evaluator = new RuleEvaluator({
     store, queue, rain, relayBridge, gatewayId: GATEWAY_ID,
   });
+  rainGpio = new RainGpio({ client, gatewayId: GATEWAY_ID, chip: process.env.GPIO_CHIP });
 
   client.on('connect', () => {
     console.log('[FALLBACK] MQTT 연결 성공');
@@ -97,6 +100,9 @@ function connect() {
 
     // 초기 모드 publish
     publishMode();
+
+    // 우적센서 GPIO 감시 시작 (rainInput.enabled 에 따라)
+    rainGpio.applyConfig(store.config().rainInput);
 
     // 폴백 중 누적된 이벤트 flush 시도
     flushQueue();
@@ -126,6 +132,8 @@ function handleMessage(topic, payload) {
     const parsed = JSON.parse(payload.toString('utf-8'));
     store.applySync(parsed);
     publishAck(parsed.version);
+    // 우적센서 설정 변화 반영 (활성/비활성/핀)
+    if (rainGpio) rainGpio.applyConfig(store.config().rainInput);
     console.log(`[FALLBACK] 룰 동기화 적용 v${parsed.version}`);
     return;
   }
@@ -261,6 +269,7 @@ function startEvaluationLoop() {
 function shutdown(sig) {
   console.log(`[FALLBACK] 종료 신호: ${sig}`);
   if (evalTimer) clearInterval(evalTimer);
+  try { if (rainGpio) rainGpio.stop(); } catch {}
   try { queue.close(); } catch {}
   if (client) client.end(false, () => process.exit(0));
   else process.exit(0);

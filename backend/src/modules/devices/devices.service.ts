@@ -548,6 +548,9 @@ export class DevicesService {
     commands: { code: string; value: any }[],
     role?: string,
     callerSource?: 'automation' | 'rain-override',
+    /** 온보드 GPIO 개폐기 등: state=ON 이후 이 시간(ms) 뒤 gpio-agent가 자동 OFF(동작 펄스).
+     *  개폐기 모터가 계속 켜지지 않도록 rain-override/자동제어의 닫힘 동작 시간에 사용. */
+    durationMs?: number,
   ) {
     const device = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
@@ -564,60 +567,33 @@ export class DevicesService {
     // (단일채널 단순 비교 — irrigation/controller는 다중 스위치라 ruleIntendedState=true 기반 비교)
     if (!callerSource) {
       const settings: any = device.deviceSettings || {};
-      const intent: boolean | null = settings.ruleIntendedState ?? null;
-      const isOnCmd = commands.some(c => c.value === true || c.value === 'ON' || c.value === 1);
-      const isOffCmd = commands.some(c => c.value === false || c.value === 'OFF' || c.value === 0);
-
-      // ── 개폐기(페어) 중립 해제 ──
-      // 열림·닫힘 채널을 모두 OFF(중립)로 만들면 → 자동제어 복귀(양쪽 userOverride 해제).
-      // 활성 채널을 끄면 결과가 '둘 다 OFF' 이므로, 이 경우는 pin 대신 release 로 처리한다.
-      // (반대 방향을 ON 으로 몰면 '둘 다 OFF'가 아니므로 기존 pin 로직이 그대로 적용되어 수동 우선 유지)
       const isOpenerDev = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
-      let handledByOpenerNeutral = false;
-      if (isOpenerDev && isOffCmd && !isOnCmd && device.pairedDeviceId) {
-        const paired = await this.devicesRepo.findOne({ where: { id: device.pairedDeviceId } });
-        const pairedOn = !!((paired?.deviceSettings as any)?.switchState);
-        if (!pairedOn) {
-          handledByOpenerNeutral = true;
-          let released = false;
-          if (settings.userOverride) {
+
+      // ── 개폐기: 수동 pin/release(userOverride) 정책 제거 ──
+      // 개폐기는 양방향 인터록 + 펄스 듀티사이클이라 "단일 목표상태 비교" 기반 pin이 성립하지 않음
+      // (수동 조작이 다음 tick에 룰에 덮여 둘 다 OFF 되는 충돌). 개폐기는 자동제어와 공존하지 않으며,
+      // 활성 룰이 있으면 프론트가 '룰 정지' 팝업으로 처리한다. → openers는 pin 로직을 건너뛴다.
+      if (!isOpenerDev) {
+        const intent: boolean | null = settings.ruleIntendedState ?? null;
+        const isOnCmd = commands.some(c => c.value === true || c.value === 'ON' || c.value === 1);
+        const isOffCmd = commands.some(c => c.value === false || c.value === 'OFF' || c.value === 0);
+
+        // 단일 ON/OFF 명령만 처리 (관수의 다중 switch는 ruleIntendedState 적용 안 함)
+        if (intent != null && (isOnCmd || isOffCmd)) {
+          const newValue = isOnCmd;
+          if (settings.userOverride && newValue === intent) {
             settings.userOverride = false;
             device.deviceSettings = settings;
             await this.devicesRepo.save(device).catch(() => undefined);
-            released = true;
-          }
-          if (paired) {
-            const ps: any = paired.deviceSettings || {};
-            if (ps.userOverride) {
-              ps.userOverride = false;
-              paired.deviceSettings = ps;
-              await this.devicesRepo.save(paired).catch(() => undefined);
-              released = true;
-            }
-          }
-          if (released) {
-            this.logger.log(`[manual-release] ${device.name} 개폐기 열림·닫힘 둘 다 OFF → 자동제어 복귀`);
+            this.logger.log(`[manual-release] ${device.name} 자동제어 복귀 (사용자 토글이 룰 의도와 일치)`);
+            // 룰이 다음 cron tick에 즉시 재평가하도록 lastState 클리어 신호 emit
             this.eventEmitter.emit('device.manual.released', { deviceId: device.id });
+          } else if (!settings.userOverride && newValue !== intent) {
+            settings.userOverride = true;
+            device.deviceSettings = settings;
+            await this.devicesRepo.save(device).catch(() => undefined);
+            this.logger.log(`[manual-pin] ${device.name} 수동 우회 활성 (rule=${intent ? 'ON' : 'OFF'}, user=${newValue ? 'ON' : 'OFF'})`);
           }
-        }
-      }
-
-      // 단일 ON/OFF 명령만 처리 (관수의 다중 switch는 ruleIntendedState 적용 안 함)
-      if (!handledByOpenerNeutral && intent != null && (isOnCmd || isOffCmd)) {
-        const newValue = isOnCmd;
-        if (settings.userOverride && newValue === intent) {
-          settings.userOverride = false;
-          device.deviceSettings = settings;
-          await this.devicesRepo.save(device).catch(() => undefined);
-          this.logger.log(`[manual-release] ${device.name} 자동제어 복귀 (사용자 토글이 룰 의도와 일치)`);
-          // 룰이 다음 cron tick에 즉시 재평가하도록 lastState 클리어 신호 emit
-          // (relay cycle OFF 구간에서 사용자가 ON 복귀 시 룰이 다시 OFF로 보낼 수 있도록)
-          this.eventEmitter.emit('device.manual.released', { deviceId: device.id });
-        } else if (!settings.userOverride && newValue !== intent) {
-          settings.userOverride = true;
-          device.deviceSettings = settings;
-          await this.devicesRepo.save(device).catch(() => undefined);
-          this.logger.log(`[manual-pin] ${device.name} 수동 우회 활성 (rule=${intent ? 'ON' : 'OFF'}, user=${newValue ? 'ON' : 'OFF'})`);
         }
       }
     }
@@ -854,13 +830,28 @@ export class DevicesService {
         slot: slot.slotKey,
         pin: slot.gpioPin,
         state: isOn,
+        // 동작 펄스: state=ON + durationMs 면 gpio-agent가 durationMs 뒤 자동 OFF (모터 연속통전 방지)
+        ...(durationMs && durationMs > 0 && isOn ? { durationMs } : {}),
       });
       // 상태 기록 (verify 응답용)
       const settings = (device.deviceSettings || {}) as any;
       settings.switchStates = { ...(settings.switchStates || {}), state: isOn, switch_1: isOn };
+      // 단일채널 액추에이터(fan/opener_*): 최상위 switchState도 동기화.
+      // (Groups.vue 개폐기 토글이 switchState로 판정 — 미저장 시 15초 폴링(fetchDevices)이
+      //  DB의 stale switchState=false로 덮어써 토글이 되돌아가던 문제. zigbee 경로와 통일)
+      if (device.equipmentType !== 'irrigation' && device.equipmentType !== 'controller') {
+        settings.switchState = isOn;
+      }
       settings.lastCommandAt = new Date().toISOString();
       device.deviceSettings = settings;
       await this.devicesRepo.save(device).catch(() => undefined);
+      // UI 즉시 동기화 (다른 클라이언트/폴링 사이 공백 방지)
+      this.eventsGateway.broadcastDeviceSwitchUpdate?.(device.userId, {
+        deviceId: device.id,
+        switchState: settings.switchState ?? null,
+        switchStates: settings.switchStates,
+        online: device.online,
+      });
       this.logger.log(`Onboard GPIO 제어: ${device.name} (BCM${slot.gpioPin}) → ${isOn ? 'ON' : 'OFF'}`);
       return { success: true, deviceId: device.id, command: { state: isOn ? 'ON' : 'OFF', pin: slot.gpioPin }, deviceName: device.name, equipmentType: device.equipmentType };
     }

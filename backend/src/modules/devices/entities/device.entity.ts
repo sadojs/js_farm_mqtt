@@ -38,7 +38,7 @@ export class Device {
   @Column({ name: 'equipment_type', nullable: true })
   equipmentType: 'fan' | 'irrigation' | 'opener_open' | 'opener_close' | 'mixer'
     | 'fertilizer_motor' | 'fertilizer_contact' | 'remote_control'
-    | 'vent_group' | 'irrigation_group' | 'controller' | 'other';
+    | 'vent_group' | 'irrigation_group' | 'controller' | 'rain' | 'other';
 
   @Column({ nullable: true })
   icon: string;

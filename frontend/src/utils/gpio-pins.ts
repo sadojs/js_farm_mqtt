@@ -17,6 +17,12 @@ export const USABLE_BCM_PINS = [
   16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
 ] as const;
 
+/**
+ * 우적센서(무전압 접점) 전용 예약 BCM 핀 — 릴레이 슬롯 배정 목록에서 제외된다.
+ * BCM21 = 물리 40번, GND(39번)와 접점 직결. 백엔드 RAIN_SENSOR_PIN 과 일치해야 함.
+ */
+export const RESERVED_BCM_PINS: readonly number[] = [21]
+
 /** 핀별 부가 기능 (시스템 인터페이스 - raspi-config로 비활성화 시 일반 GPIO로 사용 가능) */
 export const SPECIAL_FUNCTIONS: Record<number, string> = {
   2: 'I2C SDA',

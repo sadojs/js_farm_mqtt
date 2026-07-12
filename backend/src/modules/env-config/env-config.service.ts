@@ -66,7 +66,8 @@ export class EnvConfigService {
 
     // group_devices 매핑 + 게이트웨이→하우스→그룹 경로의 모든 device 합산
     // (구역관리 페이지와 동일한 로직)
-    const sensorDevices: Device[] = group.devices.filter(d => d.deviceType === 'sensor');
+    // 비활성화(enabled=false)된 센서는 역할 매핑 후보에서 제외 (구역관리·환경설정 일관성)
+    const sensorDevices: Device[] = group.devices.filter(d => d.deviceType === 'sensor' && (d as any).enabled !== false);
     const houseIds = (group.houses || []).map(h => h.id);
     if (houseIds.length > 0) {
       // 동일 그룹 내 모든 게이트웨이의 sensor 장치 추가
@@ -76,6 +77,7 @@ export class EnvConfigService {
         JOIN gateways g ON g.id::text = d.gateway_id
         WHERE g.house_id = ANY($1::uuid[])
           AND d.device_type = 'sensor'
+          AND d.enabled IS NOT FALSE
       `, [houseIds]);
       const existingIds = new Set(sensorDevices.map(d => d.id));
       for (const d of extra) {

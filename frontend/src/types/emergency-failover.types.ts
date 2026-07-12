@@ -20,6 +20,10 @@ export interface FallbackConfig {
   openerOnValue: number
   openerOffValue: number
   sensorTimeoutSeconds: number
+  openerOperationSeconds: number
+  openerStandbySeconds: number
+  fanOperationMinutes: number
+  fanStandbyMinutes: number
   version: number
   lastAppliedAt: string | null
   lastAppliedVersion: number | null
@@ -76,6 +80,10 @@ export interface UpdateConfigDto {
   openerOnValue?: number
   openerOffValue?: number
   sensorTimeoutSeconds?: number
+  openerOperationSeconds?: number
+  openerStandbySeconds?: number
+  fanOperationMinutes?: number
+  fanStandbyMinutes?: number
 }
 
 export interface UpsertScheduleDto {

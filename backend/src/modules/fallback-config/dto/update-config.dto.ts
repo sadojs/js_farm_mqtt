@@ -91,4 +91,32 @@ export class UpdateFallbackConfigDto {
   @Min(120)
   @Max(3600)
   sensorTimeoutSeconds?: number;
+
+  /** 게이트웨이 공통 개폐기 동작 시간(초) */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  openerOperationSeconds?: number;
+
+  /** 게이트웨이 공통 개폐기 대기 시간(초) */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  openerStandbySeconds?: number;
+
+  /** 게이트웨이 공통 유동팬 동작 시간(분) */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  fanOperationMinutes?: number;
+
+  /** 게이트웨이 공통 유동팬 대기 시간(분) */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  fanStandbyMinutes?: number;
 }

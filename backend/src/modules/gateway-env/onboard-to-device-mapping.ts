@@ -24,4 +24,6 @@ export const ONBOARD_TO_DEVICE: Record<SlotType, DeviceTemplate> = {
   opener_close: { category: 'opener', deviceType: 'actuator', equipmentType: 'opener_close', provisionable: true },
   vent_group: { category: 'opener', deviceType: 'group', equipmentType: 'vent_group', provisionable: false },
   irrigation_group: { category: 'irrigation', deviceType: 'group', equipmentType: 'irrigation_group', provisionable: false },
+  // 무전압 접점 우적센서 (온보드 GPIO21 직결) — 기존 Zigbee 우적 파이프라인 재사용
+  rain_sensor: { category: 'sensor', deviceType: 'sensor', equipmentType: 'rain', provisionable: true },
 };

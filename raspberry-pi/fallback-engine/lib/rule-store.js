@@ -35,6 +35,14 @@ const DEFAULT_RULES = {
     openerOffValue: 25,
     // 온습도계 보고주기(관찰 ~14분/840초)보다 넉넉히. 짧으면 매 주기 stale 오판 → primary↔backup flip-flop.
     sensorTimeoutSeconds: 1200,
+    // 게이트웨이 공통 개폐기/팬 동작·대기 (서버 sync로 갱신)
+    openerOperationSeconds: 30,
+    openerStandbySeconds: 60,
+    fanOperationMinutes: 50,
+    fanStandbyMinutes: 10,
+    // 무전압 접점 우적센서 (온보드 GPIO 직결). enabled 면 GPIO 를 감시하여
+    // farm/{gw}/z2m/{friendlyName} 로 {rain} 발행 → 기존 우적 파이프라인 재사용.
+    rainInput: { enabled: false, pin: 21, activeLow: true, friendlyName: 'rain_sensor' },
   },
   channelMapping: null,
   schedule: [

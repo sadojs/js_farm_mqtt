@@ -354,9 +354,11 @@ export class FallbackConfigService implements OnModuleInit {
   async publishSync(gatewayId: string) {
     const { config, schedule } = await this.getFullConfig(gatewayId);
     const channelMapping = await this.buildChannelMapping(gatewayId);
+    const rainInput = await this.buildRainInput(gatewayId);
     await this.mqtt.publishFallbackRulesSync(gatewayId, {
       version: config.version,
       config: {
+        rainInput,
         heartbeatTimeoutSeconds: config.heartbeatTimeoutSeconds,
         recoveryGraceSeconds: config.recoveryGraceSeconds,
         openerEnabled: config.openerEnabled,
@@ -372,6 +374,11 @@ export class FallbackConfigService implements OnModuleInit {
         openerOnValue: config.openerOnValue,
         openerOffValue: config.openerOffValue,
         sensorTimeoutSeconds: config.sensorTimeoutSeconds,
+        // 게이트웨이 공통 개폐기/팬 동작·대기 (fallback-engine 개폐기 펄스 등에서 사용)
+        openerOperationSeconds: config.openerOperationSeconds,
+        openerStandbySeconds: config.openerStandbySeconds,
+        fanOperationMinutes: config.fanOperationMinutes,
+        fanStandbyMinutes: config.fanStandbyMinutes,
       },
       schedule: schedule.map((s) => ({
         month: s.month,
@@ -434,7 +441,8 @@ export class FallbackConfigService implements OnModuleInit {
           break;
         case 'remote_control':
         case 'vent_group':
-          // 폴백 대상 아님
+        case 'rain_sensor':
+          // 폴백 릴레이 채널 대상 아님 (rain_sensor 는 rainInput 으로 별도 전달)
           break;
         default:
           skippedType++;
@@ -452,6 +460,30 @@ export class FallbackConfigService implements OnModuleInit {
       );
     }
     return result;
+  }
+
+  /**
+   * 무전압 접점 우적센서 입력 설정. Pi fallback-engine 이 GPIO 를 감시해
+   * farm/{gw}/z2m/rain_sensor 로 {rain} 을 발행하도록 하는 파라미터.
+   * 슬롯이 없거나 비활성이면 enabled=false (감시 안 함).
+   */
+  private async buildRainInput(gatewayId: string) {
+    const DEFAULT = { enabled: false, pin: 21, activeLow: true, friendlyName: 'rain_sensor' };
+    const gateway = await this.gatewayRepo.findOne({
+      where: { gatewayId },
+      select: ['id', 'gatewayId'],
+    });
+    if (!gateway) return DEFAULT;
+    const slot = await this.onboardRepo.findOne({
+      where: { gatewayId: gateway.id, slotType: 'rain_sensor' },
+    });
+    if (!slot) return DEFAULT;
+    return {
+      enabled: !!slot.enabled,
+      pin: slot.gpioPin ?? 21,
+      activeLow: true,
+      friendlyName: slot.slotKey || 'rain_sensor',
+    };
   }
 
   private emptyMapping() {

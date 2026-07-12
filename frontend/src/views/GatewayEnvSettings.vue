@@ -19,6 +19,9 @@
       <button :class="['tab-btn', activeTab === 'zigbee' && 'active']" @click="activeTab = 'zigbee'">
         Zigbee 장치 <span v-if="zigbeeDevices.length" class="tab-count">{{ zigbeeDevices.length }}</span>
       </button>
+      <button :class="['tab-btn', activeTab === 'settings' && 'active']" @click="activeTab = 'settings'">
+        장치 설정
+      </button>
     </div>
 
     <div v-if="loadError" class="error-state">
@@ -90,10 +93,8 @@
             </div>
           </div>
           <div class="card-actions" @click.stop>
-            <!-- 팬: 타이머 설정 버튼 -->
-            <button v-if="dev.equipmentType === 'fan'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'fan-zigbee')" title="타이머 설정">⏱</button>
-            <!-- 개폐기 타이머 -->
-            <button v-if="dev.equipmentType === 'opener_open'" class="btn-sm btn-timer" @click.stop="openTimerModal(dev, 'opener')" title="타이머 설정">⏱</button>
+            <!-- 팬/개폐기 동작·대기는 '장치 설정' 탭(게이트웨이 공통)에서 설정 -->
+
             <!-- 단일 채널 지그비 액추에이터 (fan, opener_open, opener_close): inline ON/OFF 테스트 -->
             <template v-if="authStore.isAdmin && isSingleChannelZigbeeActuator(dev)">
               <button class="relay-btn on btn-sm" @click.stop="testSingleZigbee(dev, true)" title="테스트 ON">ON</button>
@@ -113,15 +114,6 @@
               {{ expandedZigbeeIds.has(dev.id) ? '▲' : '▼' }}
             </span>
           </div>
-        </div>
-        <!-- 팬/개폐기 타이머 배지 -->
-        <div v-if="(dev.equipmentType === 'fan' || dev.equipmentType === 'opener_open') && (dev.deviceSettings?.operation_time || dev.deviceSettings?.standby_time)" class="timer-badge">
-          <template v-if="dev.equipmentType === 'fan'">
-            동작 {{ dev.deviceSettings?.operation_time ?? 50 }}분 · 대기 {{ dev.deviceSettings?.standby_time ?? 10 }}분
-          </template>
-          <template v-else>
-            동작 {{ dev.deviceSettings?.operation_time ?? 30 }}초 · 대기 {{ dev.deviceSettings?.standby_time ?? 60 }}초
-          </template>
         </div>
         <!-- 관수 채널 그리드 (onboard 동일 스타일, expand 시) -->
         <div v-if="dev.equipmentType === 'irrigation' && expandedZigbeeIds.has(dev.id)" class="card-body">
@@ -251,6 +243,80 @@
           </div>
         </div>
       </div>
+
+      <!-- 비활성 측정기: 메인 목록에서 숨김 — 여기서 다시 켤 수 있음 -->
+      <div v-if="disabledZigbeeSensors.length" class="disabled-sensor-box">
+        <div class="disabled-sensor-title">
+          비활성 측정기 {{ disabledZigbeeSensors.length }}
+          <span class="disabled-sensor-hint">— 구역관리·목록에서 숨겨집니다. 토글로 다시 켤 수 있습니다.</span>
+        </div>
+        <div v-for="dev in disabledZigbeeSensors" :key="dev.id" class="disabled-sensor-row">
+          <span class="ds-icon">🌡</span>
+          <span class="ds-name">{{ dev.name }}</span>
+          <span class="ds-fname">{{ dev.friendlyName }}</span>
+          <label class="toggle toggle-sm" title="다시 켜기">
+            <input type="checkbox" :checked="false" @change="toggleZigbee(dev)" />
+            <span class="toggle-slider"></span>
+          </label>
+          <button class="btn-danger btn-sm" @click="removeZigbee(dev)">삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 장치 설정 탭 (라즈베리파이 공통) ── -->
+    <div v-else-if="activeTab === 'settings'" class="section">
+      <p class="section-desc">이 라즈베리파이(게이트웨이)의 개폐기·유동팬 동작/대기 시간과 우적센서를 공통으로 설정합니다. 장치별 개별 설정이 아니라 파이당 1벌입니다.</p>
+      <div v-if="settingsLoading" class="loading-state">불러오는 중...</div>
+      <div v-else-if="settingsError" class="error-state"><p>⚠ {{ settingsError }}</p></div>
+      <template v-else>
+        <div class="settings-card">
+          <div class="settings-card-title">🪟 개폐기 동작 / 대기 <span class="settings-sub">모든 개폐기 공통 (초)</span></div>
+          <div class="settings-row">
+            <label class="settings-label">동작 시간</label>
+            <input type="number" min="1" max="600" v-model.number="deviceCfg.openerOperationSeconds" class="settings-input" />
+            <span class="settings-unit">초</span>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">대기 시간</label>
+            <input type="number" min="1" max="600" v-model.number="deviceCfg.openerStandbySeconds" class="settings-input" />
+            <span class="settings-unit">초</span>
+          </div>
+          <p class="settings-hint">비 감지·자동 제어 복귀 시 개폐기를 동작/대기 주기로 제어합니다. 최대 10분간 반복 후 완전히 닫히면 상태만 유지합니다. (수동 조작은 이 주기를 타지 않고 즉시 동작합니다.)</p>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-title">🌀 유동팬 동작 / 대기 <span class="settings-sub">모든 유동팬 공통 (분)</span></div>
+          <div class="settings-row">
+            <label class="settings-label">동작 시간</label>
+            <input type="number" min="1" max="240" v-model.number="deviceCfg.fanOperationMinutes" class="settings-input" />
+            <span class="settings-unit">분</span>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">대기 시간</label>
+            <input type="number" min="1" max="240" v-model.number="deviceCfg.fanStandbyMinutes" class="settings-input" />
+            <span class="settings-unit">분</span>
+          </div>
+        </div>
+
+        <div v-if="rainSlot" class="settings-card">
+          <div class="settings-card-title">☔ 우적센서 <span class="settings-sub">무전압 접점 · BCM21(Pin 40) 고정</span></div>
+          <div class="settings-row">
+            <label class="settings-label">사용</label>
+            <label class="toggle">
+              <input type="checkbox" :checked="rainSlot.enabled" @change="toggleRainSlot" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span :class="rainSlot.enabled ? 'text-on' : 'text-off'">{{ rainSlot.enabled ? '활성' : '비활성' }}</span>
+          </div>
+          <p class="settings-hint">비 감지 시 소속 구역 개폐기를 위 동작/대기 주기로 자동으로 닫습니다.</p>
+        </div>
+
+        <div class="settings-actions">
+          <button class="btn-primary" :disabled="settingsSaving" @click="saveDeviceConfig">
+            {{ settingsSaving ? '저장 중...' : '동작/대기 시간 저장' }}
+          </button>
+        </div>
+      </template>
     </div>
 
     <!-- ── 핀 테스트 모달 (admin only) ── -->
@@ -518,6 +584,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { gatewayEnvApi, type OnboardDevice, type ZigbeeDevice, type ZigbeeScannedDevice } from '@/api/gateway-env.api'
 import { gatewayApi } from '@/api/gateway.api'
+import { emergencyFailoverApi } from '@/api/emergency-failover.api'
 import { useNotificationStore } from '@/stores/notification.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { detectChannelCount, AVAILABLE_SWITCH_CODES_8CH, AVAILABLE_SWITCH_CODES_12CH, FUNCTION_LABELS } from '@/types/device.types'
@@ -595,13 +662,94 @@ function openOnboardPinTest() {
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
-const activeTab = ref<'onboard' | 'zigbee'>('onboard')
+const activeTab = ref<'onboard' | 'zigbee' | 'settings'>('onboard')
 const onboardDevices = ref<OnboardDevice[]>([])
+
+// ── 장치 설정 탭 (게이트웨이 공통 동작/대기 + 우적센서) ──
+const gatewayCode = ref('')  // VARCHAR gateway_id (fallback-config API용)
+const settingsLoading = ref(false)
+const settingsSaving = ref(false)
+const settingsError = ref<string | null>(null)
+const deviceCfg = ref({
+  openerOperationSeconds: 30, openerStandbySeconds: 60,
+  fanOperationMinutes: 50, fanStandbyMinutes: 10,
+})
+const rainSlot = computed(() => onboardDevices.value.find(d => d.slotType === 'rain_sensor') ?? null)
+
+async function resolveGatewayCode(): Promise<string> {
+  if (gatewayCode.value) return gatewayCode.value
+  const res = await gatewayApi.getAll()
+  const gw = res.data.find((g: any) => g.id === gatewayId)
+  gatewayCode.value = gw?.gatewayId ?? ''
+  return gatewayCode.value
+}
+
+async function loadDeviceConfig() {
+  settingsLoading.value = true
+  settingsError.value = null
+  try {
+    const code = await resolveGatewayCode()
+    if (!code) { settingsError.value = '게이트웨이 정보를 찾을 수 없습니다.'; return }
+    const full = await emergencyFailoverApi.getFull(code)
+    const c = full.config
+    deviceCfg.value = {
+      openerOperationSeconds: c.openerOperationSeconds ?? 30,
+      openerStandbySeconds: c.openerStandbySeconds ?? 60,
+      fanOperationMinutes: c.fanOperationMinutes ?? 50,
+      fanStandbyMinutes: c.fanStandbyMinutes ?? 10,
+    }
+  } catch (e: any) {
+    settingsError.value = e?.response?.data?.message ?? '설정을 불러오지 못했습니다.'
+  } finally {
+    settingsLoading.value = false
+  }
+}
+
+async function saveDeviceConfig() {
+  if (settingsSaving.value) return
+  settingsSaving.value = true
+  try {
+    const code = await resolveGatewayCode()
+    await emergencyFailoverApi.updateConfig(code, { ...deviceCfg.value })
+    notif.success('저장 완료', '동작/대기 시간이 저장되었습니다.')
+  } catch (e: any) {
+    notif.error('오류', e?.response?.data?.message ?? '저장에 실패했습니다.')
+  } finally {
+    settingsSaving.value = false
+  }
+}
+
+async function toggleRainSlot() {
+  const rs = rainSlot.value
+  if (!rs) return
+  const newVal = !rs.enabled
+  // 비활성화 경고: 우적센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중
+  if (!newVal && !window.confirm(
+    '우적센서를 비활성화하시겠습니까?\n\n이 센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중입니다. ' +
+    '비활성화하면 비가 와도 개폐기가 자동으로 닫히지 않으며, 구역관리·대시보드에서도 숨겨집니다.',
+  )) return
+  try {
+    await gatewayEnvApi.updateOnboard(gatewayId, rs.id, { enabled: newVal })
+    rs.enabled = newVal
+    notif.success(newVal ? '우적센서 활성화' : '우적센서 비활성화',
+      newVal ? '비 감지 시 개폐기가 자동으로 닫힙니다.' : '우적 신호 발행이 중단됩니다.')
+  } catch {
+    notif.error('오류', '우적센서 상태 변경에 실패했습니다.')
+  }
+}
+
+watch(activeTab, (t) => { if (t === 'settings') loadDeviceConfig() })
 const zigbeeDevices = ref<ZigbeeDevice[]>([])
 
 // Zigbee 관수 인라인 채널 카드 — onboard 동일 패턴 (매핑은 보존, enabled 별도 관리)
 // Controller card 상태 — root만 v-for에 표시
-const zigbeeRootDevices = computed(() => zigbeeDevices.value.filter(d => !d.parentDeviceId))
+// 비활성화된 측정기(sensor)는 메인 목록에서 숨기고 하단 "비활성 측정기" 섹션에서 다시 켤 수 있게 한다.
+const zigbeeRootDevices = computed(() =>
+  zigbeeDevices.value.filter(d => !d.parentDeviceId && !(d.deviceType === 'sensor' && d.enabled === false)),
+)
+const disabledZigbeeSensors = computed(() =>
+  zigbeeDevices.value.filter(d => !d.parentDeviceId && d.deviceType === 'sensor' && d.enabled === false),
+)
 
 function controllerChildren(parent: ZigbeeDevice): ZigbeeDevice[] {
   return zigbeeDevices.value
@@ -1963,4 +2111,42 @@ onMounted(loadAllDevices)
   .card-header { flex-wrap: wrap; row-gap: 10px; }
   .card-actions { flex-basis: 100%; justify-content: flex-end; }
 }
+
+/* 비활성 측정기 섹션 */
+.disabled-sensor-box {
+  margin-top: 14px; padding: 12px 14px;
+  border: 1px dashed var(--border-color, #d1d5db); border-radius: 10px;
+  background: var(--bg-secondary, #f9fafb);
+}
+.disabled-sensor-title { font-size: 12px; font-weight: 700; color: var(--text-secondary, #6b7280); margin-bottom: 8px; }
+.disabled-sensor-hint { font-weight: 400; }
+.disabled-sensor-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 8px;
+}
+.disabled-sensor-row + .disabled-sensor-row { border-top: 1px solid var(--border-color, #eee); }
+.ds-icon { font-size: 16px; opacity: 0.7; }
+.ds-name { font-size: 13px; color: var(--text-primary, #333); flex-shrink: 0; }
+.ds-fname { font-size: 11px; color: var(--text-secondary, #9ca3af); font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 장치 설정 탭 */
+.settings-card {
+  background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+}
+.settings-card-title { font-size: 14px; font-weight: 700; color: var(--text-primary, #111); margin-bottom: 12px; }
+.settings-sub { font-size: 11px; font-weight: 500; color: var(--text-secondary, #9ca3af); margin-left: 6px; }
+.settings-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.settings-label { font-size: 13px; color: var(--text-secondary, #6b7280); width: 72px; flex-shrink: 0; }
+.settings-input {
+  width: 90px; padding: 7px 10px; font-size: 13px; text-align: right;
+  border: 1px solid var(--border-color, #d1d5db); border-radius: 8px;
+  background: var(--bg-input, #fff); color: var(--text-primary, #111);
+}
+.settings-input:focus { outline: 2px solid var(--primary, #3b82f6); outline-offset: 1px; border-color: transparent; }
+.settings-unit { font-size: 12px; color: var(--text-secondary, #6b7280); }
+.settings-hint { font-size: 11px; line-height: 1.5; color: var(--text-secondary, #9ca3af); margin: 6px 0 0; }
+.settings-actions { display: flex; justify-content: flex-end; padding-top: 4px; }
+.text-on { font-size: 12px; font-weight: 600; color: #16a34a; }
+.text-off { font-size: 12px; font-weight: 600; color: #d97706; }
 </style>

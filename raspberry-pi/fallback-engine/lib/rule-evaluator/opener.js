@@ -18,24 +18,35 @@ const { evaluateHysteresis } = require('./hysteresis');
  */
 
 const OPENER_INTERLOCK_DELAY_MS = 1000;
+const DEFAULT_OPENER_PULSE_SEC = 30;
+
+// 개폐기 동작 펄스(ms) — 게이트웨이 공통 openerOperationSeconds(동기화) 사용. ON 후 이 시간 뒤
+// gpio-agent가 자동 OFF(대기). 모터 연속통전 방지 + 백엔드 rain-override durationMs와 일치.
+function openerPulseMs(store) {
+  const sec = Number(store.config().openerOperationSeconds);
+  return (sec > 0 ? sec : DEFAULT_OPENER_PULSE_SEC) * 1000;
+}
 
 function timeToMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
   return h * 60 + m;
 }
 
-function setOpenerIntent(state, intent, reason, relay, queue, openChannels, closeChannels) {
+function setOpenerIntent(state, intent, reason, relay, queue, store) {
   if (state.openerIntent === intent) return false;
 
+  const openChannels = store.getChannels('opener_open');
+  const closeChannels = store.getChannels('opener_close');
+  const pulseMs = openerPulseMs(store);
   if (intent === 'open') {
     for (const ch of closeChannels) relay.setRelay(ch, false, reason);
     setTimeout(() => {
-      for (const ch of openChannels) relay.setRelay(ch, true, reason);
+      for (const ch of openChannels) relay.setRelay(ch, true, reason, pulseMs);
     }, OPENER_INTERLOCK_DELAY_MS);
   } else if (intent === 'closed') {
     for (const ch of openChannels) relay.setRelay(ch, false, reason);
     setTimeout(() => {
-      for (const ch of closeChannels) relay.setRelay(ch, true, reason);
+      for (const ch of closeChannels) relay.setRelay(ch, true, reason, pulseMs);
     }, OPENER_INTERLOCK_DELAY_MS);
   }
 
@@ -56,7 +67,7 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
 
   // 1) 우적(비) 최우선 — 무조건 닫힘
   if (rainActive) {
-    setOpenerIntent(state, 'closed', 'rain-active', relay, queue, openChannels, closeChannels);
+    setOpenerIntent(state, 'closed', 'rain-active', relay, queue, store);
     return;
   }
 
@@ -71,7 +82,7 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
       state,
       open ? 'open' : 'closed',
       `env-${triggerType}-${open ? 'open' : 'closed'}-${reading}`,
-      relay, queue, openChannels, closeChannels,
+      relay, queue, store,
     );
     return;
   }
@@ -85,7 +96,7 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
   if (!sched || !sched.enabled) return;
 
   if (sched.mode === 'always-open') {
-    setOpenerIntent(state, 'open', `backup-month-${month}-always-open`, relay, queue, openChannels, closeChannels);
+    setOpenerIntent(state, 'open', `backup-month-${month}-always-open`, relay, queue, store);
     return;
   }
 
@@ -98,15 +109,13 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
       state,
       inOpenWindow ? 'open' : 'closed',
       `backup-month-${month}-${inOpenWindow ? 'open' : 'closed'}-window`,
-      relay, queue, openChannels, closeChannels,
+      relay, queue, store,
     );
   }
 }
 
 function forceClose(state, store, relay, queue, reason) {
-  const openChannels = store.getChannels('opener_open');
-  const closeChannels = store.getChannels('opener_close');
-  setOpenerIntent(state, 'closed', reason, relay, queue, openChannels, closeChannels);
+  setOpenerIntent(state, 'closed', reason, relay, queue, store);
 }
 
 module.exports = {

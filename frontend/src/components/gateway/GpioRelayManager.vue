@@ -61,10 +61,7 @@
           </div>
         </div>
         <div class="card-controls" @click.stop>
-          <button v-if="group.type === 'fan' && !group.isLegacy" class="btn-sm btn-timer"
-            @click.stop="$emit('openTimer', group.channels[0], 'fan-onboard')">⏱</button>
-          <button v-if="group.type === 'vent'" class="btn-sm btn-timer"
-            @click.stop="$emit('openTimer', group.channels[0], 'opener-onboard')">⏱</button>
+          <!-- 동작/대기 타이머는 '장치 설정' 탭(게이트웨이 공통)으로 이동 -->
           <label class="toggle">
             <input type="checkbox" :checked="isGroupEnabled(group)" @change="toggleGroupEnabled(group)" />
             <span class="toggle-slider"></span>
@@ -76,18 +73,6 @@
 
       <!-- 채널 목록 -->
       <div v-if="expandedIds.has(group.groupId)" class="card-body">
-        <!-- 팬 타이머 배지 -->
-        <div v-if="group.type === 'fan' && (group.channels[0]?.operationTime || group.channels[0]?.standbyTime)"
-          class="timer-badge">
-          동작 {{ group.channels[0]?.operationTime ?? 50 }}분 · 대기 {{ group.channels[0]?.standbyTime ?? 10 }}분
-        </div>
-        <!-- 개폐기 타이머 배지 (초 단위) -->
-        <div v-if="group.type === 'vent' && (group.header?.operationTime != null || group.header?.standbyTime != null)"
-          class="timer-badge">
-          동작 {{ group.header?.operationTime ?? 30 }}초 · 대기 {{ group.header?.standbyTime ?? 60 }}초
-          <span class="badge-note">(자동제어 룰에서만 적용)</span>
-        </div>
-
         <!-- 개폐기 인터록 경고 -->
         <div v-if="group.type === 'vent'" class="interlock-warn">
           ⚠ 열기/닫기 동시 ON 금지 — Pi 에이전트에서 인터록이 적용되지 않으므로 주의하세요.
@@ -124,6 +109,37 @@
           <button class="btn-bulk" @click="bulkEnable(group.channels, false)">전체 비활성화</button>
           <button class="btn-bulk btn-bulk-danger" @click="clearPins(group.channels)">핀 초기화</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 우적센서 (무전압 접점, BCM21 고정) — 활성/비활성 토글만 -->
+    <div v-if="rainSensor" class="device-card rain-card"
+      :style="{ '--type-color': '#3b82f6' }"
+      :class="{ 'card-enabled': rainSensor.enabled }">
+      <div class="card-header rain-header">
+        <div class="card-icon-wrap"><span class="card-type-icon">☔</span></div>
+        <div class="card-info">
+          <div class="card-name-row">
+            <span class="card-name">{{ rainSensor.name }}</span>
+          </div>
+          <div class="card-meta">
+            <span class="type-label" style="color:#3b82f6">무전압 접점 우적센서</span>
+            · <span class="pin-fixed">BCM 21 (Pin 40) 고정</span>
+            · <span :class="rainSensor.enabled ? 'text-ok' : 'text-warn'">
+              {{ rainSensor.enabled ? '활성' : '비활성' }}
+            </span>
+          </div>
+        </div>
+        <div class="card-controls">
+          <label class="toggle">
+            <input type="checkbox" :checked="rainSensor.enabled" @change="toggleRain" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="rain-hint">
+        비 감지 시 소속 구역의 개폐기를 강제로 닫습니다. 핀은 BCM21(물리 40번)으로 고정이며
+        변경·삭제할 수 없습니다. <strong>무전압 접점만 연결</strong>하세요 — 외부 전원 입력 시 파손 위험.
       </div>
     </div>
 
@@ -236,7 +252,7 @@ import { ref, computed } from 'vue'
 import { gatewayEnvApi, type OnboardDevice } from '@/api/gateway-env.api'
 import { gpioApi } from '@/api/gpio.api'
 import { useNotificationStore } from '@/stores/notification.store'
-import { USABLE_BCM_PINS } from '@/utils/gpio-pins'
+import { USABLE_BCM_PINS, RESERVED_BCM_PINS } from '@/utils/gpio-pins'
 
 // ─── 타입 ────────────────────────────────────────────────────────
 type DeviceType = 'fan' | 'irrigation' | 'vent'
@@ -254,8 +270,8 @@ interface DeviceGroup {
 }
 
 // ─── 상수 ────────────────────────────────────────────────────────
-// 릴레이 제어용 안전 GPIO 핀 (I2C/SPI/UART 핀 제외)
-const BCM_PINS = USABLE_BCM_PINS
+// 릴레이 제어용 안전 GPIO 핀 (I2C/SPI/UART 핀 + 우적센서 예약핀 BCM21 제외)
+const BCM_PINS = USABLE_BCM_PINS.filter(p => !RESERVED_BCM_PINS.includes(p))
 
 const DEVICE_TYPES: Record<DeviceType, { label: string; icon: string; color: string; desc: string }> = {
   irrigation: { label: '관수 릴레이', icon: '💧', color: '#0ea5e9', desc: '채널 수 선택 가능 (8 / 12)' },
@@ -281,12 +297,19 @@ const emit = defineEmits<{
 
 const notif = useNotificationStore()
 
+// 우적센서 슬롯은 릴레이/핀 배정 대상이 아니므로 그룹·핀 계산에서 분리한다.
+const relayDevices = computed(() => props.devices.filter(d => d.slotType !== 'rain_sensor'))
+const rainSensor = computed<OnboardDevice | null>(
+  () => props.devices.find(d => d.slotType === 'rain_sensor') ?? null,
+)
+
 // ─── 장치 그룹 계산 ─────────────────────────────────────────────
 const deviceGroups = computed<DeviceGroup[]>(() => {
   const groups: DeviceGroup[] = []
+  const devices = relayDevices.value
 
   // 1. 레거시 팬 (pairKey=null, slotType=fan) → 각각 독립 카드
-  for (const dev of props.devices.filter(d => d.slotType === 'fan' && d.pairKey === null)) {
+  for (const dev of devices.filter(d => d.slotType === 'fan' && d.pairKey === null)) {
     groups.push({
       groupId: dev.id,
       deleteId: dev.id,
@@ -301,7 +324,7 @@ const deviceGroups = computed<DeviceGroup[]>(() => {
   }
 
   // 2. 레거시 관수 그룹 (pairKey=null, non-fan) → 하나의 카드
-  const legacyNonFan = props.devices.filter(
+  const legacyNonFan = devices.filter(
     d => d.pairKey === null && d.slotType !== 'fan' && !HEADER_SLOT_TYPES.has(d.slotType)
   )
   if (legacyNonFan.length > 0) {
@@ -320,7 +343,7 @@ const deviceGroups = computed<DeviceGroup[]>(() => {
 
   // 3. 동적 그룹 (pairKey != null)
   const dynMap = new Map<string, { header: OnboardDevice | null; channels: OnboardDevice[] }>()
-  for (const d of props.devices.filter(d => d.pairKey !== null)) {
+  for (const d of devices.filter(d => d.pairKey !== null)) {
     const key = d.pairKey!
     if (!dynMap.has(key)) dynMap.set(key, { header: null, channels: [] })
     const g = dynMap.get(key)!
@@ -377,7 +400,7 @@ function groupActiveCount(group: DeviceGroup) { return group.channels.filter(c =
 
 // ─── 핀 충돌 / 요약 ─────────────────────────────────────────────
 const allUsedPins = computed(() =>
-  props.devices.map(d => d.gpioPin).filter((p): p is number => p !== null)
+  relayDevices.value.map(d => d.gpioPin).filter((p): p is number => p !== null)
 )
 const conflictPins = computed(() =>
   allUsedPins.value.filter((p, i) => allUsedPins.value.indexOf(p) !== i)
@@ -397,9 +420,9 @@ const summaryItems = computed(() => [
   { label: '총 채널',   value: totalChannels.value, color: '#60a5fa' },
   { label: '핀 배정됨', value: `${assignedChannels.value}/${totalChannels.value}`,
     color: assignedChannels.value === totalChannels.value ? '#22c55e' : '#f59e0b' },
-  { label: 'GPIO 사용', value: `${uniqueUsed.value}/26`, color: '#0ea5e9' },
-  { label: 'GPIO 여유', value: 26 - uniqueUsed.value,
-    color: 26 - uniqueUsed.value < 5 ? '#ef4444' : '#6b7280' },
+  { label: 'GPIO 사용', value: `${uniqueUsed.value}/${BCM_PINS.length}`, color: '#0ea5e9' },
+  { label: 'GPIO 여유', value: BCM_PINS.length - uniqueUsed.value,
+    color: BCM_PINS.length - uniqueUsed.value < 5 ? '#ef4444' : '#6b7280' },
   { label: '핀 충돌',   value: uniqueConflictPins.value.length > 0
     ? `⚠ ${uniqueConflictPins.value.length}개` : '없음',
     color: uniqueConflictPins.value.length > 0 ? '#ef4444' : '#22c55e' },
@@ -452,7 +475,7 @@ async function saveGroupName(group: DeviceGroup) {
 
 // ─── 채널 조작 ──────────────────────────────────────────────────
 function isPinUsedByOther(deviceId: string, pin: number): boolean {
-  return props.devices.some(d => d.id !== deviceId && d.gpioPin === pin)
+  return relayDevices.value.some(d => d.id !== deviceId && d.gpioPin === pin)
 }
 
 async function toggleGroupEnabled(group: DeviceGroup) {
@@ -467,6 +490,27 @@ async function toggleDevice(dev: OnboardDevice) {
     dev.enabled = newVal
   } catch {
     notif.error('오류', '상태 변경에 실패했습니다.')
+  }
+}
+
+async function toggleRain() {
+  const rs = rainSensor.value
+  if (!rs) return
+  const newVal = !rs.enabled
+  // 비활성화 경고: 우적센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중
+  if (!newVal && !window.confirm(
+    '우적센서를 비활성화하시겠습니까?\n\n이 센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중입니다. ' +
+    '비활성화하면 비가 와도 개폐기가 자동으로 닫히지 않으며, 구역관리·대시보드에서도 숨겨집니다.',
+  )) return
+  try {
+    await gatewayEnvApi.updateOnboard(props.gatewayId, rs.id, { enabled: newVal })
+    rs.enabled = newVal
+    notif.success(
+      newVal ? '우적센서 활성화' : '우적센서 비활성화',
+      newVal ? '비 감지 시 개폐기가 자동으로 닫힙니다.' : '우적 신호 발행이 중단됩니다.',
+    )
+  } catch {
+    notif.error('오류', '우적센서 상태 변경에 실패했습니다.')
   }
 }
 
@@ -584,7 +628,7 @@ async function doDelete() {
 
 // ─── GPIO 핀 맵 ─────────────────────────────────────────────────
 function getPinEntry(pin: number) {
-  const dev = props.devices.find(d => d.gpioPin === pin)
+  const dev = relayDevices.value.find(d => d.gpioPin === pin)
   if (!dev) return null
   const group = deviceGroups.value.find(g => g.channels.some(c => c.id === dev.id))
   return { dev, type: group?.type ?? 'fan' as DeviceType }
@@ -818,6 +862,21 @@ function getPinTitle(pin: number): string {
 .text-ok { color: #16a34a; }
 .text-warn { color: #d97706; }
 .text-danger { color: #dc2626; }
+
+/* 우적센서 카드 */
+.rain-card { cursor: default; }
+.rain-header { cursor: default; }
+.rain-header:hover { background: transparent; }
+.pin-fixed {
+  font-size: 11px; font-weight: 600; color: #2563eb;
+  background: #eff6ff; border-radius: 4px; padding: 1px 6px;
+}
+.rain-hint {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  padding: 8px 14px; font-size: 11px; line-height: 1.5;
+  color: var(--text-secondary, #6b7280);
+}
+#app.theme-dark .pin-fixed { color: #93c5fd; background: rgba(59, 130, 246, 0.15); }
 
 /* GPIO 핀 맵 */
 .pin-map-section { padding-top: 4px; }

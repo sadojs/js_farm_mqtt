@@ -62,6 +62,22 @@ export class FallbackConfig {
   @Column({ name: 'sensor_timeout_seconds', type: 'int', default: 1200 })
   sensorTimeoutSeconds!: number;
 
+  /** 게이트웨이(Pi) 공통 개폐기 동작 시간(초) — 닫힘/열림 펄스 지속 시간 */
+  @Column({ name: 'opener_operation_seconds', type: 'int', default: 30 })
+  openerOperationSeconds!: number;
+
+  /** 게이트웨이 공통 개폐기 대기 시간(초) — 동작 사이 휴지 */
+  @Column({ name: 'opener_standby_seconds', type: 'int', default: 60 })
+  openerStandbySeconds!: number;
+
+  /** 게이트웨이 공통 유동팬 동작 시간(분) */
+  @Column({ name: 'fan_operation_minutes', type: 'int', default: 50 })
+  fanOperationMinutes!: number;
+
+  /** 게이트웨이 공통 유동팬 대기 시간(분) */
+  @Column({ name: 'fan_standby_minutes', type: 'int', default: 10 })
+  fanStandbyMinutes!: number;
+
   @Column({ name: 'version', type: 'int', default: 1 })
   version!: number;
 

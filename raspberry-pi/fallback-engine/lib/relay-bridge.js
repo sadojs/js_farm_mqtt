@@ -21,7 +21,7 @@ class RelayBridge {
     this.store = store;
   }
 
-  setRelay(channel, state, reason) {
+  setRelay(channel, state, reason, durationMs) {
     if (!this.client?.connected) {
       console.warn(`[RELAY-BRIDGE] MQTT 미연결 — ${channel}=${state ? 'ON' : 'OFF'} drop`);
       return;
@@ -39,6 +39,8 @@ class RelayBridge {
       source: 'fallback',
       bypass: true,
       reason: reason || 'fallback-rule',
+      // 동작 펄스: state=ON + durationMs 면 gpio-agent가 durationMs 뒤 자동 OFF (개폐기 모터 연속통전 방지)
+      ...(durationMs && durationMs > 0 && state ? { durationMs } : {}),
       requestId: Date.now(),
       ts: new Date().toISOString(),
     });
