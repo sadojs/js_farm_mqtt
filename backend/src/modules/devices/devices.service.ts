@@ -68,6 +68,11 @@ export class DevicesService {
     for (const dev of openers) {
       const s: any = dev.deviceSettings || {};
       if (s.switchState !== true) continue;
+      // 자동제어 룰이 현재 유지 중인 개폐기는 강제 OFF 안 함.
+      // (룰 10분 방향 cap 이후엔 모터가 이미 정지하고 switchState 는 "열림/닫힘 유지" 표시일 뿐 —
+      //  여기서 OFF 하면 사용자가 원하는 '열림 상태 유지'가 깨진다.)
+      // relayActiveUntil 이 미래면 룰이 활성으로 유지 중 → 스킵. 만료(백엔드 다운 등)면 stale 로 보고 OFF.
+      if (s.relayActivePhase && s.relayActiveUntil && new Date(s.relayActiveUntil).getTime() > now) continue;
       const lastMs = s.lastCommandAt ? new Date(s.lastCommandAt).getTime() : null;
       if (lastMs == null || now - lastMs < OPENER_MAX_MS) continue;
       try {

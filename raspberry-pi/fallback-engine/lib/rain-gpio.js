@@ -19,7 +19,7 @@ const { execFile } = require('child_process');
  */
 
 const POLL_MS = 1000;          // 폴링 주기
-const STABLE_SAMPLES = 3;      // 상태 확정에 필요한 연속 동일 샘플 수 (~3초 디바운스)
+const STABLE_SAMPLES = 5;      // 상태 확정에 필요한 연속 동일 샘플 수 (~5초 디바운스 — 짧은 오탐/노이즈 필터)
 const REPUBLISH_MS = 60000;    // 변화 없어도 재발행 주기 (백엔드 late-join 대비)
 
 class RainGpio {
