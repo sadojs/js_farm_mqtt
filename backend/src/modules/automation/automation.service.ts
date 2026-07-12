@@ -406,6 +406,60 @@ export class AutomationService {
     return { disabledCount, stoppedIrrigation };
   }
 
+  // ──────────────────────────────────────────────────
+  // 개폐기 수동 제어 진입: 해당 개폐기(페어 포함)를 타깃하는 활성 룰 조회/정지
+  //  - 개폐기는 자동제어와 수동이 공존하지 않는다(듀티사이클·인터록 충돌).
+  //    수동 조작 전 활성 룰을 사용자에게 알리고, 확인 시 정지한다.
+  //  - 재개는 사용자가 자동제어 페이지에서 직접(룰이 여러 개일 수 있으므로 자동 재개 없음).
+  // ──────────────────────────────────────────────────
+
+  /** actions(배열/객체 모두)가 targetIds 중 하나라도 타깃하는지 */
+  private actionsTargetAny(actions: any, targetIds: Set<string>): boolean {
+    const arr = Array.isArray(actions) ? actions : [actions];
+    for (const a of arr) {
+      if (a?.targetDeviceId && targetIds.has(a.targetDeviceId)) return true;
+      if (Array.isArray(a?.targetDeviceIds) && a.targetDeviceIds.some((id: string) => targetIds.has(id))) return true;
+    }
+    return false;
+  }
+
+  /** 개폐기(및 페어)를 타깃하는 '활성(enabled)' 자동제어 룰 목록 */
+  async getActiveRulesForDevice(userId: string | null, deviceId: string): Promise<{ id: string; name: string }[]> {
+    const device = await this.devicesRepo.findOne({ where: { id: deviceId } });
+    if (!device) return [];
+    const targetIds = new Set<string>([deviceId]);
+    if (device.pairedDeviceId) targetIds.add(device.pairedDeviceId);
+
+    const rules = await this.rulesRepo.find({ where: userId ? { userId } : {} });
+    return rules
+      .filter((r) => r.enabled && this.actionsTargetAny(r.actions, targetIds))
+      .map((r) => ({ id: r.id, name: r.name }));
+  }
+
+  /** 개폐기(및 페어) 타깃 활성 룰 전부 정지 — 수동 제어 진입 */
+  async stopActiveRulesForDevice(
+    userId: string | null,
+    deviceId: string,
+  ): Promise<{ stopped: { id: string; name: string }[] }> {
+    const active = await this.getActiveRulesForDevice(userId, deviceId);
+    const stopped: { id: string; name: string }[] = [];
+    for (const { id, name } of active) {
+      const rule = await this.rulesRepo.findOne({ where: { id } });
+      if (!rule || !rule.enabled) continue;
+      rule.enabled = false;
+      const saved = await this.rulesRepo.save(rule);
+      // sticky 상태·ruleIntendedState 정리 + 다음 tick 재평가 무효화
+      try { this.runnerService.onRuleToggled(saved); } catch (err: any) {
+        this.logger.warn(`onRuleToggled 실패(stop): ${err?.message ?? err}`);
+      }
+      stopped.push({ id, name });
+    }
+    if (stopped.length > 0) {
+      this.logger.log(`[opener-manual] device=${deviceId} 활성 룰 ${stopped.length}개 정지 (수동 제어 진입)`);
+    }
+    return { stopped };
+  }
+
   /** 룰 actions에서 대상 장비 ID 배열 추출 */
   private extractDeviceIds(actions: any): string[] {
     const ids: string[] = [];

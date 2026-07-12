@@ -25,7 +25,17 @@ export const useDeviceStore = defineStore('device', () => {
     loading.value = true
     try {
       const { data } = await deviceApi.getAll()
-      devices.value = data
+      // 폴링(15초) 갱신 시 깜빡임 방지: getAll()은 sensorData를 포함하지 않으므로
+      // 교체 직후 loadLatestSensorData() 전까지 센서 칩이 사라졌다 나타나며 레이아웃이
+      // 점프했다. 기존 sensorData를 새 device에 이어붙여 공백을 없앤다.
+      const prevSensorData = new Map(
+        devices.value.map(d => [d.id, (d as any).sensorData]),
+      )
+      devices.value = data.map((d: any) =>
+        d.sensorData == null && prevSensorData.get(d.id) != null
+          ? { ...d, sensorData: prevSensorData.get(d.id) }
+          : d,
+      )
       await loadLatestSensorData()
     } finally {
       loading.value = false

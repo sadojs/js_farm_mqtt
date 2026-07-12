@@ -112,6 +112,18 @@ export class AutomationController {
     return this.automationService.bulkDisableByDevice(this.getEffectiveUserId(user), dto.deviceId);
   }
 
+  /** 개폐기 수동 제어 진입 — 해당 개폐기(페어 포함)를 제어 중인 활성 룰 조회 */
+  @Get('device/:deviceId/active-rules')
+  getActiveRulesForDevice(@CurrentUser() user: any, @Param('deviceId') deviceId: string) {
+    return this.automationService.getActiveRulesForDevice(this.getEffectiveUserId(user), deviceId);
+  }
+
+  /** 개폐기 수동 제어 진입 — 활성 룰 전부 정지 (재개는 자동제어 페이지에서 수동) */
+  @Post('device/:deviceId/stop-rules')
+  stopActiveRulesForDevice(@CurrentUser() user: any, @Param('deviceId') deviceId: string) {
+    return this.automationService.stopActiveRulesForDevice(this.getEffectiveUserId(user), deviceId);
+  }
+
   @Get('logs/stats')
   getLogStats(@CurrentUser() user: any) {
     return this.automationService.getLogStats(this.getEffectiveUserId(user));

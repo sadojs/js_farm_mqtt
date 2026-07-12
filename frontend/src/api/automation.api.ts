@@ -30,6 +30,15 @@ export const automationApi = {
     apiClient.post<{ disabledCount: number; stoppedIrrigation: boolean }>(
       '/automation/rules/bulk-disable', { deviceId }
     ),
+
+  // 개폐기 수동 제어 진입 — 해당 개폐기(페어 포함) 제어 중인 활성 룰 조회/정지
+  getActiveRulesForDevice: (deviceId: string) =>
+    apiClient.get<{ id: string; name: string }[]>(`/automation/device/${deviceId}/active-rules`),
+
+  stopActiveRulesForDevice: (deviceId: string) =>
+    apiClient.post<{ stopped: { id: string; name: string }[] }>(
+      `/automation/device/${deviceId}/stop-rules`, {}
+    ),
 }
 
 export interface IrrigationRuleSummary {

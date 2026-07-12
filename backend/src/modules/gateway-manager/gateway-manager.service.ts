@@ -163,6 +163,38 @@ export class GatewayManagerService {
       this.logger.warn(`게이트웨이 ${gw.gatewayId}: agent stale → offline (lastSeen: ${gw.lastSeen})`);
     }
 
+    // 게이트웨이 오프라인 → 소속 장치 전체 offline 처리 (self-heal, 멱등).
+    // 센서만 stale-리셋되고 액추에이터는 상태 변화 시에만 보고해 자동 offline이 안 되던 갭.
+    // 게이트웨이가 죽으면 캐시된 online=true/switchState가 '현재값'처럼 남아 오해를 유발했다.
+    // 전환 시점뿐 아니라 '이미 offline인데 online 장치가 남은' 경우도 매 틱 정리하므로,
+    // 배포 전부터 오프라인이던 게이트웨이의 stale 장치도 다음 틱에 정리된다.
+    // (복구 시엔 z2m availability/장치 보고가 online을 다시 올린다.)
+    try {
+      const offlineGateways = await this.gatewayRepo.find({ where: { agentStatus: 'offline' } });
+      for (const gw of offlineGateways) {
+        const offlined: Array<{ id: string; name: string; user_id: string; device_settings: any }> =
+          await this.dataSource.query(
+            `UPDATE devices SET online = false
+             WHERE gateway_id = $1 AND online = true
+             RETURNING id::text AS id, name, user_id::text AS user_id, device_settings`,
+            [gw.id],
+          );
+        if (offlined.length === 0) continue;
+        this.logger.warn(`게이트웨이 ${gw.gatewayId}(uuid=${gw.id}) 오프라인 → 소속 장치 ${offlined.length}개 offline: ${JSON.stringify(offlined.map(d => ({ id: d.id, name: d.name })))}`);
+        for (const d of offlined) {
+          const ds = d.device_settings || {};
+          this.eventsGateway.broadcastDeviceSwitchUpdate?.(d.user_id, {
+            deviceId: d.id,
+            switchState: ds.switchState ?? null,
+            switchStates: ds.switchStates ?? null,
+            online: false,
+          });
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`오프라인 게이트웨이 소속 장치 offline 처리 실패: ${err?.message ?? err}`);
+    }
+
     // tunnel_status: tunnelLastSeen > TUNNEL_STALE_MS 이상 오래된 것 → disconnected
     const tunnelStaleThreshold = new Date(now.getTime() - TUNNEL_STALE_MS);
     const staleTunnels = await this.gatewayRepo.find({
