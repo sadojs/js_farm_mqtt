@@ -93,6 +93,8 @@ export class AutomationService {
     const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
     rule.enabled = !rule.enabled;
+    // 수동으로 다시 켜면 일괄제어 정지 표기 클리어 (원복 배너에서 사라짐)
+    if (rule.enabled) { rule.disabledReason = null; rule.disabledAt = null; }
     const saved = await this.rulesRepo.save(rule);
 
     // 룰 toggle 시 runner의 in-memory lastState 강제 무효화 + 대상 device의 manual override / rule intent 리셋
@@ -458,6 +460,92 @@ export class AutomationService {
       this.logger.log(`[opener-manual] device=${deviceId} 활성 룰 ${stopped.length}개 정지 (수동 제어 진입)`);
     }
     return { stopped };
+  }
+
+  // ──────────────────────────────────────────────────
+  // 일괄제어 진입: 여러 장치를 타깃하는 활성 룰 일괄 조회/정지 + 원복
+  //  - 일괄제어도 개별 수동제어와 동일하게 관련 룰을 정지해야 다음 tick에 자동제어가 뒤집지 않음.
+  //  - 정지된 룰은 disabled_reason='bulk'로 표기 → 새로고침/다기기에서도 '원복' 배너 유지.
+  // ──────────────────────────────────────────────────
+
+  /** 여러 장치(및 개폐기 페어)를 타깃하는 '활성' 룰 목록 (distinct) */
+  async getActiveRulesForDevices(userId: string | null, deviceIds: string[]): Promise<{ id: string; name: string }[]> {
+    if (!deviceIds?.length) return [];
+    const targetIds = new Set<string>();
+    for (const id of deviceIds) {
+      if (!id) continue;
+      targetIds.add(id);
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      if (dev?.pairedDeviceId) targetIds.add(dev.pairedDeviceId);
+    }
+    const rules = await this.rulesRepo.find({ where: userId ? { userId } : {} });
+    return rules
+      .filter((r) => r.enabled && this.actionsTargetAny(r.actions, targetIds))
+      .map((r) => ({ id: r.id, name: r.name }));
+  }
+
+  /** 여러 장치 타깃 활성 룰 전부 정지 — 일괄제어 진입 (disabled_reason='bulk' 표기) */
+  async stopActiveRulesForDevices(
+    userId: string | null,
+    deviceIds: string[],
+  ): Promise<{ stopped: { id: string; name: string }[] }> {
+    const active = await this.getActiveRulesForDevices(userId, deviceIds);
+    const stopped: { id: string; name: string }[] = [];
+    for (const { id, name } of active) {
+      const rule = await this.rulesRepo.findOne({ where: { id } });
+      if (!rule || !rule.enabled) continue;
+      rule.enabled = false;
+      rule.disabledReason = 'bulk';
+      rule.disabledAt = new Date();
+      const saved = await this.rulesRepo.save(rule);
+      try { this.runnerService.onRuleToggled(saved); } catch (err: any) {
+        this.logger.warn(`onRuleToggled 실패(bulk-stop): ${err?.message ?? err}`);
+      }
+      stopped.push({ id, name });
+    }
+    if (stopped.length > 0) {
+      this.logger.log(`[bulk-control] 활성 룰 ${stopped.length}개 정지 (일괄제어 진입)`);
+    }
+    return { stopped };
+  }
+
+  /** 일괄제어로 정지된('bulk') 룰 목록 — 원복 배너용 (새로고침에도 유지) */
+  async getBulkStoppedRules(userId: string | null): Promise<{ id: string; name: string }[]> {
+    const rules = await this.rulesRepo.find({
+      where: userId
+        ? { userId, enabled: false, disabledReason: 'bulk' }
+        : { enabled: false, disabledReason: 'bulk' },
+    });
+    return rules.map((r) => ({ id: r.id, name: r.name }));
+  }
+
+  /** 일괄제어로 정지된 룰 원복(재활성화). ruleIds 미지정 시 'bulk' 전체 원복. */
+  async restoreBulkStoppedRules(
+    userId: string | null,
+    ruleIds?: string[],
+  ): Promise<{ restored: { id: string; name: string }[] }> {
+    let rules = await this.rulesRepo.find({
+      where: userId ? { userId, disabledReason: 'bulk' } : { disabledReason: 'bulk' },
+    });
+    if (ruleIds?.length) {
+      const set = new Set(ruleIds);
+      rules = rules.filter((r) => set.has(r.id));
+    }
+    const restored: { id: string; name: string }[] = [];
+    for (const rule of rules) {
+      rule.enabled = true;
+      rule.disabledReason = null;
+      rule.disabledAt = null;
+      const saved = await this.rulesRepo.save(rule);
+      try { this.runnerService.onRuleToggled(saved); } catch (err: any) {
+        this.logger.warn(`onRuleToggled 실패(bulk-restore): ${err?.message ?? err}`);
+      }
+      restored.push({ id: rule.id, name: rule.name });
+    }
+    if (restored.length > 0) {
+      this.logger.log(`[bulk-control] 룰 ${restored.length}개 원복(재활성화)`);
+    }
+    return { restored };
   }
 
   /** 룰 actions에서 대상 장비 ID 배열 추출 */

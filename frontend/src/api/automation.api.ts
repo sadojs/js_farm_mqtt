@@ -39,6 +39,19 @@ export const automationApi = {
     apiClient.post<{ stopped: { id: string; name: string }[] }>(
       `/automation/device/${deviceId}/stop-rules`, {}
     ),
+
+  // 일괄제어 — 여러 장치 대상 룰 일괄 조회/정지 + 원복
+  getActiveRulesForDevices: (deviceIds: string[]) =>
+    apiClient.post<{ id: string; name: string }[]>(`/automation/devices/active-rules`, { deviceIds }),
+
+  stopActiveRulesForDevices: (deviceIds: string[]) =>
+    apiClient.post<{ stopped: { id: string; name: string }[] }>(`/automation/devices/stop-rules`, { deviceIds }),
+
+  getBulkStoppedRules: () =>
+    apiClient.get<{ id: string; name: string }[]>(`/automation/bulk-stopped-rules`),
+
+  restoreBulkStoppedRules: (ruleIds?: string[]) =>
+    apiClient.post<{ restored: { id: string; name: string }[] }>(`/automation/rules/restore`, ruleIds ? { ruleIds } : {}),
 }
 
 export interface IrrigationRuleSummary {

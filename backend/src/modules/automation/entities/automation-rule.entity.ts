@@ -35,6 +35,14 @@ export class AutomationRule {
   @Column({ default: 0 })
   priority: number;
 
+  /** 정지 사유 — 'bulk'(일괄제어로 정지). 원복/수동 재활성화 시 null. */
+  @Column({ name: 'disabled_reason', type: 'varchar', length: 20, nullable: true })
+  disabledReason: string | null;
+
+  /** 정지 시각 (disabled_reason 세팅 시각) */
+  @Column({ name: 'disabled_at', type: 'timestamptz', nullable: true })
+  disabledAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -25,6 +25,19 @@
       </div>
     </header>
 
+    <!-- 일괄제어로 정지된 자동제어 룰 원복 배너 -->
+    <div v-if="!isFarmUser && bulkStoppedRules.length > 0" class="bulk-restore-banner">
+      <div class="brb-text">
+        <span class="brb-icon">⏸</span>
+        <span>일괄제어로 정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b> —
+          <span class="brb-names">{{ bulkStoppedRules.map(r => r.name).join(', ') }}</span>
+        </span>
+      </div>
+      <button class="brb-restore" :disabled="restoringBulk" @click="restoreBulk">
+        {{ restoringBulk ? '원복 중…' : '↩ 자동제어 원복' }}
+      </button>
+    </div>
+
     <div v-if="loading" class="loading-state">구역 목록을 불러오는 중...</div>
 
     <EmptyState
@@ -378,6 +391,7 @@
       v-if="showBulkControl"
       :groups="groups"
       @close="showBulkControl = false"
+      @rules-changed="loadBulkStopped"
     />
 
     <ZoneVisibilityModal
@@ -640,6 +654,34 @@ const loading = computed(() => groupStore.loading)
 const showVisibilityModal = ref(false)
 const showBulkControl = ref(false)
 
+// 일괄제어로 정지된 자동제어 룰 (원복 배너)
+const bulkStoppedRules = ref<{ id: string; name: string }[]>([])
+const restoringBulk = ref(false)
+
+async function loadBulkStopped() {
+  if (isFarmUser) return
+  try {
+    bulkStoppedRules.value = (await automationApi.getBulkStoppedRules()).data
+  } catch {
+    bulkStoppedRules.value = []
+  }
+}
+
+async function restoreBulk() {
+  if (restoringBulk.value) return
+  restoringBulk.value = true
+  try {
+    const { restored } = (await automationApi.restoreBulkStoppedRules()).data
+    bulkStoppedRules.value = []
+    await automationStore.fetchRules().catch(() => undefined)
+    notify.success('자동제어 원복', `룰 ${restored.length}개를 다시 켰습니다.`)
+  } catch {
+    notify.error('오류', '자동제어 원복에 실패했습니다.')
+  } finally {
+    restoringBulk.value = false
+  }
+}
+
 const collapsedGroups = ref(new Set<string>())
 
 // 장치 추가 모달
@@ -718,6 +760,7 @@ onMounted(async () => {
   ])
   automationStore.fetchIrrigationStatus()
   loadNoteCounts()
+  loadBulkStopped()
   const envConfigGroupId = route.query.envConfig as string | undefined
   if (envConfigGroupId) {
     const target = groupStore.groups.find(g => g.id === envConfigGroupId)
@@ -2172,6 +2215,24 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .group-header { padding: 14px 16px; }
   .group-body { padding: 0 16px 14px; }
 }
+
+/* 일괄제어 정지 룰 원복 배너 */
+.bulk-restore-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1); border: 1px solid #fcd34d;
+}
+.brb-text { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary, #333); min-width: 0; }
+.brb-icon { font-size: 15px; flex-shrink: 0; }
+.brb-text b { color: #b45309; }
+.brb-names { color: var(--text-secondary, #6b7280); font-size: 12px; }
+.brb-restore {
+  flex-shrink: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px;
+  background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
+}
+.brb-restore:hover:not(:disabled) { filter: brightness(0.95); }
+.brb-restore:disabled { opacity: 0.6; cursor: not-allowed; }
+#app.theme-dark .bulk-restore-banner { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.45); }
 
 /* 우적센서: 비 감지 자동 제어 토글 버튼 (측정기 카드) */
 .rain-override-btn {

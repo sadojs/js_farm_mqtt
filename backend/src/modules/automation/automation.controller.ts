@@ -124,6 +124,31 @@ export class AutomationController {
     return this.automationService.stopActiveRulesForDevice(this.getEffectiveUserId(user), deviceId);
   }
 
+  // ── 일괄제어: 여러 장치 대상 룰 일괄 조회/정지 + 원복 ──
+  /** 일괄제어 진입 — 대상 장치들을 제어 중인 활성 룰 조회 (팝업 리스트용) */
+  @Post('devices/active-rules')
+  getActiveRulesForDevices(@CurrentUser() user: any, @Body() dto: { deviceIds: string[] }) {
+    return this.automationService.getActiveRulesForDevices(this.getEffectiveUserId(user), dto?.deviceIds ?? []);
+  }
+
+  /** 일괄제어 진입 — 대상 장치들의 활성 룰 전부 정지 (disabled_reason='bulk') */
+  @Post('devices/stop-rules')
+  stopActiveRulesForDevices(@CurrentUser() user: any, @Body() dto: { deviceIds: string[] }) {
+    return this.automationService.stopActiveRulesForDevices(this.getEffectiveUserId(user), dto?.deviceIds ?? []);
+  }
+
+  /** 일괄제어로 정지된 룰 목록 (원복 배너용 — 새로고침에도 유지) */
+  @Get('bulk-stopped-rules')
+  getBulkStoppedRules(@CurrentUser() user: any) {
+    return this.automationService.getBulkStoppedRules(this.getEffectiveUserId(user));
+  }
+
+  /** 일괄제어로 정지된 룰 원복(재활성화). ruleIds 미지정 시 전체 */
+  @Post('rules/restore')
+  restoreBulkStoppedRules(@CurrentUser() user: any, @Body() dto: { ruleIds?: string[] }) {
+    return this.automationService.restoreBulkStoppedRules(this.getEffectiveUserId(user), dto?.ruleIds);
+  }
+
   @Get('logs/stats')
   getLogStats(@CurrentUser() user: any) {
     return this.automationService.getLogStats(this.getEffectiveUserId(user));

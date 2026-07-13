@@ -102,11 +102,25 @@
           </div>
         </div>
 
+        <!-- 관련 자동제어 룰 — 정지 후 실행 안내 + 전체 리스트 -->
+        <div v-if="confirm.rulesLoading" class="confirm-rules loading">관련 자동제어 룰 확인 중…</div>
+        <div v-else-if="confirm.relatedRules.length > 0" class="confirm-rules">
+          <div class="confirm-rules-head">⚠ 이 장치를 제어 중인 자동제어 룰 {{ confirm.relatedRules.length }}개 — <b>정지 후</b> 실행됩니다</div>
+          <div class="confirm-rules-list">
+            <span v-for="r in confirm.relatedRules" :key="r.id" class="confirm-rule-chip">{{ r.name }}</span>
+          </div>
+          <div class="confirm-rules-note">실행 후 구역관리 상단 <b>'자동제어 원복'</b> 으로 되돌릴 수 있습니다.</div>
+        </div>
+
         <div class="confirm-btns">
           <button class="cf-cancel" :disabled="executing" @click="confirm = null">취소</button>
           <button class="cf-run" :disabled="executing" @click="execute">
             <span v-if="executing" class="cf-spin"></span>
-            {{ executing ? `실행 중… (${execDone}/${confirm.count})` : `${confirm.count}대 ${confirm.verb}` }}
+            {{ executing
+              ? `실행 중… (${execDone}/${confirm.count})`
+              : (confirm.relatedRules.length > 0
+                  ? `룰 ${confirm.relatedRules.length}개 정지하고 ${confirm.verb}`
+                  : `${confirm.count}대 ${confirm.verb}`) }}
           </button>
         </div>
       </div>
@@ -118,12 +132,14 @@
 import { ref, computed } from 'vue'
 import { useDeviceStore } from '../../stores/device.store'
 import { useNotificationStore } from '../../stores/notification.store'
+import { automationApi } from '../../api/automation.api'
 import type { Device } from '../../types/device.types'
 import type { HouseGroup } from '../../types/group.types'
 import EquipmentIcon from '../common/EquipmentIcon.vue'
 
 const props = defineProps<{ groups: HouseGroup[] }>()
-const emit = defineEmits<{ (e: 'close'): void }>()
+// rules-changed: 일괄제어로 룰을 정지했을 때 부모(구역관리)가 원복 배너를 갱신하도록
+const emit = defineEmits<{ (e: 'close'): void; (e: 'rules-changed'): void }>()
 
 const deviceStore = useDeviceStore()
 const notify = useNotificationStore()
@@ -205,12 +221,25 @@ interface ConfirmState {
   iconType: string
   count: number
   zones: ConfirmZone[]
+  deviceIds: string[]                          // 관련 룰 조회/정지 대상 장치 id
+  relatedRules: { id: string; name: string }[] // 대상 장치를 제어 중인 활성 룰
+  rulesLoading: boolean
 }
 const confirm = ref<ConfirmState | null>(null)
 const executing = ref(false)
 const execDone = ref(0)
 
-function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close') {
+// 확인 대상 장치 id 수집 (개폐기는 열림·닫힘 페어 모두 — 백엔드가 페어도 포함하지만 명시)
+function collectDeviceIds(kind: 'fan' | 'opener'): string[] {
+  const ids: string[] = []
+  for (const g of scopeGroups.value) {
+    if (kind === 'fan') for (const f of fansOf(g)) ids.push(f.id)
+    else for (const p of openerPairsOf(g)) { ids.push(p.open.id, p.close.id) }
+  }
+  return [...new Set(ids)]
+}
+
+async function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'close') {
   const zones: ConfirmZone[] = []
   if (kind === 'fan') {
     const value = action === 'on'
@@ -228,6 +257,7 @@ function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'cl
       sentence: action === 'on' ? '켭니다.' : '끕니다.',
       accent: ACCENT_FAN, iconType: 'fan',
       count: zones.reduce((n, z) => n + z.items.length, 0), zones,
+      deviceIds: collectDeviceIds(kind), relatedRules: [], rulesLoading: true,
     }
   } else {
     for (const g of scopeGroups.value) {
@@ -249,7 +279,17 @@ function openConfirm(kind: 'fan' | 'opener', action: 'on' | 'off' | 'open' | 'cl
       sentence: action === 'open' ? '엽니다.' : '닫습니다.',
       accent: ACCENT_OPENER, iconType: 'opener_open',
       count: zones.reduce((n, z) => n + z.items.length, 0), zones,
+      deviceIds: collectDeviceIds(kind), relatedRules: [], rulesLoading: true,
     }
+  }
+
+  // 대상 장치를 제어 중인 활성 룰 조회 → 확인 모달에 표시
+  const cur = confirm.value
+  try {
+    const rules = (await automationApi.getActiveRulesForDevices(cur.deviceIds)).data
+    if (confirm.value === cur) { cur.relatedRules = rules; cur.rulesLoading = false }
+  } catch {
+    if (confirm.value === cur) cur.rulesLoading = false
   }
 }
 
@@ -265,6 +305,16 @@ async function execute() {
   if (!confirm.value || executing.value) return
   executing.value = true
   const c = confirm.value
+
+  // 관련 자동제어 룰 먼저 정지 — 정지하지 않으면 다음 tick에 자동제어가 일괄 조작을 뒤집음.
+  // (정지 실패해도 제어 자체는 진행)
+  if (c.relatedRules.length > 0) {
+    try {
+      await automationApi.stopActiveRulesForDevices(c.deviceIds)
+      emit('rules-changed')
+    } catch { /* ignore */ }
+  }
+
   const gap = staggerMs(c.kind, c.action)
   let ok = 0
   const failed: string[] = []
@@ -416,6 +466,25 @@ async function execute() {
 .cr-name { flex: 1; min-width: 0; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cr-change { flex-shrink: 0; font-weight: 700; color: var(--act); }
 .cr-arrow { color: var(--text-muted); }
+
+/* 관련 자동제어 룰 */
+.confirm-rules {
+  text-align: left; border: 1px solid #fde68a; background: rgba(245, 158, 11, 0.08);
+  border-radius: 10px; padding: 10px 12px; margin-bottom: 16px;
+}
+.confirm-rules.loading { color: var(--text-muted); font-size: 12px; text-align: center; }
+.confirm-rules-head { font-size: 12px; font-weight: 700; color: #b45309; margin-bottom: 8px; }
+.confirm-rules-head b { color: #92400e; }
+.confirm-rules-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.confirm-rule-chip {
+  font-size: 12px; font-weight: 600; background: var(--bg-card); border: 1px solid #fcd34d;
+  border-radius: 6px; padding: 3px 9px; color: var(--text-primary);
+}
+.confirm-rules-note { font-size: 11px; color: var(--text-muted); }
+.confirm-rules-note b { color: var(--text-secondary); }
+#app.theme-dark .confirm-rules { border-color: rgba(245,158,11,0.4); }
+#app.theme-dark .confirm-rule-chip { border-color: rgba(245,158,11,0.5); }
+
 .confirm-btns { display: flex; gap: 10px; }
 .cf-cancel {
   flex: 1; min-height: 46px; border-radius: 10px; cursor: pointer;
