@@ -14,6 +14,10 @@ export const deviceApi = {
   update: (id: string, data: Partial<Device>) =>
     apiClient.put<Device>(`/devices/${id}`, data),
 
+  /** 구역관리 카드 순서 배치 저장 (드래그 정렬 확정 시 1회) */
+  reorder: (orders: { id: string; displayOrder: number }[]) =>
+    apiClient.patch<{ updated: number }>('/devices/reorder', { orders }),
+
   remove: (id: string) =>
     apiClient.delete(`/devices/${id}`),
 

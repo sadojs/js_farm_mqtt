@@ -278,6 +278,38 @@ export class DevicesService {
     return device;
   }
 
+  /**
+   * 구역관리 카드 순서 배치 저장. 드래그 정렬 확정(pointerup) 시 1회 호출.
+   * admin은 전체, 그 외는 본인 소유 장치만 갱신.
+   */
+  async reorder(
+    userId: string,
+    orders: { id: string; displayOrder: number }[],
+    role?: string,
+  ): Promise<{ updated: number }> {
+    if (!Array.isArray(orders) || orders.length === 0) return { updated: 0 };
+    let updated = 0;
+    for (const o of orders) {
+      if (!o || !o.id || typeof o.displayOrder !== 'number' || Number.isNaN(o.displayOrder)) continue;
+      const where: any = role === 'admin' ? { id: o.id } : { id: o.id, userId };
+      const res = await this.devicesRepo.update(where, { displayOrder: Math.round(o.displayOrder) } as any);
+      updated += res.affected ?? 0;
+    }
+    return { updated };
+  }
+
+  /** 특정 구역(house)의 현재 최대 display_order (신규 장치 append용). 없으면 -1. */
+  private async maxDisplayOrder(houseId?: string | null): Promise<number> {
+    if (!houseId) return -1;
+    const row = await this.devicesRepo
+      .createQueryBuilder('d')
+      .select('MAX(d.display_order)', 'max')
+      .where('d.house_id = :houseId', { houseId })
+      .getRawOne<{ max: string | null }>();
+    const max = row?.max == null ? -1 : parseInt(String(row.max), 10);
+    return Number.isNaN(max) ? -1 : max;
+  }
+
   async updateByUser(id: string, userId: string, data: Partial<{ name: string; category: string; equipmentType: string; icon: string }>, role?: string) {
     // admin은 user_id 검사 없이 수정 가능
     const where: any = role === 'admin' ? { id } : { id, userId };
@@ -353,6 +385,8 @@ export class DevicesService {
     equipmentType?: string; icon?: string; online?: boolean; gatewayId?: string;
   }[], houseId?: string) {
     const results: Device[] = [];
+    // 신규 장치는 해당 구역의 max(display_order)+1 부터 부여해 섹션 끝에 붙는다.
+    let nextOrder = (await this.maxDisplayOrder(houseId)) + 1;
 
     for (const d of devices) {
       const existing = await this.devicesRepo.findOne({
@@ -387,6 +421,7 @@ export class DevicesService {
           icon: d.icon,
           online: d.online ?? false,
           ...(d.online && { lastSeen: new Date() }),
+          displayOrder: nextOrder++,
         });
         results.push(await this.devicesRepo.save(entity));
       }

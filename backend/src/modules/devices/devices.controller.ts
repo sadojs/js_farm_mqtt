@@ -40,6 +40,18 @@ export class DevicesController {
     return result;
   }
 
+  // 구역관리 카드 순서 저장 (드래그 정렬). ':id' 파라미터 라우트보다 먼저 선언.
+  // farm_user 는 제외(드래그 핸들 숨김과 동일 정책).
+  @Patch('reorder')
+  @Roles('admin', 'farm_admin')
+  @HttpCode(HttpStatus.OK)
+  reorder(
+    @CurrentUser() user: any,
+    @Body() body: { orders: { id: string; displayOrder: number }[] },
+  ) {
+    return this.devicesService.reorder(this.getEffectiveUserId(user), body?.orders ?? [], user.role);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.devicesService.findOneByUser(id, this.getEffectiveUserId(user));

@@ -138,6 +138,8 @@ export interface Device {
   /** 룰이 마지막으로 의도한 상태 (true=ON 유지, null=룰 inactive) — 다음 사용자 토글 판정용 */
   ruleIntendedState?: boolean | null
   sensorData?: SensorData | null
+  /** 구역관리 카드 정렬 순서 (같은 구역+섹션 내). 드래그 정렬로 갱신. */
+  displayOrder?: number
   lastSeen?: string
   createdAt: string
   updatedAt: string

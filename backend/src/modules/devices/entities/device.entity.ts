@@ -78,6 +78,10 @@ export class Device {
   @Column({ name: 'last_seen', nullable: true })
   lastSeen: Date;
 
+  /** 구역관리 화면 카드 정렬 순서 (같은 구역+섹션 내). 드래그 정렬로 갱신. */
+  @Column({ name: 'display_order', type: 'int', default: 0 })
+  displayOrder: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

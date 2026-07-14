@@ -125,7 +125,11 @@
           <template v-if="getGroupSensors(group).length > 0">
             <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
             <div class="device-sub-grid">
-              <div v-for="device in getGroupSensors(group)" :key="device.id" class="sub-card sensor">
+              <div v-for="device in getGroupSensors(group)" :key="device.id"
+                :class="['sub-card sensor', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':sensor'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':sensor', getGroupSensors(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <!-- 타입 아이콘 칩 (헤더 순서 통일: [칩][상태점+이름+✎][배지]) -->
                   <EquipmentIcon
@@ -186,6 +190,7 @@
                 </button>
               </div>
             </div>
+            <div v-if="!isFarmUser && getGroupSensors(group).length > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 장치(액추에이터 + 개폐기 + 관수) 목록 -->
@@ -193,7 +198,11 @@
             <div class="section-label actuator">장치 ({{ getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length }})</div>
             <div class="device-sub-grid">
               <!-- 개폐기 그룹 카드 -->
-              <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName" class="sub-card actuator">
+              <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
+                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === og.openDevice.id }]"
+                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="opener"
@@ -241,7 +250,11 @@
                 </div>
               </div>
               <!-- 관수 장치 카드 -->
-              <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id" class="sub-card actuator">
+              <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id"
+                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="irrigation"
@@ -290,7 +303,11 @@
                 </div>
               </div>
               <!-- 일반 장치 카드 -->
-              <div v-for="device in getGroupActuators(group)" :key="device.id" class="sub-card actuator">
+              <div v-for="device in getGroupActuators(group)" :key="device.id"
+                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     :type="device.equipmentType"
@@ -335,6 +352,7 @@
                 </div>
               </div>
             </div>
+            <div v-if="!isFarmUser && (getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length) > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 자동 제어 설정 — D2 컴팩트 행 (Automation.vue와 동일 패턴) -->
@@ -518,6 +536,7 @@ import BulkControlModal from '@/components/groups/BulkControlModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
+import { useReorder } from '../composables/useReorder'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
 import { deviceApi } from '../api/device.api'
@@ -537,6 +556,7 @@ const automationStore = useAutomationStore()
 const authStore = useAuthStore()
 const { isFarmUser, isAdmin } = authStore
 const { confirm } = useConfirm()
+const { press: reorderPress, draggingId: reorderDraggingId } = useReorder()
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
 
@@ -784,6 +804,10 @@ const toggleCollapse = (groupId: string) => {
   }
 }
 
+// 카드 정렬 순서 — store(낙관적 업데이트 대상)의 displayOrder 우선, 없으면 group.devices 값
+const orderOf = (id: string, fallback?: number): number =>
+  deviceStore.devices.find(sd => sd.id === id)?.displayOrder ?? fallback ?? 0
+
 const getGroupSensors = (group: HouseGroup): Device[] =>
   (group.devices || []).filter(d => d.deviceType === 'sensor').map(d => {
     const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
@@ -791,6 +815,7 @@ const getGroupSensors = (group: HouseGroup): Device[] =>
       ? { ...d, sensorData: storeDevice.sensorData, online: storeDevice.online, enabled: storeDevice.enabled, rainOverrideDisabled: (storeDevice as any).rainOverrideDisabled }
       : d
   }).filter(d => d.enabled !== false)  // 비활성화된 측정기(우적센서 등)는 구역관리에서 숨김
+    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 
 // 개폐기 쌍 ID (개별 표시 제외용)
 const getOpenerPairIds = (group: HouseGroup): Set<string> => {
@@ -823,7 +848,9 @@ const getGroupOpenerGroups = (group: HouseGroup): OpenerGroupInfo[] => {
       openDevice: storeOpen ? { ...od, switchState: storeOpen.switchState, online: storeOpen.online } : od,
       closeDevice: storeClose ? { ...cd, switchState: storeClose.switchState, online: storeClose.online } : cd,
     }
-  }).filter(Boolean) as OpenerGroupInfo[]
+  }).filter(Boolean)
+    // 개폐기는 대표(open) 장치의 displayOrder 기준 정렬
+    .sort((a, b) => orderOf(a!.openDevice.id, a!.openDevice.displayOrder) - orderOf(b!.openDevice.id, b!.openDevice.displayOrder)) as OpenerGroupInfo[]
 }
 
 const getGroupActuators = (group: HouseGroup): Device[] => {
@@ -834,6 +861,7 @@ const getGroupActuators = (group: HouseGroup): Device[] => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
       return storeDevice ? { ...d, switchState: storeDevice.switchState, online: storeDevice.online } : d
     })
+    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 }
 
 // 관수 장치
@@ -844,6 +872,7 @@ const getGroupIrrigationDevices = (group: HouseGroup): Device[] => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
       return storeDevice ? { ...d, ...storeDevice } : d
     })
+    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 }
 
 const irrigationControlling = ref<string | null>(null)
@@ -1765,6 +1794,46 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border-light);
   min-width: 0;
   overflow: hidden;
+}
+
+/* 카드 드래그 정렬 (구역관리) */
+.sub-card.reorderable { position: relative; padding-left: 30px; }
+.drag-grip {
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  height: 22px;
+  margin: auto 0;
+  cursor: grab;
+  touch-action: none;
+  color: var(--text-muted);
+  opacity: 0.7;
+  /* 6점(2열×3행) 그립 — 배경 도트 */
+  background-image:
+    radial-gradient(currentColor 1.3px, transparent 1.6px),
+    radial-gradient(currentColor 1.3px, transparent 1.6px);
+  background-size: 5px 7px;
+  background-position: 3px 2px, 8px 2px;
+  background-repeat: repeat-y;
+}
+.drag-grip:hover { opacity: 1; }
+.drag-grip:active { cursor: grabbing; }
+.sub-card.dragging {
+  transform: scale(1.02);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+  z-index: 5;
+  pointer-events: none; /* 드래그 중 아래 카드를 힛테스트하도록 */
+  border-color: var(--primary, var(--accent));
+}
+.sub-card.dragging .drag-grip { color: var(--primary, var(--accent)); opacity: 1; }
+.reorder-hint {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0 2px;
+  user-select: none;
 }
 
 .sub-card-top {
