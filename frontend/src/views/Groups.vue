@@ -391,7 +391,7 @@
       v-if="showBulkControl"
       :groups="groups"
       @close="showBulkControl = false"
-      @rules-changed="loadBulkStopped"
+      @rules-changed="onBulkRulesChanged"
     />
 
     <ZoneVisibilityModal
@@ -665,6 +665,14 @@ async function loadBulkStopped() {
   } catch {
     bulkStoppedRules.value = []
   }
+}
+
+// 일괄제어로 룰이 정지되면 원복 배너 + 룰 상태(스토어)를 즉시 갱신 (새로고침 불필요)
+async function onBulkRulesChanged() {
+  await Promise.all([
+    loadBulkStopped(),
+    automationStore.fetchRules().catch(() => undefined),
+  ])
 }
 
 async function restoreBulk() {
