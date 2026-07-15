@@ -4,18 +4,15 @@ import { useNotificationStore } from '../stores/notification.store'
 import { deviceApi } from '../api/device.api'
 
 /**
- * 구역관리 카드 길게 눌러 드래그 정렬.
+ * 구역관리 카드 길게 눌러 드래그 정렬 (실시간 재정렬).
  *
  * 동작:
- *  - grip 핸들 pointerdown → 500ms 유지 시 드래그 시작(그 전에 떼거나 8px 이상 움직이면 취소 = 탭/스크롤 통과)
- *  - 드래그 중 카드는 커서를 따라 이동(transform)만 하고, 다른 카드는 그대로 둔다(라이브 재정렬 X).
- *  - pointerup(놓기) 시 **최종 커서 위치**로 삽입 위치를 결정(결정론적) → displayOrder 0..N-1 재부여 →
- *    PATCH /devices/reorder 저장. 실패 시 원래 순서로 롤백 + 토스트.
+ *  - grip pointerdown → 500ms 유지 시 드래그 시작(그 전 떼거나 8px↑ 이동 = 탭/스크롤 통과)
+ *  - 드래그 중 **커서 위치를 기준으로 다른 카드들이 실시간으로 밀려나며** 들어갈 자리를 보여줌.
+ *    삽입 인덱스는 포인터 절대좌표(reading-order)로 계산 → 진동 없음, 맨앞/윗줄도 정확히 이동.
+ *  - pointerup 시 확정 → PATCH /devices/reorder 저장. 실패 시 롤백 + 토스트.
  *
- * ※ 라이브 스왑(커서가 카드 위에 올 때마다 교체)은 첫 카드/윗줄 경계에서 0↔1 진동이 생겨
- *    "맨 앞으로 못 옮김" 버그가 있었다. 놓는 위치 기준(reading-order 삽입 인덱스)으로 바꿔 해결.
- *
- * 개폐기: 드래그 단위는 대표(open) 장치. pairs[openId]=closeId 를 주면 close 도 같은 값으로 이동.
+ * 개폐기: 드래그 단위는 대표(open). pairs[openId]=closeId 를 주면 close 도 같은 값으로 이동.
  */
 const LONG_PRESS_MS = 500
 const MOVE_CANCEL_PX = 8
@@ -24,19 +21,15 @@ export function useReorder() {
   const deviceStore = useDeviceStore()
   const notify = useNotificationStore()
 
-  const draggingId = ref<string | null>(null) // 드래그 중인 대표 device id
-  const dragGroup = ref<string | null>(null)  // 섹션 키
-  const dragDX = ref(0)                        // 커서추적 translate
-  const dragDY = ref(0)
+  const draggingId = ref<string | null>(null)
+  const dragGroup = ref<string | null>(null)
 
   let pressTimer: ReturnType<typeof setTimeout> | null = null
   let startX = 0
   let startY = 0
-  let lastX = 0
-  let lastY = 0
-  let orderIds: string[] = []                 // 현재 섹션 대표 id 순서
-  let pairMap: Record<string, string | undefined> = {} // openId -> closeId
-  let backup: Record<string, number> = {}     // 롤백용 원래 displayOrder
+  let orderIds: string[] = []
+  let pairMap: Record<string, string | undefined> = {}
+  let backup: Record<string, number> = {}
 
   function setDisplayOrder(id: string, value: number) {
     const d = deviceStore.devices.find(x => x.id === id)
@@ -47,28 +40,27 @@ export function useReorder() {
     ids.forEach((id, i) => {
       setDisplayOrder(id, i)
       const closeId = pairMap[id]
-      if (closeId) setDisplayOrder(closeId, i) // 개폐기 close 동반 이동
+      if (closeId) setDisplayOrder(closeId, i)
     })
   }
 
-  /** 드래그 중 카드에 적용할 스타일 (커서 추적). */
+  /** 드래그 중인 카드: 살짝 확대 + 위로(그림자는 .dragging CSS). */
   function dragStyle(id: string) {
     if (draggingId.value !== id) return undefined
-    return {
-      transform: `translate(${Math.round(dragDX.value)}px, ${Math.round(dragDY.value)}px) scale(1.03)`,
-      zIndex: 30,
-      position: 'relative' as const,
-    }
+    return { transform: 'scale(1.03)', zIndex: 30, position: 'relative' as const }
   }
 
   /**
-   * 최종 포인터 위치(px, py)에서 같은 섹션 내 삽입 인덱스 계산.
-   * reading-order 기준: 포인터보다 '앞'(윗줄, 또는 같은 줄 왼쪽)인 카드 수 = 삽입 위치.
-   * 2열 그리드/1열 모두 결정론적으로 동작(진동 없음).
+   * 포인터(px,py)에서 같은 섹션 내 삽입 인덱스 계산.
+   * reading-order: 포인터보다 '앞'(윗줄 / 같은 줄 왼쪽 절반)인 카드 수.
+   * 드래그 카드 제외한 형제들의 현재 렌더 위치 기준 → 결정론적(진동 없음).
    */
   function computeInsertIndex(groupKey: string, dragId: string, px: number, py: number): number {
     const cards = Array.from(document.querySelectorAll(`[data-reorder-group="${CSS.escape(groupKey)}"]`))
-      .filter(el => el.getAttribute('data-reorder-id') && el.getAttribute('data-reorder-id') !== dragId)
+      .filter(el => {
+        const id = el.getAttribute('data-reorder-id')
+        return id && id !== dragId
+      })
     let idx = 0
     for (const el of cards) {
       const r = el.getBoundingClientRect()
@@ -81,6 +73,20 @@ export function useReorder() {
     return idx
   }
 
+  function reorderTo(px: number, py: number) {
+    const g = dragGroup.value
+    const dragId = draggingId.value
+    if (!g || !dragId) return
+    const idx = computeInsertIndex(g, dragId, px, py)
+    const others = orderIds.filter(id => id !== dragId)
+    others.splice(idx, 0, dragId)
+    const changed = others.length !== orderIds.length || others.some((id, i) => id !== orderIds[i])
+    if (changed) {
+      orderIds = others
+      applyOrder(orderIds)
+    }
+  }
+
   function cleanup() {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
     window.removeEventListener('pointermove', onPreMove)
@@ -91,40 +97,21 @@ export function useReorder() {
     window.removeEventListener('pointercancel', onDragUp)
     draggingId.value = null
     dragGroup.value = null
-    dragDX.value = 0
-    dragDY.value = 0
   }
 
-  // ── 롱프레스 대기 단계 ──
+  // ── 롱프레스 대기 ──
   function onPreMove(e: PointerEvent) {
-    if (Math.hypot(e.clientX - startX, e.clientY - startY) > MOVE_CANCEL_PX) {
-      cleanup() // 스크롤 의도 → 드래그 취소, 기존 동작 통과
-    }
+    if (Math.hypot(e.clientX - startX, e.clientY - startY) > MOVE_CANCEL_PX) cleanup()
   }
-  function onPreUp() {
-    cleanup() // 롱프레스 발동 전 뗌 = 짧은 탭 → 클릭 통과
-  }
+  function onPreUp() { cleanup() }
 
-  // ── 드래그 단계: 카드만 커서 따라 이동 (재정렬은 놓을 때) ──
+  // ── 드래그 중: 실시간 재정렬 ──
   function onDragMove(e: PointerEvent) {
     e.preventDefault()
-    lastX = e.clientX
-    lastY = e.clientY
-    dragDX.value = e.clientX - startX
-    dragDY.value = e.clientY - startY
+    reorderTo(e.clientX, e.clientY)
   }
 
   async function onDragUp() {
-    const g = dragGroup.value
-    const dragId = draggingId.value
-    if (g && dragId) {
-      const idx = computeInsertIndex(g, dragId, lastX, lastY)
-      const others = orderIds.filter(id => id !== dragId)
-      others.splice(idx, 0, dragId)
-      orderIds = others
-      applyOrder(orderIds) // 낙관적 반영
-    }
-
     const finalIds = [...orderIds]
     const prev = { ...backup }
     cleanup()
@@ -138,17 +125,17 @@ export function useReorder() {
     try {
       await deviceApi.reorder(orders)
     } catch {
-      Object.entries(prev).forEach(([id, v]) => setDisplayOrder(id, v)) // 롤백
+      Object.entries(prev).forEach(([id, v]) => setDisplayOrder(id, v))
       notify.error('순서 저장 실패', '잠시 후 다시 시도해 주세요.')
     }
   }
 
   /**
-   * grip 핸들 pointerdown 에 연결.
+   * grip pointerdown 에 연결.
    * @param repId 대표 device id (개폐기는 open id)
-   * @param groupKey 섹션 키 (구역+섹션)
+   * @param groupKey 섹션 키
    * @param ids 현재 섹션 대표 id 순서
-   * @param pairs (선택) openId -> closeId 매핑
+   * @param pairs (선택) openId -> closeId
    */
   function press(
     e: PointerEvent,
@@ -158,11 +145,14 @@ export function useReorder() {
     pairs?: Record<string, string | undefined>,
   ) {
     if (draggingId.value) return
-    if (e.button !== undefined && e.button !== 0) return // 좌클릭/터치만
+    if (e.button !== undefined && e.button !== 0) return
+    // 컨트롤(토글/버튼/입력) 위에서 시작하면 무시 → 기존 조작 유지
+    const t = e.target as HTMLElement | null
+    if (t?.closest?.('button, input, select, textarea, a, label')) return
+    // 터치는 grip 에서만 시작 (카드 본문 터치는 스크롤 보존). 마우스는 카드 어디서나 가능.
+    if (e.pointerType === 'touch' && !t?.closest?.('.drag-grip')) return
     startX = e.clientX
     startY = e.clientY
-    lastX = e.clientX
-    lastY = e.clientY
     orderIds = [...ids]
     pairMap = pairs || {}
 
@@ -188,8 +178,6 @@ export function useReorder() {
       }
       draggingId.value = repId
       dragGroup.value = groupKey
-      dragDX.value = 0
-      dragDY.value = 0
       navigator.vibrate?.(12)
 
       window.addEventListener('pointermove', onDragMove, { passive: false })
