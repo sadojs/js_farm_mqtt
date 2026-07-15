@@ -599,7 +599,13 @@ onMounted(async () => {
 .rule-row.is-off { opacity: 0.72; }
 
 /* 룰 순서 드래그 */
-.rule-row.reorderable { position: relative; padding-left: 40px; }
+.rule-row.reorderable {
+  position: relative;
+  padding-left: 40px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 .rule-row .drag-grip {
   position: absolute;
   left: 14px; top: 0; bottom: 0;

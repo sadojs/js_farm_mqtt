@@ -190,6 +190,8 @@ export function useReorder(opts: ReorderOptions) {
         const closeId = pairMap[id]
         if (closeId) backup[closeId] = opts.getOrder(closeId)
       }
+      // 모바일 롱프레스로 시작된 텍스트 선택이 있으면 해제 (카드 선택과 동시에 텍스트 선택되는 문제)
+      try { window.getSelection?.()?.removeAllRanges?.() } catch { /* noop */ }
       draggingId.value = repId
       dragGroup.value = groupKey
       dragEl = document.querySelector(`[data-reorder-id="${CSS.escape(repId)}"]`) as HTMLElement | null

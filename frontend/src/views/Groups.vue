@@ -1822,7 +1822,16 @@ onBeforeUnmount(() => {
 }
 
 /* 카드 드래그 정렬 (구역관리) */
-.sub-card.reorderable { position: relative; padding-left: 30px; }
+.sub-card.reorderable {
+  position: relative;
+  padding-left: 30px;
+  /* 모바일 롱프레스 시 텍스트 선택/복사 콜아웃 방지 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+/* 이름 변경 입력은 선택/편집 가능하게 복원 */
+.sub-card.reorderable .rename-input-inline { user-select: text; -webkit-user-select: text; }
 .drag-grip {
   position: absolute;
   left: 6px;
@@ -2095,7 +2104,13 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rule-row.d2:hover { background: var(--bg-hover); }
 .rule-row.d2.is-off { opacity: 0.72; }
 /* 룰 순서 드래그 (grip 은 위 .drag-grip 스타일 공용) */
-.rule-row.d2.reorderable { position: relative; padding-left: 38px; }
+.rule-row.d2.reorderable {
+  position: relative;
+  padding-left: 38px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 .rule-row.d2 .drag-grip { left: 12px; }
 .rule-row.d2.dragging {
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);

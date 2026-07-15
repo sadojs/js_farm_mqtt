@@ -248,7 +248,13 @@ function onCloseAttempt() {
 .house-row.off .row-sub { color: var(--text-muted); }
 
 /* 구역 순서 드래그 */
-.house-row.reorderable { position: relative; padding-left: 34px; }
+.house-row.reorderable {
+  position: relative;
+  padding-left: 34px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 .drag-grip {
   position: absolute;
   left: 6px; top: 0; bottom: 0;
