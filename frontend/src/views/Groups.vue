@@ -128,9 +128,9 @@
               <div v-for="device in getGroupSensors(group)" :key="device.id"
                 :class="['sub-card sensor', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':sensor'"
-                @pointerdown="!isFarmUser && reorderPress($event, device.id, group.id + ':sensor', getGroupSensors(group).map(d => d.id))">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"></span>
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':sensor'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':sensor', getGroupSensors(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <!-- 타입 아이콘 칩 (헤더 순서 통일: [칩][상태점+이름+✎][배지]) -->
                   <EquipmentIcon
@@ -202,9 +202,9 @@
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
                 :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === og.openDevice.id }]"
                 :style="reorderDragStyle(og.openDevice.id)"
-                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'"
-                @pointerdown="!isFarmUser && reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"></span>
+                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="opener"
@@ -255,9 +255,9 @@
               <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id"
                 :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'"
-                @pointerdown="!isFarmUser && reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"></span>
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="irrigation"
@@ -309,9 +309,9 @@
               <div v-for="device in getGroupActuators(group)" :key="device.id"
                 :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'"
-                @pointerdown="!isFarmUser && reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"></span>
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'">
+                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                  @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
                     :type="device.equipmentType"
@@ -1800,29 +1800,29 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* 카드 드래그 정렬 (구역관리) */
-.sub-card.reorderable { position: relative; padding-left: 30px; }
+/* 카드 드래그 정렬 (구역관리) — grip 손잡이(카드 높이 전체, 잡기 쉽게) */
+.sub-card.reorderable { position: relative; padding-left: 34px; }
 .drag-grip {
   position: absolute;
-  left: 6px;
+  left: 0;
   top: 0;
   bottom: 0;
-  width: 16px;
-  height: 22px;
-  margin: auto 0;
+  width: 28px;
   cursor: grab;
-  touch-action: none;
+  touch-action: none;         /* grip 위에서만 드래그(카드 본문은 스크롤 보존) */
   color: var(--text-muted);
-  opacity: 0.7;
-  /* 6점(2열×3행) 그립 — 배경 도트 */
+  opacity: 0.65;
+  border-right: 1px solid var(--border-light);
+  border-radius: 12px 0 0 12px;
+  /* 6점(2열) 그립 — 세로로 반복되는 도트 레일 */
   background-image:
     radial-gradient(currentColor 1.3px, transparent 1.6px),
     radial-gradient(currentColor 1.3px, transparent 1.6px);
-  background-size: 5px 7px;
-  background-position: 3px 2px, 8px 2px;
+  background-size: 6px 8px;
+  background-position: 9px center, 15px center;
   background-repeat: repeat-y;
 }
-.drag-grip:hover { opacity: 1; }
+.drag-grip:hover { opacity: 1; background-color: var(--bg-hover); }
 .drag-grip:active { cursor: grabbing; }
 .sub-card.dragging {
   /* transform 은 커서 추적을 위해 인라인(:style)에서 지정 */
