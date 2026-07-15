@@ -2343,20 +2343,17 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .group-header { padding: 11px 14px; }
   .group-body { padding: 0 12px 12px; }
 
-  /* 모바일 카드 밀도 — 상하 여백·글씨 축소해 한 화면에 더 많은 카드 노출 */
+  /* 모바일 카드 밀도 — 상하 여백만 축소(글씨 크기는 폰트 설정 3단계 그대로 유지) */
   .device-sub-grid { gap: 8px; }
-  .section-label { padding: 4px 10px; font-size: calc(12px * var(--content-scale, 1)); }
+  .section-label { padding: 4px 10px; }
   .sub-card { padding: 9px 12px; }
   .sub-card.reorderable { padding-left: 26px; }
   .sub-card-top { margin-bottom: 4px; gap: 6px; row-gap: 4px; }
-  .sub-card-name { font-size: calc(13px * var(--content-scale, 1)); }
   .sub-card-control { padding: 3px 0; }
-  .control-label { font-size: calc(13px * var(--content-scale, 1)); }
-  .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
   .sub-card-sensor-chips { gap: 4px; }
-  .sensor-chip { padding: 2px 8px; font-size: calc(11px * var(--content-scale, 1)); }
+  .sensor-chip { padding: 2px 8px; }
   .reorder-hint { padding: 2px 0 0; }
-  /* 구역별 룰 행도 약간 컴팩트 */
+  /* 구역별 룰 행도 상하 여백만 컴팩트 */
   .rule-row.d2 { padding: 10px 12px; min-height: 40px; }
 }
 
