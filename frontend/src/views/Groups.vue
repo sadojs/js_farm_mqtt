@@ -1800,29 +1800,29 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* 카드 드래그 정렬 (구역관리) — grip 손잡이(카드 높이 전체, 잡기 쉽게) */
-.sub-card.reorderable { position: relative; padding-left: 34px; }
+/* 카드 드래그 정렬 (구역관리) */
+.sub-card.reorderable { position: relative; padding-left: 30px; }
 .drag-grip {
   position: absolute;
-  left: 0;
+  left: 6px;
   top: 0;
   bottom: 0;
-  width: 28px;
+  width: 16px;
+  height: 22px;
+  margin: auto 0;
   cursor: grab;
   touch-action: none;         /* grip 위에서만 드래그(카드 본문은 스크롤 보존) */
   color: var(--text-muted);
-  opacity: 0.65;
-  border-right: 1px solid var(--border-light);
-  border-radius: 12px 0 0 12px;
-  /* 6점(2열) 그립 — 세로로 반복되는 도트 레일 */
+  opacity: 0.7;
+  /* 6점(2열×3행) 그립 — 배경 도트 */
   background-image:
     radial-gradient(currentColor 1.3px, transparent 1.6px),
     radial-gradient(currentColor 1.3px, transparent 1.6px);
-  background-size: 6px 8px;
-  background-position: 9px center, 15px center;
+  background-size: 5px 7px;
+  background-position: 3px 2px, 8px 2px;
   background-repeat: repeat-y;
 }
-.drag-grip:hover { opacity: 1; background-color: var(--bg-hover); }
+.drag-grip:hover { opacity: 1; }
 .drag-grip:active { cursor: grabbing; }
 .sub-card.dragging {
   /* transform 은 커서 추적을 위해 인라인(:style)에서 지정 */
