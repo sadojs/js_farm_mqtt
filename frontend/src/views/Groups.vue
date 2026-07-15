@@ -370,9 +370,19 @@
                 v-for="rule in getGroupRules(group.id)"
                 :key="rule.id"
                 class="rule-row d2"
-                :class="{ 'is-off': !rule.enabled }"
+                :class="{ 'is-off': !rule.enabled, reorderable: !isFarmUser, dragging: ruleReorderDraggingId === rule.id }"
+                :style="ruleReorderDragStyle(rule.id)"
+                :data-reorder-id="rule.id"
+                :data-reorder-group="'grouprules:' + group.id"
                 @click="openEditRule(rule)"
               >
+                <span
+                  v-if="!isFarmUser"
+                  class="drag-grip"
+                  title="길게 눌러 순서 이동"
+                  @click.stop
+                  @pointerdown="ruleReorderPress($event, rule.id, 'grouprules:' + group.id, getGroupRules(group.id).map(r => r.id))"
+                ></span>
                 <EquipmentIcon
                   :type="detectRuleKind(rule)"
                   :active="rule.enabled"
@@ -564,6 +574,12 @@ const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDr
   setOrder: (id, v) => { const d = deviceStore.devices.find(x => x.id === id); if (d) d.displayOrder = v },
   getOrder: (id) => deviceStore.devices.find(x => x.id === id)?.displayOrder ?? 0,
   persist: (orders) => deviceApi.reorder(orders),
+})
+// 자동제어룰 순서 드래그 (구역관리 창의 구역별 룰 목록)
+const { press: ruleReorderPress, draggingId: ruleReorderDraggingId, dragStyle: ruleReorderDragStyle } = useReorder({
+  setOrder: (id, v) => { const r = automationStore.rules.find(x => x.id === id); if (r) r.displayOrder = v },
+  getOrder: (id) => automationStore.rules.find(x => x.id === id)?.displayOrder ?? 0,
+  persist: (orders) => automationApi.reorderRules(orders),
 })
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
@@ -1239,6 +1255,7 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
 // 자동화 룰
 const getGroupRules = (groupId: string): AutomationRule[] =>
   automationStore.rules.filter(r => r.groupId === groupId)
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
 
 const getGroupRulesActiveCount = (groupId: string): number =>
   getGroupRules(groupId).filter(r => r.enabled).length
@@ -2077,6 +2094,16 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rule-row.d2:last-child { border-bottom: none; }
 .rule-row.d2:hover { background: var(--bg-hover); }
 .rule-row.d2.is-off { opacity: 0.72; }
+/* 룰 순서 드래그 (grip 은 위 .drag-grip 스타일 공용) */
+.rule-row.d2.reorderable { position: relative; padding-left: 38px; }
+.rule-row.d2 .drag-grip { left: 12px; }
+.rule-row.d2.dragging {
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
+  background: var(--bg-card);
+  z-index: 5;
+  pointer-events: none;
+  user-select: none;
+}
 
 .rule-row.d2 .rule-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .rule-row.d2 .rule-row-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }

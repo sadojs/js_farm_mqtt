@@ -5,7 +5,12 @@ import type { HouseGroupWithOwner, House, CreateGroupRequest, CreateHouseRequest
 
 export const useGroupStore = defineStore('group', () => {
   const groups = ref<HouseGroupWithOwner[]>([])             // 전체 (iot_enabled 무관)
-  const iotGroups = ref<HouseGroupWithOwner[]>([])          // iot_enabled=true 만
+  // iot_enabled=true 만 — groups 에서 파생(computed) → 순서/토글 변경이 즉시 반영됨
+  const iotGroups = computed<HouseGroupWithOwner[]>(() =>
+    groups.value
+      .filter(g => g.iotEnabled !== false)
+      .map(g => ({ ...g, houses: (g.houses ?? []).filter(h => h.iotEnabled !== false) })) as HouseGroupWithOwner[],
+  )
   const houses = ref<House[]>([])
   const loading = ref(false)
 
@@ -27,13 +32,7 @@ export const useGroupStore = defineStore('group', () => {
     try {
       const { data } = await groupApi.getGroups()
       groups.value = data
-      // group 단위 iotEnabled=true 만 남기고, 그 group 의 houses 도 false 인 건 제거
-      iotGroups.value = data
-        .filter(g => g.iotEnabled !== false)
-        .map(g => ({
-          ...g,
-          houses: (g.houses ?? []).filter(h => h.iotEnabled !== false),
-        })) as HouseGroupWithOwner[]
+      // iotGroups 는 computed 라 자동 파생됨
     } finally {
       loading.value = false
     }

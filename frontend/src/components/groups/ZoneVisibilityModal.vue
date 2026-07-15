@@ -46,7 +46,7 @@
           </label>
         </li>
       </ul>
-      <div v-if="canEdit && flatHouses.length > 1" class="reorder-hint">⇅ 손잡이를 길게 눌러 구역 순서를 바꿀 수 있어요 (메인 화면에 반영)</div>
+      <div v-if="canEdit && flatHouses.length > 1" class="reorder-hint">⇅ 왼쪽 손잡이를 길게 눌러 순서 변경 — 놓는 즉시 저장되고 메인 화면에 반영됩니다</div>
       <div v-if="!flatHouses.length" class="empty">등록된 구역이 없습니다.</div>
 
       <p v-if="!canEdit" class="readonly-hint">관리자에게 문의하세요. (farm_user 권한)</p>
@@ -108,7 +108,10 @@ const flatHouses = computed<HouseGroupWithOwner[]>(() =>
 const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder({
   setOrder: (id, v) => { const g = (props.groups ?? []).find(x => x.id === id); if (g) g.displayOrder = v },
   getOrder: (id) => (props.groups ?? []).find(x => x.id === id)?.displayOrder ?? 0,
-  persist: (orders) => groupApi.reorder(orders),
+  persist: async (orders) => {
+    await groupApi.reorder(orders)
+    notify.success('구역 순서', '순서를 저장했어요. (아래 저장 버튼은 IoT 사용 여부용)')
+  },
 })
 
 const draft = ref<Record<string, boolean>>({})
