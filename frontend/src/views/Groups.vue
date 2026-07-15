@@ -2340,8 +2340,24 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   /* 카드 내부 좌우에 일정한 여백을 줘서 이름·설명·아이콘·본문이 카드 가장자리에
      붙지 않고 나란히 정렬되도록 한다. */
   .group-card { padding: 0; }
-  .group-header { padding: 14px 16px; }
-  .group-body { padding: 0 16px 14px; }
+  .group-header { padding: 11px 14px; }
+  .group-body { padding: 0 12px 12px; }
+
+  /* 모바일 카드 밀도 — 상하 여백·글씨 축소해 한 화면에 더 많은 카드 노출 */
+  .device-sub-grid { gap: 8px; }
+  .section-label { padding: 4px 10px; font-size: calc(12px * var(--content-scale, 1)); }
+  .sub-card { padding: 9px 12px; }
+  .sub-card.reorderable { padding-left: 26px; }
+  .sub-card-top { margin-bottom: 4px; gap: 6px; row-gap: 4px; }
+  .sub-card-name { font-size: calc(13px * var(--content-scale, 1)); }
+  .sub-card-control { padding: 3px 0; }
+  .control-label { font-size: calc(13px * var(--content-scale, 1)); }
+  .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
+  .sub-card-sensor-chips { gap: 4px; }
+  .sensor-chip { padding: 2px 8px; font-size: calc(11px * var(--content-scale, 1)); }
+  .reorder-hint { padding: 2px 0 0; }
+  /* 구역별 룰 행도 약간 컴팩트 */
+  .rule-row.d2 { padding: 10px 12px; min-height: 40px; }
 }
 
 /* 일괄제어 정지 룰 원복 배너 */
