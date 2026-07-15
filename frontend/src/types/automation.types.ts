@@ -88,6 +88,8 @@ export interface AutomationRule {
   conditions: ConditionGroup | IrrigationConditions
   actions: RuleAction
   priority: number
+  /** 표시 순서 (드래그 정렬) */
+  displayOrder?: number
   createdAt: string
   updatedAt: string
 }

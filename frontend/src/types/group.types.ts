@@ -9,6 +9,8 @@ export interface HouseGroup {
   enableGroupControl: boolean
   enableAutomation: boolean
   iotEnabled: boolean
+  /** 구역 표시 순서 (구역표시 설정 드래그 정렬) */
+  displayOrder?: number
   houses: House[]
   devices: Device[]
   createdAt: string

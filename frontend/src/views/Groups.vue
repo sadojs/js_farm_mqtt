@@ -560,7 +560,11 @@ const automationStore = useAutomationStore()
 const authStore = useAuthStore()
 const { isFarmUser, isAdmin } = authStore
 const { confirm } = useConfirm()
-const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder()
+const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder({
+  setOrder: (id, v) => { const d = deviceStore.devices.find(x => x.id === id); if (d) d.displayOrder = v },
+  getOrder: (id) => deviceStore.devices.find(x => x.id === id)?.displayOrder ?? 0,
+  persist: (orders) => deviceApi.reorder(orders),
+})
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
 
@@ -671,8 +675,8 @@ const blockingModal = ref<{
   rules: [],
 })
 // 메인 그리드는 IoT 활성 구역만 노출. 비활성 구역은 우측 상단 "구역 표시 설정" 모달에서 관리.
-const groups = computed(() => groupStore.iotGroups)
-const allGroups = computed(() => groupStore.groups)
+const groups = computed(() => [...groupStore.iotGroups].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
+const allGroups = computed(() => [...groupStore.groups].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
 const hiddenZoneCount = computed(() => groupStore.hiddenZoneCount)
 const loading = computed(() => groupStore.loading)
 const showVisibilityModal = ref(false)

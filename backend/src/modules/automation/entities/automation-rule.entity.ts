@@ -35,6 +35,10 @@ export class AutomationRule {
   @Column({ default: 0 })
   priority: number;
 
+  /** 표시 순서 (드래그 정렬). 낮을수록 위. */
+  @Column({ name: 'display_order', type: 'int', default: 0 })
+  displayOrder: number;
+
   /** 정지 사유 — 'bulk'(일괄제어로 정지). 원복/수동 재활성화 시 null. */
   @Column({ name: 'disabled_reason', type: 'varchar', length: 20, nullable: true })
   disabledReason: string | null;

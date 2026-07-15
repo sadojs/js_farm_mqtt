@@ -16,8 +16,17 @@
           v-for="g in flatHouses"
           :key="g.id"
           class="house-row"
-          :class="{ off: !draft[g.id] }"
+          :class="{ off: !draft[g.id], reorderable: canEdit, dragging: reorderDraggingId === g.id }"
+          :style="reorderDragStyle(g.id)"
+          :data-reorder-id="g.id"
+          data-reorder-group="zones"
         >
+          <span
+            v-if="canEdit"
+            class="drag-grip"
+            title="길게 눌러 순서 이동"
+            @pointerdown="reorderPress($event, g.id, 'zones', flatHouses.map(x => x.id))"
+          ></span>
           <span class="row-icon">⛶</span>
           <div class="row-main">
             <div class="row-title">{{ g.name }}</div>
@@ -37,7 +46,8 @@
           </label>
         </li>
       </ul>
-      <div v-else class="empty">등록된 구역이 없습니다.</div>
+      <div v-if="canEdit && flatHouses.length > 1" class="reorder-hint">⇅ 손잡이를 길게 눌러 구역 순서를 바꿀 수 있어요 (메인 화면에 반영)</div>
+      <div v-if="!flatHouses.length" class="empty">등록된 구역이 없습니다.</div>
 
       <p v-if="!canEdit" class="readonly-hint">관리자에게 문의하세요. (farm_user 권한)</p>
 
@@ -77,6 +87,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useGroupStore } from '@/stores/group.store'
 import { useNotificationStore } from '@/stores/notification.store'
 import { groupApi } from '@/api/group.api'
+import { useReorder } from '@/composables/useReorder'
 import type { HouseGroupWithOwner, IotRelatedCounts } from '@/types/group.types'
 
 const props = defineProps<{
@@ -88,8 +99,17 @@ const emit = defineEmits<{ close: [] }>()
 const groupStore = useGroupStore()
 const notify = useNotificationStore()
 
-// 토글 단위는 group (사용자가 화면에서 보는 "구역 카드"와 1:1)
-const flatHouses = computed<HouseGroupWithOwner[]>(() => props.groups ?? [])
+// 토글 단위는 group (사용자가 화면에서 보는 "구역 카드"와 1:1). displayOrder 순 정렬.
+const flatHouses = computed<HouseGroupWithOwner[]>(() =>
+  [...(props.groups ?? [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
+)
+
+// 구역 순서 드래그 — displayOrder 낙관적 갱신 + 서버 저장(메인 화면과 동일 순서)
+const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder({
+  setOrder: (id, v) => { const g = (props.groups ?? []).find(x => x.id === id); if (g) g.displayOrder = v },
+  getOrder: (id) => (props.groups ?? []).find(x => x.id === id)?.displayOrder ?? 0,
+  persist: (orders) => groupApi.reorder(orders),
+})
 
 const draft = ref<Record<string, boolean>>({})
 const original = ref<Record<string, boolean>>({})
@@ -223,6 +243,37 @@ function onCloseAttempt() {
 .house-row:last-child { border-bottom: none; }
 .house-row.off .row-title,
 .house-row.off .row-sub { color: var(--text-muted); }
+
+/* 구역 순서 드래그 */
+.house-row.reorderable { position: relative; padding-left: 34px; }
+.drag-grip {
+  position: absolute;
+  left: 6px; top: 0; bottom: 0;
+  width: 16px; height: 22px; margin: auto 0;
+  cursor: grab; touch-action: none;
+  color: var(--text-muted); opacity: 0.7;
+  background-image:
+    radial-gradient(currentColor 1.3px, transparent 1.6px),
+    radial-gradient(currentColor 1.3px, transparent 1.6px);
+  background-size: 5px 7px;
+  background-position: 3px 2px, 8px 2px;
+  background-repeat: repeat-y;
+}
+.drag-grip:hover { opacity: 1; }
+.house-row.dragging {
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
+  background: var(--bg-card);
+  border-radius: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+.reorder-hint {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--text-muted);
+  text-align: center;
+  padding: 6px 12px 2px;
+  user-select: none;
+}
 
 .row-icon {
   width: 36px; height: 36px; border-radius: 10px;

@@ -11,6 +11,10 @@ export const automationApi = {
   updateRule: (id: string, data: Partial<CreateRuleRequest>) =>
     apiClient.put<AutomationRule>(`/automation/rules/${id}`, data),
 
+  /** 자동제어룰 표시 순서 배치 저장 (드래그 정렬) */
+  reorderRules: (orders: { id: string; displayOrder: number }[]) =>
+    apiClient.patch<{ updated: number }>('/automation/rules/reorder', { orders }),
+
   toggleRule: (id: string, params?: string) =>
     apiClient.patch(`/automation/rules/${id}/toggle${params || ''}`),
 

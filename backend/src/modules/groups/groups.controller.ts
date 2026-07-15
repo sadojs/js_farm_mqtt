@@ -28,6 +28,13 @@ export class GroupsController {
     );
   }
 
+  // 구역 표시 순서 저장 (드래그 정렬). ':id' 라우트보다 먼저. farm_user 제외.
+  @Patch('reorder')
+  @Roles('admin', 'farm_admin')
+  reorder(@CurrentUser() user: any, @Body() body: { orders: { id: string; displayOrder: number }[] }) {
+    return this.groupsService.reorderGroups(this.getEffectiveUserId(user), body?.orders ?? [], user.role);
+  }
+
   @Get(':id/dependencies')
   getDependencies(@Param('id') id: string, @CurrentUser() user: any) {
     return this.groupsService.getDependencies(id, this.getEffectiveUserId(user), user.role);

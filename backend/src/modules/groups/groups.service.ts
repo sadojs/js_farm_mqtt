@@ -23,6 +23,23 @@ export class GroupsService {
     @Optional() @Inject(MqttService) private mqttService?: MqttService,
   ) {}
 
+  /** 구역 표시 순서 배치 저장 (드래그 정렬). admin은 전체, 그 외 본인 소유만. */
+  async reorderGroups(
+    userId: string,
+    orders: { id: string; displayOrder: number }[],
+    role?: string,
+  ): Promise<{ updated: number }> {
+    if (!Array.isArray(orders) || orders.length === 0) return { updated: 0 };
+    let updated = 0;
+    for (const o of orders) {
+      if (!o || !o.id || typeof o.displayOrder !== 'number' || Number.isNaN(o.displayOrder)) continue;
+      const where: any = role === 'admin' ? { id: o.id } : { id: o.id, userId };
+      const res = await this.groupsRepo.update(where, { displayOrder: Math.round(o.displayOrder) } as any);
+      updated += res.affected ?? 0;
+    }
+    return { updated };
+  }
+
   async findAllGroups(
     userId: string,
     role?: string,
@@ -32,7 +49,7 @@ export class GroupsService {
     const groups = await this.groupsRepo.find({
       where: isAdmin ? {} : { userId },
       relations: ['houses', 'devices'],
-      order: { createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', createdAt: 'ASC' },
     });
 
     let filtered = groups;

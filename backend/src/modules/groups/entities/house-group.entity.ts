@@ -31,6 +31,10 @@ export class HouseGroup {
   @Column({ name: 'iot_enabled', type: 'boolean', default: true })
   iotEnabled: boolean;
 
+  /** 구역 표시 순서 (구역관리 메인/구역표시 설정 공통). 드래그 정렬로 갱신. */
+  @Column({ name: 'display_order', type: 'int', default: 0 })
+  displayOrder: number;
+
   @OneToMany(() => House, house => house.group)
   houses: House[];
 

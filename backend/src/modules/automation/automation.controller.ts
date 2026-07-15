@@ -56,6 +56,14 @@ export class AutomationController {
     return result;
   }
 
+  // 자동제어룰 표시 순서 저장 (드래그 정렬). 'rules/:id' 보다 먼저 선언.
+  @Patch('rules/reorder')
+  @Roles('admin', 'farm_admin')
+  reorder(@CurrentUser() user: any, @Body() body: { orders: { id: string; displayOrder: number }[] }) {
+    const uid = user.role === 'admin' ? null : this.getEffectiveUserId(user);
+    return this.automationService.reorder(uid, body?.orders ?? []);
+  }
+
   @Put('rules/:id')
   async update(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: UpdateRuleDto) {
     const result = await this.automationService.update(id, this.getEffectiveUserId(user), dto);

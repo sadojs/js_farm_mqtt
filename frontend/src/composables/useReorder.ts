@@ -1,10 +1,20 @@
 import { ref, nextTick } from 'vue'
-import { useDeviceStore } from '../stores/device.store'
 import { useNotificationStore } from '../stores/notification.store'
-import { deviceApi } from '../api/device.api'
 
 /**
- * 구역관리 카드 길게 눌러 드래그 정렬.
+ * 드래그 정렬 범용 컴포저블 옵션.
+ * - setOrder(id, i): 낙관적으로 로컬 순서값 반영
+ * - getOrder(id): 롤백용 현재 순서값
+ * - persist(orders): 서버 저장 (PATCH .../reorder)
+ */
+export interface ReorderOptions {
+  setOrder: (id: string, value: number) => void
+  getOrder: (id: string) => number
+  persist: (orders: { id: string; displayOrder: number }[]) => Promise<unknown>
+}
+
+/**
+ * 길게 눌러 드래그 정렬 (구역관리 카드 / 자동제어룰 / 구역 목록 공용).
  *
  * - 카드 아무 곳이나 500ms 길게 누르면 드래그 시작(컨트롤 위 제외, 터치는 grip 에서만).
  * - 드래그 카드는 **커서를 따라 이동**(translate)하고 그림자로 떠오름.
@@ -18,8 +28,7 @@ import { deviceApi } from '../api/device.api'
 const LONG_PRESS_MS = 500
 const MOVE_CANCEL_PX = 8
 
-export function useReorder() {
-  const deviceStore = useDeviceStore()
+export function useReorder(opts: ReorderOptions) {
   const notify = useNotificationStore()
 
   const draggingId = ref<string | null>(null)
@@ -40,8 +49,7 @@ export function useReorder() {
   let backup: Record<string, number> = {}
 
   function setDisplayOrder(id: string, value: number) {
-    const d = deviceStore.devices.find(x => x.id === id)
-    if (d) d.displayOrder = value
+    opts.setOrder(id, value)
   }
 
   function applyOrder(ids: string[]) {
@@ -135,7 +143,7 @@ export function useReorder() {
       if (closeId) orders.push({ id: closeId, displayOrder: i })
     })
     try {
-      await deviceApi.reorder(orders)
+      await opts.persist(orders)
     } catch {
       Object.entries(prev).forEach(([id, v]) => setDisplayOrder(id, v))
       notify.error('순서 저장 실패', '잠시 후 다시 시도해 주세요.')
@@ -178,13 +186,9 @@ export function useReorder() {
 
       backup = {}
       for (const id of orderIds) {
-        const d = deviceStore.devices.find(x => x.id === id)
-        if (d) backup[id] = d.displayOrder ?? 0
+        backup[id] = opts.getOrder(id)
         const closeId = pairMap[id]
-        if (closeId) {
-          const c = deviceStore.devices.find(x => x.id === closeId)
-          if (c) backup[closeId] = c.displayOrder ?? 0
-        }
+        if (closeId) backup[closeId] = opts.getOrder(closeId)
       }
       draggingId.value = repId
       dragGroup.value = groupKey

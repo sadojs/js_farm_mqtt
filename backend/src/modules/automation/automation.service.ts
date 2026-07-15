@@ -25,9 +25,25 @@ export class AutomationService {
   async findAll(userId: string | null) {
     const rules = await this.rulesRepo.find({
       where: userId ? { userId } : {},
-      order: { priority: 'DESC', createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', priority: 'DESC', createdAt: 'DESC' },
     });
     return rules.map((rule) => this.withTarget(rule));
+  }
+
+  /** 자동제어룰 표시 순서 배치 저장 (드래그 정렬). userId=null 이면 admin(전체). */
+  async reorder(
+    userId: string | null,
+    orders: { id: string; displayOrder: number }[],
+  ): Promise<{ updated: number }> {
+    if (!Array.isArray(orders) || orders.length === 0) return { updated: 0 };
+    let updated = 0;
+    for (const o of orders) {
+      if (!o || !o.id || typeof o.displayOrder !== 'number' || Number.isNaN(o.displayOrder)) continue;
+      const where: any = userId ? { id: o.id, userId } : { id: o.id };
+      const res = await this.rulesRepo.update(where, { displayOrder: Math.round(o.displayOrder) } as any);
+      updated += res.affected ?? 0;
+    }
+    return { updated };
   }
 
   /** groupId로 owner user_id 추론 (admin이 룰 생성 시 사용) */

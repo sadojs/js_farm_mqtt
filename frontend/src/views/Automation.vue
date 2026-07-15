@@ -62,10 +62,19 @@
             v-for="rule in grp.rules"
             :key="rule.id"
             class="rule-row"
-            :class="{ 'is-off': !rule.enabled }"
+            :class="{ 'is-off': !rule.enabled, reorderable: true, dragging: reorderDraggingId === rule.id }"
+            :style="reorderDragStyle(rule.id)"
+            :data-reorder-id="rule.id"
+            :data-reorder-group="'rules:' + grp.key"
             :title="targetLabel(rule)"
             @click="openWizard(rule)"
           >
+            <span
+              class="drag-grip"
+              title="길게 눌러 순서 이동"
+              @click.stop
+              @pointerdown="reorderPress($event, rule.id, 'rules:' + grp.key, grp.rules.map(r => r.id))"
+            ></span>
             <!-- 좌측: 장치 타입 아이콘 -->
             <EquipmentIcon
               :type="detectRuleKind(rule)"
@@ -137,6 +146,8 @@ import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
 import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
 import { useConfirm } from '../composables/useConfirm'
+import { useReorder } from '../composables/useReorder'
+import { automationApi } from '../api/automation.api'
 import { useNotificationStore } from '../stores/notification.store'
 import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
@@ -166,6 +177,13 @@ const editingRule = ref<AutomationRule | null>(null)
 
 const rules = computed(() => automationStore.rules)
 const loading = computed(() => automationStore.loading)
+
+// 자동제어룰 순서 드래그 (구역 섹션 내). displayOrder 낙관적 갱신 + 서버 저장.
+const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder({
+  setOrder: (id, v) => { const r = automationStore.rules.find(x => x.id === id); if (r) r.displayOrder = v },
+  getOrder: (id) => automationStore.rules.find(x => x.id === id)?.displayOrder ?? 0,
+  persist: (orders) => automationApi.reorderRules(orders),
+})
 
 function getRuleDeviceNames(rule: AutomationRule): string[] {
   const actions = rule.actions as any
@@ -361,6 +379,10 @@ const rulesGroupedByZone = computed<ZoneGroup[]>(() => {
     const b = buckets.get(key)!
     b.rules.push(r)
     if (r.enabled) b.activeCount += 1
+  }
+  // 각 구역 내 룰은 displayOrder 순 (드래그 정렬 반영)
+  for (const b of buckets.values()) {
+    b.rules.sort((a, c) => ((a as any).displayOrder ?? 0) - ((c as any).displayOrder ?? 0))
   }
   // 비어있는 그룹 제외 + 미지정은 맨 뒤
   const arr: ZoneGroup[] = []
@@ -575,6 +597,30 @@ onMounted(async () => {
 .rule-row:last-child { border-bottom: none; }
 .rule-row:hover { background: var(--bg-hover); }
 .rule-row.is-off { opacity: 0.72; }
+
+/* 룰 순서 드래그 */
+.rule-row.reorderable { position: relative; padding-left: 40px; }
+.rule-row .drag-grip {
+  position: absolute;
+  left: 14px; top: 0; bottom: 0;
+  width: 16px; height: 22px; margin: auto 0;
+  cursor: grab; touch-action: none;
+  color: var(--text-muted); opacity: 0.6;
+  background-image:
+    radial-gradient(currentColor 1.3px, transparent 1.6px),
+    radial-gradient(currentColor 1.3px, transparent 1.6px);
+  background-size: 5px 7px;
+  background-position: 3px 2px, 8px 2px;
+  background-repeat: repeat-y;
+}
+.rule-row .drag-grip:hover { opacity: 1; }
+.rule-row.dragging {
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
+  background: var(--bg-card);
+  z-index: 5;
+  pointer-events: none;
+  user-select: none;
+}
 
 .rule-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
