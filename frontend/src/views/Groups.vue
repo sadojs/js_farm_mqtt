@@ -353,7 +353,7 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span class="type-tag actuator">장치</span>
+                  <span class="type-tag actuator">{{ getEquipmentLabel(device) }}</span>
                   <span v-if="device.userOverride" class="manual-override-badge"
                     title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
                     🖐 수동
@@ -563,6 +563,7 @@ import AutomationEditModal from '@/components/automation/AutomationEditModal.vue
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useReorder } from '../composables/useReorder'
+import { getEquipmentLabel } from '../utils/device-labels'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
 import { deviceApi } from '../api/device.api'
