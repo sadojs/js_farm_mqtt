@@ -92,7 +92,6 @@
             <p v-if="group.description && renamingGroupId !== group.id" class="group-desc">{{ group.description }}</p>
           </div>
           <div class="group-header-actions">
-            <span class="device-count-badge">{{ getGroupSensors(group).length + getGroupActuators(group).length + getGroupOpenerGroups(group).length }}개 장치</span>
             <button
               class="btn-memo"
               :class="{ 'has-notes': noteCount(group.id) > 0 }"
@@ -2339,17 +2338,20 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   /* 모바일 2열 — minmax(0, 1fr) 필수(1fr 만으로는 자식 min-content 가 viewport 폭을 넘겨 가로 잘림).
      측정기·장치 카드만 2열, 자동제어룰 리스트는 아래에서 1열 유지. */
   .device-sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .group-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-  /* 모바일에선 배지·메모·아이콘 버튼이 한 줄에 깔끔하게 들어오도록 사이즈·간격 압축 */
+  /* 모바일: 제목 + 옵션 버튼을 한 줄에(수량 배지 제거로 공간 확보). 제목은 한 줄 말줄임,
+     버튼 묶음은 유지. 버튼은 한 줄에 들어가도록 살짝 축소. */
+  .group-header { align-items: center; gap: 6px; }
+  .group-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .farm-owner-badge { font-size: 10px; padding: 1px 7px; margin-right: 5px; }
   .group-header-actions {
-    width: 100%;
     justify-content: flex-end;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: 3px;
+    flex-shrink: 0;
   }
   .group-header-actions .btn-icon {
-    min-width: 36px; min-height: 36px;
-    width: 36px; height: 36px;
+    min-width: 32px; min-height: 32px;
+    width: 32px; height: 32px;
     padding: 0;
     flex-shrink: 0;
   }
@@ -2357,8 +2359,8 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     position: relative;          /* 배지 absolute 기준 */
     /* 다른 아이콘 버튼(.btn-icon)과 완전히 동일한 박스 — 크기·모양·정렬 통일 */
     box-sizing: border-box;
-    width: 36px; height: 36px;
-    min-width: 36px; min-height: 36px;
+    width: 32px; height: 32px;
+    min-width: 32px; min-height: 32px;
     padding: 0;
     gap: 0;
     border-radius: 8px;
