@@ -107,7 +107,16 @@ export function useReorder(opts: ReorderOptions) {
     if (!overId || overId === draggingId.value) return
 
     const r = el.getBoundingClientRect()
-    const after = e.clientY > r.top + r.height / 2 // 그 카드 세로중앙 아래면 뒤에 삽입
+    // 그리드 열 수 판정: 2열 이상이면 읽기순서(좌→우)로 좌우(X) 기준, 1열이면 상하(Y) 기준.
+    // getComputedStyle 은 repeat(auto-fill,…) 도 실제 px 트랙으로 펼쳐주므로 그대로 개수를 셈.
+    // (자동제어룰 리스트는 flex-column → gridTemplateColumns='none' → 1열로 처리되어 기존 동작 유지)
+    const parent = el.parentElement
+    const cols = parent
+      ? getComputedStyle(parent).gridTemplateColumns.split(' ').filter(Boolean).length
+      : 1
+    const after = cols > 1
+      ? e.clientX > r.left + r.width / 2   // 카드 가로중앙 오른쪽이면 뒤에 삽입
+      : e.clientY > r.top + r.height / 2   // 카드 세로중앙 아래면 뒤에 삽입
     const others = orderIds.filter(id => id !== draggingId.value)
     let tIdx = others.indexOf(overId)
     if (tIdx === -1) return

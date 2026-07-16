@@ -2288,8 +2288,9 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     display: flex; align-items: center; justify-content: center;
   }
   .page-header .header-actions .badge-hidden .hz-text { display: none; }
-  /* minmax(0, 1fr) — 1fr 만으로는 자식 min-content 가 viewport 폭을 넘기는 흔한 함정 */
-  .device-sub-grid { grid-template-columns: minmax(0, 1fr); }
+  /* 모바일 2열 — minmax(0, 1fr) 필수(1fr 만으로는 자식 min-content 가 viewport 폭을 넘겨 가로 잘림).
+     측정기·장치 카드만 2열, 자동제어룰 리스트는 아래에서 1열 유지. */
+  .device-sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .group-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   /* 모바일에선 배지·메모·아이콘 버튼이 한 줄에 깔끔하게 들어오도록 사이즈·간격 압축 */
   .group-header-actions {
@@ -2343,17 +2344,32 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   .group-header { padding: 11px 14px; }
   .group-body { padding: 0 12px 12px; }
 
-  /* 모바일 카드 밀도 — 상하 여백만 축소(글씨 크기는 폰트 설정 3단계 그대로 유지) */
+  /* 모바일 2열 카드 밀도 — 여백·손잡이·토글 압축(글씨 크기는 폰트 설정 3단계 --content-scale 그대로 유지) */
   .device-sub-grid { gap: 8px; }
   .section-label { padding: 4px 10px; }
-  .sub-card { padding: 9px 12px; }
-  .sub-card.reorderable { padding-left: 26px; }
-  .sub-card-top { margin-bottom: 4px; gap: 6px; row-gap: 4px; }
+  .sub-card { padding: 9px 10px; }
+  .sub-card.reorderable { padding-left: 22px; }
+  .sub-card-top { margin-bottom: 4px; gap: 5px; row-gap: 4px; }
   .sub-card-control { padding: 3px 0; }
   .sub-card-sensor-chips { gap: 4px; }
-  .sensor-chip { padding: 2px 8px; }
+  .sensor-chip { padding: 2px 8px; font-size: 11px; }
   .reorder-hint { padding: 2px 0 0; }
-  /* 구역별 룰 행도 상하 여백만 컴팩트 */
+  /* 2열은 카드 폭이 좁아 기존 글씨면 장치명이 잘림 → 3단계 기능은 유지(--content-scale 곱셈 그대로)하고
+     2열 전용 기준 크기만 낮춰 이름이 읽히게 함. 3단계 확대/축소는 그대로 작동. */
+  /* 이름은 최소폭 보장 → 타입태그가 인라인으로 이름을 짓눌러 'ㅏ'처럼 잘리는 것 방지.
+     짧은 이름은 태그와 한 줄 유지, 긴 이름은 태그가 다음 줄로 자연스럽게 내려감. */
+  .sub-card-name { font-size: calc(12.5px * var(--content-scale, 1)); min-width: 5.5em; }
+  .control-label { font-size: calc(12.5px * var(--content-scale, 1)); }
+  .type-tag { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 7px; }
+  .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
+  /* 좁은 2열 카드에서 손잡이 폭 축소 */
+  .drag-grip { left: 4px; width: 14px; }
+  /* 컴팩트 토글(48×26 → 38×20) — 좁은 카드에서 라벨 공간 확보 */
+  .toggle-switch { width: 38px; height: 20px; }
+  .toggle-slider { border-radius: 20px; }
+  .toggle-slider:before { height: 16px; width: 16px; left: 2px; bottom: 2px; }
+  input:checked + .toggle-slider:before { transform: translateX(18px); }
+  /* 자동제어룰 행은 1열 유지 + 상하 여백만 컴팩트 */
   .rule-row.d2 { padding: 10px 12px; min-height: 40px; }
 }
 
