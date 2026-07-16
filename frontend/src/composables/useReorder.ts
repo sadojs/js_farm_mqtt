@@ -101,6 +101,18 @@ export function useReorder(opts: ReorderOptions) {
 
   // ── 드래그: 커서 추적 + 커서 아래 카드 기준 재정렬 ──
   function onDragMove(e: PointerEvent) {
+    // ── self-healing 안전장치 (실기기에서 pointerup/touchend 가 유실돼 cleanup 이 안 도는 경우 대비) ──
+    // 1) 드래그 상태가 이미 해제됐는데 리스너가 남아있으면 스스로 제거 → 이후 스크롤 정상.
+    if (draggingId.value == null) {
+      window.removeEventListener('pointermove', onDragMove)
+      return
+    }
+    // 2) 원래 드래그 포인터가 아닌 '다른 포인터'의 이동이면(=이전 드래그의 종료 이벤트가 유실됨),
+    //    즉시 정리하고 이 이벤트는 preventDefault 하지 않고 통과 → 새 스크롤 제스처가 살아난다.
+    if (startPointerId != null && e.pointerId !== startPointerId) {
+      cleanup()
+      return
+    }
     e.preventDefault()
     lastX = e.clientX
     lastY = e.clientY
