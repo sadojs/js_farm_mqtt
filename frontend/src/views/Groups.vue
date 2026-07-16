@@ -291,14 +291,14 @@
                   <span class="type-tag actuator type-tag-irrigation">관주</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
-                  <span class="control-label">원격제어 ON/OFF</span>
+                  <span class="control-label">원격제어</span>
                   <label class="toggle-switch" @click.prevent="device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
                     <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control disabled">
-                  <span class="control-label">액비/교반기 B접점</span>
+                  <span class="control-label">액비/교반기</span>
                   <label class="toggle-switch">
                     <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['fertilizer_b_contact']] === true" disabled />
                     <span class="toggle-slider"></span>
@@ -2359,9 +2359,16 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   /* 이름은 최소폭 보장 → 타입태그가 인라인으로 이름을 짓눌러 'ㅏ'처럼 잘리는 것 방지.
      짧은 이름은 태그와 한 줄 유지, 긴 이름은 태그가 다음 줄로 자연스럽게 내려감. */
   .sub-card-name { font-size: calc(12.5px * var(--content-scale, 1)); min-width: 5.5em; }
-  .control-label { font-size: calc(12.5px * var(--content-scale, 1)); }
+  /* 컨트롤 라벨은 줄바꿈 금지(카드가 세로로 길어지는 것 방지) — 넘치면 말줄임 */
+  .control-label {
+    font-size: calc(12.5px * var(--content-scale, 1));
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .type-tag { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 7px; }
   .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
+  /* 카드별 이름변경(✎) 버튼은 모바일에서 공간만 차지 → 숨김(이름변경은 데스크탑에서).
+     구역 헤더의 이름변경(✎)은 별도(.btn-rename-inline 등)라 영향 없음. */
+  .sub-card-top .btn-rename-mini { display: none; }
   /* 좁은 2열 카드에서 손잡이 폭 축소 */
   .drag-grip { left: 4px; width: 14px; }
   /* 컴팩트 토글(48×26 → 38×20) — 좁은 카드에서 라벨 공간 확보 */

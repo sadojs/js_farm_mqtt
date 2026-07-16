@@ -1154,14 +1154,15 @@ body {
   line-height: 1.55;
   background: var(--bg-primary);
   color: var(--text-primary);
-  /* 페이지 헤더/콘텐츠가 사이드바와 너무 가까이 붙지 않도록 좌우 패딩 + 상단 여유 */
-  padding: 24px 28px 32px 28px;
+  /* 페이지 헤더/콘텐츠가 사이드바와 너무 가까이 붙지 않도록 좌우 패딩 + 상단 여유
+     (전체 화면 밀도 개선 요청 — 여백 축소) */
+  padding: 18px 20px 24px 20px;
   box-sizing: border-box;
 }
 
-/* 모바일에서는 사이드바가 collapse되므로 패딩 축소 */
+/* 모바일에서는 사이드바가 collapse되므로 패딩 더 축소(카드 폭 확보) */
 @media (max-width: 768px) {
-  .main-content { padding: 16px 16px 24px 16px; }
+  .main-content { padding: 12px 10px 18px 10px; }
 }
 
 /* 본문 공통 가독성 보정 */
