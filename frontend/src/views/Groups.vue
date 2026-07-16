@@ -2383,7 +2383,15 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     flex-shrink: 0;
   }
   .btn-sm { padding: 0 18px; line-height: 1.8; }
-  .btn-status-sm { padding: 0 18px; line-height: 1.8; }
+  /* '상태' 버튼: 2열 컴팩트 카드에선 작은 pill 로(전역 button min-height:44px 해제,
+     옆 타입태그와 높이·radius·글씨 통일) */
+  .btn-status-sm {
+    padding: 3px 9px;
+    min-height: 0;
+    line-height: 1.4;
+    font-size: calc(11px * var(--content-scale, 1));
+    border-radius: 6px;
+  }
   .type-tag { padding: 0 18px; line-height: 1.8; }
   /* 카드 내부 좌우에 일정한 여백을 줘서 이름·설명·아이콘·본문이 카드 가장자리에
      붙지 않고 나란히 정렬되도록 한다. */
