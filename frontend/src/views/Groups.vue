@@ -107,6 +107,10 @@
             <button v-if="!isFarmUser" class="btn-icon" @click="openEnvConfig(group)" title="환경설정" aria-label="환경설정">⚙</button>
             <button v-if="!isFarmUser" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
             <button v-if="!isFarmUser" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
+            <button v-if="!isFarmUser" class="btn-icon btn-edit-toggle" :class="{ active: isGroupEditing(group.id) }"
+              @click="toggleGroupEdit(group.id)"
+              :title="isGroupEditing(group.id) ? '편집 완료' : '편집 (이름변경·순서이동)'"
+              :aria-label="isGroupEditing(group.id) ? '편집 완료' : '편집'">{{ isGroupEditing(group.id) ? '완료' : '✎' }}</button>
             <button class="btn-icon" @click="toggleCollapse(group.id)" :title="collapsedGroups.has(group.id) ? '펼치기' : '접기'" :aria-label="collapsedGroups.has(group.id) ? '펼치기' : '접기'">
               {{ collapsedGroups.has(group.id) ? '▶' : '▼' }}
             </button>
@@ -126,10 +130,10 @@
             <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
             <div class="device-sub-grid">
               <div v-for="device in getGroupSensors(group)" :key="device.id"
-                :class="['sub-card sensor', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :class="['sub-card sensor', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
                 :data-reorder-id="device.id" :data-reorder-group="group.id + ':sensor'">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':sensor', getGroupSensors(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <!-- 타입 아이콘 칩 (헤더 순서 통일: [칩][상태점+이름+✎][배지]) -->
@@ -153,9 +157,11 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name">{{ device.name }}</span>
+                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser"
+                      v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
@@ -191,7 +197,7 @@
                 </button>
               </div>
             </div>
-            <div v-if="!isFarmUser && getGroupSensors(group).length > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
+            <div v-if="!isFarmUser && isGroupEditing(group.id) && getGroupSensors(group).length > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 장치(액추에이터 + 개폐기 + 관수) 목록 -->
@@ -200,10 +206,10 @@
             <div class="device-sub-grid">
               <!-- 개폐기 그룹 카드 -->
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
-                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === og.openDevice.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === og.openDevice.id }]"
                 :style="reorderDragStyle(og.openDevice.id)"
                 :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
@@ -226,9 +232,11 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitOpenerGroupRename(og)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name">{{ og.groupName }}</span>
+                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) && startOpenerGroupRename(og)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ og.groupName }}</span>
                     <button
-                      v-if="!isFarmUser"
+                      v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
                       @click.stop="startOpenerGroupRename(og)"
                       title="이름 변경"
@@ -253,10 +261,10 @@
               </div>
               <!-- 관수 장치 카드 -->
               <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
                 :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
@@ -279,9 +287,11 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name">{{ device.name }}</span>
+                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser"
+                      v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
@@ -307,10 +317,10 @@
               </div>
               <!-- 일반 장치 카드 -->
               <div v-for="device in getGroupActuators(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser, dragging: reorderDraggingId === device.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
                 :style="reorderDragStyle(device.id)"
                 :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'">
-                <span v-if="!isFarmUser" class="drag-grip" title="길게 눌러 순서 이동"
+                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
                   <EquipmentIcon
@@ -333,9 +343,11 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name">{{ device.name }}</span>
+                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser"
+                      v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
@@ -356,7 +368,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="!isFarmUser && (getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length) > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
+            <div v-if="!isFarmUser && isGroupEditing(group.id) && (getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length) > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 자동 제어 설정 — D2 컴팩트 행 (Automation.vue와 동일 패턴) -->
@@ -370,14 +382,14 @@
                 v-for="rule in getGroupRules(group.id)"
                 :key="rule.id"
                 class="rule-row d2"
-                :class="{ 'is-off': !rule.enabled, reorderable: !isFarmUser, dragging: ruleReorderDraggingId === rule.id }"
+                :class="{ 'is-off': !rule.enabled, reorderable: !isFarmUser && isGroupEditing(group.id), dragging: ruleReorderDraggingId === rule.id }"
                 :style="ruleReorderDragStyle(rule.id)"
                 :data-reorder-id="rule.id"
                 :data-reorder-group="'grouprules:' + group.id"
                 @click="openEditRule(rule)"
               >
                 <span
-                  v-if="!isFarmUser"
+                  v-if="!isFarmUser && isGroupEditing(group.id)"
                   class="drag-grip"
                   title="길게 눌러 순서 이동"
                   @click.stop
@@ -622,14 +634,24 @@ const renamingDeviceId = ref<string | null>(null)
 const renameDeviceValue = ref('')
 const renamingOpenerGroup = ref<string | null>(null)
 
+// 인라인 이름 입력에 커서 자동 포커스 + 전체 선택(사용자가 바로 타이핑 가능)
+function focusRenameInput() {
+  nextTick(() => {
+    const el = document.querySelector('.rename-input-inline') as HTMLInputElement | null
+    if (el) { el.focus(); el.select() }
+  })
+}
+
 function startDeviceRename(deviceId: string, currentName: string) {
   renamingDeviceId.value = deviceId
   renameDeviceValue.value = currentName
+  focusRenameInput()
 }
 
 function startOpenerGroupRename(og: { groupName: string; openDevice: Device; closeDevice: Device }) {
   renamingOpenerGroup.value = og.groupName
   renameDeviceValue.value = og.groupName
+  focusRenameInput()
 }
 
 function cancelDeviceRename() {
@@ -825,6 +847,18 @@ const toggleCollapse = (groupId: string) => {
     collapsedGroups.value.delete(groupId)
   } else {
     collapsedGroups.value.add(groupId)
+  }
+}
+
+// 구역별 편집 모드 — 켜면 드래그 손잡이 + 이름 인라인 수정이 나타남(평상시엔 숨김)
+const editingGroups = ref(new Set<string>())
+const isGroupEditing = (groupId: string): boolean => editingGroups.value.has(groupId)
+const toggleGroupEdit = (groupId: string) => {
+  if (editingGroups.value.has(groupId)) {
+    editingGroups.value.delete(groupId)
+    cancelDeviceRename() // 편집 종료 시 진행 중이던 이름 수정 취소
+  } else {
+    editingGroups.value.add(groupId)
   }
 }
 
@@ -1899,6 +1933,19 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 편집 모드에서 이름은 눌러서 바로 수정 가능(커서 + 점선 밑줄로 어포던스 표시) */
+.sub-card-name.editable {
+  cursor: text;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-color, #cbd5e1);
+}
+/* 구역 헤더 '편집' 토글 — 켜짐 상태 강조 */
+.btn-edit-toggle.active {
+  background: var(--accent, #4caf50);
+  color: #fff;
+  border-color: var(--accent, #4caf50);
+}
 
 .type-tag {
   font-size: calc(13px * var(--content-scale, 1));
@@ -2366,9 +2413,6 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   }
   .type-tag { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 7px; }
   .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
-  /* 카드별 이름변경(✎) 버튼은 모바일에서 공간만 차지 → 숨김(이름변경은 데스크탑에서).
-     구역 헤더의 이름변경(✎)은 별도(.btn-rename-inline 등)라 영향 없음. */
-  .sub-card-top .btn-rename-mini { display: none; }
   /* 좁은 2열 카드에서 손잡이 폭 축소 */
   .drag-grip { left: 4px; width: 14px; }
   /* 컴팩트 토글(48×26 → 38×20) — 좁은 카드에서 라벨 공간 확보 */
