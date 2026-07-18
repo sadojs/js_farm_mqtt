@@ -58,9 +58,35 @@ export interface ResolvedValue {
   updatedAt: string | null
 }
 
+export interface ZoneDeviceSettings {
+  gateways: Array<{ id: string; gatewayId: string; name: string }>
+  settings: {
+    openerOperationSeconds: number
+    openerStandbySeconds: number
+    fanOperationMinutes: number
+    fanStandbyMinutes: number
+    hasRainSensor: boolean
+    rainEnabled: boolean
+  } | null
+}
+
+export interface SaveZoneDeviceSettings {
+  openerOperationSeconds?: number
+  openerStandbySeconds?: number
+  fanOperationMinutes?: number
+  fanStandbyMinutes?: number
+  rainEnabled?: boolean
+}
+
 export const envConfigApi = {
   getRoles: () =>
     apiClient.get<EnvRole[]>('/env-config/roles'),
+
+  getDeviceSettings: (groupId: string) =>
+    apiClient.get<ZoneDeviceSettings>(`/env-config/groups/${groupId}/device-settings`),
+
+  saveDeviceSettings: (groupId: string, dto: SaveZoneDeviceSettings) =>
+    apiClient.patch<ZoneDeviceSettings>(`/env-config/groups/${groupId}/device-settings`, dto),
 
   getSources: (groupId: string) =>
     apiClient.get<SourcesResponse>(`/env-config/groups/${groupId}/sources`),

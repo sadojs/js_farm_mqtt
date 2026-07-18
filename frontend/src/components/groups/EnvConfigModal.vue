@@ -2,7 +2,7 @@
   <div v-if="show && group" class="modal-overlay" @click.self="$emit('close')">
     <div class="env-config-modal">
       <div class="env-modal-header">
-        <h3>센서 환경 설정 — {{ group.name }}</h3>
+        <h3>구역 환경 설정 — {{ group.name }}</h3>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="env-modal-body">
@@ -67,6 +67,37 @@
               </optgroup>
             </select>
           </div>
+
+          <!-- 장치 설정 (개폐기/유동팬 동작·대기 + 우적센서) — 폴백/자동제어 공통, 구역 내 전체 게이트웨이 적용 -->
+          <template v-if="deviceForm">
+            <div class="env-section-label" style="margin-top: 16px;">
+              장치 설정
+              <span v-if="deviceGateways.length" class="env-unit">· 게이트웨이 {{ deviceGateways.length }}대 공통</span>
+            </div>
+            <p class="device-hint">개폐기·유동팬 동작/대기 주기와 우적센서. 저장 시 구역 내 모든 게이트웨이에 적용됩니다.</p>
+            <div class="device-grid">
+              <div class="device-field">
+                <label class="env-role-label">개폐기 동작 <span class="env-unit">(초)</span></label>
+                <input type="number" min="1" max="600" v-model.number="deviceForm.openerOperationSeconds" class="env-source-select" />
+              </div>
+              <div class="device-field">
+                <label class="env-role-label">개폐기 대기 <span class="env-unit">(초)</span></label>
+                <input type="number" min="1" max="600" v-model.number="deviceForm.openerStandbySeconds" class="env-source-select" />
+              </div>
+              <div class="device-field">
+                <label class="env-role-label">유동팬 동작 <span class="env-unit">(분)</span></label>
+                <input type="number" min="1" max="240" v-model.number="deviceForm.fanOperationMinutes" class="env-source-select" />
+              </div>
+              <div class="device-field">
+                <label class="env-role-label">유동팬 대기 <span class="env-unit">(분)</span></label>
+                <input type="number" min="1" max="240" v-model.number="deviceForm.fanStandbyMinutes" class="env-source-select" />
+              </div>
+            </div>
+            <label v-if="deviceForm.hasRainSensor" class="device-rain-row">
+              <input type="checkbox" v-model="deviceForm.rainEnabled" />
+              <span>☔ 우적센서 활성화 <span class="env-unit">(비 감지 시 개폐기 자동 닫힘)</span></span>
+            </label>
+          </template>
         </template>
       </div>
       <div class="env-modal-footer">
@@ -82,8 +113,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { envConfigApi } from '../../api/env-config.api'
-import type { EnvRole, SourcesResponse, SaveMappingItem } from '../../api/env-config.api'
+import type { EnvRole, SourcesResponse, SaveMappingItem, ZoneDeviceSettings } from '../../api/env-config.api'
 import type { HouseGroup } from '../../types/group.types'
+
+type DeviceForm = NonNullable<ZoneDeviceSettings['settings']>
 
 const props = defineProps<{
   show: boolean
@@ -99,6 +132,8 @@ const envSources = ref<SourcesResponse>({ sensors: [], weather: [] })
 const envMappings = ref<Record<string, { sourceType: string; deviceId?: string; sensorType?: string; weatherField?: string }>>({})
 const envSaving = ref(false)
 const envLoading = ref(false)
+const deviceForm = ref<DeviceForm | null>(null)
+const deviceGateways = ref<ZoneDeviceSettings['gateways']>([])
 
 watch(() => props.show, async (val) => {
   if (val && props.group) {
@@ -109,13 +144,16 @@ watch(() => props.show, async (val) => {
 async function loadEnvConfig(group: HouseGroup) {
   envLoading.value = true
   try {
-    const [rolesRes, sourcesRes, mappingsRes] = await Promise.all([
+    const [rolesRes, sourcesRes, mappingsRes, deviceRes] = await Promise.all([
       envConfigApi.getRoles(),
       envConfigApi.getSources(group.id),
       envConfigApi.getMappings(group.id),
+      envConfigApi.getDeviceSettings(group.id),
     ])
     envRoles.value = rolesRes.data
     envSources.value = sourcesRes.data
+    deviceGateways.value = deviceRes.data.gateways
+    deviceForm.value = deviceRes.data.settings ? { ...deviceRes.data.settings } : null
     const map: Record<string, any> = {}
     for (const m of mappingsRes.data) {
       map[m.roleKey] = {
@@ -149,9 +187,20 @@ async function saveEnvConfig() {
         weatherField: v.weatherField,
       }))
     await envConfigApi.saveMappings(props.group.id, mappings)
+    // 장치 설정(개폐기/팬 동작·대기 + 우적) — 구역 내 모든 게이트웨이에 fan-out
+    if (deviceForm.value) {
+      const d = deviceForm.value
+      await envConfigApi.saveDeviceSettings(props.group.id, {
+        openerOperationSeconds: d.openerOperationSeconds,
+        openerStandbySeconds: d.openerStandbySeconds,
+        fanOperationMinutes: d.fanOperationMinutes,
+        fanStandbyMinutes: d.fanStandbyMinutes,
+        ...(d.hasRainSensor ? { rainEnabled: d.rainEnabled } : {}),
+      })
+    }
     emit('close')
   } catch {
-    alert('매핑 저장에 실패했습니다.')
+    alert('환경설정 저장에 실패했습니다.')
   } finally {
     envSaving.value = false
   }
@@ -230,6 +279,20 @@ function getSelectedValue(roleKey: string): string {
   font-size: calc(14px * var(--content-scale, 1)); cursor: pointer;
 }
 .env-source-select:focus { outline: none; border-color: var(--accent); }
+.device-hint {
+  font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.device-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px;
+}
+.device-field { min-width: 0; }
+.device-rain-row {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  padding: 10px 12px; background: var(--bg-secondary); border-radius: 8px;
+  cursor: pointer;
+}
+.device-rain-row input { width: 18px; height: 18px; flex-shrink: 0; }
 .loading-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
 .close-btn {
   background: none; border: none; font-size: 20px; color: var(--text-muted);
