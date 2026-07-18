@@ -291,6 +291,8 @@ function getSelectedValue(roleKey: string): string {
   display: flex; align-items: center; gap: 10px; margin-top: 12px;
   padding: 10px 12px; background: var(--bg-secondary); border-radius: 8px;
   cursor: pointer;
+  font-size: calc(14px * var(--content-scale, 1));
+  font-weight: 500; color: var(--text-primary);
 }
 .device-rain-row input { width: 18px; height: 18px; flex-shrink: 0; }
 .loading-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }

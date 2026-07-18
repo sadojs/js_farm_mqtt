@@ -40,7 +40,7 @@ const DEFAULT_SLOTS: Omit<GatewayOnboardDevice, 'id' | 'gatewayId' | 'createdAt'
   { slotKey: 'mixer',              slotType: 'mixer',              pairKey: null, name: '교반기',           enabled: true, sortOrder: 11, gpioPin: null },
   { slotKey: 'fertilizer_motor',   slotType: 'fertilizer_motor',   pairKey: null, name: '액비',             enabled: true, sortOrder: 12, gpioPin: null },
   // 무전압 접점 우적센서 — BCM21(물리 40번) 고정, 기본 비활성. 사용자는 활성/비활성만 선택.
-  { slotKey: 'rain_sensor',        slotType: 'rain_sensor',        pairKey: null, name: '우적센서',         enabled: false, sortOrder: 13, gpioPin: RAIN_SENSOR_PIN },
+  { slotKey: 'rain_sensor',        slotType: 'rain_sensor',        pairKey: null, name: '우적센서',         enabled: true,  sortOrder: 13, gpioPin: RAIN_SENSOR_PIN },
 ];
 
 /** 구버전에서 제거된 슬롯 키 (opener_* 는 지그비로만 추가) */
