@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Patch, Param, Body, UseGuards } from '@nestjs/common';
 import { EnvConfigService } from './env-config.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -38,6 +38,7 @@ export class EnvConfigController {
   }
 
   @Put('groups/:groupId/mappings')
+  @Roles('admin', 'farm_admin') // 편집은 관리자·농장관리자만 (farm_user 는 조회만)
   saveMappings(
     @CurrentUser() user: any,
     @Param('groupId') groupId: string,
@@ -58,5 +59,38 @@ export class EnvConfigController {
     @Param('groupId') groupId: string,
   ) {
     return this.envConfigService.getResolved(this.getEffectiveUserId(user), groupId);
+  }
+
+  // ── 구역 장치설정 (개폐기/팬 동작·대기 + 우적센서 활성화) — 통합 환경설정 ──
+  @Get('groups/:groupId/device-settings')
+  getZoneDeviceSettings(
+    @CurrentUser() user: any,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.envConfigService.getZoneDeviceSettings(
+      this.getEffectiveUserId(user),
+      groupId,
+    );
+  }
+
+  @Patch('groups/:groupId/device-settings')
+  @Roles('admin', 'farm_admin') // 편집은 관리자·농장관리자만 (소유권은 서비스에서 검증)
+  saveZoneDeviceSettings(
+    @CurrentUser() user: any,
+    @Param('groupId') groupId: string,
+    @Body()
+    body: {
+      openerOperationSeconds?: number;
+      openerStandbySeconds?: number;
+      fanOperationMinutes?: number;
+      fanStandbyMinutes?: number;
+      rainEnabled?: boolean;
+    },
+  ) {
+    return this.envConfigService.saveZoneDeviceSettings(
+      this.getEffectiveUserId(user),
+      groupId,
+      body,
+    );
   }
 }

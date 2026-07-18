@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { EnvRole } from './entities/env-role.entity';
 import { EnvMapping } from './entities/env-mapping.entity';
 import { Device } from '../devices/entities/device.entity';
 import { WeatherData } from '../weather/weather-data.entity';
 import { HouseGroup } from '../groups/entities/house-group.entity';
+import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
+import { FallbackConfigService } from '../fallback-config/fallback-config.service';
 
 const SENSOR_TYPE_LABELS: Record<string, string> = {
   temperature: '온도', humidity: '습도', co2: 'CO2',
@@ -52,6 +55,10 @@ export class EnvConfigService {
     @InjectRepository(Device) private deviceRepo: Repository<Device>,
     @InjectRepository(WeatherData) private weatherRepo: Repository<WeatherData>,
     @InjectRepository(HouseGroup) private groupRepo: Repository<HouseGroup>,
+    @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
+    @InjectRepository(GatewayOnboardDevice)
+    private onboardRepo: Repository<GatewayOnboardDevice>,
+    private fallbackConfigService: FallbackConfigService,
     private dataSource: DataSource,
   ) {}
 
@@ -309,5 +316,95 @@ export class EnvConfigService {
     }
 
     return result;
+  }
+
+  // ───────── 구역 장치설정 (통합 환경설정) ─────────
+  // 게이트웨이별 fallback_config(개폐기/팬 동작·대기) + 온보드 우적센서 활성화를
+  // 구역(house_group) 단위로 읽고/저장한다. 저장은 구역 내 모든 게이트웨이로 fan-out.
+  // 소유권: groupRepo 조회에 userId 스코프(getEffectiveUserId) → 남의 구역 접근 차단.
+
+  private async resolveZoneGateways(
+    userId: string | null,
+    groupId: string,
+  ): Promise<Gateway[]> {
+    const where: any = userId ? { id: groupId, userId } : { id: groupId };
+    const group = await this.groupRepo.findOne({ where, relations: ['houses'] });
+    if (!group) throw new NotFoundException('구역을 찾을 수 없습니다');
+    const houseIds = (group.houses || []).map((h) => h.id);
+    if (!houseIds.length) return [];
+    return this.gatewayRepo.find({ where: { houseId: In(houseIds) } });
+  }
+
+  async getZoneDeviceSettings(userId: string | null, groupId: string) {
+    const gateways = await this.resolveZoneGateways(userId, groupId);
+    if (!gateways.length) {
+      return { gateways: [], settings: null };
+    }
+    const rep = gateways[0]; // 대표(첫) 게이트웨이 값 표시
+    const { config } = await this.fallbackConfigService.getFullConfig(
+      rep.gatewayId,
+    );
+    const rainSlot = await this.onboardRepo.findOne({
+      where: { gatewayId: rep.id, slotType: 'rain_sensor' },
+    });
+    return {
+      gateways: gateways.map((g) => ({
+        id: g.id,
+        gatewayId: g.gatewayId,
+        name: g.name ?? g.gatewayId,
+      })),
+      settings: {
+        openerOperationSeconds: config.openerOperationSeconds,
+        openerStandbySeconds: config.openerStandbySeconds,
+        fanOperationMinutes: config.fanOperationMinutes,
+        fanStandbyMinutes: config.fanStandbyMinutes,
+        hasRainSensor: !!rainSlot,
+        rainEnabled: rainSlot ? rainSlot.enabled : false,
+      },
+    };
+  }
+
+  async saveZoneDeviceSettings(
+    userId: string | null,
+    groupId: string,
+    dto: {
+      openerOperationSeconds?: number;
+      openerStandbySeconds?: number;
+      fanOperationMinutes?: number;
+      fanStandbyMinutes?: number;
+      rainEnabled?: boolean;
+    },
+  ) {
+    const gateways = await this.resolveZoneGateways(userId, groupId);
+    if (!gateways.length) {
+      throw new NotFoundException('구역에 연결된 게이트웨이가 없습니다');
+    }
+
+    const dutyDto: any = {};
+    if (dto.openerOperationSeconds != null)
+      dutyDto.openerOperationSeconds = dto.openerOperationSeconds;
+    if (dto.openerStandbySeconds != null)
+      dutyDto.openerStandbySeconds = dto.openerStandbySeconds;
+    if (dto.fanOperationMinutes != null)
+      dutyDto.fanOperationMinutes = dto.fanOperationMinutes;
+    if (dto.fanStandbyMinutes != null)
+      dutyDto.fanStandbyMinutes = dto.fanStandbyMinutes;
+
+    // 구역 내 모든 게이트웨이에 fan-out — 각각 fallback_config 갱신 + publishSync.
+    for (const gw of gateways) {
+      // 우적센서 활성화 — 온보드 rain_sensor 슬롯이 있을 때만
+      if (dto.rainEnabled !== undefined) {
+        await this.onboardRepo.update(
+          { gatewayId: gw.id, slotType: 'rain_sensor' },
+          { enabled: dto.rainEnabled },
+        );
+      }
+      // 개폐기/팬 동작·대기 — 행 없으면 lazy-seed 후 갱신(updateConfig 가 publishSync,
+      // rainInput 은 방금 갱신한 onboard 최신값으로 재조립됨). version 은 항상 bump.
+      await this.fallbackConfigService.getFullConfig(gw.gatewayId);
+      await this.fallbackConfigService.updateConfig(gw.gatewayId, dutyDto);
+    }
+
+    return this.getZoneDeviceSettings(userId, groupId);
   }
 }
