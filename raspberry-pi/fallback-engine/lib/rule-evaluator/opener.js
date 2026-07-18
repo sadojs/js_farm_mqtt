@@ -19,6 +19,9 @@ const { evaluateHysteresis } = require('./hysteresis');
 
 const OPENER_INTERLOCK_DELAY_MS = 1000;
 const DEFAULT_OPENER_PULSE_SEC = 30;
+// 동일 방향(open/closed) 최대 10분간 동작/대기 반복 후 정지(상태만 유지).
+// 개폐기는 실제 ~3분이면 완전 개/폐 — 무한 반복(모터 혹사) 방지. 온라인 automation-runner 와 동일.
+const OPENER_DUTY_MAX_MS = 10 * 60 * 1000;
 
 // 개폐기 동작 펄스(ms) — 게이트웨이 공통 openerOperationSeconds(동기화) 사용. ON 후 이 시간 뒤
 // gpio-agent가 자동 OFF(대기). 모터 연속통전 방지 + 백엔드 rain-override durationMs와 일치.
@@ -32,9 +35,9 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
-function setOpenerIntent(state, intent, reason, relay, queue, store) {
-  if (state.openerIntent === intent) return false;
-
+// 목표 방향 동작 펄스 1회 — 반대 채널 OFF → 인터록 지연(1초) → 목표 채널 ON(pulseMs 후 gpio-agent 자동 OFF).
+// 열림/닫힘 동시 ON 금지(인터록) 보장.
+function firePulse(intent, reason, relay, store) {
   const openChannels = store.getChannels('opener_open');
   const closeChannels = store.getChannels('opener_close');
   const pulseMs = openerPulseMs(store);
@@ -49,13 +52,42 @@ function setOpenerIntent(state, intent, reason, relay, queue, store) {
       for (const ch of closeChannels) relay.setRelay(ch, true, reason, pulseMs);
     }, OPENER_INTERLOCK_DELAY_MS);
   }
+}
 
+// 같은 의도 유지 중 동작(openerOperationSeconds)/대기(openerStandbySeconds) 주기로 펄스 반복.
+// 각 동작 구간 진입(off→on) 시 새 펄스 재발행. 10분 경과 후에는 정지(상태 유지).
+// 온라인 rain-override.service 의 tickCloseCycles 와 동일 semantics.
+function tickOpenerDuty(state, store, relay) {
+  const duty = state.openerDuty;
+  if (!duty || duty.intent !== state.openerIntent) return;
+  const elapsed = Date.now() - duty.anchorMs;
+  if (elapsed >= OPENER_DUTY_MAX_MS) return; // 10분 초과 → 반복 중단, 상태만 유지
+  const onMs = openerPulseMs(store);
+  const offMs = Math.max(0, Number(store.config().openerStandbySeconds) || 60) * 1000;
+  const cycleMs = onMs + offMs;
+  if (cycleMs <= 0) return;
+  const isOnPhase = (elapsed % cycleMs) < onMs;
+  if (isOnPhase && !duty.lastOnPhase) {
+    firePulse(state.openerIntent, `${duty.reason}-duty`, relay, store); // 새 동작 구간 → 재펄스
+  }
+  duty.lastOnPhase = isOnPhase;
+}
+
+function setOpenerIntent(state, intent, reason, relay, queue, store) {
+  if (state.openerIntent === intent) {
+    tickOpenerDuty(state, store, relay); // 같은 의도 유지 — 동작/대기 주기 반복 처리
+    return false;
+  }
+
+  firePulse(intent, reason, relay, store);
   queue.enqueue({
     eventType: 'rule_fired',
     payload: { rule: 'opener-intent', from: state.openerIntent, to: intent, reason },
     occurredAt: new Date().toISOString(),
   });
   state.openerIntent = intent;
+  // 첫 동작 펄스 발행됨 → 동작/대기 듀티 시작(lastOnPhase=true).
+  state.openerDuty = { intent, reason, anchorMs: Date.now(), lastOnPhase: true };
   return true;
 }
 
