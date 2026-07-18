@@ -5,6 +5,16 @@ import { MqttSensorHandler } from './mqtt-sensor.handler';
 import { MqttDeviceHandler } from './mqtt-device.handler';
 import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { ZigbeeDevice } from './mqtt.types';
+/** 폴백 채널 매핑 엔트리 — 온보드 GPIO(pin) 또는 Zigbee(friendlyName/z2mKey) */
+type ChannelEntry = {
+  channel: string;
+  name: string;
+  type?: 'gpio' | 'zigbee';
+  pin?: number;
+  friendlyName?: string;
+  z2mKey?: string;
+};
+
 type ConfigResponseHandler = (gatewayId: string, payload: Buffer) => void;
 type FallbackModeHandler = (gatewayId: string, payload: Buffer) => void;
 type FallbackEventsHandler = (gatewayId: string, payload: Buffer) => void;
@@ -308,15 +318,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       version: number;
       config: object;
       schedule: object[];
-      // rpi-fallback-channel-sync (v2): 채널-핀 매핑
+      // rpi-fallback-channel-sync: 채널 매핑. gpio(pin) + zigbee(friendlyName/z2mKey) 혼합.
       channelMapping?: {
-        irrigation: Array<{ channel: string; pin: number; name: string }>;
-        fertilizer: Array<{ channel: string; pin: number; name: string }>;
-        fan: Array<{ channel: string; pin: number; name: string }>;
-        opener: {
-          open: Array<{ channel: string; pin: number; name: string }>;
-          close: Array<{ channel: string; pin: number; name: string }>;
-        };
+        irrigation: ChannelEntry[];
+        fertilizer: ChannelEntry[];
+        fan: ChannelEntry[];
+        opener: { open: ChannelEntry[]; close: ChannelEntry[] };
       };
       // 폴백 관수 스케줄(automation 관수룰 → 온보드 GPIO 오프라인 실행용)
       irrigationSchedules?: Array<{

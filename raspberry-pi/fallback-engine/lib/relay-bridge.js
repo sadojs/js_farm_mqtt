@@ -40,6 +40,11 @@ class RelayBridge {
       console.warn(`[RELAY-BRIDGE] 채널 ${channel} 매핑 없음 — drop`);
       return false;
     }
+    // Zigbee 액추에이터: 로컬 z2m 으로 발행 (서버 단절돼도 로컬 zigbee2mqtt+코디네이터는 살아있음)
+    if (mapping.type === 'zigbee') {
+      return this._setZigbee(mapping, state, reason, durationMs);
+    }
+    // 온보드 GPIO (기본)
     const topic = `farm/${this.gatewayId}/gpio/relay`;
     const payload = JSON.stringify({
       slot: mapping.channel,
@@ -57,6 +62,28 @@ class RelayBridge {
       if (err) console.error(`[RELAY-BRIDGE] publish 실패: ${err.message}`);
       else console.log(`[RELAY-BRIDGE] slot=${mapping.channel} pin=${mapping.pin} → ${state ? 'ON' : 'OFF'} (${reason})`);
     });
+    return true;
+  }
+
+  /**
+   * Zigbee 액추에이터 발행 — farm/{gw}/z2m/{friendlyName}/set 로 {z2mKey: ON/OFF}.
+   * friendlyName/z2mKey(state_lN 사전변환 포함)는 서버 sync 시 채널맵에 실려온다(온라인 publishDeviceSwitch 미러).
+   * z2m 은 gpio-agent 의 durationMs 자동 OFF 가 없으므로, 펄스(state=ON+durationMs)면 Pi 가 OFF 를 예약(개폐기 모터 보호 복제).
+   */
+  _setZigbee(mapping, state, reason, durationMs) {
+    const topic = `farm/${this.gatewayId}/z2m/${mapping.friendlyName}/set`;
+    const key = mapping.z2mKey || 'state';
+    this.client.publish(topic, JSON.stringify({ [key]: state ? 'ON' : 'OFF' }), { qos: 1 }, (err) => {
+      if (err) console.error(`[RELAY-BRIDGE] z2m publish 실패: ${err.message}`);
+      else console.log(`[RELAY-BRIDGE] z2m ${mapping.friendlyName}.${key} → ${state ? 'ON' : 'OFF'} (${reason})`);
+    });
+    if (durationMs && durationMs > 0 && state) {
+      setTimeout(() => {
+        if (this.client?.connected) {
+          this.client.publish(topic, JSON.stringify({ [key]: 'OFF' }), { qos: 1 });
+        }
+      }, durationMs);
+    }
     return true;
   }
 }

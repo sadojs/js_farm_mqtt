@@ -449,17 +449,13 @@ export class FallbackConfigService implements OnModuleInit {
         (Array.isArray(a.targetDeviceIds) ? a.targetDeviceIds[0] : null);
       if (!targetDeviceId) continue;
 
-      // 대상 장치가 이 게이트웨이 소속 + 온보드 소스여야 폴백 실행 가능
+      // 대상 장치가 이 게이트웨이 소속이면 실행 가능(온보드 GPIO + Zigbee 모두).
+      // 실제 채널 존재 여부는 아래 zone→slotKey + irrigationChannels 필터로 검증(zigbee zone_N 도 포함됨).
       const device = await this.deviceRepo.findOne({
         where: { id: targetDeviceId },
         select: ['id', 'gatewayId', 'source'],
       });
-      if (
-        !device ||
-        device.gatewayId !== gateway.id ||
-        device.source !== 'onboard'
-      )
-        continue;
+      if (!device || device.gatewayId !== gateway.id) continue;
 
       // zone 번호 → slotKey 변환 + 채널 존재 필터
       const zones = (Array.isArray(c.zones) ? c.zones : [])
@@ -538,7 +534,7 @@ export class FallbackConfigService implements OnModuleInit {
         skippedNoPin++;
         continue;
       }
-      const entry = { channel: s.slotKey, pin: s.gpioPin, name: s.name };
+      const entry: any = { channel: s.slotKey, type: 'gpio', pin: s.gpioPin, name: s.name };
       switch (s.slotType) {
         case 'irrigation_zone':
         case 'irrigation_group':
@@ -578,7 +574,121 @@ export class FallbackConfigService implements OnModuleInit {
         `channelMapping(${gatewayId}): 미지원 slot_type 슬롯 ${skippedType}개 제외`,
       );
     }
+
+    // Zigbee 액추에이터도 채널맵에 추가(폴백에서 로컬 z2m 으로 제어). 온보드와 동일 버킷.
+    await this.addZigbeeChannels(gateway.id, result);
     return result;
+  }
+
+  /** switch_N → state_lN (TS0601 만). 온라인 translateSwitchKeyForZ2m 미러 — 서버에서 사전변환. */
+  private z2mKeyFor(switchCode: string, zigbeeModel?: string | null): string {
+    if (zigbeeModel && zigbeeModel.toLowerCase().includes('ts0601')) {
+      const m = /^switch_(\d+)$/.exec(switchCode);
+      if (m) return `state_l${m[1]}`;
+    }
+    return switchCode;
+  }
+
+  /**
+   * 게이트웨이의 Zigbee 액추에이터를 채널맵에 추가(type:'zigbee', friendlyName, z2mKey).
+   * - irrigation(단일 다스위치): channelMapping(functionKey→switchCode), disabledChannels 제외, remote_control 제외.
+   *   zone_*→irrigation, mixer/fertilizer_motor/fertilizer_b_contact→fertilizer.
+   * - fan/opener_open/opener_close(컨트롤러 child or 단독): friendlyName/model 은 parent 우선, switchCode=channelCode??'state'.
+   * 채널 key 충돌(온보드와 동일 key)은 온보드 우선(GPIO 가 더 견고) — Zigbee 는 스킵.
+   */
+  private async addZigbeeChannels(
+    gatewayUuid: string,
+    result: any,
+  ): Promise<void> {
+    const devices = await this.deviceRepo.find({
+      where: {
+        gatewayId: gatewayUuid,
+        source: 'zigbee',
+        deviceType: 'actuator',
+        enabled: true,
+      },
+    });
+    if (!devices.length) return;
+
+    const seen = new Set<string>(
+      [
+        ...result.irrigation,
+        ...result.fertilizer,
+        ...result.fan,
+        ...result.opener.open,
+        ...result.opener.close,
+      ].map((e: any) => e.channel),
+    );
+    const parentCache = new Map<string, any>();
+
+    for (const d of devices) {
+      if (d.equipmentType === 'controller') continue; // parent shell — 직접 제어 대상 아님
+
+      if (d.equipmentType === 'irrigation') {
+        const mapping = d.channelMapping || {};
+        const disabled = new Set(
+          (d.deviceSettings?.disabledChannels as string[]) ?? [],
+        );
+        for (const [fnKey, switchCode] of Object.entries(mapping)) {
+          if (fnKey === 'remote_control' || disabled.has(fnKey)) continue;
+          const cat = fnKey.startsWith('zone_')
+            ? 'irrigation'
+            : fnKey === 'mixer' ||
+                fnKey === 'fertilizer_motor' ||
+                fnKey === 'fertilizer_b_contact'
+              ? 'fertilizer'
+              : null;
+          if (!cat || seen.has(fnKey)) continue;
+          result[cat].push({
+            channel: fnKey,
+            type: 'zigbee',
+            friendlyName: d.friendlyName,
+            z2mKey: this.z2mKeyFor(switchCode as string, d.zigbeeModel),
+            name: d.name,
+          });
+          seen.add(fnKey);
+        }
+        continue;
+      }
+
+      if (
+        d.equipmentType === 'fan' ||
+        d.equipmentType === 'opener_open' ||
+        d.equipmentType === 'opener_close'
+      ) {
+        let friendlyName = d.friendlyName;
+        let model = d.zigbeeModel;
+        if (d.parentDeviceId) {
+          let parent = parentCache.get(d.parentDeviceId);
+          if (!parent) {
+            parent = await this.deviceRepo.findOne({
+              where: { id: d.parentDeviceId },
+              select: ['id', 'friendlyName', 'zigbeeModel'],
+            });
+            parentCache.set(d.parentDeviceId, parent);
+          }
+          if (parent) {
+            friendlyName = parent.friendlyName;
+            model = parent.zigbeeModel;
+          }
+        }
+        const switchCode = d.channelCode ?? 'state';
+        // 채널 key 는 장치별 고유(여러 zigbee 팬/개폐기 구분). 온보드 fan_1/vent_* 와 충돌 없음.
+        const channel = `zb_${d.id}`;
+        if (seen.has(channel)) continue;
+        const entry = {
+          channel,
+          type: 'zigbee',
+          friendlyName,
+          z2mKey: this.z2mKeyFor(switchCode, model),
+          name: d.name,
+        };
+        if (d.equipmentType === 'fan') result.fan.push(entry);
+        else if (d.equipmentType === 'opener_open') result.opener.open.push(entry);
+        else result.opener.close.push(entry);
+        seen.add(channel);
+      }
+    }
   }
 
   /**
