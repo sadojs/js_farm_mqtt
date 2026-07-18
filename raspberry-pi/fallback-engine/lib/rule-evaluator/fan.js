@@ -28,12 +28,16 @@ function evaluate({ cfg, store, state, relay, queue }) {
   const reading = triggerType === 'humidity' ? state.lastHumidity : state.lastTemperature;
   if (typeof reading !== 'number') return;
 
-  // 릴레이 실제 ON/OFF 를 상태 변화 시에만 발행.
+  // 릴레이 실제 ON/OFF 를 상태 변화 시에만 발행. 전달(publish) 성공한 경우에만 상태 커밋 →
+  // 브로커 순간 단절 시 상태 미갱신 → 다음 eval tick에서 동일 target 재판정으로 자연 재시도.
   const applyRelay = (on) => {
     if (on === state.fanState) return;
+    let allOk = true;
     for (const ch of channels) {
-      relay.setRelay(ch, on, `fallback-fan-${on ? 'on' : 'off'}-${triggerType[0].toUpperCase()}${reading}`);
+      const ok = relay.setRelay(ch, on, `fallback-fan-${on ? 'on' : 'off'}-${triggerType[0].toUpperCase()}${reading}`);
+      if (!ok) allOk = false;
     }
+    if (!allOk) return; // 전달 실패 — 커밋 보류(다음 tick 재시도)
     queue.enqueue({
       eventType: 'rule_fired',
       payload: { rule: 'fan-toggle', from: state.fanState, to: on, triggerType, value: reading, channels },

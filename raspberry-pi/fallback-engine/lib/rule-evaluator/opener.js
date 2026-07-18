@@ -37,9 +37,14 @@ function timeToMinutes(hhmm) {
 
 // 목표 방향 동작 펄스 1회 — 반대 채널 OFF → 인터록 지연(1초) → 목표 채널 ON(pulseMs 후 gpio-agent 자동 OFF).
 // 열림/닫힘 동시 ON 금지(인터록) 보장.
+// 반환: 발행 시도됨(true) / 보류(false). 브로커 미연결·목표채널 매핑 없음이면 false →
+// 호출부가 의도를 커밋하지 않아 다음 eval tick에서 재시도. 지연 ON 전에 사전 판단.
 function firePulse(intent, reason, relay, store) {
+  if (typeof relay.ready === 'function' && !relay.ready()) return false; // 브로커 미연결 — 보류
   const openChannels = store.getChannels('opener_open');
   const closeChannels = store.getChannels('opener_close');
+  const targetChannels = intent === 'open' ? openChannels : closeChannels;
+  if (targetChannels.length === 0) return false;
   const pulseMs = openerPulseMs(store);
   if (intent === 'open') {
     for (const ch of closeChannels) relay.setRelay(ch, false, reason);
@@ -52,6 +57,7 @@ function firePulse(intent, reason, relay, store) {
       for (const ch of closeChannels) relay.setRelay(ch, true, reason, pulseMs);
     }, OPENER_INTERLOCK_DELAY_MS);
   }
+  return true;
 }
 
 // 같은 의도 유지 중 동작(openerOperationSeconds)/대기(openerStandbySeconds) 주기로 펄스 반복.
@@ -79,7 +85,8 @@ function setOpenerIntent(state, intent, reason, relay, queue, store) {
     return false;
   }
 
-  firePulse(intent, reason, relay, store);
+  // 전달 보류(브로커 미연결 등)면 의도 커밋하지 않음 → 다음 tick 재시도.
+  if (!firePulse(intent, reason, relay, store)) return false;
   queue.enqueue({
     eventType: 'rule_fired',
     payload: { rule: 'opener-intent', from: state.openerIntent, to: intent, reason },

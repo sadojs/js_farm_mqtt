@@ -20,7 +20,9 @@ function evaluate({ cfg, store, state, now, relay, queue }) {
     if (!cur?.state || !cur.onSince) continue;
     const elapsed = now.getTime() - cur.onSince.getTime();
     if (elapsed >= maxMs) {
-      relay.setRelay(ch, false, `fallback-irrigation-timeout-${cfg.irrigationMaxRuntimeMinutes}min`);
+      // OFF 발행 성공 시에만 상태 커밋 — 실패 시 다음 tick 재시도(안전상 반드시 꺼져야 함).
+      const ok = relay.setRelay(ch, false, `fallback-irrigation-timeout-${cfg.irrigationMaxRuntimeMinutes}min`);
+      if (!ok) continue;
       queue.enqueue({
         eventType: 'rule_fired',
         payload: {

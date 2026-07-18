@@ -21,15 +21,24 @@ class RelayBridge {
     this.store = store;
   }
 
+  /** 브로커 연결 여부 — 룰 평가기가 발행 가능 시점을 사전 판단(개폐기 지연 펄스 등). */
+  ready() {
+    return !!this.client?.connected;
+  }
+
+  /**
+   * 릴레이 명령 발행. 반환값: 발행 시도됨(true) / drop됨(false).
+   * false 면 호출부는 in-memory 상태를 커밋하지 말 것 → 다음 eval tick에서 자연 재시도.
+   */
   setRelay(channel, state, reason, durationMs) {
     if (!this.client?.connected) {
       console.warn(`[RELAY-BRIDGE] MQTT 미연결 — ${channel}=${state ? 'ON' : 'OFF'} drop`);
-      return;
+      return false;
     }
     const mapping = this.store.findMapping(channel);
     if (!mapping) {
       console.warn(`[RELAY-BRIDGE] 채널 ${channel} 매핑 없음 — drop`);
-      return;
+      return false;
     }
     const topic = `farm/${this.gatewayId}/gpio/relay`;
     const payload = JSON.stringify({
@@ -48,6 +57,7 @@ class RelayBridge {
       if (err) console.error(`[RELAY-BRIDGE] publish 실패: ${err.message}`);
       else console.log(`[RELAY-BRIDGE] slot=${mapping.channel} pin=${mapping.pin} → ${state ? 'ON' : 'OFF'} (${reason})`);
     });
+    return true;
   }
 }
 

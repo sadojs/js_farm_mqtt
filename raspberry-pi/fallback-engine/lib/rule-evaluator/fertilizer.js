@@ -12,7 +12,9 @@ function evaluate({ cfg, store, state, relay, queue }) {
   for (const ch of channels) {
     const cur = state.channels[ch];
     if (cur?.state) {
-      relay.setRelay(ch, false, 'fallback-fertilizer-off');
+      // OFF 발행 성공 시에만 상태 커밋 — 실패 시 다음 tick 재시도(안전상 반드시 꺼져야 함).
+      const ok = relay.setRelay(ch, false, 'fallback-fertilizer-off');
+      if (!ok) continue;
       queue.enqueue({
         eventType: 'rule_fired',
         payload: { rule: 'fertilizer-off', channel: ch },
