@@ -318,6 +318,20 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           close: Array<{ channel: string; pin: number; name: string }>;
         };
       };
+      // 폴백 관수 스케줄(automation 관수룰 → 온보드 GPIO 오프라인 실행용)
+      irrigationSchedules?: Array<{
+        ruleId: string;
+        startTime: string;
+        days: number[];
+        zones: Array<{ channel: string; durationMin: number; waitMin: number }>;
+        mixer: { enabled: boolean; channel: string } | null;
+        fertilizer: {
+          enabled: boolean;
+          channel: string;
+          durationMin: number;
+          preStopWaitMin: number;
+        } | null;
+      }>;
     },
   ): Promise<void> {
     const topic = `farm/${gatewayId}/fallback/rules/sync`;

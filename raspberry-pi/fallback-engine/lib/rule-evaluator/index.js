@@ -7,6 +7,7 @@
 
 const opener = require('./opener');
 const irrigation = require('./irrigation');
+const irrigationSchedule = require('./irrigation-schedule');
 const fertilizer = require('./fertilizer');
 const fan = require('./fan');
 const { SensorWatchdog } = require('../sensor-watchdog');
@@ -133,9 +134,15 @@ class RuleEvaluator {
       sensorWatchdog: this.sensorWatchdog,
     };
     fertilizer.evaluate(args);
-    irrigation.evaluate(args);
+    irrigation.evaluate(args);        // 안전망: 최대런타임 초과 구역 OFF
+    irrigationSchedule.evaluate(args); // 폴백 관수 스케줄 실행(요일+시각 발화)
     fan.evaluate(args);
     opener.evaluate(args);
+  }
+
+  /** 폴백 이탈(온라인 복귀) 시 — 예약된 폴백 관수 타이머 취소(온라인 스케줄러 인계). */
+  onExitFallback() {
+    irrigationSchedule.cancelAll(this.state);
   }
 }
 

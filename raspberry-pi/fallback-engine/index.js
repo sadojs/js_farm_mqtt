@@ -241,7 +241,10 @@ function startEvaluationLoop() {
           occurredAt: new Date().toISOString(),
         });
         publishMode();
-        if (fsm.mode === 'online') flushQueue();
+        if (fsm.mode === 'online') {
+          flushQueue();
+          evaluator.onExitFallback(); // 폴백 관수 예약 타이머 취소 → 온라인 스케줄러 인계
+        }
 
         // rpi-fallback-channel-sync: 폴백 진입 시 채널 매핑이 없으면 안전망 발행
         if (fsm.mode === 'fallback' && !store.channelMapping()) {

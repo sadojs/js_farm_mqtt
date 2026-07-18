@@ -45,6 +45,10 @@ const DEFAULT_RULES = {
     rainInput: { enabled: false, pin: 21, activeLow: true, friendlyName: 'rain_sensor' },
   },
   channelMapping: null,
+  // 폴백 중 실행할 관수 스케줄(서버 automation 관수룰에서 동기화). 온보드 GPIO 관수만.
+  // 형식: [{ ruleId, startTime:'HH:MM', days:[0-6], zones:[{channel,durationMin,waitMin}],
+  //          mixer:{enabled}, fertilizer:{enabled,durationMin,preStopWaitMin} }]
+  irrigationSchedules: [],
   schedule: [
     { month: 1, enabled: false, mode: 'time', openTime: null, closeTime: null },
     { month: 2, enabled: false, mode: 'time', openTime: null, closeTime: null },
@@ -95,6 +99,9 @@ class RuleStore {
       schedule: Array.isArray(payload.schedule) && payload.schedule.length
         ? payload.schedule
         : DEFAULT_RULES.schedule,
+      irrigationSchedules: Array.isArray(payload.irrigationSchedules)
+        ? payload.irrigationSchedules
+        : [],
     };
     this.persist();
   }
@@ -118,6 +125,11 @@ class RuleStore {
 
   scheduleFor(month) {
     return this.schedule().find((s) => s.month === month) || null;
+  }
+
+  /** 폴백 관수 스케줄 배열 (없으면 []). */
+  irrigationSchedules() {
+    return this.cache?.irrigationSchedules ?? [];
   }
 
   version() {

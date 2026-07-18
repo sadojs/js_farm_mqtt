@@ -11,6 +11,8 @@ import { HeartbeatService } from './heartbeat.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { Device } from '../devices/entities/device.entity';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
       FallbackGatewayStatus,
       Gateway,
       GatewayOnboardDevice,
+      AutomationRule,
+      Device,
     ]),
     forwardRef(() => MqttModule),
     GatewayModule,

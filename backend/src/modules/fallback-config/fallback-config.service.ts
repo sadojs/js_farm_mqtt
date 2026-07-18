@@ -24,6 +24,8 @@ import { MqttService } from '../mqtt/mqtt.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { Device } from '../devices/entities/device.entity';
 
 @Injectable()
 export class FallbackConfigService implements OnModuleInit {
@@ -42,6 +44,10 @@ export class FallbackConfigService implements OnModuleInit {
     private readonly onboardRepo: Repository<GatewayOnboardDevice>,
     @InjectRepository(Gateway)
     private readonly gatewayRepo: Repository<Gateway>,
+    @InjectRepository(AutomationRule)
+    private readonly automationRuleRepo: Repository<AutomationRule>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
     private readonly mqtt: MqttService,
     private readonly events: EventsGateway,
   ) {}
@@ -355,6 +361,10 @@ export class FallbackConfigService implements OnModuleInit {
     const { config, schedule } = await this.getFullConfig(gatewayId);
     const channelMapping = await this.buildChannelMapping(gatewayId);
     const rainInput = await this.buildRainInput(gatewayId);
+    const irrigationSchedules = await this.buildIrrigationSchedules(
+      gatewayId,
+      channelMapping,
+    );
     await this.mqtt.publishFallbackRulesSync(gatewayId, {
       version: config.version,
       config: {
@@ -388,6 +398,7 @@ export class FallbackConfigService implements OnModuleInit {
         closeTime: s.closeTime,
       })),
       channelMapping,
+      irrigationSchedules,
     });
   }
 
@@ -395,6 +406,114 @@ export class FallbackConfigService implements OnModuleInit {
    * rpi-fallback-channel-sync: gateway_onboard_devices 테이블에서 슬롯 정보 빌드.
    * gpio_pin이 NULL인 슬롯, enabled=false 슬롯, 미지원 slot_type은 제외.
    */
+  /**
+   * 폴백 관수 스케줄 조립 — 서버 automation 관수룰(conditions.type='irrigation')을
+   * Pi 오프라인 실행용으로 변환. 온보드 GPIO 관수룰만(Zigbee 컨트롤러는 폴백 채널맵에
+   * 없어 실행 불가하므로 제외). zone 번호→onboard slotKey(zone_N) 변환 후
+   * channelMapping 에 실제 존재하는 채널만 포함(미활성/미매핑 필터).
+   */
+  private async buildIrrigationSchedules(
+    gatewayId: string,
+    channelMapping: {
+      irrigation: Array<{ channel: string }>;
+      fertilizer: Array<{ channel: string }>;
+    },
+  ): Promise<any[]> {
+    const gateway = await this.gatewayRepo.findOne({
+      where: { gatewayId },
+      select: ['id'],
+    });
+    if (!gateway) return [];
+
+    const irrigationChannels = new Set(
+      channelMapping.irrigation.map((e) => e.channel),
+    );
+    const fertilizerChannels = new Set(
+      channelMapping.fertilizer.map((e) => e.channel),
+    );
+    if (irrigationChannels.size === 0) return [];
+
+    const rules = await this.automationRuleRepo
+      .createQueryBuilder('r')
+      .where('r.enabled = true')
+      .andWhere("r.conditions->>'type' = :t", { t: 'irrigation' })
+      .getMany();
+    if (!rules.length) return [];
+
+    const out: any[] = [];
+    for (const rule of rules) {
+      const c = rule.conditions || {};
+      const a = rule.actions || {};
+      const targetDeviceId =
+        a.targetDeviceId ||
+        (Array.isArray(a.targetDeviceIds) ? a.targetDeviceIds[0] : null);
+      if (!targetDeviceId) continue;
+
+      // 대상 장치가 이 게이트웨이 소속 + 온보드 소스여야 폴백 실행 가능
+      const device = await this.deviceRepo.findOne({
+        where: { id: targetDeviceId },
+        select: ['id', 'gatewayId', 'source'],
+      });
+      if (
+        !device ||
+        device.gatewayId !== gateway.id ||
+        device.source !== 'onboard'
+      )
+        continue;
+
+      // zone 번호 → slotKey 변환 + 채널 존재 필터
+      const zones = (Array.isArray(c.zones) ? c.zones : [])
+        .filter((z: any) => z && z.enabled && z.duration > 0)
+        .sort((x: any, y: any) => (x.zone || 0) - (y.zone || 0))
+        .map((z: any) => ({
+          channel: `zone_${z.zone}`,
+          durationMin: z.duration,
+          waitMin: z.waitTime || 0,
+        }))
+        .filter((z: any) => irrigationChannels.has(z.channel));
+      if (!zones.length) continue;
+
+      const mixer =
+        c.mixer && c.mixer.enabled && fertilizerChannels.has('mixer')
+          ? { enabled: true, channel: 'mixer' }
+          : null;
+      const fertilizer =
+        c.fertilizer &&
+        c.fertilizer.enabled &&
+        c.fertilizer.duration > 0 &&
+        fertilizerChannels.has('fertilizer_motor')
+          ? {
+              enabled: true,
+              channel: 'fertilizer_motor',
+              durationMin: c.fertilizer.duration,
+              preStopWaitMin: c.fertilizer.preStopWait || 0,
+            }
+          : null;
+
+      // 스케줄 정규화: schedules[] 우선, 없으면 legacy startTime/schedule
+      const schedules =
+        Array.isArray(c.schedules) && c.schedules.length
+          ? c.schedules
+          : c.startTime
+            ? [{ startTime: c.startTime, days: c.schedule?.days || [] }]
+            : [];
+
+      for (const s of schedules) {
+        if (!s || !s.startTime || !Array.isArray(s.days) || !s.days.length)
+          continue;
+        out.push({
+          ruleId: rule.id,
+          startTime: s.startTime,
+          days: s.days,
+          zones,
+          mixer,
+          fertilizer,
+        });
+      }
+    }
+    return out;
+  }
+
   private async buildChannelMapping(gatewayId: string) {
     // gateway_id (VARCHAR) → gateways.id (UUID) 변환 (onboard 테이블이 UUID FK)
     const gateway = await this.gatewayRepo.findOne({
