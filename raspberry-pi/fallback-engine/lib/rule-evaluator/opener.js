@@ -73,7 +73,7 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
 
   // 2) primary: 온습도 제어 (온습도계 정상일 때) — 유동팬과 동일 히스테리시스
   const triggerType = cfg.openerTriggerType === 'humidity' ? 'humidity' : 'temperature';
-  const timeoutMs = (cfg.sensorTimeoutSeconds || 600) * 1000;
+  const timeoutMs = (cfg.sensorTimeoutSeconds || 1200) * 1000;
   if (sensorWatchdog && sensorWatchdog.isFresh(triggerType, state, timeoutMs, now.getTime())) {
     const reading = triggerType === 'humidity' ? state.lastHumidity : state.lastTemperature;
     const currentlyOpen = state.openerIntent === 'open';

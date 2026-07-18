@@ -67,11 +67,16 @@ class RuleEvaluator {
 
   applyRainOverride(active) {
     this.state.rainActive = !!active;
+    const cfg = this.store.config();
+    // 설정에서 '우적 강제닫힘'(openerRainOverride)이 꺼져 있으면 비 감지가 개폐기에 영향 없음.
+    // (default true — 미설정/true 는 기존 동작 유지)
+    const enabled = cfg.openerRainOverride !== false;
     this.queue.enqueue({
       eventType: 'rule_fired',
-      payload: { rule: 'rain-override', active },
+      payload: { rule: 'rain-override', active, enabled },
       occurredAt: new Date().toISOString(),
     });
+    if (!enabled) return; // 강제닫힘 비활성 — 개폐기 상태 건드리지 않음
     if (this.state.rainActive) {
       opener.forceClose(this.state, this.store, this.relay, this.queue, 'rain-override-active');
     } else {
