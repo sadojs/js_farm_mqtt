@@ -88,7 +88,7 @@ const presets = [
   { min: 180, label: '3시간' },
 ]
 const hourOptions = Array.from({ length: 13 }, (_, n) => n) // 0~12
-const minuteOptions = Array.from({ length: 12 }, (_, n) => n * 5) // 0,5,...,55
+const minuteOptions = Array.from({ length: 60 }, (_, n) => n) // 0~59 (1분 단위)
 
 const direction = ref<'open' | 'close' | null>(null)
 const hour = ref(1)

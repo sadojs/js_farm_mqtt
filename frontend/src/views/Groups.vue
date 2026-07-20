@@ -265,9 +265,11 @@
               </div>
               <!-- 관수 장치 카드 -->
               <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id, 'timer-active': !!irrigationTimerSummary(device) }]"
                 :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'">
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'"
+                @pointerdown="onIrrigationTimerPress(device, isGroupEditing(group.id))"
+                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
@@ -303,13 +305,13 @@
                   </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
                   <span class="type-tag actuator type-tag-irrigation">관주</span>
-                  <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationStatusModal(device)" title="채널별 타이머 — 상태창에서 관리">
+                  <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationTimerModal(device)" title="채널별 타이머 관리">
                     <span class="timer-dot"></span>{{ irrigationTimerSummary(device)!.count }}채널 · {{ formatCountdown(irrigationTimerSummary(device)!.until) }}
                   </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
                   <span class="control-label">원격제어</span>
-                  <label class="toggle-switch" @click.prevent="device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
+                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
                     <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
@@ -476,7 +478,6 @@
       :visible="showIrrigationStatusModal"
       :device="irrigationStatusDevice"
       @close="showIrrigationStatusModal = false"
-      @changed="deviceStore.fetchDevices()"
     />
 
     <!-- 임시 타이머 시트 (팬·개폐기) -->
@@ -488,6 +489,13 @@
       :submitting="timerSubmitting"
       @close="timerSheetOpen = false"
       @start="onTimerStart"
+    />
+
+    <!-- 관수 채널별 타이머 모달 (길게누름) -->
+    <IrrigationTimerModal
+      :visible="irrigationTimerModalOpen"
+      :device-id="irrigationTimerDeviceId"
+      @close="irrigationTimerModalOpen = false"
     />
 
     <!-- 자동화 편집 모달 -->
@@ -575,6 +583,7 @@ import { useAuthStore } from '../stores/auth.store'
 import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
+import IrrigationTimerModal from '@/components/devices/IrrigationTimerModal.vue'
 import DeviceTimerSheet from '@/components/devices/DeviceTimerSheet.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
@@ -944,7 +953,8 @@ const getGroupActuators = (group: HouseGroup): Device[] => {
     .filter(d => d.deviceType === 'actuator' && !openerIds.has(d.id) && d.equipmentType !== 'irrigation')
     .map(d => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
-      return storeDevice ? { ...d, switchState: storeDevice.switchState, online: storeDevice.online } : d
+      // 전체 스프레드 — switchState/online 뿐 아니라 overrideUntil/userOverride 등 타이머 필드도 반영
+      return storeDevice ? { ...d, ...storeDevice } : d
     })
     .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 }
@@ -1346,6 +1356,23 @@ function onTimerPress(kind: TimerKind, device: Device, editing: boolean) {
 function consumeLongPress(): boolean {
   if (timerLongPressed.value) { timerLongPressed.value = false; return true }
   return false
+}
+
+// 관수 카드 길게누름 → 채널별 타이머 모달
+const irrigationTimerModalOpen = ref(false)
+const irrigationTimerDeviceId = ref<string | null>(null)
+function onIrrigationTimerPress(device: Device, editing: boolean) {
+  if (editing || !device.online) return
+  clearTimerPress()
+  timerLongPressed.value = false
+  timerPressTimer = setTimeout(() => {
+    timerLongPressed.value = true
+    openIrrigationTimerModal(device)
+  }, 500)
+}
+function openIrrigationTimerModal(device: Device) {
+  irrigationTimerDeviceId.value = device.id
+  irrigationTimerModalOpen.value = true
 }
 
 function openTimerSheet(kind: TimerKind, device: Device) {

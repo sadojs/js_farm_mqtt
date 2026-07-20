@@ -281,7 +281,14 @@ export class DevicesService {
   // 설정 시간 동안 강제 상태 유지(자동제어 무시) → 만료 시 자동제어 복귀.
   // 서버 저장(deviceSettings)이라 브라우저를 닫아도 만료·복귀가 보장됨.
   // - 팬/개폐기: 장치 단위 (userOverride=true + overrideUntil). 기존 relay 크론 스킵을 재활용.
-  // - 관수: 채널 단위 (channelOverrides[zone_N]). zone_* 만 허용(원격제어·액비·교반기 제외).
+  // - 관수: 채널 단위 (channelOverrides[key]). 원격제어·액비/교반기(B접점) 제외, 그 외(구역·교반기·액비모터) 허용.
+  //
+  // ⚠️ controlDevice 는 switchState/인터록 결과를 DB에 기록하므로, override 필드는 반드시
+  //    controlDevice 이후 "다시 로드한" 최신 device 에 얹어 저장한다(과거 stale 객체 저장이
+  //    controlDevice 의 기록을 덮어써 인터록·팬·채널이 동작 안 하던 버그).
+
+  /** 관수 채널 타이머 제외 대상 — 원격제어·액비/교반기(B접점) */
+  private static readonly TIMER_EXCLUDED_CHANNELS = new Set(['remote_control', 'fertilizer_b_contact']);
 
   async setDeviceTimer(
     id: string,
@@ -298,11 +305,11 @@ export class DevicesService {
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     const settings: any = device.deviceSettings || {};
 
-    // ── 관수 채널 타이머 (zone_* 만) ──
+    // ── 관수 채널 타이머 (원격제어·액비/교반기 B접점 제외) ──
     if (dto.channelKey) {
       const key = dto.channelKey;
-      if (!key.startsWith('zone_')) {
-        throw new BadRequestException('타이머는 관수 구역(zone_*)만 가능합니다. 원격제어·액비·교반기는 제외됩니다.');
+      if (DevicesService.TIMER_EXCLUDED_CHANNELS.has(key)) {
+        throw new BadRequestException('원격제어·액비/교반기(B접점) 채널은 타이머를 설정할 수 없습니다.');
       }
       const mapping = this.getEffectiveMapping(device);
       const switchCode = mapping[key];
@@ -311,10 +318,12 @@ export class DevicesService {
         throw new BadRequestException('비활성/미매핑 채널입니다.');
       }
       await this.controlDevice(id, userId, [{ code: switchCode, value: true }], role); // 강제 ON
-      settings.channelOverrides = settings.channelOverrides || {};
-      settings.channelOverrides[key] = { until, desiredState: true };
-      device.deviceSettings = settings;
-      await this.devicesRepo.save(device);
+      // controlDevice 이후 최신 상태를 다시 로드해서 override 만 얹는다.
+      const fresh = await this.devicesRepo.findOne({ where: { id } });
+      const fs: any = fresh?.deviceSettings || settings;
+      fs.channelOverrides = fs.channelOverrides || {};
+      fs.channelOverrides[key] = { until, desiredState: true };
+      if (fresh) { fresh.deviceSettings = fs; await this.devicesRepo.save(fresh); }
       return { ok: true, channelKey: key, until };
     }
 
@@ -327,9 +336,10 @@ export class DevicesService {
       const wantOpen = dto.direction === 'open';
       const isThisOpen = device.equipmentType === 'opener_open';
       const targetId = wantOpen === isThisOpen ? device.id : (device.pairedDeviceId || device.id);
-      await this.controlDevice(targetId, userId, [{ code: 'switch_1', value: true }], role); // 인터록은 controlDevice가 처리
+      await this.controlDevice(targetId, userId, [{ code: 'switch_1', value: true }], role); // 인터록(반대편 OFF→1초→ON)은 controlDevice가 처리
+      // 인터록이 DB에 기록한 switchState 를 덮어쓰지 않도록 쌍 모두 최신 상태를 다시 로드해 override 만 얹는다.
       for (const did of [device.id, device.pairedDeviceId].filter(Boolean) as string[]) {
-        const d = did === device.id ? device : await this.devicesRepo.findOne({ where: { id: did } });
+        const d = await this.devicesRepo.findOne({ where: { id: did } });
         if (!d) continue;
         const s: any = d.deviceSettings || {};
         s.userOverride = true; s.overrideUntil = until; s.overrideDirection = dto.direction;
@@ -342,9 +352,10 @@ export class DevicesService {
     // ── 팬 타이머 ──
     const value = dto.value !== false;
     await this.controlDevice(id, userId, [{ code: 'switch_1', value }], role);
-    settings.userOverride = true; settings.overrideUntil = until; settings.overrideValue = value;
-    device.deviceSettings = settings;
-    await this.devicesRepo.save(device);
+    const fresh = await this.devicesRepo.findOne({ where: { id } });
+    const fs: any = fresh?.deviceSettings || settings;
+    fs.userOverride = true; fs.overrideUntil = until; fs.overrideValue = value;
+    if (fresh) { fresh.deviceSettings = fs; await this.devicesRepo.save(fresh); }
     return { ok: true, value, until };
   }
 
