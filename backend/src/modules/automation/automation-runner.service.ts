@@ -765,6 +765,12 @@ export class AutomationRunnerService {
 
     const results: any[] = [];
     for (const device of candidateDevices) {
+      // 수동/타이머 우회 활성 device 는 룰 실행 대상에서 제외(relay 경로와 동일). 만료 시 자동 복귀.
+      if ((device.deviceSettings as any)?.userOverride) {
+        this.logger.log(`[manual-override] ${device.name} 수동/타이머 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
+        results.push({ deviceId: device.id, deviceName: device.name, success: true, skipped: true });
+        continue;
+      }
       this.logger.log(
         `자동 제어 명령 전송: rule=${rule.name}, device=${device.name}(${device.id}), command=${JSON.stringify(commands)}`,
       );

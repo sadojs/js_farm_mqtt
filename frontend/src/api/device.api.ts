@@ -24,6 +24,19 @@ export const deviceApi = {
   control: (id: string, commands: { code: string; value: any }[]) =>
     apiClient.post(`/devices/${id}/control`, { commands }),
 
+  /** 임시 타이머 설정 — 설정 시간 동안 강제 상태 유지, 만료 시 자동제어 복귀.
+   *  팬: {value,durationMinutes} / 개폐기: {direction,durationMinutes} / 관수: {channelKey:'zone_N',durationMinutes} */
+  setTimer: (
+    id: string,
+    body: { channelKey?: string; direction?: 'open' | 'close'; value?: boolean; durationMinutes: number },
+  ) => apiClient.post<{ ok: boolean; until: string; channelKey?: string; direction?: string; value?: boolean }>(
+    `/devices/${id}/timer`, body,
+  ),
+
+  /** 임시 타이머 해제 — 즉시 자동제어 복귀. 관수는 {channelKey}로 채널별 해제. */
+  cancelTimer: (id: string, body?: { channelKey?: string }) =>
+    apiClient.post<{ ok: boolean }>(`/devices/${id}/timer/cancel`, body ?? {}),
+
   getStatus: (id: string) =>
     apiClient.get(`/devices/${id}/status`),
 

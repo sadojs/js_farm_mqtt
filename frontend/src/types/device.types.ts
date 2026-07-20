@@ -137,6 +137,15 @@ export interface Device {
   userOverride?: boolean
   /** 룰이 마지막으로 의도한 상태 (true=ON 유지, null=룰 inactive) — 다음 사용자 토글 판정용 */
   ruleIntendedState?: boolean | null
+  /** 임시 타이머 만료 시각 ISO (팬·개폐기 장치 단위). 만료 시 자동제어 복귀. */
+  overrideUntil?: string | null
+  /** 개폐기 타이머 방향 (open/close) */
+  overrideDirection?: 'open' | 'close' | null
+  /** 팬 타이머 목표 상태 */
+  overrideValue?: boolean | null
+  /** 관수 채널별 타이머 { zone_N: { until, desiredState } } */
+  channelOverrides?: Record<string, { until: string; desiredState: boolean }>
+
   sensorData?: SensorData | null
   /** 구역관리 카드 정렬 순서 (같은 구역+섹션 내). 드래그 정렬로 갱신. */
   displayOrder?: number

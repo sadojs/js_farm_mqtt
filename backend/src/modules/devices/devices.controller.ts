@@ -99,6 +99,27 @@ export class DevicesController {
     return result;
   }
 
+  /** 임시 타이머 설정 — 설정 시간 동안 강제 상태 유지, 만료 시 자동제어 복귀.
+   *  팬: {value,durationMinutes} / 개폐기: {direction,durationMinutes} / 관수: {channelKey:'zone_N',durationMinutes} */
+  @Post(':id/timer')
+  setTimer(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { channelKey?: string; direction?: 'open' | 'close'; value?: boolean; durationMinutes: number },
+  ) {
+    return this.devicesService.setDeviceTimer(id, this.getEffectiveUserId(user), body, user.role);
+  }
+
+  /** 임시 타이머 해제 — 즉시 자동제어 복귀. 관수는 {channelKey} 로 채널별 해제. */
+  @Post(':id/timer/cancel')
+  cancelTimer(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { channelKey?: string },
+  ) {
+    return this.devicesService.cancelDeviceTimer(id, this.getEffectiveUserId(user), body ?? {}, user.role);
+  }
+
   @Patch(':id/name')
   async renameDevice(
     @Param('id') id: string,

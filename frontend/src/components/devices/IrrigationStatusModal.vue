@@ -3,6 +3,9 @@
     <div class="status-modal">
       <div class="status-modal-header">
         <h3>{{ device.name }} - 스위치 상태</h3>
+        <span v-if="timerSummary" class="hdr-timer-badge">
+          <span class="timer-dot"></span>⏱ 타이머 {{ timerSummary.count }}
+        </span>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="status-modal-body">
@@ -10,12 +13,13 @@
         <div class="status-header-row">
           <span class="col-label">구역</span>
           <span class="col-auto">자동화</span>
-          <span class="col-state">상태</span>
+          <span class="col-state">상태 · 타이머</span>
         </div>
         <div
           v-for="fnKey in mappingKeys"
           :key="fnKey"
           class="status-row"
+          :class="{ 'timer-active': isActive(channelUntil(fnKey)) }"
         >
           <span class="status-row-label">{{ FUNCTION_LABELS[fnKey] || fnKey }}</span>
           <span class="status-row-auto">
@@ -26,16 +30,29 @@
             </template>
           </span>
           <div class="status-row-right">
-            <span
-              v-if="device.switchStates?.[mapping[fnKey] ?? ''] && deviceStatus?.isRunning"
-              class="badge-running"
-            >가동중</span>
-            <span
-              class="status-row-value"
-              :class="device.switchStates?.[mapping[fnKey] ?? ''] ? 'on' : 'off'"
-            >
-              {{ device.switchStates?.[mapping[fnKey] ?? ''] ? 'ON' : 'OFF' }}
+            <!-- 타이머 활성: 카운트다운 + 해제 -->
+            <span v-if="isActive(channelUntil(fnKey))" class="timer-badge" @click="cancelChannelTimer(fnKey)" title="타이머 해제 → 자동제어 복귀">
+              <span class="timer-dot"></span>{{ formatCountdown(channelUntil(fnKey)) }}<span class="timer-x">✕</span>
             </span>
+            <template v-else>
+              <span
+                v-if="device.switchStates?.[mapping[fnKey] ?? ''] && deviceStatus?.isRunning"
+                class="badge-running"
+              >가동중</span>
+              <span
+                class="status-row-value"
+                :class="device.switchStates?.[mapping[fnKey] ?? ''] ? 'on' : 'off'"
+              >
+                {{ device.switchStates?.[mapping[fnKey] ?? ''] ? 'ON' : 'OFF' }}
+              </span>
+              <!-- 타이머 설정 (zone_* 만 — 원격제어·액비·교반기 제외) -->
+              <button
+                v-if="isTimerable(fnKey) && device.online"
+                class="btn-timer-sm"
+                :title="`${FUNCTION_LABELS[fnKey] || fnKey} 타이머 설정`"
+                @click="openChannelSheet(fnKey)"
+              >⏱</button>
+            </template>
           </div>
         </div>
       </div>
@@ -57,24 +74,40 @@
         </div>
       </div>
     </div>
+
+    <!-- 채널 타이머 시트 -->
+    <DeviceTimerSheet
+      :visible="channelSheetOpen"
+      :title="channelSheetTitle"
+      subtitle="설정 시간 동안 이 채널만 강제 관수하고, 만료 시 자동제어로 복귀합니다."
+      :submitting="channelSubmitting"
+      @close="channelSheetOpen = false"
+      @start="onChannelTimerStart"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { Device } from '@/types/device.types'
 import { FUNCTION_LABELS } from '@/types/device.types'
 import { useDeviceStore } from '@/stores/device.store'
 import { useAutomationStore } from '@/stores/automation.store'
+import { useNotificationStore } from '@/stores/notification.store'
+import { deviceApi } from '@/api/device.api'
+import { useTimerTick } from '@/composables/useTimerTick'
+import DeviceTimerSheet from './DeviceTimerSheet.vue'
 
 const props = defineProps<{
   visible: boolean
   device: Device | null
 }>()
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; changed: [] }>()
 
 const deviceStore = useDeviceStore()
 const automationStore = useAutomationStore()
+const notify = useNotificationStore()
+const { formatCountdown, isActive } = useTimerTick()
 
 const mapping = computed<Record<string, string | undefined>>(() =>
   props.device ? deviceStore.getEffectiveMapping(props.device) : {}
@@ -100,8 +133,6 @@ const remainingMinutes = computed(() => {
 })
 
 // 자동화 상태 = 환경설정 채널 활성 여부.
-// (각 룰별 zone enabled는 별개로 관리되므로 룰 검사하지 않음 — 단순히 게이트웨이 환경설정의
-//  채널 활성화/비활성화만 반영. 비활성 채널은 mappingKeys 필터에서 이미 제외됨.)
 const zoneAutoMap = computed<Record<string, 'on' | 'off'>>(() => {
   if (!props.device) return {}
   const disabled = new Set<string>((props.device as any).disabledChannels ?? [])
@@ -116,10 +147,67 @@ const zoneAutoMap = computed<Record<string, 'on' | 'off'>>(() => {
 function isZoneOrControl(fnKey: string): boolean {
   return fnKey.startsWith('zone_') || fnKey === 'mixer' || fnKey === 'fertilizer_motor'
 }
+// 타이머 가능 채널 — zone_* 만 (원격제어·액비/교반기·모터 제외)
+function isTimerable(fnKey: string): boolean {
+  return fnKey.startsWith('zone_')
+}
 
-// 자동 제어 설정에서의 해당 구역 ON/OFF 상태
 function getAutoState(fnKey: string): 'on' | 'off' | null {
   return zoneAutoMap.value[fnKey] || null
+}
+
+// ── 채널별 타이머 ──
+function channelUntil(fnKey: string): string | null {
+  const ov = (props.device as any)?.channelOverrides as Record<string, { until: string }> | undefined
+  return ov?.[fnKey]?.until ?? null
+}
+const timerSummary = computed(() => {
+  const ov = (props.device as any)?.channelOverrides as Record<string, { until: string }> | undefined
+  if (!ov) return null
+  const count = Object.keys(ov).filter(k => isActive(ov[k]?.until)).length
+  return count > 0 ? { count } : null
+})
+
+const channelSheetOpen = ref(false)
+const channelSheetKey = ref<string | null>(null)
+const channelSheetTitle = ref('')
+const channelSubmitting = ref(false)
+
+function openChannelSheet(fnKey: string) {
+  channelSheetKey.value = fnKey
+  channelSheetTitle.value = `${FUNCTION_LABELS[fnKey] || fnKey} 타이머`
+  channelSheetOpen.value = true
+}
+
+async function onChannelTimerStart(payload: { durationMinutes: number }) {
+  if (!props.device || !channelSheetKey.value) return
+  channelSubmitting.value = true
+  try {
+    await deviceApi.setTimer(props.device.id, {
+      channelKey: channelSheetKey.value,
+      durationMinutes: payload.durationMinutes,
+    })
+    channelSheetOpen.value = false
+    notify.success('타이머 시작', `${FUNCTION_LABELS[channelSheetKey.value] || channelSheetKey.value} — ${payload.durationMinutes}분`)
+    await deviceStore.fetchDevices()
+    emit('changed')
+  } catch (err: any) {
+    notify.error('타이머 실패', err?.response?.data?.message || '타이머 설정에 실패했습니다')
+  } finally {
+    channelSubmitting.value = false
+  }
+}
+
+async function cancelChannelTimer(fnKey: string) {
+  if (!props.device) return
+  try {
+    await deviceApi.cancelTimer(props.device.id, { channelKey: fnKey })
+    notify.info('타이머 해제', `${FUNCTION_LABELS[fnKey] || fnKey} — 자동제어로 복귀`)
+    await deviceStore.fetchDevices()
+    emit('changed')
+  } catch {
+    notify.error('해제 실패', '타이머 해제에 실패했습니다')
+  }
 }
 
 onMounted(() => {
@@ -142,15 +230,21 @@ onMounted(() => {
   max-height: calc(100vh - 40px); display: flex; flex-direction: column;
 }
 .status-modal-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
   padding: 20px 24px; border-bottom: 1px solid var(--border-color);
 }
-.status-modal-header h3 { font-size: calc(18px * var(--content-scale, 1)); font-weight: 600; margin: 0; }
+.status-modal-header h3 { font-size: calc(18px * var(--content-scale, 1)); font-weight: 600; margin: 0; flex: 1; }
+.hdr-timer-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 800;
+  padding: 3px 9px; border-radius: 999px;
+  background: #ecfeff; color: #0e7490; border: 1px solid #67e8f9; white-space: nowrap;
+}
 .close-btn {
   background: none; border: none; font-size: 20px; color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
 }
-.status-modal-body { padding: 16px 24px 0; }
+.status-modal-body { padding: 16px 24px 0; overflow-y: auto; }
 
 .status-header-row {
   display: flex; align-items: center; padding: 0 0 8px;
@@ -159,16 +253,17 @@ onMounted(() => {
 }
 .col-label { flex: 1; }
 .col-auto { width: 56px; text-align: center; }
-.col-state { width: 100px; text-align: right; }
+.col-state { width: 128px; text-align: right; }
 
 .status-row {
   display: flex; align-items: center;
   padding: 10px 0; border-bottom: 1px solid var(--border-light);
 }
 .status-row:last-child { border-bottom: none; }
+.status-row.timer-active { background: #ecfeff; border-radius: 8px; padding-left: 6px; padding-right: 6px; }
 .status-row-label { flex: 1; font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; color: var(--text-primary); }
 .status-row-auto { width: 56px; text-align: center; }
-.status-row-right { width: 100px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.status-row-right { width: 128px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 .badge-auto {
   display: inline-block; font-size: calc(11px * var(--content-scale, 1)); font-weight: 600;
@@ -184,6 +279,34 @@ onMounted(() => {
 .badge-running {
   font-size: calc(11px * var(--content-scale, 1)); font-weight: 600; padding: 2px 8px;
   border-radius: 4px; background: #e3f2fd; color: #1565c0;
+}
+
+/* 타이머(시안) */
+.btn-timer-sm {
+  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid #dfe3e8; color: #9aa1ab; cursor: pointer;
+  font-size: 13px; transition: all 0.15s;
+}
+.btn-timer-sm:hover { background: #ecfeff; border-color: #06b6d4; color: #0e7490; }
+.timer-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 800;
+  padding: 2px 6px 2px 7px; border-radius: 999px;
+  background: #ecfeff; color: #0e7490; border: 1px solid #67e8f9;
+  white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.timer-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #06b6d4; flex-shrink: 0;
+  animation: timer-blink 1s steps(1) infinite;
+}
+@keyframes timer-blink { 50% { opacity: 0.25; } }
+.timer-x {
+  width: 15px; height: 15px; border-radius: 5px;
+  background: #fff; border: 1px solid #06b6d4; color: #0e7490;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; margin-left: 1px;
 }
 
 .automation-summary {

@@ -269,7 +269,147 @@ export class DevicesService {
       // 수동 우회 정책 — frontend가 배지 표시용으로 사용
       userOverride: !!settings.userOverride,
       ruleIntendedState: settings.ruleIntendedState ?? null,
+      // 임시 타이머(override-until) — frontend 카운트다운/배지용
+      overrideUntil: settings.overrideUntil ?? null,
+      overrideDirection: settings.overrideDirection ?? null,
+      overrideValue: settings.overrideValue ?? null,
+      channelOverrides: settings.channelOverrides ?? {},
     };
+  }
+
+  // ─────────── 임시 타이머 (override-until) ───────────
+  // 설정 시간 동안 강제 상태 유지(자동제어 무시) → 만료 시 자동제어 복귀.
+  // 서버 저장(deviceSettings)이라 브라우저를 닫아도 만료·복귀가 보장됨.
+  // - 팬/개폐기: 장치 단위 (userOverride=true + overrideUntil). 기존 relay 크론 스킵을 재활용.
+  // - 관수: 채널 단위 (channelOverrides[zone_N]). zone_* 만 허용(원격제어·액비·교반기 제외).
+
+  async setDeviceTimer(
+    id: string,
+    userId: string,
+    dto: { channelKey?: string; direction?: 'open' | 'close'; value?: boolean; durationMinutes: number },
+    role?: string,
+  ) {
+    const minutes = Math.round(Number(dto.durationMinutes));
+    if (!minutes || minutes < 1 || minutes > 720) {
+      throw new BadRequestException('타이머 시간은 1~720분이어야 합니다.');
+    }
+    const until = new Date(Date.now() + minutes * 60000).toISOString();
+    const device = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    const settings: any = device.deviceSettings || {};
+
+    // ── 관수 채널 타이머 (zone_* 만) ──
+    if (dto.channelKey) {
+      const key = dto.channelKey;
+      if (!key.startsWith('zone_')) {
+        throw new BadRequestException('타이머는 관수 구역(zone_*)만 가능합니다. 원격제어·액비·교반기는 제외됩니다.');
+      }
+      const mapping = this.getEffectiveMapping(device);
+      const switchCode = mapping[key];
+      const disabled = new Set<string>(settings.disabledChannels ?? []);
+      if (!switchCode || disabled.has(key)) {
+        throw new BadRequestException('비활성/미매핑 채널입니다.');
+      }
+      await this.controlDevice(id, userId, [{ code: switchCode, value: true }], role); // 강제 ON
+      settings.channelOverrides = settings.channelOverrides || {};
+      settings.channelOverrides[key] = { until, desiredState: true };
+      device.deviceSettings = settings;
+      await this.devicesRepo.save(device);
+      return { ok: true, channelKey: key, until };
+    }
+
+    // ── 개폐기 타이머 (방향 필요, 쌍 함께 override) ──
+    const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+    if (isOpener) {
+      if (dto.direction !== 'open' && dto.direction !== 'close') {
+        throw new BadRequestException('개폐기 타이머는 방향(open/close)이 필요합니다.');
+      }
+      const wantOpen = dto.direction === 'open';
+      const isThisOpen = device.equipmentType === 'opener_open';
+      const targetId = wantOpen === isThisOpen ? device.id : (device.pairedDeviceId || device.id);
+      await this.controlDevice(targetId, userId, [{ code: 'switch_1', value: true }], role); // 인터록은 controlDevice가 처리
+      for (const did of [device.id, device.pairedDeviceId].filter(Boolean) as string[]) {
+        const d = did === device.id ? device : await this.devicesRepo.findOne({ where: { id: did } });
+        if (!d) continue;
+        const s: any = d.deviceSettings || {};
+        s.userOverride = true; s.overrideUntil = until; s.overrideDirection = dto.direction;
+        d.deviceSettings = s;
+        await this.devicesRepo.save(d);
+      }
+      return { ok: true, direction: dto.direction, until };
+    }
+
+    // ── 팬 타이머 ──
+    const value = dto.value !== false;
+    await this.controlDevice(id, userId, [{ code: 'switch_1', value }], role);
+    settings.userOverride = true; settings.overrideUntil = until; settings.overrideValue = value;
+    device.deviceSettings = settings;
+    await this.devicesRepo.save(device);
+    return { ok: true, value, until };
+  }
+
+  async cancelDeviceTimer(id: string, userId: string, dto: { channelKey?: string }, role?: string) {
+    const device = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
+    if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
+    const settings: any = device.deviceSettings || {};
+
+    if (dto.channelKey) {
+      const mapping = this.getEffectiveMapping(device);
+      const sc = mapping[dto.channelKey];
+      if (sc) await this.controlDevice(id, userId, [{ code: sc, value: false }], 'admin', 'automation').catch(() => undefined);
+      if (settings.channelOverrides) delete settings.channelOverrides[dto.channelKey];
+      device.deviceSettings = settings;
+      await this.devicesRepo.save(device);
+      return { ok: true };
+    }
+    // 장치 타이머 해제 → override 클리어(자동제어가 다음 tick에 재구동). 개폐기 쌍도 함께.
+    for (const did of [device.id, device.pairedDeviceId].filter(Boolean) as string[]) {
+      const d = did === device.id ? device : await this.devicesRepo.findOne({ where: { id: did } });
+      if (!d) continue;
+      const s: any = d.deviceSettings || {};
+      s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue;
+      d.deviceSettings = s;
+      await this.devicesRepo.save(d);
+    }
+    this.eventEmitter.emit('device.manual.released', { deviceId: device.id });
+    return { ok: true };
+  }
+
+  /** 만료된 타이머 정리(10초 주기) — override 클리어 후 자동제어 복귀, 관수 채널은 OFF. */
+  @Cron('*/10 * * * * *')
+  async clearExpiredTimers() {
+    const now = Date.now();
+    let devices: Device[];
+    try {
+      devices = await this.devicesRepo.find({ where: { deviceType: 'actuator' } });
+    } catch { return; }
+    for (const d of devices) {
+      const s: any = d.deviceSettings;
+      if (!s) continue;
+      let changed = false;
+      if (s.overrideUntil && new Date(s.overrideUntil).getTime() <= now) {
+        s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue;
+        changed = true;
+        this.eventEmitter.emit('device.manual.released', { deviceId: d.id });
+        this.logger.log(`[timer-expire] ${d.name} 타이머 만료 → 자동제어 복귀`);
+      }
+      if (s.channelOverrides && typeof s.channelOverrides === 'object') {
+        const mapping = this.getEffectiveMapping(d);
+        for (const [key, ov] of Object.entries<any>(s.channelOverrides)) {
+          if (ov?.until && new Date(ov.until).getTime() <= now) {
+            const sc = mapping[key];
+            if (sc) await this.controlDevice(d.id, d.userId, [{ code: sc, value: false }], 'admin', 'automation').catch(() => undefined);
+            delete s.channelOverrides[key];
+            changed = true;
+            this.logger.log(`[timer-expire] ${d.name}/${key} 채널 타이머 만료 → OFF·자동제어 복귀`);
+          }
+        }
+      }
+      if (changed) {
+        d.deviceSettings = s;
+        await this.devicesRepo.save(d).catch(() => undefined);
+      }
+    }
   }
 
   async findOneByUser(id: string, userId: string) {

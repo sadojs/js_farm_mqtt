@@ -205,9 +205,11 @@
             <div class="device-sub-grid">
               <!-- 개폐기 그룹 카드 -->
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === og.openDevice.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === og.openDevice.id, 'timer-active': !!openerTimerOf(og) }]"
                 :style="reorderDragStyle(og.openDevice.id)"
-                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'">
+                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'"
+                @pointerdown="onTimerPress('opener', og.openDevice, isGroupEditing(group.id))"
+                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
                 <div class="sub-card-top">
@@ -242,17 +244,20 @@
                     >✎</button>
                   </template>
                   <span class="type-tag actuator type-tag-opener">개폐기</span>
+                  <span v-if="openerTimerOf(og)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(og.openDevice)" title="타이머 해제 → 자동제어 복귀">
+                    <span class="timer-dot"></span>{{ openerTimerOf(og)!.direction === 'open' ? '열기' : '닫기' }} {{ formatCountdown(openerTimerOf(og)!.until) }}<span class="timer-x">✕</span>
+                  </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
                   <span class="control-label">열림</span>
-                  <label class="toggle-switch" @click.prevent="og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
+                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
                     <input type="checkbox" :checked="og.openDevice.online && og.openDevice.switchState === true" :disabled="!og.openDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.closeDevice.online }">
                   <span class="control-label">닫힘</span>
-                  <label class="toggle-switch" @click.prevent="og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
+                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
                     <input type="checkbox" :checked="og.closeDevice.online && og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
@@ -298,6 +303,9 @@
                   </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
                   <span class="type-tag actuator type-tag-irrigation">관주</span>
+                  <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationStatusModal(device)" title="채널별 타이머 — 상태창에서 관리">
+                    <span class="timer-dot"></span>{{ irrigationTimerSummary(device)!.count }}채널 · {{ formatCountdown(irrigationTimerSummary(device)!.until) }}
+                  </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
                   <span class="control-label">원격제어</span>
@@ -316,9 +324,11 @@
               </div>
               <!-- 일반 장치 카드 -->
               <div v-for="device in getGroupActuators(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
+                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id, 'timer-active': isActive(device.overrideUntil) }]"
                 :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'">
+                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'"
+                @pointerdown="onTimerPress('fan', device, isGroupEditing(group.id))"
+                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
                 <div class="sub-card-top">
@@ -353,14 +363,17 @@
                     >✎</button>
                   </template>
                   <span class="type-tag actuator">{{ getEquipmentLabel(device) }}</span>
-                  <span v-if="device.userOverride" class="manual-override-badge"
+                  <span v-if="isActive(device.overrideUntil)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(device)" title="타이머 해제 → 자동제어 복귀">
+                    <span class="timer-dot"></span>{{ formatCountdown(device.overrideUntil) }}<span class="timer-x">✕</span>
+                  </span>
+                  <span v-else-if="device.userOverride" class="manual-override-badge"
                     title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
                     🖐 수동
                   </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
-                  <span class="control-label">{{ !device.online ? '오프라인' : (device.switchState === true ? '가동중' : '정지') }}</span>
-                  <label class="toggle-switch" @click.prevent="device.online && handleControl(device.id, !device.switchState)">
+                  <span class="control-label">{{ !device.online ? '오프라인' : (isActive(device.overrideUntil) ? '타이머 가동중' : device.switchState === true ? '가동중' : '정지') }}</span>
+                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && device.online && handleControl(device.id, !device.switchState)">
                     <input type="checkbox" :checked="device.online && device.switchState === true" :disabled="!device.online || controllingId === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
@@ -463,6 +476,18 @@
       :visible="showIrrigationStatusModal"
       :device="irrigationStatusDevice"
       @close="showIrrigationStatusModal = false"
+      @changed="deviceStore.fetchDevices()"
+    />
+
+    <!-- 임시 타이머 시트 (팬·개폐기) -->
+    <DeviceTimerSheet
+      :visible="timerSheetOpen"
+      :title="timerSheetTitle"
+      :subtitle="timerSheetSub"
+      :show-direction="timerSheetKind === 'opener'"
+      :submitting="timerSubmitting"
+      @close="timerSheetOpen = false"
+      @start="onTimerStart"
     />
 
     <!-- 자동화 편집 모달 -->
@@ -550,6 +575,7 @@ import { useAuthStore } from '../stores/auth.store'
 import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
+import DeviceTimerSheet from '@/components/devices/DeviceTimerSheet.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
@@ -562,6 +588,7 @@ import AutomationEditModal from '@/components/automation/AutomationEditModal.vue
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useReorder } from '../composables/useReorder'
+import { useTimerTick } from '../composables/useTimerTick'
 import { getEquipmentLabel } from '../utils/device-labels'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
@@ -1286,6 +1313,112 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
   }
 }
 
+// ── 임시 타이머 (팬·개폐기 = 장치 단위 / 관수 = 채널 단위) ──
+const { formatCountdown, isActive } = useTimerTick()
+
+type TimerKind = 'fan' | 'opener'
+const timerSheetOpen = ref(false)
+const timerSheetKind = ref<TimerKind>('fan')
+const timerSheetDevice = ref<Device | null>(null)
+const timerSheetTitle = ref('')
+const timerSheetSub = ref('')
+const timerSubmitting = ref(false)
+
+// 길게 누름(0.5s) → 타이머 시트. 짧은 탭은 기존 토글 유지.
+let timerPressTimer: ReturnType<typeof setTimeout> | null = null
+const timerLongPressed = ref(false)
+
+function clearTimerPress() {
+  if (timerPressTimer) { clearTimeout(timerPressTimer); timerPressTimer = null }
+}
+
+function onTimerPress(kind: TimerKind, device: Device, editing: boolean) {
+  if (editing || !device.online) return // 편집(정렬) 모드·오프라인은 제외
+  clearTimerPress()
+  timerLongPressed.value = false
+  timerPressTimer = setTimeout(() => {
+    timerLongPressed.value = true
+    openTimerSheet(kind, device)
+  }, 500)
+}
+
+// 길게 눌러 시트가 열렸으면 뒤따르는 토글 click 1회 무시
+function consumeLongPress(): boolean {
+  if (timerLongPressed.value) { timerLongPressed.value = false; return true }
+  return false
+}
+
+function openTimerSheet(kind: TimerKind, device: Device) {
+  timerSheetKind.value = kind
+  timerSheetDevice.value = device
+  if (kind === 'opener') {
+    timerSheetTitle.value = `${device.openerGroupName || device.name} 타이머`
+    timerSheetSub.value = '설정 시간 동안 방향을 유지하고, 만료 시 자동제어로 복귀합니다.'
+  } else {
+    timerSheetTitle.value = `${device.name} 타이머`
+    timerSheetSub.value = '설정 시간 동안 가동하고, 만료 시 자동제어로 복귀합니다.'
+  }
+  timerSheetOpen.value = true
+}
+
+async function onTimerStart(payload: { durationMinutes: number; direction?: 'open' | 'close' }) {
+  const device = timerSheetDevice.value
+  if (!device) return
+  timerSubmitting.value = true
+  try {
+    await deviceApi.setTimer(device.id, {
+      durationMinutes: payload.durationMinutes,
+      ...(timerSheetKind.value === 'opener' ? { direction: payload.direction } : { value: true }),
+    })
+    timerSheetOpen.value = false
+    notify.success('타이머 시작', `${device.openerGroupName || device.name} — ${Math.floor(payload.durationMinutes / 60) ? Math.floor(payload.durationMinutes / 60) + '시간 ' : ''}${payload.durationMinutes % 60 ? (payload.durationMinutes % 60) + '분' : ''}`.trim())
+    await deviceStore.fetchDevices()
+  } catch (err: any) {
+    notify.error('타이머 실패', err?.response?.data?.message || '타이머 설정에 실패했습니다')
+  } finally {
+    timerSubmitting.value = false
+  }
+}
+
+// 카드의 카운트다운 배지 ✕ — 타이머 해제(자동제어 복귀)
+async function cancelDeviceTimerFromCard(device: Device) {
+  try {
+    await deviceApi.cancelTimer(device.id)
+    notify.info('타이머 해제', `${device.openerGroupName || device.name} — 자동제어로 복귀`)
+    await deviceStore.fetchDevices()
+  } catch {
+    notify.error('해제 실패', '타이머 해제에 실패했습니다')
+  }
+}
+
+// 개폐기 그룹의 활성 타이머(둘 중 아무 device의 override) — 배지 표시용
+function openerTimerOf(og: OpenerGroupInfo): { until: string; direction: 'open' | 'close' } | null {
+  for (const d of [og.openDevice, og.closeDevice]) {
+    const store = deviceStore.devices.find(x => x.id === d.id) as any
+    if (store?.overrideUntil && isActive(store.overrideUntil)) {
+      return { until: store.overrideUntil, direction: store.overrideDirection || (d === og.openDevice ? 'open' : 'close') }
+    }
+  }
+  return null
+}
+
+// 관수 카드 헤더 배지 — 활성 채널 타이머 요약 { count, maxUntil }
+function irrigationTimerSummary(device: Device): { count: number; until: string } | null {
+  const store = deviceStore.devices.find(x => x.id === device.id) as any
+  const ov = store?.channelOverrides as Record<string, { until: string }> | undefined
+  if (!ov) return null
+  let count = 0
+  let soonest = ''
+  for (const key of Object.keys(ov)) {
+    const until = ov[key]?.until
+    if (until && isActive(until)) {
+      count++
+      if (!soonest || new Date(until).getTime() < new Date(soonest).getTime()) soonest = until
+    }
+  }
+  return count > 0 ? { count, until: soonest } : null
+}
+
 // 자동화 룰
 const getGroupRules = (groupId: string): AutomationRule[] =>
   automationStore.rules.filter(r => r.groupId === groupId)
@@ -1979,6 +2112,38 @@ onBeforeUnmount(() => {
   color: #b45309;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* 임시 타이머 (시안) — 자동=초록·수동=주황과 구분 */
+.sub-card.timer-active {
+  background: #ecfeff;
+  border-color: #06b6d4;
+}
+.timer-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 800;
+  padding: 2px 6px 2px 7px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0e7490;
+  border: 1px solid #67e8f9;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.timer-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #06b6d4; flex-shrink: 0;
+  animation: timer-blink 1s steps(1) infinite;
+}
+@keyframes timer-blink { 50% { opacity: 0.25; } }
+.timer-x {
+  width: 15px; height: 15px; border-radius: 5px;
+  background: #fff; border: 1px solid #06b6d4; color: #0e7490;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; margin-left: 1px;
 }
 
 .sub-card-sensor-chips {

@@ -122,6 +122,17 @@ export class IrrigationSchedulerService {
       return;
     }
 
+    // 수동 타이머(채널 override) 활성 존이 있으면 스케줄 실행 스킵(충돌 방지). 만료 후 다음 스케줄부터 정상 동작.
+    const chOv = (device.deviceSettings as any)?.channelOverrides;
+    if (chOv && typeof chOv === 'object') {
+      const nowMs = Date.now();
+      const active = Object.values<any>(chOv).some((o) => o?.until && new Date(o.until).getTime() > nowMs);
+      if (active) {
+        this.logger.log(`관수 스케줄 스킵: 수동 타이머 활성 채널 존재 - ${rule.name}`);
+        return;
+      }
+    }
+
     // 장비 채널 매핑 로드
     const mapping = this.devicesService.getEffectiveMapping(device);
 
