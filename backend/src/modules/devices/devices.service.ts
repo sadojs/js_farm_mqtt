@@ -259,10 +259,21 @@ export class DevicesService {
   /** deviceSettings의 switchState/switchStates/disabledChannels를 최상위로 expose */
   exposeSwitchFields(device: Device): any {
     const settings = (device.deviceSettings as any) || {};
+    let switchStates = settings.switchStates ?? null;
+    // 관수: 액비/교반기 B접점은 원격제어와 페어(물리 GPIO 없는 논리 슬롯) —
+    // 표시/상태를 항상 원격제어에 미러하여 둘이 어긋나 보이는 문제 방지.
+    if (device.equipmentType === 'irrigation' && switchStates) {
+      const mapping = this.getEffectiveMapping(device);
+      const remoteCode = mapping['remote_control'];
+      const bCode = mapping['fertilizer_b_contact'];
+      if (remoteCode && bCode) {
+        switchStates = { ...switchStates, [bCode]: !!switchStates[remoteCode] };
+      }
+    }
     return {
       ...device,
       switchState: settings.switchState ?? null,
-      switchStates: settings.switchStates ?? null,
+      switchStates,
       relayActivePhase: settings.relayActivePhase ?? null,
       disabledChannels: Array.isArray(settings.disabledChannels) ? settings.disabledChannels : [],
       rainOverrideDisabled: !!settings.rainOverrideDisabled,
