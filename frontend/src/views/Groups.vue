@@ -55,41 +55,9 @@
         <div class="group-header">
           <div class="group-title">
             <span v-if="isAdmin && group.ownerName" class="farm-owner-badge">🏠 {{ group.ownerName }}</span>
-            <template v-if="renamingGroupId === group.id">
-              <div class="rename-form">
-                <input
-                  ref="renameGroupInput"
-                  v-model="renameGroupValue"
-                  class="rename-group-input"
-                  maxlength="50"
-                  placeholder="구역명"
-                  @keyup.enter="submitRenameGroup(group)"
-                  @keyup.esc="cancelRenameGroup"
-                />
-                <input
-                  v-model="renameDescValue"
-                  class="rename-desc-input"
-                  maxlength="100"
-                  placeholder="설명 (선택)"
-                  @keyup.enter="submitRenameGroup(group)"
-                  @keyup.esc="cancelRenameGroup"
-                />
-                <div class="rename-actions">
-                  <button class="btn-rename-ok" @mousedown.prevent="submitRenameGroup(group)">저장</button>
-                  <button class="btn-rename-cancel" @mousedown.prevent="cancelRenameGroup">취소</button>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <h3>{{ group.name }}</h3>
-              <button
-                v-if="!isFarmUser"
-                class="btn-rename-group"
-                @click="startRenameGroup(group.id, group.name, group.description)"
-                title="이름/설명 변경"
-              >✎</button>
-            </template>
-            <p v-if="group.description && renamingGroupId !== group.id" class="group-desc">{{ group.description }}</p>
+            <!-- 구역 이름/설명 변경은 환경설정(⚙) 안으로 이동됨 -->
+            <h3>{{ group.name }}</h3>
+            <p v-if="group.description" class="group-desc">{{ group.description }}</p>
           </div>
           <div class="group-header-actions">
             <button
@@ -640,37 +608,7 @@ const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
 
 // 구역명/설명 인라인 편집
-const renamingGroupId = ref<string | null>(null)
-const renameGroupValue = ref('')
-const renameDescValue = ref('')
-const renameGroupInput = ref<HTMLInputElement | null>(null)
-
-function startRenameGroup(groupId: string, currentName: string, currentDesc?: string) {
-  renamingGroupId.value = groupId
-  renameGroupValue.value = currentName
-  renameDescValue.value = currentDesc ?? ''
-  nextTick(() => renameGroupInput.value?.focus())
-}
-
-function cancelRenameGroup() {
-  renamingGroupId.value = null
-  renameGroupValue.value = ''
-  renameDescValue.value = ''
-}
-
-async function submitRenameGroup(group: HouseGroup) {
-  const trimmed = renameGroupValue.value.trim()
-  if (!trimmed) { cancelRenameGroup(); return }
-  try {
-    await groupApi.updateGroup(group.id, { name: trimmed, description: renameDescValue.value.trim() || undefined })
-    await groupStore.fetchGroups()
-    notify.success('수정 완료', `구역 정보가 저장되었습니다`)
-  } catch {
-    notify.error('수정 실패', '저장에 실패했습니다')
-  } finally {
-    cancelRenameGroup()
-  }
-}
+// 구역 이름/설명 변경은 환경설정 모달(EnvConfigModal)로 이동됨.
 
 // 장치명 인라인 편집 (sub-card 안)
 const renamingDeviceId = ref<string | null>(null)
@@ -1863,57 +1801,22 @@ onBeforeUnmount(() => {
   vertical-align: middle;
 }
 
-.btn-rename-group {
-  background: none; border: none; color: var(--text-secondary);
-  font-size: 14px; cursor: pointer; padding: 0 4px;
-  vertical-align: middle; opacity: 0.6;
-}
-.btn-rename-group:hover { opacity: 1; color: var(--accent, #4caf50); }
-
 /* sub-card 안 미니 이름 편집 버튼 — 이동 버튼과 붙어 눌기 어려워 숨김.
    대신 편집 모드에서 장치 이름 자체가 편집 가능 어포던스(.editable)를 표시한다. */
 .btn-rename-mini { display: none; }
+/* 장치명 인라인 편집 완료(✓) 버튼 — 카드 스케일에 맞춰 컴팩트하게 (기존엔 구역 rename용
+   규칙에 덮여 상대적으로 컸음. 구역 rename 은 환경설정 모달로 이동해 제거됨). */
 .btn-rename-ok {
+  flex-shrink: 0;
   background: var(--accent, #4caf50); color: #fff; border: none;
-  border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer;
-  margin-left: 4px;
+  border-radius: 5px; padding: 1px 6px; font-size: 12px; line-height: 1.4;
+  font-weight: 700; cursor: pointer; margin-left: 4px;
 }
 .rename-input-inline {
   padding: 2px 6px; border: 1px solid var(--accent, #4caf50);
   border-radius: 4px; font-size: 13px; font-weight: 600;
   background: var(--bg-input); color: var(--text-primary);
   outline: none; flex: 1; min-width: 100px;
-}
-
-.rename-form {
-  display: flex; flex-direction: column; gap: 6px; min-width: 240px;
-}
-.rename-actions { display: flex; gap: 6px; }
-
-.rename-group-input {
-  padding: 5px 10px; border: 1px solid var(--accent, #4caf50);
-  border-radius: 6px; font-size: calc(15px * var(--content-scale, 1));
-  font-weight: 600; background: var(--bg-primary); color: var(--text-primary);
-  outline: none; width: 100%;
-}
-
-.rename-desc-input {
-  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 6px; font-size: calc(13px * var(--content-scale, 1));
-  background: var(--bg-primary); color: var(--text-secondary);
-  outline: none; width: 100%;
-}
-.rename-desc-input:focus { border-color: var(--accent, #4caf50); }
-
-.btn-rename-ok {
-  padding: 4px 12px; border: none;
-  background: var(--accent, #4caf50); color: #fff;
-  border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
-}
-.btn-rename-cancel {
-  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
-  background: transparent; color: var(--text-secondary);
-  border-radius: 6px; font-size: 12px; cursor: pointer;
 }
 
 .group-desc {

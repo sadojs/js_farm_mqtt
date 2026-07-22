@@ -8,7 +8,13 @@
       <div class="env-modal-body">
         <div v-if="envLoading" class="loading-state">불러오는 중...</div>
         <template v-else>
-          <div class="env-section-label">내부 환경</div>
+          <div class="env-section-label">구역 정보</div>
+          <div class="group-info-fields">
+            <input v-model="groupName" class="env-source-select" maxlength="50" placeholder="구역명" />
+            <input v-model="groupDesc" class="env-source-select" maxlength="100" placeholder="설명 (선택)" />
+          </div>
+
+          <div class="env-section-label" style="margin-top: 16px;">내부 환경</div>
           <div v-for="role in envRoles.filter(r => r.category === 'internal')" :key="role.roleKey" class="env-role-row">
             <label class="env-role-label">{{ role.label }} <span v-if="role.unit" class="env-unit">({{ role.unit }})</span></label>
             <select
@@ -121,6 +127,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { envConfigApi } from '../../api/env-config.api'
+import { groupApi } from '../../api/group.api'
+import { useGroupStore } from '../../stores/group.store'
 import type { EnvRole, SourcesResponse, SaveMappingItem, ZoneDeviceSettings } from '../../api/env-config.api'
 import type { HouseGroup } from '../../types/group.types'
 
@@ -142,6 +150,10 @@ const envSaving = ref(false)
 const envLoading = ref(false)
 const deviceForm = ref<DeviceForm | null>(null)
 const deviceGateways = ref<ZoneDeviceSettings['gateways']>([])
+// 구역 이름/설명 (구역관리 메인페이지에서 이동해 온 편집 항목)
+const groupName = ref('')
+const groupDesc = ref('')
+const groupStore = useGroupStore()
 
 watch(() => props.show, async (val) => {
   if (val && props.group) {
@@ -151,6 +163,8 @@ watch(() => props.show, async (val) => {
 
 async function loadEnvConfig(group: HouseGroup) {
   envLoading.value = true
+  groupName.value = group.name
+  groupDesc.value = group.description ?? ''
   try {
     const [rolesRes, sourcesRes, mappingsRes, deviceRes] = await Promise.all([
       envConfigApi.getRoles(),
@@ -194,6 +208,12 @@ async function saveEnvConfig() {
         sensorType: v.sensorType,
         weatherField: v.weatherField,
       }))
+    // 구역 이름/설명 저장 (변경 시)
+    const nm = groupName.value.trim()
+    if (nm && (nm !== props.group.name || groupDesc.value.trim() !== (props.group.description ?? ''))) {
+      await groupApi.updateGroup(props.group.id, { name: nm, description: groupDesc.value.trim() || undefined })
+      await groupStore.fetchGroups().catch(() => undefined)
+    }
     await envConfigApi.saveMappings(props.group.id, mappings)
     // 장치 설정(개폐기/팬 동작·대기 + 우적) — 구역 내 모든 게이트웨이에 fan-out
     if (deviceForm.value) {
@@ -276,6 +296,7 @@ function getSelectedValue(roleKey: string): string {
   padding: 8px 0 4px; border-bottom: 1px solid var(--border-light);
   margin-bottom: 8px;
 }
+.group-info-fields { display: flex; flex-direction: column; gap: 8px; }
 .env-role-row { margin-bottom: 12px; }
 .env-role-label {
   display: block; font-size: calc(14px * var(--content-scale, 1));
