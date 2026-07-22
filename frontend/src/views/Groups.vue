@@ -72,8 +72,8 @@
               <span v-if="noteCount(group.id) > 0" class="memo-count">{{ noteCount(group.id) }}</span>
             </button>
             <button v-if="!isFarmUser" class="btn-icon" @click="openEnvConfig(group)" title="환경설정" aria-label="환경설정">⚙</button>
-            <button v-if="!isFarmUser" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
-            <button v-if="!isFarmUser" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
+            <button v-if="isAdmin" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
+            <button v-if="isAdmin" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
             <button v-if="!isFarmUser" class="btn-icon btn-edit-toggle" :class="{ active: isGroupEditing(group.id) }"
               @click="toggleGroupEdit(group.id)"
               :title="isGroupEditing(group.id) ? '편집 완료' : '편집 (이름변경·순서이동)'"
