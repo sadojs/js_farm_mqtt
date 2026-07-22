@@ -672,7 +672,14 @@ export class DevicesService {
     const settings: any = device.deviceSettings || {};
     settings.rainOverrideDisabled = disabled;
     device.deviceSettings = settings;
-    return this.exposeSwitchFields(await this.devicesRepo.save(device));
+    const saved = this.exposeSwitchFields(await this.devicesRepo.save(device));
+    // 비활성화(OFF) 토글 시, 이미 돌고 있던 rain-override 닫힘 사이클을 즉시 종료해
+    // 자동제어(고온 열기 등)로 바로 복귀시킨다. (기존엔 새 이벤트만 무시하고 진행 중
+    // 닫힘 사이클은 10분 최대치까지 계속돼, 껐는데도 개폐기가 닫히던 문제.)
+    if (disabled && this.rainOverride) {
+      await this.rainOverride.clearBySensor(id).catch(() => undefined);
+    }
+    return saved;
   }
 
   /**

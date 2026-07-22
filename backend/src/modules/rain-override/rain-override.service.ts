@@ -211,6 +211,29 @@ export class RainOverrideService {
     }
   }
 
+  /**
+   * 우적센서 device 의 rain-override 를 즉시 해제 — '비감지자동제어' OFF 토글 시 호출.
+   * 진행 중이던 닫힘 듀티사이클(closeCycles)을 종료하고 rainState 를 클리어해 자동제어로
+   * 즉시 복귀시킨다. (handleRainSignal 의 disabled-return 은 '새 이벤트 차단'만 하므로
+   * 이미 돌던 사이클은 이 메서드로 멈춘다 — 토글을 껐는데 개폐기가 계속 닫히던 문제 수정.)
+   */
+  async clearBySensor(rainDeviceId: string): Promise<void> {
+    const mappings = await this.mappingRepo.find({
+      where: { deviceId: rainDeviceId, roleKey: 'rain_detection' },
+    });
+    for (const m of mappings) {
+      const hadCycle = this.closeCycles.delete(m.groupId);
+      this.rainState.set(m.groupId, false);
+      this.userOverride.set(m.groupId, false);
+      if (hadCycle) {
+        this.logger.log(`🛑 구역 ${m.groupId} 비감지자동제어 OFF → 닫힘 사이클 즉시 종료(자동제어 복귀)`);
+      }
+      this.eventsGateway.broadcastRainOverride?.({
+        groupId: m.groupId, rainDetected: false, userOverride: false,
+      });
+    }
+  }
+
   private async getZoneOwnerUserId(groupId: string): Promise<string | null> {
     const rows = await this.dataSource.query(`
       SELECT user_id::text AS user_id FROM house_groups WHERE id = CAST($1 AS uuid) LIMIT 1
