@@ -158,6 +158,41 @@ export class AutomationRunnerService {
   }
 
   /**
+   * 개별 수동 제어로 룰을 정지할 때 호출 — 룰 enable/disable 토글과 달리 '개별'이므로
+   * 룰의 다른 대상 장치는 건드리지 않는다(현재 상태 유지). 이 룰이 제어하던 장치들 중
+   * 실제 수동 조작 대상(deviceId)과 그 개폐기 페어의 rule sticky 만 해제하고 룰 캐시를 무효화한다.
+   * (기존엔 onRuleToggled 가 룰의 전체 대상 장치를 리셋해, 3개 중 1개만 만졌는데 나머지 2개도
+   *  꺼지던 문제.)
+   */
+  async onRuleStoppedForDevice(rule: AutomationRule, deviceId: string): Promise<void> {
+    this.lastState.delete(rule.id);
+    const ids = new Set<string>([deviceId]);
+    const dev = await this.devicesRepo.findOne({ where: { id: deviceId } });
+    if (dev?.pairedDeviceId) ids.add(dev.pairedDeviceId);
+    for (const id of ids) {
+      const d = await this.devicesRepo.findOne({ where: { id } });
+      if (!d) continue;
+      const s: any = d.deviceSettings || {};
+      if (s.relayActivePhase || s.relayActiveRuleId || s.ruleIntendedState != null || s.userOverride) {
+        // 수동 제어 대상만 rule sticky 해제 (switchState 는 곧 수동 제어가 덮어씀 — 여기선 유지).
+        s.relayActivePhase = null;
+        s.relayActiveRuleId = null;
+        s.relayActiveUntil = null;
+        s.ruleIntendedState = null;
+        s.userOverride = false;
+        d.deviceSettings = s;
+        await this.devicesRepo.save(d).catch(() => undefined);
+        this.eventsGateway.broadcastDeviceSwitchUpdate?.(d.userId, {
+          deviceId: d.id,
+          switchState: s.switchState ?? null,
+          switchStates: s.switchStates ?? null,
+          online: d.online,
+        });
+      }
+    }
+  }
+
+  /**
    * 사용자가 수동 우회 release(룰 의도와 일치하는 토글)할 때 호출됨.
    * 해당 device를 target으로 하는 룰들의 lastState 캐시 클리어 → 다음 cron tick에 신규 매칭처럼 재평가.
    * (relay cycle OFF 구간에서 사용자가 ON으로 release했을 때 룰이 다시 OFF로 보낼 수 있도록)
@@ -973,25 +1008,36 @@ export class AutomationRunnerService {
     return undefined;
   }
 
-  // 개폐기 페어(opener_open/opener_close)에서 hysteresisAction에 맞는 대상 장치를 선택
+  // 개폐기 페어(opener_open/opener_close)에서 hysteresisAction에 맞는 대상 장치를 선택.
+  // 다중 개폐기 룰(여러 그룹을 targetDeviceIds로 지정)이면 각 개폐기를 방향에 맞는 장치로 매핑.
   private async resolveOpenerTargets(action: any, hysteresisAction?: 'on' | 'off' | 'hold'): Promise<string[] | null> {
     if (!hysteresisAction || hysteresisAction === 'hold') return null;
-    const targetId = action?.targetDeviceId
-      ?? (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds[0]);
-    if (!targetId) return null;
-    const device = await this.devicesRepo.findOne({ where: { id: targetId } });
-    if (!device) return null;
-    const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
-    if (!isOpener) return null;
-    // 'on' (온도 ≥ ON 임계값) → 열림 장치, 'off' (온도 ≤ OFF 임계값) → 닫힘 장치
+    const ids = [
+      ...(action?.targetDeviceId ? [action.targetDeviceId] : []),
+      ...(Array.isArray(action?.targetDeviceIds) ? action.targetDeviceIds : []),
+    ];
+    if (ids.length === 0) return null;
+    // 'on' (측정값 ≥ ON 임계값) → 열림 장치, 'off' (≤ OFF 임계값) → 닫힘 장치
     const wantOpen = hysteresisAction === 'on';
-    if ((wantOpen && device.equipmentType === 'opener_open')
-      || (!wantOpen && device.equipmentType === 'opener_close')) {
-      return [device.id];
+    const result = new Set<string>();
+    let anyOpener = false;
+    for (const id of new Set<string>(ids)) {
+      const device = await this.devicesRepo.findOne({ where: { id } });
+      if (!device) continue;
+      const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+      if (!isOpener) { result.add(id); continue; } // 개폐기 아닌 대상은 그대로 통과
+      anyOpener = true;
+      if ((wantOpen && device.equipmentType === 'opener_open')
+        || (!wantOpen && device.equipmentType === 'opener_close')) {
+        result.add(device.id);
+      } else if (device.pairedDeviceId) {
+        result.add(device.pairedDeviceId); // 반대편 페어로 스위칭
+      } else {
+        result.add(device.id);
+      }
     }
-    // 반대편 장치로 스위칭
-    if (device.pairedDeviceId) return [device.pairedDeviceId];
-    return [device.id];
+    if (!anyOpener) return null; // 개폐기 대상이 하나도 없으면 일반 경로 사용
+    return [...result];
   }
 
   /** 룰이 active 상태인 동안 relayActiveUntil 만료 방지 (매분 heartbeat) */

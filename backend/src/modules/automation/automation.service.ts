@@ -466,9 +466,10 @@ export class AutomationService {
       if (!rule || !rule.enabled) continue;
       rule.enabled = false;
       const saved = await this.rulesRepo.save(rule);
-      // sticky 상태·ruleIntendedState 정리 + 다음 tick 재평가 무효화
-      try { this.runnerService.onRuleToggled(saved); } catch (err: any) {
-        this.logger.warn(`onRuleToggled 실패(stop): ${err?.message ?? err}`);
+      // 개별 제어: 룰 캐시 무효화 + '이 장치(+개폐기 페어)'의 sticky 만 해제.
+      // 룰의 다른 대상 장치는 건드리지 않아 현재 상태 유지 (일괄제어와 구분).
+      try { await this.runnerService.onRuleStoppedForDevice(saved, deviceId); } catch (err: any) {
+        this.logger.warn(`onRuleStoppedForDevice 실패(stop): ${err?.message ?? err}`);
       }
       stopped.push({ id, name });
     }
