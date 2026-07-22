@@ -94,7 +94,32 @@
 
           <!-- 센서 목록 -->
           <template v-if="getGroupSensors(group).length > 0">
-            <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
+            <div class="section-header sensor">
+              <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
+              <div class="info-guide-wrap" @click.stop>
+                <button
+                  type="button"
+                  class="info-guide-btn sensor"
+                  :class="{ open: infoGuideKey === 'sensor:' + group.id }"
+                  :aria-expanded="infoGuideKey === 'sensor:' + group.id"
+                  aria-label="측정기 아이콘 안내"
+                  @click.stop="toggleInfoGuide('sensor', group.id)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>아이콘 안내</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-if="infoGuideKey === 'sensor:' + group.id" class="info-guide-popover sensor" role="dialog" aria-label="측정기 종류">
+                  <div class="info-guide-title sensor">측정기 종류</div>
+                  <ul class="info-guide-list">
+                    <li v-for="item in guideSensorTypes(group)" :key="item.type" class="info-guide-item">
+                      <EquipmentIcon :type="item.type" :active="true" :size="16" />
+                      <span>{{ item.label }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
             <div class="device-sub-grid">
               <div v-for="device in getGroupSensors(group)" :key="device.id"
                 :class="['sub-card sensor', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
@@ -134,7 +159,6 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span class="type-tag sensor">측정기</span>
                 </div>
                 <div v-if="device.sensorData && Object.keys(getTopSensorData(device.sensorData)).length > 0" class="sub-card-sensor-chips">
                   <span v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-chip">
@@ -169,7 +193,32 @@
 
           <!-- 장치(액추에이터 + 개폐기 + 관수) 목록 -->
           <template v-if="getGroupActuators(group).length > 0 || getGroupOpenerGroups(group).length > 0 || getGroupIrrigationDevices(group).length > 0">
-            <div class="section-label actuator">장치 ({{ getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length }})</div>
+            <div class="section-header actuator">
+              <div class="section-label actuator">장치 ({{ getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length }})</div>
+              <div class="info-guide-wrap" @click.stop>
+                <button
+                  type="button"
+                  class="info-guide-btn actuator"
+                  :class="{ open: infoGuideKey === 'device:' + group.id }"
+                  :aria-expanded="infoGuideKey === 'device:' + group.id"
+                  aria-label="장치 아이콘 안내"
+                  @click.stop="toggleInfoGuide('device', group.id)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>아이콘 안내</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-if="infoGuideKey === 'device:' + group.id" class="info-guide-popover actuator" role="dialog" aria-label="장치 종류">
+                  <div class="info-guide-title actuator">장치 종류</div>
+                  <ul class="info-guide-list">
+                    <li v-for="item in guideDeviceTypes(group)" :key="item.type" class="info-guide-item">
+                      <EquipmentIcon :type="item.type" :active="true" :size="16" />
+                      <span>{{ item.label }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
             <div class="device-sub-grid">
               <!-- 개폐기 그룹 카드 -->
               <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
@@ -212,7 +261,6 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span class="type-tag actuator type-tag-opener">개폐기</span>
                   <span v-if="highTempActiveZones.has(group.id)" class="hightemp-badge" title="고온 무대기 강제열림 동작 중 — 개폐기를 대기 없이 연속 개방 중입니다">
                     🔥 고온 강제열림
                   </span>
@@ -277,7 +325,6 @@
                     >✎</button>
                   </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
-                  <span class="type-tag actuator type-tag-irrigation">관주</span>
                   <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationTimerModal(device)" title="채널별 타이머 관리">
                     <span class="timer-dot"></span>{{ irrigationTimerSummary(device)!.count }}채널 · {{ formatCountdown(irrigationTimerSummary(device)!.until) }}
                   </span>
@@ -338,7 +385,6 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span class="type-tag actuator">{{ getEquipmentLabel(device) }}</span>
                   <span v-if="isActive(device.overrideUntil)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(device)" title="타이머 해제 → 자동제어 복귀">
                     <span class="timer-dot"></span>{{ formatCountdown(device.overrideUntil) }}<span class="timer-x">✕</span>
                   </span>
@@ -701,6 +747,49 @@ const loading = computed(() => groupStore.loading)
 const showVisibilityModal = ref(false)
 const showBulkControl = ref(false)
 
+// 섹션 헤더 "ⓘ 아이콘 안내" 팝오버 — 한 번에 하나만 열림.
+// 값 형식: 'sensor:{groupId}' | 'device:{groupId}' | null
+const infoGuideKey = ref<string | null>(null)
+function toggleInfoGuide(kind: 'sensor' | 'device', groupId: string) {
+  const key = `${kind}:${groupId}`
+  infoGuideKey.value = infoGuideKey.value === key ? null : key
+}
+function closeInfoGuideOnOutside(e: Event) {
+  if (!infoGuideKey.value) return
+  const target = e.target as HTMLElement | null
+  if (target?.closest('.info-guide-wrap')) return
+  infoGuideKey.value = null
+}
+
+// 그 구역 실재하는 측정기 종류 (중복 제거)
+function guideSensorTypes(group: HouseGroup): Array<{ type: string; label: string }> {
+  const seen = new Set<string>()
+  const list: Array<{ type: string; label: string }> = []
+  for (const d of getGroupSensors(group)) {
+    const type = isRainSensor(d) ? 'rain' : 'sensor'
+    if (seen.has(type)) continue
+    seen.add(type)
+    list.push({ type, label: type === 'rain' ? '우적센서' : '온습도' })
+  }
+  return list
+}
+
+// 그 구역 실재하는 장치 종류 (중복 제거)
+function guideDeviceTypes(group: HouseGroup): Array<{ type: string; label: string }> {
+  const seen = new Set<string>()
+  const list: Array<{ type: string; label: string }> = []
+  if (getGroupOpenerGroups(group).length > 0) { seen.add('opener'); list.push({ type: 'opener', label: '개폐기' }) }
+  if (getGroupIrrigationDevices(group).length > 0) { seen.add('irrigation'); list.push({ type: 'irrigation', label: '관수' }) }
+  for (const d of getGroupActuators(group)) {
+    const t = d.equipmentType || 'other'
+    if (seen.has(t)) continue
+    seen.add(t)
+    const label = t === 'fan' ? '유동팬' : (getEquipmentLabel(d) || '기타')
+    list.push({ type: t, label })
+  }
+  return list
+}
+
 // 일괄제어로 정지된 자동제어 룰 (원복 배너)
 const bulkStoppedRules = ref<{ id: string; name: string }[]>([])
 const restoringBulk = ref(false)
@@ -811,6 +900,8 @@ const highTempActiveZones = ref<Set<string>>(new Set())
 let offHighTempOverride: (() => void) | null = null
 
 onMounted(async () => {
+  // 섹션 헤더 아이콘 안내 팝오버 — 바깥 클릭 시 닫기
+  document.addEventListener('pointerdown', closeInfoGuideOnOutside)
   await Promise.all([
     groupStore.fetchGroups(),
     deviceStore.fetchDevices(),
@@ -1663,6 +1754,7 @@ onBeforeUnmount(() => {
   for (const timerId of openerAutoOffTimers.values()) clearTimeout(timerId)
   openerAutoOffTimers.clear()
   offHighTempOverride?.()
+  document.removeEventListener('pointerdown', closeInfoGuideOnOutside)
 })
 </script>
 
@@ -1922,6 +2014,91 @@ onBeforeUnmount(() => {
 .section-label.actuator { background: var(--accent-bg); color: var(--accent); }
 .section-label.automation { background: var(--automation-bg); color: var(--automation-text); }
 .section-label.gateway { background: #e0f2fe; color: #0369a1; }
+
+/* ── 섹션 헤더 row + "ⓘ 아이콘 안내" 팝오버 ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: relative;
+}
+.info-guide-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.info-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.info-guide-btn:hover,
+.info-guide-btn:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+.info-guide-btn.sensor { color: var(--sensor-accent); }
+.info-guide-btn.actuator { color: var(--accent); }
+.info-guide-btn .chevron {
+  transition: transform 0.2s;
+}
+.info-guide-btn.open .chevron {
+  transform: rotate(180deg);
+}
+@media (max-width: 768px) {
+  .info-guide-btn { min-height: 44px; }
+}
+
+.info-guide-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 200px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  z-index: 20;
+  animation: infoGuidePop 0.12s ease-out;
+}
+@keyframes infoGuidePop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.info-guide-title {
+  font-size: calc(12.5px * var(--content-scale, 1));
+  font-weight: 800;
+  margin: 0 0 10px;
+}
+.info-guide-title.sensor { color: var(--sensor-accent); }
+.info-guide-title.actuator { color: var(--accent); }
+.info-guide-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.info-guide-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: calc(14px * var(--content-scale, 1));
+  font-weight: 700;
+  color: var(--text-secondary);
+}
 
 .device-sub-grid {
   display: grid;
