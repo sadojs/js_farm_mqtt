@@ -12,6 +12,9 @@ let socket: Socket | null = null
 const _connected = ref(false)
 const _reconnecting = ref(false)
 const _reconnectAttempts = ref(0)
+// 끊긴 시각 — 짧은 재연결(앱 재개·네트워크 blip)엔 '연결 복구' 토스트를 띄우지 않기 위함
+let _disconnectedAt = 0
+const RECONNECT_TOAST_MIN_MS = 15000
 
 type GpioStatusHandler = (data: { gatewayId: string; slot: string; pin: number; state: boolean; auto?: boolean }) => void
 const gpioStatusHandlers = new Set<GpioStatusHandler>()
@@ -90,6 +93,7 @@ export function useWebSocket() {
 
     socket.on('disconnect', (reason) => {
       _connected.value = false
+      _disconnectedAt = Date.now()
       // 서버 측 종료가 아니면 자동 재연결
       if (reason === 'io server disconnect') {
         // 서버가 강제 종료한 경우 → 토큰 갱신 후 재연결 시도
@@ -111,8 +115,12 @@ export function useWebSocket() {
       _connected.value = true
       _reconnecting.value = false
       _reconnectAttempts.value = 0
-      const notificationStore = useNotificationStore()
-      notificationStore.success('연결 복구', '서버와 다시 연결되었습니다.')
+      // 짧은 끊김(앱 재개·모바일 네트워크 전환)엔 조용히. 장시간 끊김 복구만 안내.
+      const downMs = _disconnectedAt ? Date.now() - _disconnectedAt : 0
+      if (downMs >= RECONNECT_TOAST_MIN_MS) {
+        useNotificationStore().success('연결 복구', '서버와 다시 연결되었습니다.')
+      }
+      _disconnectedAt = 0
     })
 
     socket.io.on('reconnect_failed', () => {

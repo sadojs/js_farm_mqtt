@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="tmr-sheet-overlay" @click.self="$emit('close')">
+  <div v-if="visible" class="tmr-sheet-overlay" @click.self="$emit('close')" @contextmenu.prevent @selectstart.prevent>
     <div class="tmr-sheet">
       <div class="tmr-grip"></div>
       <div class="tmr-title"><span class="tmr-ic">⏱</span>{{ title }}</div>
@@ -133,6 +133,8 @@ watch(
 .tmr-sheet-overlay {
   position: fixed; inset: 0; background: rgba(20, 22, 26, 0.34);
   display: flex; align-items: flex-end; justify-content: center; z-index: 1100;
+  /* 롱프레스로 열릴 때 시트 텍스트가 선택/복사메뉴로 잡히는 것 방지 */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .tmr-sheet {
   background: var(--bg-card, #fff); width: 100%; max-width: 460px;

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible && device" class="modal-overlay" @click.self="$emit('close')">
+  <div v-if="visible && device" class="modal-overlay" @click.self="$emit('close')" @contextmenu.prevent @selectstart.prevent style="user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;">
     <div class="timer-modal">
       <div class="timer-modal-header">
         <span class="hdr-ic">⏱</span>
