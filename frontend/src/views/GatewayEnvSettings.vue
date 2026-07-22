@@ -263,58 +263,58 @@
       </div>
     </div>
 
-    <!-- ── 장치 설정 탭 (라즈베리파이 공통) ── -->
+    <!-- ── 장치 설정 탭 (구역 단위 관리 · 읽기 전용) ── -->
     <div v-else-if="activeTab === 'settings'" class="section">
-      <p class="section-desc">이 라즈베리파이(게이트웨이)의 개폐기·유동팬 동작/대기 시간과 우적센서를 공통으로 설정합니다. 장치별 개별 설정이 아니라 파이당 1벌입니다.</p>
+      <div class="zone-managed-banner">
+        <div class="zone-managed-main">
+          <span class="zone-managed-icon">🔒</span>
+          <div class="zone-managed-text">
+            <strong>구역 단위로 관리되는 설정입니다</strong>
+            <p>개폐기·유동팬 동작/대기, 우적센서, 고온 강제열림은 <b>소속 구역 환경설정</b>에서 편집하며 구역 내 모든 라즈베리파이에 함께 적용됩니다. 여기서는 이 게이트웨이에 적용된 값을 <b>확인만</b> 할 수 있습니다.</p>
+          </div>
+        </div>
+        <button v-if="zoneGroupId" class="btn-primary zone-goto-btn" @click="goToZoneSettings">
+          구역 설정으로 이동{{ zoneGroupName ? ` — ${zoneGroupName}` : '' }} →
+        </button>
+        <span v-else class="zone-none-hint">이 게이트웨이가 속한 구역을 찾을 수 없습니다.</span>
+      </div>
       <div v-if="settingsLoading" class="loading-state">불러오는 중...</div>
       <div v-else-if="settingsError" class="error-state"><p>⚠ {{ settingsError }}</p></div>
       <template v-else>
-        <div class="settings-card">
+        <div class="settings-card readonly">
           <div class="settings-card-title">🪟 개폐기 동작 / 대기 <span class="settings-sub">모든 개폐기 공통 (초)</span></div>
           <div class="settings-row">
             <label class="settings-label">동작 시간</label>
-            <input type="number" min="1" max="600" v-model.number="deviceCfg.openerOperationSeconds" class="settings-input" />
+            <input type="number" :value="deviceCfg.openerOperationSeconds" class="settings-input" disabled readonly />
             <span class="settings-unit">초</span>
           </div>
           <div class="settings-row">
             <label class="settings-label">대기 시간</label>
-            <input type="number" min="1" max="600" v-model.number="deviceCfg.openerStandbySeconds" class="settings-input" />
+            <input type="number" :value="deviceCfg.openerStandbySeconds" class="settings-input" disabled readonly />
             <span class="settings-unit">초</span>
           </div>
-          <p class="settings-hint">비 감지·자동 제어 복귀 시 개폐기를 동작/대기 주기로 제어합니다. 최대 10분간 반복 후 완전히 닫히면 상태만 유지합니다. (수동 조작은 이 주기를 타지 않고 즉시 동작합니다.)</p>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card readonly">
           <div class="settings-card-title">🌀 유동팬 동작 / 대기 <span class="settings-sub">모든 유동팬 공통 (분)</span></div>
           <div class="settings-row">
             <label class="settings-label">동작 시간</label>
-            <input type="number" min="1" max="240" v-model.number="deviceCfg.fanOperationMinutes" class="settings-input" />
+            <input type="number" :value="deviceCfg.fanOperationMinutes" class="settings-input" disabled readonly />
             <span class="settings-unit">분</span>
           </div>
           <div class="settings-row">
             <label class="settings-label">대기 시간</label>
-            <input type="number" min="1" max="240" v-model.number="deviceCfg.fanStandbyMinutes" class="settings-input" />
+            <input type="number" :value="deviceCfg.fanStandbyMinutes" class="settings-input" disabled readonly />
             <span class="settings-unit">분</span>
           </div>
         </div>
 
-        <div v-if="rainSlot" class="settings-card">
+        <div v-if="rainSlot" class="settings-card readonly">
           <div class="settings-card-title">☔ 우적센서 <span class="settings-sub">무전압 접점 · BCM21(Pin 40) 고정</span></div>
           <div class="settings-row">
             <label class="settings-label">사용</label>
-            <label class="toggle">
-              <input type="checkbox" :checked="rainSlot.enabled" @change="toggleRainSlot" />
-              <span class="toggle-slider"></span>
-            </label>
             <span :class="rainSlot.enabled ? 'text-on' : 'text-off'">{{ rainSlot.enabled ? '활성' : '비활성' }}</span>
           </div>
-          <p class="settings-hint">비 감지 시 소속 구역 개폐기를 위 동작/대기 주기로 자동으로 닫습니다.</p>
-        </div>
-
-        <div class="settings-actions">
-          <button class="btn-primary" :disabled="settingsSaving" @click="saveDeviceConfig">
-            {{ settingsSaving ? '저장 중...' : '동작/대기 시간 저장' }}
-          </button>
         </div>
       </template>
     </div>
@@ -581,7 +581,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { groupApi } from '@/api/group.api'
 import { gatewayEnvApi, type OnboardDevice, type ZigbeeDevice, type ZigbeeScannedDevice } from '@/api/gateway-env.api'
 import { gatewayApi } from '@/api/gateway.api'
 import { emergencyFailoverApi } from '@/api/emergency-failover.api'
@@ -594,6 +595,7 @@ import PinTestModal from '@/components/gateway/PinTestModal.vue'
 import DeviceReplaceModal from '@/components/devices/DeviceReplaceModal.vue'
 
 const route = useRoute()
+const router = useRouter()
 const notif = useNotificationStore()
 const authStore = useAuthStore()
 const gatewayId = route.params.id as string
@@ -668,8 +670,10 @@ const onboardDevices = ref<OnboardDevice[]>([])
 // ── 장치 설정 탭 (게이트웨이 공통 동작/대기 + 우적센서) ──
 const gatewayCode = ref('')  // VARCHAR gateway_id (fallback-config API용)
 const settingsLoading = ref(false)
-const settingsSaving = ref(false)
 const settingsError = ref<string | null>(null)
+// 소속 구역 (읽기전용 장치설정 → 구역 환경설정 이동용)
+const zoneGroupId = ref<string | null>(null)
+const zoneGroupName = ref('')
 const deviceCfg = ref({
   openerOperationSeconds: 30, openerStandbySeconds: 60,
   fanOperationMinutes: 50, fanStandbyMinutes: 10,
@@ -687,6 +691,7 @@ async function resolveGatewayCode(): Promise<string> {
 async function loadDeviceConfig() {
   settingsLoading.value = true
   settingsError.value = null
+  void resolveZone()
   try {
     const code = await resolveGatewayCode()
     if (!code) { settingsError.value = '게이트웨이 정보를 찾을 수 없습니다.'; return }
@@ -705,37 +710,25 @@ async function loadDeviceConfig() {
   }
 }
 
-async function saveDeviceConfig() {
-  if (settingsSaving.value) return
-  settingsSaving.value = true
+// 이 게이트웨이가 속한 구역 해석 (하우스 → 구역). 장치설정은 구역에서 편집하므로 이동 버튼용.
+async function resolveZone() {
   try {
-    const code = await resolveGatewayCode()
-    await emergencyFailoverApi.updateConfig(code, { ...deviceCfg.value })
-    notif.success('저장 완료', '동작/대기 시간이 저장되었습니다.')
-  } catch (e: any) {
-    notif.error('오류', e?.response?.data?.message ?? '저장에 실패했습니다.')
-  } finally {
-    settingsSaving.value = false
+    const [gwRes, grpRes] = await Promise.all([gatewayApi.getAll(), groupApi.getGroups()])
+    const gw = gwRes.data.find((g: any) => g.id === gatewayId)
+    if (!gw?.houseId) { zoneGroupId.value = null; zoneGroupName.value = ''; return }
+    const grp = grpRes.data.find(g => (g.houses || []).some(h => h.id === gw.houseId))
+    zoneGroupId.value = grp?.id ?? null
+    zoneGroupName.value = grp?.name ?? ''
+  } catch {
+    zoneGroupId.value = null
+    zoneGroupName.value = ''
   }
 }
 
-async function toggleRainSlot() {
-  const rs = rainSlot.value
-  if (!rs) return
-  const newVal = !rs.enabled
-  // 비활성화 경고: 우적센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중
-  if (!newVal && !window.confirm(
-    '우적센서를 비활성화하시겠습니까?\n\n이 센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중입니다. ' +
-    '비활성화하면 비가 와도 개폐기가 자동으로 닫히지 않으며, 구역관리·대시보드에서도 숨겨집니다.',
-  )) return
-  try {
-    await gatewayEnvApi.updateOnboard(gatewayId, rs.id, { enabled: newVal })
-    rs.enabled = newVal
-    notif.success(newVal ? '우적센서 활성화' : '우적센서 비활성화',
-      newVal ? '비 감지 시 개폐기가 자동으로 닫힙니다.' : '우적 신호 발행이 중단됩니다.')
-  } catch {
-    notif.error('오류', '우적센서 상태 변경에 실패했습니다.')
-  }
+// 구역 환경설정 모달 열기 (Groups 화면 ?envConfig=<groupId>)
+function goToZoneSettings() {
+  if (!zoneGroupId.value) return
+  router.push({ path: '/groups', query: { envConfig: zoneGroupId.value } })
 }
 
 watch(activeTab, (t) => { if (t === 'settings') loadDeviceConfig() })
@@ -2130,6 +2123,22 @@ onMounted(loadAllDevices)
 .ds-fname { font-size: 11px; color: var(--text-secondary, #9ca3af); font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 장치 설정 탭 */
+.zone-managed-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  background: var(--bg-subtle, #f8fafc); border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+}
+.zone-managed-main { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 240px; }
+.zone-managed-icon { font-size: 18px; line-height: 1.3; flex-shrink: 0; }
+.zone-managed-text strong { display: block; font-size: 13px; color: var(--text-primary, #111); margin-bottom: 3px; }
+.zone-managed-text p { font-size: 12px; line-height: 1.55; color: var(--text-secondary, #6b7280); margin: 0; }
+.zone-goto-btn { flex-shrink: 0; white-space: nowrap; }
+.zone-none-hint { font-size: 12px; color: var(--text-secondary, #9ca3af); flex-shrink: 0; }
+.settings-card.readonly { opacity: 0.92; background: var(--bg-subtle, #fafafa); }
+.settings-card.readonly .settings-input:disabled {
+  background: var(--bg-subtle, #f3f4f6); color: var(--text-primary, #374151);
+  -webkit-text-fill-color: var(--text-primary, #374151); opacity: 1; cursor: default;
+}
 .settings-card {
   background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
