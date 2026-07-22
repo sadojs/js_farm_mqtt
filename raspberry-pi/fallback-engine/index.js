@@ -250,6 +250,7 @@ function startEvaluationLoop() {
         if (fsm.mode === 'online') {
           flushQueue();
           evaluator.onExitFallback(); // 폴백 관수 예약 타이머 취소 → 온라인 스케줄러 인계
+          evaluator.applyRainOverride(false); // 폴백이 걸어둔 빗물 강제닫힘 해제 → 서버 인계
         }
 
         // rpi-fallback-channel-sync: 폴백 진입 시 채널 매핑이 없으면 안전망 발행
@@ -259,10 +260,14 @@ function startEvaluationLoop() {
         }
       }
 
-      // 2) 빗물 override (모드 무관, 최우선)
+      // 2) 빗물 override — 폴백 모드에서만 적용(서버 단절 시 작물보호 안전망).
+      //    online 중엔 서버 rain-override가 담당하며 사용자 '비감지자동제어' 토글을 존중하므로,
+      //    fallback 은 개입하지 않는다(index.js 상단 원칙: 정상 통신 중엔 idle).
       const rainState = rain.state();
-      if (rainState === 'active') evaluator.applyRainOverride(true);
-      else if (rainState === 'inactive') evaluator.applyRainOverride(false);
+      if (fsm.mode === 'fallback') {
+        if (rainState === 'active') evaluator.applyRainOverride(true);
+        else if (rainState === 'inactive') evaluator.applyRainOverride(false);
+      }
 
       // 3) 폴백 모드면 룰 평가
       if (fsm.mode === 'fallback') {
