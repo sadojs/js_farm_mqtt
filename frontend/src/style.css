@@ -224,12 +224,15 @@ body {
   overscroll-behavior-y: none;
   overflow-x: clip;
   max-width: 100%;
-  /* 롱프레스 콜아웃(복사하기 등) 전역 차단 — -webkit-touch-callout 은 상속되어 모든 요소에 적용.
-     (앱형 UX. 입력/편집 요소는 아래에서 예외 처리해 붙여넣기 유지.) */
+  /* 롱프레스 콜아웃(복사하기)·돋보기(loupe)·텍스트선택 전역 차단 — iOS 네이티브 선택 UI는
+     -webkit-user-select / -webkit-touch-callout 로 제어되며 상속된다. (앱형 UX.
+     입력/편집 요소는 아래에서 예외 처리해 붙여넣기·선택 유지.) */
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
-/* 입력·편집 요소는 콜아웃/선택 허용 (붙여넣기·텍스트 선택) */
-input, textarea, [contenteditable="true"], [contenteditable=""] {
+/* 입력·편집 요소(및 .selectable)는 콜아웃/선택 허용 (붙여넣기·텍스트 선택) */
+input, textarea, select, [contenteditable="true"], [contenteditable=""], .selectable {
   -webkit-touch-callout: default;
   -webkit-user-select: text;
   user-select: text;
