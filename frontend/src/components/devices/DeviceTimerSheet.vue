@@ -91,7 +91,7 @@ const hourOptions = Array.from({ length: 13 }, (_, n) => n) // 0~12
 const minuteOptions = Array.from({ length: 60 }, (_, n) => n) // 0~59 (1분 단위)
 
 const direction = ref<'open' | 'close' | null>(null)
-const hour = ref(1)
+const hour = ref(0)
 const minute = ref(0)
 
 const totalMinutes = computed(() => hour.value * 60 + minute.value)
@@ -121,7 +121,7 @@ watch(
   () => props.visible,
   (v) => {
     if (v) {
-      hour.value = 1
+      hour.value = 0
       minute.value = 0
       direction.value = null
     }
