@@ -751,9 +751,15 @@ export class AutomationRunnerService {
 
   private async executeAction(rule: AutomationRule, action: any) {
     let candidateDevices: Device[];
-    const targetIds = action?.targetDeviceId
-      ? [action.targetDeviceId]
-      : (Array.isArray(action?.targetDeviceIds) && action.targetDeviceIds.length > 0 ? action.targetDeviceIds : null);
+    // targetDeviceId(단일)와 targetDeviceIds(다중)의 합집합 사용 — 룰을 나중에 여러 장치로
+    // 편집(targetDeviceIds 추가)했는데 원래 targetDeviceId 하나만 동작하던 버그 수정.
+    const mergedTargetIds = [
+      ...(action?.targetDeviceId ? [action.targetDeviceId] : []),
+      ...(Array.isArray(action?.targetDeviceIds) ? action.targetDeviceIds : []),
+    ];
+    const targetIds = mergedTargetIds.length > 0
+      ? [...new Set<string>(mergedTargetIds)]
+      : null;
 
     if (targetIds) {
       // 명시적 targetIds는 user_id 검사 없이 조회 (admin이 다른 사용자 그룹의 룰을 만든 경우 호환)
