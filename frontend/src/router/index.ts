@@ -183,4 +183,23 @@ router.beforeEach(async (to, _from, next) => {
   next()
 })
 
+// ── 청크 로드 실패 자동 복구 ──
+// 프론트 재배포로 예전 lazy 청크(해시)가 서버에서 사라지면, 이미 열려있던 오래된 index가
+// 라우트 전환 시 없어진 청크를 fetch하려다 "Failed to fetch dynamically imported module"로
+// 깨진다. 이때 의도한 경로로 전체 로드(최신 index+청크)해 자동 복구한다. (세션당 1회 — 무한루프 방지)
+const CHUNK_RELOAD_KEY = 'chunk-reload-attempt'
+router.onError((error, to) => {
+  const msg = (error as any)?.message || ''
+  const isChunkError =
+    /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Failed to fetch/i.test(msg)
+  if (!isChunkError) return
+  if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return // 이미 한 번 복구 시도 → 무한루프 방지
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+  window.location.assign(to?.fullPath || window.location.pathname)
+})
+router.afterEach(() => {
+  // 정상 네비게이션 성공 → 재시도 가드 해제 (이후 실제 실패 시 다시 복구 가능)
+  sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+})
+
 export default router
