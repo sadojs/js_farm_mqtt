@@ -182,7 +182,13 @@ function handleMessage(topic, payload) {
     try { data = JSON.parse(payload.toString('utf-8')); }
     catch { return; }
     evaluator.ingestSensor(deviceName, data);
-    rain.ingestSensor(deviceName, data);
+    // 빗물 override 는 '구성된 우적센서(rainInput)'가 활성일 때 그 센서만 신뢰한다.
+    // 비활성이거나 다른 zigbee 우적 장치(예: 0xa4c1…)의 z2m 데이터는 무시 →
+    // 게이트웨이 환경설정에서 비활성화한 센서가 개폐기를 오작동으로 닫는 문제 방지.
+    const rainCfg = store.config().rainInput || {};
+    if (rainCfg.enabled && deviceName === rainCfg.friendlyName) {
+      rain.ingestSensor(deviceName, data);
+    }
     return;
   }
 }
