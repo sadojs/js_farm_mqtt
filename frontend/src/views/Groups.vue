@@ -209,7 +209,7 @@
                 :style="reorderDragStyle(og.openDevice.id)"
                 :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'"
                 @pointerdown="onTimerPress('opener', og.openDevice, isGroupEditing(group.id))"
-                @contextmenu.prevent
+                @contextmenu.prevent @selectstart.prevent
                 @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
@@ -273,7 +273,7 @@
                 :style="reorderDragStyle(device.id)"
                 :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'"
                 @pointerdown="onIrrigationTimerPress(device, isGroupEditing(group.id))"
-                @contextmenu.prevent
+                @contextmenu.prevent @selectstart.prevent
                 @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
@@ -335,7 +335,7 @@
                 :style="reorderDragStyle(device.id)"
                 :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'"
                 @pointerdown="onTimerPress('fan', device, isGroupEditing(group.id))"
-                @contextmenu.prevent
+                @contextmenu.prevent @selectstart.prevent
                 @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
                 <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
                   @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
@@ -1366,6 +1366,7 @@ function onTimerPress(kind: TimerKind, device: Device, editing: boolean) {
   timerLongPressed.value = false
   timerPressTimer = setTimeout(() => {
     timerLongPressed.value = true
+    try { window.getSelection()?.removeAllRanges() } catch { /* noop */ } // 롱프레스로 생긴 텍스트 선택 해제
     openTimerSheet(kind, device)
   }, 500)
 }
@@ -1385,6 +1386,7 @@ function onIrrigationTimerPress(device: Device, editing: boolean) {
   timerLongPressed.value = false
   timerPressTimer = setTimeout(() => {
     timerLongPressed.value = true
+    try { window.getSelection()?.removeAllRanges() } catch { /* noop */ }
     openIrrigationTimerModal(device)
   }, 500)
 }
