@@ -678,6 +678,9 @@ export class DevicesService {
     // 닫힘 사이클은 10분 최대치까지 계속돼, 껐는데도 개폐기가 닫히던 문제.)
     if (disabled && this.rainOverride) {
       await this.rainOverride.clearBySensor(id).catch(() => undefined);
+    } else if (!disabled && this.rainOverride) {
+      // 재활성화(ON): 지금 비가 감지 중이면 다음 센서 재발행(최대 60s) 대기 없이 즉시 닫힘 시작.
+      await this.rainOverride.reevaluateBySensor(id).catch(() => undefined);
     }
     return saved;
   }

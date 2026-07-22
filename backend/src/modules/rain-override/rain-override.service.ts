@@ -27,6 +27,11 @@ export class RainOverrideService {
 
   /** groupId → rain detected */
   private rainState = new Map<string, boolean>();
+  /**
+   * deviceId → 최근 원신호(rain true/false). 토글(비감지자동제어) 상태와 무관하게 항상 갱신.
+   * 재활성화(ON) 시 다음 센서 재발행(최대 60s)을 기다리지 않고 현재 비 여부를 즉시 판단하는 용도.
+   */
+  private lastRawRain = new Map<string, boolean>();
   /** groupId → 비 도중 사용자 직접 제어 발생 여부 (suppress) */
   private userOverride = new Map<string, boolean>();
   /**
@@ -56,6 +61,8 @@ export class RainOverrideService {
   }
 
   async handleRainSignal(rainDeviceId: string, rainDetected: boolean) {
+    // 토글 상태와 무관하게 최신 원신호를 기록 (재활성화 시 즉시 재평가용)
+    this.lastRawRain.set(rainDeviceId, rainDetected);
     // 우적센서 device-level 비활성화 토글 — deviceSettings.rainOverrideDisabled=true면 무시
     // (오탐 방지 — 옆집 스프링쿨러 등으로 인한 잘못된 닫힘 방지)
     const sensorDev = await this.devicesRepo.findOne({ where: { id: rainDeviceId } });
@@ -232,6 +239,30 @@ export class RainOverrideService {
         groupId: m.groupId, rainDetected: false, userOverride: false,
       });
     }
+  }
+
+  /**
+   * 우적센서 device 의 rain-override 를 즉시 재평가 — '비감지자동제어' ON(재활성) 토글 시 호출.
+   * 현재 비 감지 중이면(마지막 원신호=true) 다음 센서 재발행(최대 60s)을 기다리지 않고
+   * 곧바로 닫힘 사이클을 시작한다. (재활성화 반응 지연 제거.)
+   */
+  async reevaluateBySensor(rainDeviceId: string): Promise<void> {
+    let raining = this.lastRawRain.get(rainDeviceId);
+    if (raining === undefined) {
+      // 메모리에 원신호 없음(백엔드 재시작 직후 등) → 최신 센서값으로 판단
+      const rows = await this.dataSource.query(
+        `SELECT value FROM sensor_data
+         WHERE device_id = $1 AND sensor_type = 'rain_detection'
+         ORDER BY time DESC LIMIT 1`,
+        [rainDeviceId],
+      );
+      raining = rows[0] ? Number(rows[0].value) === 1 : false;
+    }
+    if (raining !== true) return; // 현재 비 아님 → 즉시 처리할 것 없음
+    const mappings = await this.mappingRepo.find({
+      where: { deviceId: rainDeviceId, roleKey: 'rain_detection' },
+    });
+    for (const m of mappings) await this.handleZoneRainChange(m.groupId, true);
   }
 
   private async getZoneOwnerUserId(groupId: string): Promise<string | null> {
