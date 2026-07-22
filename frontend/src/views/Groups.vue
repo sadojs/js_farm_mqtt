@@ -1304,10 +1304,43 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   }
 }
 
+// 자동제어 룰 동작 중 수동 조작 가드 (개폐기와 동일) — 활성 룰이 있으면 정지 확인 팝업.
+// 반환: true=진행(룰 없음 또는 정지함), false=취소. 정지 안 하면 다음 tick에 룰이 수동값을 덮어씀.
+async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: string): Promise<boolean> {
+  if (isFarmUser) return true
+  try {
+    const active = (await automationApi.getActiveRulesForDevice(deviceId)).data
+    if (!active || active.length === 0) return true
+    const names = active.map(r => `• ${r.name}`).join('\n')
+    const go = await confirm({
+      title: '자동제어 룰이 동작 중입니다',
+      message:
+        `${deviceLabel}을(를) 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
+        `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
+        `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
+      confirmText: '정지하고 수동 제어',
+      cancelText: '취소',
+      variant: 'warning',
+    })
+    if (!go) return false
+    const { stopped } = (await automationApi.stopActiveRulesForDevice(deviceId)).data
+    if (stopped.length > 0) {
+      await automationStore.fetchRules().catch(() => undefined)
+      notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
+    }
+    return true
+  } catch (e) {
+    console.warn('활성 룰 조회/정지 실패:', e)
+    return true // 조회 실패해도 수동 제어는 진행
+  }
+}
+
 const handleControl = async (deviceId: string, turnOn: boolean) => {
   if (controllingId.value) return
-  controllingId.value = deviceId
   const device = deviceStore.devices.find(d => d.id === deviceId)
+  // 자동제어 룰 동작 중이면 먼저 정지 확인 (개폐기와 동일)
+  if (!(await guardActiveRulesBeforeManual(deviceId, device?.name || '장치'))) return
+  controllingId.value = deviceId
   const loadingId = notify.add('info', '적용 중...', `${device?.name || '장치'} ${turnOn ? 'ON' : 'OFF'} 명령 전송 중`, 0)
   try {
     const result = await deviceStore.controlDevice(deviceId, [{ code: 'switch_1', value: turnOn }])
