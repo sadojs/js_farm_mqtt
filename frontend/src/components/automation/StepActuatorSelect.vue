@@ -9,11 +9,12 @@
       선택한 구역에 제어 가능한 장치가 없습니다.
     </div>
     <template v-else>
-      <!-- 개폐기 (단일 선택, opener_open이 대표 ID) -->
+      <!-- 개폐기 (복수 선택, opener_open이 대표 ID) -->
       <div v-if="openers.length > 0" class="device-section">
         <div class="section-label">
           <span class="section-label-text">개폐기</span>
           <span class="section-count">{{ openers.length }}</span>
+          <span class="multi-badge">복수 선택 가능</span>
         </div>
         <div class="device-list">
           <button
@@ -22,12 +23,11 @@
             type="button"
             class="device-card"
             :class="{ selected: selectedIds.includes(device.id) }"
-            role="radio"
-            :aria-checked="selectedIds.includes(device.id)"
-            @click="selectOther(device.id)"
+            :aria-pressed="selectedIds.includes(device.id)"
+            @click="toggleOpener(device.id)"
           >
-            <!-- 좌측: 라디오 원 -->
-            <span class="radio-mark" :class="{ checked: selectedIds.includes(device.id) }" aria-hidden="true">
+            <!-- 좌측: 체크박스 -->
+            <span class="check-box" :class="{ checked: selectedIds.includes(device.id) }" aria-hidden="true">
               <svg v-if="selectedIds.includes(device.id)" viewBox="0 0 24 24" width="14" height="14" fill="none"
                 stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12" />
@@ -202,6 +202,18 @@ function openerDisplayName(device: any): string {
 
 function toggleFan(deviceId: string) {
   const current = props.selectedIds.filter(id => fans.value.some((f: any) => f.id === id))
+  const idx = current.indexOf(deviceId)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(deviceId)
+  }
+  emit('update:selectedIds', current)
+}
+
+function toggleOpener(deviceId: string) {
+  // 개폐기도 팬처럼 복수 선택 — 개폐기 선택분만 유지하며 토글(다른 카테고리는 배타)
+  const current = props.selectedIds.filter(id => openers.value.some((o: any) => o.id === id))
   const idx = current.indexOf(deviceId)
   if (idx >= 0) {
     current.splice(idx, 1)
