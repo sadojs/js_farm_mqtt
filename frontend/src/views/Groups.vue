@@ -1166,41 +1166,10 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   const targetDevice = action === 'open' ? group.openDevice : group.closeDevice
   const oppositeDevice = action === 'open' ? group.closeDevice : group.openDevice
 
-  // ── 자동제어 룰 동작 중 수동 조작 가드 ──
+  // ── 자동제어 룰 동작 중 수동 조작 가드 (팬과 공용 헬퍼) ──
   // 개폐기는 자동제어와 수동이 공존하지 않는다(듀티사이클·인터록 충돌). 활성 룰이 있으면
-  // 먼저 정지해야 수동 제어가 유지된다. 정지하지 않으면 다음 tick에 룰이 다시 제어해버림.
-  // (재개는 사용자가 자동제어 페이지에서 직접 — 룰이 여러 개일 수 있으므로 자동 재개 없음)
-  let rulesStopped = false
-  if (!isFarmUser) {
-    try {
-      const active = (await automationApi.getActiveRulesForDevice(targetDevice.id)).data
-      if (active && active.length > 0) {
-        const names = active.map(r => `• ${r.name}`).join('\n')
-        const go = await confirm({
-          title: '자동제어 룰이 동작 중입니다',
-          message:
-            `${group.groupName} 개폐기를 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
-            `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
-            `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
-          confirmText: '정지하고 수동 제어',
-          cancelText: '취소',
-          variant: 'warning',
-        })
-        if (!go) return
-        const { stopped } = (await automationApi.stopActiveRulesForDevice(targetDevice.id)).data
-        rulesStopped = stopped.length > 0
-        if (stopped.length > 0) {
-          // 룰 목록 캐시 갱신 → 구역관리 페이지의 룰 on/off 상태가 즉시 반영
-          // (미갱신 시 새로고침/재진입 전까지 활성으로 표시되던 문제)
-          await automationStore.fetchRules().catch(() => undefined)
-          notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
-        }
-      }
-    } catch (e) {
-      // 활성 룰 조회 실패해도 수동 제어 자체는 진행 (안내만 생략)
-      console.warn('활성 룰 조회/정지 실패:', e)
-    }
-  }
+  // 먼저 정지해야 수동 제어가 유지된다. 개별 정지 → 그 개폐기 그룹만 영향(다른 그룹 유지).
+  if (!(await guardActiveRulesBeforeManual(targetDevice.id, `${group.groupName} 개폐기`))) return
 
   // ── 비 감지 자동 제어(강제 닫힘) 동작 중 수동 '열기' 가드 ──
   // 비 감지로 개폐기가 닫혀 있을 때 수동으로 열려면 먼저 비 감지 자동 제어를 꺼야
@@ -1234,11 +1203,10 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   openerInterlocking.value = true
   const loadingId = notify.add('info', '적용 중...', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'} 명령 전송 중`, 0)
   try {
-    // 이미 ON이면 OFF만 (자동 타이머도 취소).
-    // 단 방금 룰을 정지한 경우(rulesStopped)는 sticky로 남은 '가동중' 상태를 무시하고
-    // 사용자가 누른 방향을 강제로 ON 한다. (룰이 열림을 sticky ON 표시하던 중 클릭하면
-    // '이미 ON→OFF'로 뒤집혀 여는 대신 꺼지던 문제 방지 — 수동 시 동작/대기 로직 무시)
-    if (!rulesStopped && targetDevice.switchState) {
+    // 켜져있는(열림/닫힘) 방향 토글을 누르면 '중지(OFF)'. 자동 타이머도 취소.
+    // 룰을 방금 정지했더라도, 룰로 열려있던 개폐기를 끄려는 의도이므로 그대로 OFF 한다.
+    // (이전엔 룰 정지 시 여기서 강제 재-ON 해서 '중지했는데 안 꺼지던' 문제가 있었음.)
+    if (targetDevice.switchState) {
       if (openerAutoOffTimers.has(targetDevice.id)) {
         clearTimeout(openerAutoOffTimers.get(targetDevice.id))
         openerAutoOffTimers.delete(targetDevice.id)
