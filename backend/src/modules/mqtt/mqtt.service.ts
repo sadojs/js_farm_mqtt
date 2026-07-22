@@ -191,6 +191,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   /** GPIO 릴레이 명령 발행 → farm/{gatewayId}/gpio/relay */
   async publishGpioRelay(gatewayId: string, cmd: {
     slot: string; pin: number; state: boolean; durationMs?: number;
+    /** 개폐기 인터록 파트너 핀(BCM). state=ON 시 gpio-agent가 이 핀을 먼저 강제 OFF → 동시 ON 방지. */
+    interlockPin?: number;
   }): Promise<void> {
     const topic = `farm/${gatewayId}/gpio/relay`;
     const payload = JSON.stringify({ ...cmd, requestId: Date.now() });

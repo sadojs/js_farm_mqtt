@@ -41,6 +41,26 @@ try {
 const pinProcs = new Map();
 // 핀별 자동해제 타이머
 const pinTimers = new Map();
+// 핀별 마지막 논리 ON 상태 (인터록 판단용)
+const pinOn = new Map();
+
+// ── 하드웨어 인터록 (개폐기 열기/닫기 동시 ON 방지 = 쇼트/모터 역가압 방어) ──
+// 두 핀이 물리적으로 동시에 ON 되면 절대 안 된다. 어떤 명령이 오더라도 한 핀을 ON 하기
+// 전에 인터록 파트너 핀을 반드시 먼저 OFF 시킨다. 파트너 정보 출처(누적):
+//   (1) env GPIO_INTERLOCK_PAIRS="22:27,23:24"  (고정 배선 — 서버와 무관한 최종 방어선)
+//   (2) 명령 payload의 interlockPin  (서버가 쌍을 알려줌 → 자동 학습)
+const interlockMap = new Map(); // pin -> 파트너 pin (양방향)
+function linkInterlock(a, b) {
+  if (!BCM_VALID.has(a) || !BCM_VALID.has(b) || a === b) return;
+  interlockMap.set(a, b);
+  interlockMap.set(b, a);
+}
+(process.env.GPIO_INTERLOCK_PAIRS || '').split(',').forEach((seg) => {
+  const [a, b] = seg.split(':').map((s) => parseInt(s.trim(), 10));
+  if (Number.isInteger(a) && Number.isInteger(b)) linkInterlock(a, b);
+});
+// 파트너 강제 OFF 후 물리 릴레이가 실제로 떨어질 때까지 대기(ms) — 동시 ON 구간 제거.
+const INTERLOCK_SETTLE_MS = parseInt(process.env.GPIO_INTERLOCK_SETTLE_MS || '250', 10);
 
 /**
  * BCM 핀을 특정 level(0/1)로 설정하고 프로세스를 유지.
@@ -125,49 +145,71 @@ client.on('message', (topic, payload) => {
   handleRelayCommand(payload.toString());
 });
 
+function clearPinTimer(pin) {
+  if (pinTimers.has(pin)) { clearTimeout(pinTimers.get(pin)); pinTimers.delete(pin); }
+}
+
+function publishStatus(obj) {
+  client.publish(TOPIC_STATUS, JSON.stringify({ timestamp: new Date().toISOString(), ...obj }), { qos: 1 });
+}
+
+// 모든 릴레이 명령을 단일 큐로 직렬화 — 인터록(파트너 OFF→대기→자기 ON) 시퀀스가
+// 다른 명령과 인터리빙되지 않도록 원자적으로 처리한다.
+let cmdQueue = Promise.resolve();
+
 function handleRelayCommand(raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch {
     console.warn('[GPIO] 잘못된 JSON:', raw);
     return;
   }
+  cmdQueue = cmdQueue
+    .then(() => processRelayCommand(msg))
+    .catch((err) => console.error('[GPIO] 명령 처리 오류:', err && err.message ? err.message : err));
+}
 
-  const { slot, pin, state, durationMs, requestId } = msg;
+async function processRelayCommand(msg) {
+  const { slot, pin, state, durationMs, requestId, interlockPin } = msg;
 
   if (!BCM_VALID.has(pin)) {
     console.warn(`[GPIO] 유효하지 않은 핀: BCM ${pin}`);
     return;
   }
 
+  // 서버가 파트너 핀을 알려주면 인터록 쌍으로 학습(양방향)
+  if (Number.isInteger(interlockPin)) linkInterlock(pin, interlockPin);
+
   // 기존 자동해제 타이머 취소
-  if (pinTimers.has(pin)) {
-    clearTimeout(pinTimers.get(pin));
-    pinTimers.delete(pin);
+  clearPinTimer(pin);
+
+  // ── 하드웨어 인터록: 이 핀을 ON 하기 전에 파트너 핀을 반드시 먼저 OFF ──
+  // (state=false, 즉 OFF 명령은 언제나 안전하므로 인터록 불필요.)
+  if (state === true) {
+    const partner = interlockMap.get(pin);
+    // 파트너가 ON(또는 상태 미상)이면 강제 OFF + 물리 릴레이 해제 대기.
+    if (partner != null && pinOn.get(partner) !== false) {
+      clearPinTimer(partner);
+      relaySet(partner, false);
+      pinOn.set(partner, false);
+      console.log(`[GPIO] 🔒 인터록: BCM ${pin} ON 전 파트너 BCM ${partner} 강제 OFF`);
+      publishStatus({ slot: 'interlock', pin: partner, state: false, interlock: true });
+      await new Promise((r) => setTimeout(r, INTERLOCK_SETTLE_MS));
+    }
   }
 
   relaySet(pin, state);
+  pinOn.set(pin, state === true);
 
-  client.publish(TOPIC_STATUS, JSON.stringify({
-    requestId,
-    slot,
-    pin,
-    state,
-    timestamp: new Date().toISOString(),
-  }), { qos: 1 });
+  publishStatus({ requestId, slot, pin, state });
 
   // 자동 해제
   if (durationMs && durationMs > 0 && state) {
     const timer = setTimeout(() => {
       pinTimers.delete(pin);
       relaySet(pin, false);
+      pinOn.set(pin, false);
       console.log(`[GPIO] BCM ${pin} (${slot}) → OFF (자동해제)`);
-      client.publish(TOPIC_STATUS, JSON.stringify({
-        slot,
-        pin,
-        state: false,
-        timestamp: new Date().toISOString(),
-        auto: true,
-      }), { qos: 1 });
+      publishStatus({ slot, pin, state: false, auto: true });
     }, durationMs);
     pinTimers.set(pin, timer);
   }
@@ -193,6 +235,7 @@ if (GPIO_INIT_PINS.length > 0) {
   const offLevel = ACTIVE_LOW ? 1 : 0;
   GPIO_INIT_PINS.forEach(pin => {
     setPin(pin, offLevel);
+    pinOn.set(pin, false);
     console.log(`[GPIO] BCM ${pin} 초기화 → OFF (level=${offLevel})`);
   });
 }

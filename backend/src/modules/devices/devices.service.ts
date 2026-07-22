@@ -744,7 +744,58 @@ export class DevicesService {
    * @param callerSource - 호출자 컨텍스트 (자동제어 vs 사용자 vs rain-override 구분용).
    *                       'automation' | 'rain-override' | undefined(사용자)
    */
+  /**
+   * 개폐기 쌍(open/close) 단위 직렬화 락.
+   * 인터록(반대편 OFF→1초 대기→자기 ON)은 단일 호출 내에서만 성립하므로, 플래핑으로
+   * rain-override(닫기 ON)와 자동제어(열기 ON)가 1초 이내로 겹쳐 호출되면 두 시퀀스가
+   * 인터리빙돼 열기·닫기 릴레이가 동시에 ON 될 수 있다(인터록 위반). 같은 개폐기 쌍의
+   * controlDevice 호출을 이 락으로 직렬화해 한 번에 하나의 OFF→대기→ON 시퀀스만 진행시킨다.
+   */
+  private openerLocks = new Map<string, Promise<unknown>>();
+
+  private async withOpenerLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.openerLocks.get(key) ?? Promise.resolve();
+    const run = prev.catch(() => undefined).then(fn);
+    this.openerLocks.set(key, run);
+    try {
+      return await run;
+    } finally {
+      if (this.openerLocks.get(key) === run) this.openerLocks.delete(key);
+    }
+  }
+
+  /** 개폐기(opener_open/close)면 쌍을 정규화한 락 키, 아니면 null. */
+  private async openerLockKey(id: string, role?: string, userId?: string): Promise<string | null> {
+    const d = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
+    if (!d) return null;
+    const isOpener = d.equipmentType === 'opener_open' || d.equipmentType === 'opener_close';
+    if (!isOpener) return null;
+    const pair = d.pairedDeviceId ?? undefined;
+    const ids = pair ? [d.id, pair].sort() : [d.id];
+    return `opener:${ids.join('|')}`;
+  }
+
+  /**
+   * 공개 진입점 — 개폐기면 쌍 단위 락으로 직렬화한 뒤 실제 제어(controlDeviceInner)를 수행한다.
+   * (개폐기가 아니면 락 없이 즉시 위임 — 팬/관수 등 일반 제어 경로에는 오버헤드 없음.)
+   */
   async controlDevice(
+    id: string,
+    userId: string,
+    commands: { code: string; value: any }[],
+    role?: string,
+    callerSource?: 'automation' | 'rain-override',
+    durationMs?: number,
+  ) {
+    const lockKey = await this.openerLockKey(id, role, userId);
+    if (lockKey) {
+      return this.withOpenerLock(lockKey, () =>
+        this.controlDeviceInner(id, userId, commands, role, callerSource, durationMs));
+    }
+    return this.controlDeviceInner(id, userId, commands, role, callerSource, durationMs);
+  }
+
+  private async controlDeviceInner(
     id: string,
     userId: string,
     commands: { code: string; value: any }[],
@@ -969,6 +1020,9 @@ export class DevicesService {
     // 개폐기 인터록: ON 명령 시 반대쪽을 먼저 OFF 후 1초 대기
     const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
     const isOnCmd = commands.some(c => (c.value === true || c.value === 'ON' || c.value === 1));
+    // 파트너(반대편) onboard GPIO 핀 — 자기 ON 발행 시 gpio-agent에 함께 실어보내
+    // 하드웨어 인터록(동시 ON 방지)의 근거로 사용한다.
+    let interlockPartnerPin: number | undefined;
     if (isOpener && isOnCmd && device.pairedDeviceId) {
       const paired = await this.devicesRepo.findOne({ where: { id: device.pairedDeviceId } });
       if (paired) {
@@ -980,6 +1034,7 @@ export class DevicesService {
             // paired가 onboard 장치면 GPIO 토픽으로 OFF
             const pairedSlot = await this.onboardRepo.findOne({ where: { id: paired.onboardDeviceId } });
             if (pairedSlot?.gpioPin != null) {
+              interlockPartnerPin = pairedSlot.gpioPin;
               await this.mqttService.publishGpioRelay(pairedGw.gatewayId, {
                 slot: pairedSlot.slotKey,
                 pin: pairedSlot.gpioPin,
@@ -1032,6 +1087,8 @@ export class DevicesService {
         slot: slot.slotKey,
         pin: slot.gpioPin,
         state: isOn,
+        // 개폐기 ON: 파트너 핀을 함께 실어보내 gpio-agent가 하드웨어 인터록(파트너 먼저 OFF) 적용
+        ...(isOn && interlockPartnerPin != null ? { interlockPin: interlockPartnerPin } : {}),
         // 동작 펄스: state=ON + durationMs 면 gpio-agent가 durationMs 뒤 자동 OFF (모터 연속통전 방지)
         ...(durationMs && durationMs > 0 && isOn ? { durationMs } : {}),
       });
