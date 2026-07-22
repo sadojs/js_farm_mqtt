@@ -9,6 +9,7 @@ import { Device } from '../devices/entities/device.entity';
 import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
 import { RainOverrideService } from '../rain-override/rain-override.service';
+import { HighTempOverrideService } from './high-temp-override.service';
 
 type LogicOp = 'AND' | 'OR';
 
@@ -29,6 +30,7 @@ export class AutomationRunnerService {
     private readonly eventsGateway: EventsGateway,
     private readonly devicesService: DevicesService,
     private readonly rainOverride: RainOverrideService,
+    private readonly highTempOverride: HighTempOverrideService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -224,6 +226,14 @@ export class AutomationRunnerService {
     // 사이클을 룰 활성화 시각(anchor)에 정렬 → 항상 동작(ON)부터 시작 (기존 epoch 정렬은 대기부터 시작 가능).
     const relayResult = this.checkRelayCycle(rule, evaluatedAt, cycleAnchorMs);
     if (relayResult) {
+      // 고온 무대기 강제열림: 개폐기 '열림' 방향(hysteresis 'on') 이고 구역이 고온 오버라이드
+      // 활성이면, 동작/대기 듀티의 대기(off) phase 를 생략하고 연속 '열림'을 유지한다.
+      // (10분 캡은 아래에서 그대로 적용 — 완전 개방 후 정지.)
+      if (hysteresisAction === 'on'
+        && await this.isOpenerRule(rule)
+        && await this.highTempOverride.isActive(rule.groupId)) {
+        relayResult.isOnPhase = true;
+      }
       // 동일 방향 10분 초과 시 자동 OFF + 정지 (개폐기는 실제 ~3분이면 완전 개/폐 — 무한 반복 방지).
       if (nowMs - directionStartMs >= 10 * 60 * 1000) {
         relayResult.isOnPhase = false;

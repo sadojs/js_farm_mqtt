@@ -40,6 +40,9 @@ const DEFAULT_RULES = {
     openerStandbySeconds: 60,
     fanOperationMinutes: 50,
     fanStandbyMinutes: 10,
+    // 고온 무대기 강제열림 (비 그친 뒤 고온 시 대기 없이 연속 개방). 기본 OFF. 서버 sync로 갱신.
+    highTempOverrideEnabled: false,
+    highTempOpenThreshold: null,
     // 무전압 접점 우적센서 (온보드 GPIO 직결). enabled 면 GPIO 를 감시하여
     // farm/{gw}/z2m/{friendlyName} 로 {rain} 발행 → 기존 우적 파이프라인 재사용.
     rainInput: { enabled: false, pin: 21, activeLow: true, friendlyName: 'rain_sensor' },

@@ -98,6 +98,28 @@ function setOpenerIntent(state, intent, reason, relay, queue, store) {
   return true;
 }
 
+// 고온 무대기 강제열림 — 비 그친 뒤 고온 시 대기 없이 매 eval tick 열림 펄스 재발행(연속 개방),
+// 10분 캡 후 정지(상태 유지). rain-override 의 강제닫힘과 대칭. (온라인 automation-runner 와 동일 의미)
+function forceOpenHighTemp(state, store, relay, queue, now) {
+  const nowMs = now && now.getTime ? now.getTime() : Date.now();
+  if (state.highTempOpen !== true) {
+    const from = state.openerIntent;
+    if (!firePulse('open', 'high-temp-override', relay, store)) return; // 보류 — 다음 tick 재시도
+    state.openerIntent = 'open';
+    state.openerDuty = null;          // 일반 동작/대기 듀티 사용 안 함
+    state.highTempOpen = true;
+    state.highTempAnchorMs = nowMs;
+    queue.enqueue({
+      eventType: 'rule_fired',
+      payload: { rule: 'high-temp-override', from, to: 'open' },
+      occurredAt: new Date().toISOString(),
+    });
+    return;
+  }
+  if (nowMs - (state.highTempAnchorMs || nowMs) >= OPENER_DUTY_MAX_MS) return; // 10분 캡 → 정지
+  firePulse('open', 'high-temp-override-continuous', relay, store);           // 무대기 재펄스
+}
+
 function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatchdog }) {
   if (!cfg.openerEnabled) return;
   const openChannels = store.getChannels('opener_open');
@@ -106,8 +128,25 @@ function evaluate({ cfg, store, state, rainActive, now, relay, queue, sensorWatc
 
   // 1) 우적(비) 최우선 — 무조건 닫힘
   if (rainActive) {
+    state.highTempOpen = false;
     setOpenerIntent(state, 'closed', 'rain-active', relay, queue, store);
     return;
+  }
+
+  // 1.5) 고온 무대기 강제열림 (비 아님 + 온습도계 정상 + 내부온도 ≥ 임계값)
+  if (cfg.highTempOverrideEnabled && cfg.highTempOpenThreshold != null) {
+    const timeoutMs = (cfg.sensorTimeoutSeconds || 1200) * 1000;
+    const tempFresh = sensorWatchdog && sensorWatchdog.isFresh('temperature', state, timeoutMs, now.getTime());
+    if (tempFresh && state.lastTemperature != null && state.lastTemperature >= cfg.highTempOpenThreshold) {
+      forceOpenHighTemp(state, store, relay, queue, now);
+      return;
+    }
+  }
+  // 고온 세션 종료 → 일반 제어 복귀 시 intent 재초기화(듀티 재수립)
+  if (state.highTempOpen) {
+    state.highTempOpen = false;
+    state.openerIntent = null;
+    state.openerDuty = null;
   }
 
   // 2) primary: 온습도 제어 (온습도계 정상일 때) — 유동팬과 동일 히스테리시스

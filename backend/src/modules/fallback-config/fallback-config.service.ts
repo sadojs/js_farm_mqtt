@@ -389,6 +389,9 @@ export class FallbackConfigService implements OnModuleInit {
         openerStandbySeconds: config.openerStandbySeconds,
         fanOperationMinutes: config.fanOperationMinutes,
         fanStandbyMinutes: config.fanStandbyMinutes,
+        // [고온 무대기 강제열림] — 이머전시(fallback) opener 도 동일 적용
+        highTempOverrideEnabled: config.highTempOverrideEnabled,
+        highTempOpenThreshold: config.highTempOpenThreshold,
       },
       schedule: schedule.map((s) => ({
         month: s.month,

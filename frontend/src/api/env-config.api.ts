@@ -67,6 +67,8 @@ export interface ZoneDeviceSettings {
     fanStandbyMinutes: number
     hasRainSensor: boolean
     rainEnabled: boolean
+    highTempOverrideEnabled: boolean
+    highTempOpenThreshold: number | null
   } | null
 }
 
@@ -76,6 +78,8 @@ export interface SaveZoneDeviceSettings {
   fanOperationMinutes?: number
   fanStandbyMinutes?: number
   rainEnabled?: boolean
+  highTempOverrideEnabled?: boolean
+  highTempOpenThreshold?: number | null
 }
 
 export const envConfigApi = {

@@ -85,6 +85,8 @@ export class EnvConfigController {
       fanOperationMinutes?: number;
       fanStandbyMinutes?: number;
       rainEnabled?: boolean;
+      highTempOverrideEnabled?: boolean;
+      highTempOpenThreshold?: number | null;
     },
   ) {
     return this.envConfigService.saveZoneDeviceSettings(

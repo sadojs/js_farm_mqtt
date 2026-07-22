@@ -97,6 +97,14 @@
               <input type="checkbox" v-model="deviceForm.rainEnabled" />
               <span>☔ 우적센서 활성화 <span class="env-unit">(비 감지 시 개폐기 자동 닫힘)</span></span>
             </label>
+            <label class="device-rain-row">
+              <input type="checkbox" v-model="deviceForm.highTempOverrideEnabled" />
+              <span>🔥 고온 무대기 강제열림 <span class="env-unit">(비 그친 뒤 고온 시 개폐기 대기 없이 연속 개방)</span></span>
+            </label>
+            <div v-if="deviceForm.highTempOverrideEnabled" class="device-field" style="margin-top: 8px;">
+              <label class="env-role-label">고온 임계 온도 <span class="env-unit">(°C 이상 시 강제열림)</span></label>
+              <input type="number" min="-10" max="100" step="0.5" v-model.number="deviceForm.highTempOpenThreshold" class="env-source-select" placeholder="예: 35" />
+            </div>
           </template>
         </template>
       </div>
@@ -196,6 +204,8 @@ async function saveEnvConfig() {
         fanOperationMinutes: d.fanOperationMinutes,
         fanStandbyMinutes: d.fanStandbyMinutes,
         ...(d.hasRainSensor ? { rainEnabled: d.rainEnabled } : {}),
+        highTempOverrideEnabled: d.highTempOverrideEnabled,
+        highTempOpenThreshold: d.highTempOpenThreshold ?? null,
       })
     }
     emit('close')

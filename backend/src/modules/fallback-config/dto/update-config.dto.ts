@@ -119,4 +119,16 @@ export class UpdateFallbackConfigDto {
   @Min(1)
   @Max(240)
   fanStandbyMinutes?: number;
+
+  /** [고온 무대기 강제열림] 활성 토글 (구역 환경설정). 기본 OFF. */
+  @IsOptional()
+  @IsBoolean()
+  highTempOverrideEnabled?: boolean;
+
+  /** [고온 무대기 강제열림] 임계 온도(°C). null 이면 미설정. */
+  @IsOptional()
+  @IsNumber()
+  @Min(-10)
+  @Max(100)
+  highTempOpenThreshold?: number | null;
 }

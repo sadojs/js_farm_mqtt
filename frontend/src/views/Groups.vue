@@ -244,6 +244,9 @@
                     >✎</button>
                   </template>
                   <span class="type-tag actuator type-tag-opener">개폐기</span>
+                  <span v-if="highTempActiveZones.has(group.id)" class="hightemp-badge" title="고온 무대기 강제열림 동작 중 — 개폐기를 대기 없이 연속 개방 중입니다">
+                    🔥 고온 강제열림
+                  </span>
                   <span v-if="openerTimerOf(og)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(og.openDevice)" title="타이머 해제 → 자동제어 복귀">
                     <span class="timer-dot"></span>{{ openerTimerOf(og)!.direction === 'open' ? '열기' : '닫기' }} {{ formatCountdown(openerTimerOf(og)!.until) }}<span class="timer-x">✕</span>
                   </span>
@@ -610,6 +613,7 @@ import type { Device, DependencyRule, ChannelMapping } from '../types/device.typ
 import { FUNCTION_LABELS } from '../types/device.types'
 import type { AutomationRule } from '../types/automation.types'
 import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
+import { onHighTempOverride } from '../composables/useWebSocket'
 
 const route = useRoute()
 const groupStore = useGroupStore()
@@ -861,6 +865,10 @@ async function confirmAddGateways() {
   }
 }
 
+// 고온 무대기 강제열림 활성 구역 (WebSocket 실시간) — 개폐기 카드 배지용
+const highTempActiveZones = ref<Set<string>>(new Set())
+let offHighTempOverride: (() => void) | null = null
+
 onMounted(async () => {
   await Promise.all([
     groupStore.fetchGroups(),
@@ -871,6 +879,12 @@ onMounted(async () => {
   automationStore.fetchIrrigationStatus()
   loadNoteCounts()
   loadBulkStopped()
+  offHighTempOverride = onHighTempOverride(({ groupId, active }) => {
+    const next = new Set(highTempActiveZones.value)
+    if (active) next.add(groupId)
+    else next.delete(groupId)
+    highTempActiveZones.value = next
+  })
   const envConfigGroupId = route.query.envConfig as string | undefined
   if (envConfigGroupId) {
     const target = groupStore.groups.find(g => g.id === envConfigGroupId)
@@ -1704,6 +1718,7 @@ onBeforeUnmount(() => {
   // 남은 개폐기 자동 OFF 타이머 모두 취소
   for (const timerId of openerAutoOffTimers.values()) clearTimeout(timerId)
   openerAutoOffTimers.clear()
+  offHighTempOverride?.()
 })
 </script>
 
@@ -2159,6 +2174,19 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+}
+.hightemp-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: calc(11px * var(--content-scale, 1));
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: timer-blink 1.2s steps(1) infinite;
 }
 .timer-dot {
   width: 6px; height: 6px; border-radius: 50%;

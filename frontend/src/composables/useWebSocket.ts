@@ -45,6 +45,19 @@ export function onFallbackEvent(fn: FallbackEventHandler) {
   return () => fallbackEventHandlers.delete(fn)
 }
 
+// 고온 무대기 강제열림 상태 (구역 단위) 핸들러
+type HighTempOverrideHandler = (data: {
+  groupId: string
+  active: boolean
+  temperature?: number | null
+  threshold?: number | null
+}) => void
+const highTempOverrideHandlers = new Set<HighTempOverrideHandler>()
+export function onHighTempOverride(fn: HighTempOverrideHandler) {
+  highTempOverrideHandlers.add(fn)
+  return () => highTempOverrideHandlers.delete(fn)
+}
+
 export const socketStatus = readonly({
   connected: _connected,
   reconnecting: _reconnecting,
@@ -216,6 +229,11 @@ export function useWebSocket() {
     })
     socket.on('fallback:event', (data: Parameters<FallbackEventHandler>[0]) => {
       fallbackEventHandlers.forEach(fn => fn(data))
+    })
+
+    // 고온 무대기 강제열림 상태 (구역 단위)
+    socket.on('high-temp:override', (data: Parameters<HighTempOverrideHandler>[0]) => {
+      highTempOverrideHandlers.forEach(fn => fn(data))
     })
 
     // 일반 알림

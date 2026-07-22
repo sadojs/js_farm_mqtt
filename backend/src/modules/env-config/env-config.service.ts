@@ -360,6 +360,9 @@ export class EnvConfigService {
         fanStandbyMinutes: config.fanStandbyMinutes,
         hasRainSensor: !!rainSlot,
         rainEnabled: rainSlot ? rainSlot.enabled : false,
+        // 고온 무대기 강제열림
+        highTempOverrideEnabled: config.highTempOverrideEnabled,
+        highTempOpenThreshold: config.highTempOpenThreshold,
       },
     };
   }
@@ -373,6 +376,8 @@ export class EnvConfigService {
       fanOperationMinutes?: number;
       fanStandbyMinutes?: number;
       rainEnabled?: boolean;
+      highTempOverrideEnabled?: boolean;
+      highTempOpenThreshold?: number | null;
     },
   ) {
     const gateways = await this.resolveZoneGateways(userId, groupId);
@@ -389,6 +394,10 @@ export class EnvConfigService {
       dutyDto.fanOperationMinutes = dto.fanOperationMinutes;
     if (dto.fanStandbyMinutes != null)
       dutyDto.fanStandbyMinutes = dto.fanStandbyMinutes;
+    if (dto.highTempOverrideEnabled != null)
+      dutyDto.highTempOverrideEnabled = dto.highTempOverrideEnabled;
+    if (dto.highTempOpenThreshold !== undefined)
+      dutyDto.highTempOpenThreshold = dto.highTempOpenThreshold;
 
     // 구역 내 모든 게이트웨이에 fan-out — 각각 fallback_config 갱신 + publishSync.
     for (const gw of gateways) {

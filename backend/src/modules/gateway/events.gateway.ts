@@ -246,6 +246,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('rain:override', payload);
   }
 
+  // 고온 무대기 강제열림 상태 브로드캐스트 (구역 단위)
+  broadcastHighTempOverride(payload: { groupId: string; active: boolean; temperature?: number | null; threshold?: number | null }) {
+    this.server.emit('high-temp:override', payload);
+  }
+
   // rpi-emergency-failover: 폴백 모드 전환 브로드캐스트
   broadcastFallbackModeChanged(payload: {
     gatewayId: string;

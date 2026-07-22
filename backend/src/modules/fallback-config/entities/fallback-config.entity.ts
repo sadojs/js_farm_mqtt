@@ -70,6 +70,17 @@ export class FallbackConfig {
   @Column({ name: 'opener_standby_seconds', type: 'int', default: 60 })
   openerStandbySeconds!: number;
 
+  /** [고온 무대기 강제열림] 활성 토글(구역 환경설정). 기본 OFF — 미설정 시 기존 동작 그대로. */
+  @Column({ name: 'high_temp_override_enabled', type: 'boolean', default: false })
+  highTempOverrideEnabled!: boolean;
+
+  /** [고온 무대기 강제열림] 임계 온도(°C). 비 그친 뒤 내부온도 ≥ 이 값이면 대기 없이 연속 개방. */
+  @Column({
+    name: 'high_temp_open_threshold', type: 'numeric', precision: 5, scale: 2, nullable: true,
+    transformer: { to: (v) => v, from: (v) => (v == null ? null : parseFloat(v)) },
+  })
+  highTempOpenThreshold!: number | null;
+
   /** 게이트웨이 공통 유동팬 동작 시간(분) */
   @Column({ name: 'fan_operation_minutes', type: 'int', default: 50 })
   fanOperationMinutes!: number;
