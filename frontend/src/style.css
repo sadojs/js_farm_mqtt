@@ -224,6 +224,15 @@ body {
   overscroll-behavior-y: none;
   overflow-x: clip;
   max-width: 100%;
+  /* 롱프레스 콜아웃(복사하기 등) 전역 차단 — -webkit-touch-callout 은 상속되어 모든 요소에 적용.
+     (앱형 UX. 입력/편집 요소는 아래에서 예외 처리해 붙여넣기 유지.) */
+  -webkit-touch-callout: none;
+}
+/* 입력·편집 요소는 콜아웃/선택 허용 (붙여넣기·텍스트 선택) */
+input, textarea, [contenteditable="true"], [contenteditable=""] {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
 }
 /* viewport 안에 강제로 가두어 한 카드가 폭을 넘쳐도 가로 캐러셀 안 만듦.
    (clip 사용 — hidden 은 세로 스크롤 컨테이너를 만들어 본문 스크롤을 막음) */
