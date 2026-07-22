@@ -1870,13 +1870,9 @@ onBeforeUnmount(() => {
 }
 .btn-rename-group:hover { opacity: 1; color: var(--accent, #4caf50); }
 
-/* sub-card 안 미니 이름 편집 버튼 */
-.btn-rename-mini {
-  background: none; border: none; color: var(--text-muted);
-  font-size: 12px; cursor: pointer; padding: 0 4px;
-  opacity: 0.5; vertical-align: middle;
-}
-.btn-rename-mini:hover { opacity: 1; color: var(--accent, #4caf50); }
+/* sub-card 안 미니 이름 편집 버튼 — 이동 버튼과 붙어 눌기 어려워 숨김.
+   대신 편집 모드에서 장치 이름 자체가 편집 가능 어포던스(.editable)를 표시한다. */
+.btn-rename-mini { display: none; }
 .btn-rename-ok {
   background: var(--accent, #4caf50); color: #fff; border: none;
   border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer;
@@ -2114,12 +2110,22 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 편집 모드에서 이름은 눌러서 바로 수정 가능(커서 + 점선 밑줄로 어포던스 표시) */
+/* 편집 모드에서 이름은 눌러서 바로 수정 가능 — 점선 테두리 칩 + ✎ 아이콘으로 명확히 표시.
+   (별도 편집 버튼을 없앤 대신 이름 자체가 '탭하면 수정' 어포던스를 갖는다.) */
 .sub-card-name.editable {
   cursor: text;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--border-color, #cbd5e1);
+  color: var(--accent, #16a34a);
+  background: color-mix(in srgb, var(--accent, #4caf50) 9%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent, #4caf50) 50%, transparent);
+  border-radius: 7px;
+  padding: 1px 7px;
+  text-decoration: none;
+}
+.sub-card-name.editable::before {
+  content: '✎';
+  margin-right: 4px;
+  font-weight: 700;
+  opacity: 0.85;
 }
 /* 구역 헤더 '편집' 토글 — 켜짐 상태 강조 */
 .btn-edit-toggle.active {
