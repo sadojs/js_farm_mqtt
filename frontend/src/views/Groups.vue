@@ -1808,15 +1808,20 @@ onBeforeUnmount(() => {
    규칙에 덮여 상대적으로 컸음. 구역 rename 은 환경설정 모달로 이동해 제거됨). */
 .btn-rename-ok {
   flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; min-height: 28px; min-width: 28px; box-sizing: border-box;
   background: var(--accent, #4caf50); color: #fff; border: none;
-  border-radius: 5px; padding: 1px 6px; font-size: 12px; line-height: 1.4;
-  font-weight: 700; cursor: pointer; margin-left: 4px;
+  border-radius: 7px; font-size: 14px; line-height: 1;
+  font-weight: 700; cursor: pointer; margin-left: 6px; padding: 0;
+  transition: background 0.15s;
 }
+.btn-rename-ok:hover { background: color-mix(in srgb, var(--accent, #4caf50) 85%, #000); }
 .rename-input-inline {
-  padding: 2px 6px; border: 1px solid var(--accent, #4caf50);
-  border-radius: 4px; font-size: 13px; font-weight: 600;
+  height: 28px; box-sizing: border-box;
+  padding: 2px 8px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 7px; font-size: 13px; font-weight: 600;
   background: var(--bg-input); color: var(--text-primary);
-  outline: none; flex: 1; min-width: 100px;
+  outline: none; flex: 1; min-width: 90px;
 }
 
 .group-desc {
@@ -2013,8 +2018,8 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 편집 모드에서 이름은 눌러서 바로 수정 가능 — 점선 테두리 칩 + ✎ 아이콘으로 명확히 표시.
-   (별도 편집 버튼을 없앤 대신 이름 자체가 '탭하면 수정' 어포던스를 갖는다.) */
+/* 편집 모드에서 이름은 눌러서 바로 수정 가능 — 점선 테두리 칩으로 '탭하면 수정' 어포던스만 표시.
+   (별도 편집 버튼·연필 아이콘 없이 이름 자체가 편집 대상임을 나타낸다.) */
 .sub-card-name.editable {
   cursor: text;
   color: var(--accent, #16a34a);
@@ -2023,12 +2028,6 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   padding: 1px 7px;
   text-decoration: none;
-}
-.sub-card-name.editable::before {
-  content: '✎';
-  margin-right: 4px;
-  font-weight: 700;
-  opacity: 0.85;
 }
 /* 구역 헤더 '편집' 토글 — 켜짐 상태 강조 */
 .btn-edit-toggle.active {
