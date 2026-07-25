@@ -24,26 +24,47 @@ const CLEAR_COOKIE_OPTIONS = {
   path: '/',
 };
 
+// Capacitor 앱(iOS/Android)은 출처가 capacitor://localhost · http://localhost 라
+// httpOnly refresh 쿠키가 교차출처로 취급돼 전송되지 않는다. 그래서 앱은 X-Client 헤더를
+// 보내고, 서버는 이 요청에 한해 refreshToken 을 응답 body 로도 내려준다(웹은 지금대로 쿠키만).
+// Plan v2 §5.2 — 추가·하위호환(웹 동작 무변경).
+function isAppClient(req: Request): boolean {
+  return req.headers['x-client']?.toString().endsWith('-app') ?? false;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.login(dto);
     res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      // 앱 전용: 쿠키를 못 쓰므로 refresh token 을 body 로도 전달 (웹은 미포함)
+      ...(isAppClient(req) ? { refreshToken: result.refreshToken } : {}),
+    };
   }
 
   @Post('refresh')
   @SkipThrottle()
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token = req.cookies?.[REFRESH_COOKIE];
+    // 웹은 쿠키, 앱은 body 의 refreshToken 사용
+    const token = req.cookies?.[REFRESH_COOKIE] || req.body?.refreshToken;
     try {
       const result = await this.authService.refresh(token);
       res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
-      return { accessToken: result.accessToken };
+      return {
+        accessToken: result.accessToken,
+        ...(isAppClient(req) ? { refreshToken: result.refreshToken } : {}),
+      };
     } catch (err) {
       // 만료/무효 토큰 — 쿠키 즉시 정리 (iOS Safari 가 httpOnly 쿠키 영구 보관해
       // 사용자가 수동으로 쿠키 삭제할 때까지 로그인 못 하는 문제 해결)
@@ -72,7 +93,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @CurrentUser('id') userId: string,
   ) {
-    const token = req.cookies?.[REFRESH_COOKIE];
+    const token = req.cookies?.[REFRESH_COOKIE] || req.body?.refreshToken;
     await this.authService.logout(userId, token);
     res.clearCookie(REFRESH_COOKIE, CLEAR_COOKIE_OPTIONS);
     return { ok: true };

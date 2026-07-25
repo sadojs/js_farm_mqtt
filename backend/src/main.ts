@@ -15,7 +15,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
+    // 기존 웹 오리진 유지 + Capacitor 앱 오리진 추가(하위호환). Plan v2 §5.1.
+    origin: [
+      process.env.CORS_ORIGIN || 'http://localhost:5174',
+      'capacitor://localhost', // iOS 앱
+      'http://localhost', // Android 앱
+    ],
     credentials: true,
   });
 
