@@ -433,6 +433,8 @@ import { useAuthStore } from './stores/auth.store'
 import { useNoDoubleTapZoom } from './composables/useNoDoubleTapZoom'
 import { useNotificationStore } from './stores/notification.store'
 import { useWebSocket } from './composables/useWebSocket'
+// 네이티브 앱 전용 OS 푸시 등록 (웹에서는 no-op)
+import { initNativePush } from './composables/useNativePush'
 import ConfirmDialog from './components/common/ConfirmDialog.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
 import NotificationCenter from './components/common/NotificationCenter.vue'
@@ -526,9 +528,23 @@ onMounted(() => {
     fetchCropFeature()
     fetchFeatures()
     authStore.resolveWorkerStatus()
+    void initNativePush() // 앱에서만 실행 (웹 no-op)
   }
   updateClock()
   clockTimer = setInterval(updateClock, 10000)
+})
+
+// 로그인 직후(비인증 → 인증)에도 푸시 등록 — 앱에서만 동작, 웹은 no-op
+watch(isAuthenticated, (authed) => {
+  if (authed) {
+    void initNativePush()
+    return
+  }
+  // 인증 소멸(무음 갱신 실패·토큰 만료 등) 시 셸(상단바·사이드바)이 사라지므로,
+  // 보호된 화면에 햄버거도 없이 갇히지 않도록 로그인으로 강제 이동한다. (셸 안전장치)
+  if (route.path !== '/login') {
+    router.replace('/login')
+  }
 })
 
 // 라우트 이동 시 모바일 drawer 자동 닫기 — 메뉴 항목 클릭 후 본문이 가려지는 문제 방지

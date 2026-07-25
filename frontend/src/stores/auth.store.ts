@@ -3,9 +3,12 @@ import { defineStore } from 'pinia'
 import { authApi } from '../api/auth.api'
 import apiClient from '../api/client'
 import type { User } from '../types/auth.types'
+// 앱 전용 refresh token 저장/전송 (웹에서는 전부 no-op)
+import { saveAppRefreshToken, loadAppRefreshToken, clearAppRefreshToken } from '../utils/appAuth'
 
-// 14분마다 silent refresh (accessToken 만료 15분 기준)
-const SILENT_REFRESH_INTERVAL_MS = 14 * 60 * 1000
+// 10분마다 silent refresh (accessToken 만료 15분 기준 — 만료 전 여유 5분 확보).
+// 이전 14분은 여유 1분뿐이라 앱 백그라운드/느린 네트워크에서 만료→셸 소멸 위험이 컸음.
+const SILENT_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -13,6 +16,10 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const loading = ref(false)
   let silentRefreshTimer: ReturnType<typeof setInterval> | null = null
+  // refresh 동시호출 방지 뮤텍스 — 여러 요청이 동시에 401→refresh 하면 백엔드가 refresh
+  // 토큰을 회전시키므로 두 번째부터 실패하고, 그 실패가 성공한 갱신을 null 로 덮어써
+  // 셸(상단바·사이드바)이 사라지는 버그가 있었다. in-flight Promise 를 공유해 1회로 합친다.
+  let refreshInFlight: Promise<boolean> | null = null
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
@@ -44,7 +51,15 @@ export const useAuthStore = defineStore('auth', () => {
   function startSilentRefreshTimer() {
     stopSilentRefreshTimer()
     silentRefreshTimer = setInterval(async () => {
-      await refreshToken()
+      const ok = await refreshToken()
+      if (!ok) {
+        // 무음 갱신 실패 = 세션 만료. 인터셉터를 안 거치는 경로라 여기서 명시적으로 정리한다.
+        // (예전엔 accessToken 만 null 이 되어 상단바·사이드바가 사라진 채 페이지에 갇혔음)
+        stopSilentRefreshTimer()
+        user.value = null
+        isWorkerAccount.value = null
+        // accessToken 은 refreshToken() 이 이미 null 처리 → App.vue 의 isAuthenticated 워처가 /login 이동
+      }
     }, SILENT_REFRESH_INTERVAL_MS)
   }
 
@@ -59,9 +74,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const { data } = await authApi.login(username, password)
-      // refreshToken은 백엔드가 httpOnly 쿠키로 설정 → JS에서 접근 불가
+      // 웹: refreshToken 은 httpOnly 쿠키(응답 body 미포함). 앱: body 로 받은 토큰을 네이티브 저장.
       accessToken.value = data.accessToken
       user.value = data.user
+      await saveAppRefreshToken(data.refreshToken)
       // farm_user 는 worker 여부를 미리 결정해야 사이드바 NAV 분기가 깜빡이지 않음.
       // 다른 role 은 즉시 확정 — false 로 명시.
       if (user.value?.role === 'farm_user') {
@@ -86,19 +102,30 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null
     isWorkerAccount.value = null
     stopSilentRefreshTimer()
+    await clearAppRefreshToken()
   }
 
   async function refreshToken(): Promise<boolean> {
-    try {
-      // 쿠키는 브라우저가 자동 전송 → body에 토큰 불필요
-      const { data } = await authApi.refresh()
-      accessToken.value = data.accessToken
-      return true
-    } catch {
-      // 401 인터셉터가 로그아웃 처리 — 여기서는 상태만 초기화
-      accessToken.value = null
-      return false
-    }
+    // 이미 진행 중인 refresh 가 있으면 그 결과를 공유 (동시호출 → 토큰 회전 경쟁 방지)
+    if (refreshInFlight) return refreshInFlight
+    const p = (async (): Promise<boolean> => {
+      try {
+        // 웹: 쿠키 자동 전송. 앱: 저장된 refresh token 을 body 로 전달.
+        const stored = await loadAppRefreshToken()
+        const { data } = await authApi.refresh(stored)
+        accessToken.value = data.accessToken
+        await saveAppRefreshToken(data.refreshToken) // 회전된 새 토큰 저장 (앱)
+        return true
+      } catch {
+        // 갱신 실패(만료/무효) — 토큰 초기화. 리다이렉트는 호출측(인터셉터/무음타이머/App.vue 워처)이 담당.
+        accessToken.value = null
+        await clearAppRefreshToken()
+        return false
+      }
+    })()
+    refreshInFlight = p
+    void p.finally(() => { if (refreshInFlight === p) refreshInFlight = null })
+    return p
   }
 
   async function fetchUser() {
@@ -111,11 +138,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function initAuth() {
-    // 쿠키 기반 silent refresh 시도 (httpOnly refreshToken 쿠키 사용)
-    // refreshToken() 실패 시 로그아웃 호출 없이 상태만 초기화
+    // 웹: 쿠키 기반 silent refresh. 앱: 네이티브 저장된 refresh token 으로 세션 복원(앱 재시작 후 로그인 유지).
+    // 실패 시 로그아웃 호출 없이 상태만 초기화
     try {
-      const { data } = await authApi.refresh()
+      const stored = await loadAppRefreshToken()
+      const { data } = await authApi.refresh(stored)
       accessToken.value = data.accessToken
+      await saveAppRefreshToken(data.refreshToken)
       await fetchUser()
       if (user.value) {
         // 새로고침 케이스도 farm_user 면 worker 확정 후 mount → NAV 깜빡임 방지
@@ -130,6 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
       // 유효한 세션 없음 → 로그인 필요 (logout API 호출 없이 상태만 초기화)
       user.value = null
       accessToken.value = null
+      await clearAppRefreshToken() // 앱: 만료/무효 토큰 정리
       // iOS Safari 등이 만료된 httpOnly refresh 쿠키를 영구 보관해 다음 로그인을 방해하는 문제 방지 —
       // 백엔드에 명시적으로 쿠키 정리 요청 (안전망; 백엔드도 refresh 401 시 자동 정리함)
       try { await authApi.clearCookie() } catch { /* 무시 */ }

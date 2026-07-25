@@ -1,6 +1,7 @@
 import axios from 'axios'
 import router from '../router'
 import { useAuthStore } from '../stores/auth.store'
+import { appClientHeader } from '../utils/appAuth'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -15,6 +16,12 @@ apiClient.interceptors.request.use((config) => {
   const token = authStore.accessToken
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  // 앱(Capacitor)이면 X-Client 헤더 첨부 → 서버가 refresh token 을 body 로도 내려준다.
+  // 웹에서는 undefined 라 헤더 미첨부(동작 무변경).
+  const client = appClientHeader()
+  if (client) {
+    config.headers['X-Client'] = client
   }
   return config
 })
