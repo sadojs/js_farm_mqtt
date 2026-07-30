@@ -19,7 +19,8 @@ async function bootstrap() {
     origin: [
       process.env.CORS_ORIGIN || 'http://localhost:5174',
       'capacitor://localhost', // iOS 앱
-      'http://localhost', // Android 앱
+      'https://localhost', // Android 앱 (androidScheme https, 프로덕션)
+      'http://localhost', // Android 앱 (androidScheme http, dev 테스트용)
     ],
     credentials: true,
   });
