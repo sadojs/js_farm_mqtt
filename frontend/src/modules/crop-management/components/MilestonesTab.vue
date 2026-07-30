@@ -89,14 +89,14 @@ function milestoneTypeLabel(type: string) {
 }
 
 .batch-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
   margin: 0 0 14px;
   color: var(--text-primary, #222);
 }
 
 .sowing-info {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 400;
   color: var(--text-secondary, #888);
   margin-left: 8px;
@@ -104,7 +104,7 @@ function milestoneTypeLabel(type: string) {
 
 .loading {
   color: var(--text-secondary, #888);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   padding: 12px 0;
 }
 
@@ -132,7 +132,7 @@ function milestoneTypeLabel(type: string) {
 }
 
 .milestone-icon {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -150,12 +150,12 @@ function milestoneTypeLabel(type: string) {
 }
 
 .milestone-name {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 500;
 }
 
 .milestone-type-tag {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   padding: 2px 6px;
   border-radius: 10px;
   background: #e0f2f1;
@@ -178,7 +178,7 @@ function milestoneTypeLabel(type: string) {
 }
 
 .priority-badge {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   padding: 2px 6px;
   border-radius: 10px;
   background: #ff5722;
@@ -186,13 +186,13 @@ function milestoneTypeLabel(type: string) {
 }
 
 .milestone-threshold {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   margin-bottom: 2px;
 }
 
 .milestone-desc {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
   line-height: 1.4;
 }

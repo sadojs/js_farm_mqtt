@@ -70,7 +70,7 @@ const iconMap: Record<string, string> = {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 700;
   flex-shrink: 0;
   color: #fff;
@@ -88,7 +88,7 @@ const iconMap: Record<string, string> = {
 
 .toast-title {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary, #333);
   line-height: 1.4;
@@ -96,7 +96,7 @@ const iconMap: Record<string, string> = {
 
 .toast-message {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-secondary, #555);
   line-height: 1.4;
 }
@@ -104,7 +104,7 @@ const iconMap: Record<string, string> = {
 .toast-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   color: var(--text-muted, #999);
   cursor: pointer;
   padding: 0 2px;

@@ -689,7 +689,7 @@ onUnmounted(() => {
 .score-ring .ring-center.danger { color: #b71c1c; }
 .score-ring .ring-center.unset { color: var(--text-muted); }
 .score-ring .ring-number {
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
   line-height: 1;
 }
 
@@ -753,7 +753,7 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-weight: 600;
 }
-.gauge-icon { font-size: 14px; }
+.gauge-icon { font-size: calc(14px * var(--content-scale, 1)); }
 .gauge-name { white-space: nowrap; }
 
 .gauge-value-row {

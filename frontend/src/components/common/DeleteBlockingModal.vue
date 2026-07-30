@@ -130,19 +130,19 @@ const handleNavigate = () => {
 }
 
 .blocking-icon {
-  font-size: 40px;
+  font-size: calc(40px * var(--content-scale, 1));
   margin-bottom: 12px;
 }
 
 .blocking-title {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .blocking-desc {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 16px;
@@ -172,7 +172,7 @@ const handleNavigate = () => {
 }
 
 .rule-name {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-primary);
   font-weight: 500;
   flex: 1;
@@ -183,7 +183,7 @@ const handleNavigate = () => {
 }
 
 .rule-badge {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
@@ -224,13 +224,13 @@ const handleNavigate = () => {
 }
 
 .group-name {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-primary);
   font-weight: 500;
 }
 
 .blocking-guide {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 20px;
@@ -248,7 +248,7 @@ const handleNavigate = () => {
   min-height: 44px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   cursor: pointer;
   border: none;
   background: var(--accent);
@@ -275,7 +275,7 @@ const handleNavigate = () => {
   min-height: 44px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   cursor: pointer;
   border: none;
   background: var(--bg-hover);

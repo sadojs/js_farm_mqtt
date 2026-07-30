@@ -345,7 +345,7 @@
         </div>
         <div v-else class="form-group">
           <p style="margin:4px 0; padding:10px 12px; background:#eff6ff; color:#1e40af;
-                     border-radius:6px; font-size:13px; line-height:1.5;">
+                     border-radius:6px; font-size: calc(13px * var(--content-scale, 1)); line-height:1.5;">
             💡 라즈베리파이의 IP·machineId·hostname 등은 Pi 첫 부팅 시 자동으로 보고됩니다.
             여기서는 <strong>게이트웨이 ID</strong>만 미리 만들어 두면 Pi가 자동 등록됩니다.
           </p>
@@ -779,12 +779,12 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .page-header-text { flex: 1; min-width: 0; }
 .page-header-text h2 {
   margin: 0 0 4px;
-  font-size: 24px;
+  font-size: calc(24px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
 .page-description {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-secondary);
   margin: 0;
 }
@@ -801,7 +801,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 }
 .toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.toolbar-label { font-size: 12px; color: var(--text-muted); }
+.toolbar-label { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); }
 
 .search-box {
   position: relative;
@@ -821,7 +821,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   border: none;
   outline: none;
   background: transparent;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   padding: 0 8px;
   color: var(--text-primary);
 }
@@ -835,7 +835,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   border-radius: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -848,7 +848,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   color: #fff;
 }
 .chip-count {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 700;
   background: rgba(0, 0, 0, 0.1);
   padding: 1px 6px;
@@ -867,7 +867,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   padding: 7px 14px;
   background: transparent;
   border: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-secondary);
   cursor: pointer;
   border-right: 1px solid var(--border-color);
@@ -902,19 +902,19 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 700;
   flex-shrink: 0;
 }
 .farm-info { display: flex; flex-direction: column; }
-.farm-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
-.farm-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.farm-name { font-size: calc(16px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.farm-sub { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin-top: 2px; }
 .farm-group-header-right { display: flex; gap: 6px; }
 .farm-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
 }
 .badge-ok { background: var(--success-bg); color: var(--success-text); }
@@ -926,7 +926,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-light);
 }
-.status-group-header h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.status-group-header h3 { margin: 0; font-size: calc(14px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .muted { color: var(--text-muted); font-weight: 500; }
 
 /* 카드 그리드 */
@@ -975,13 +975,13 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .card-title-wrap { flex: 1; min-width: 0; }
 .card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gateway-name {
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
 .gateway-id-chip {
   font-family: ui-monospace, monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   background: var(--bg-badge);
   color: var(--text-muted);
   padding: 1px 6px;
@@ -1021,7 +1021,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   background: transparent;
   border: none;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-primary);
   cursor: pointer;
   transition: background 0.12s;
@@ -1038,7 +1038,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 /* 위치 행 */
 .card-location {
   display: flex; align-items: center; gap: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-muted);
   margin-top: -4px;
 }
@@ -1048,7 +1048,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   line-height: 1.4;
 }
 .card-issue.warn {
@@ -1077,7 +1077,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 }
 .conn-cell:last-child { border-right: none; }
 .conn-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-muted);
@@ -1085,7 +1085,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 }
 .conn-value {
   display: flex; align-items: center; gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1098,7 +1098,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .dot-off { background: var(--text-muted); }
 .port {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--accent);
 }
 
@@ -1106,21 +1106,21 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .card-meta-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
 }
 .zone-tag-wrap { flex: 1; min-width: 0; }
 .zone-tag {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
 }
 .zone-assigned { background: var(--accent-bg); color: var(--accent); }
 .zone-warn { background: var(--warning-bg); color: var(--warning-text); }
 .zone-inline-edit { display: inline-flex; align-items: center; gap: 6px; }
 .zone-select-inline {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid var(--border-input);
@@ -1128,8 +1128,8 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   color: var(--text-primary);
   max-width: 200px;
 }
-.zone-saving { font-size: 11px; color: var(--text-muted); }
-.last-seen { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.zone-saving { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); }
+.last-seen { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); white-space: nowrap; }
 
 /* 액션 버튼 */
 .card-actions {
@@ -1144,7 +1144,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   gap: 6px;
   padding: 9px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1178,13 +1178,13 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   border-radius: 9px;
   padding: 9px 16px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   transition: background 0.15s ease;
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.plus-sign { font-size: 17px; line-height: 1; margin-top: -1px; }
+.plus-sign { font-size: calc(17px * var(--content-scale, 1)); line-height: 1; margin-top: -1px; }
 
 .btn-ghost {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1194,7 +1194,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   border-radius: 9px;
   padding: 9px 14px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   transition: all 0.15s ease;
 }
 .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -1221,7 +1221,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   border-radius: 8px;
   padding: 8px 14px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   transition: background 0.15s ease;
 }
 .btn-secondary:hover { background: var(--bg-hover); }
@@ -1247,11 +1247,11 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   display: flex; justify-content: space-between; align-items: center;
   padding-bottom: 4px;
 }
-.modal-header h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-primary); }
+.modal-header h3 { margin: 0; font-size: calc(17px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .modal-close {
   background: transparent;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   color: var(--text-muted);
   cursor: pointer;
   width: 28px; height: 28px;
@@ -1262,13 +1262,13 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 .modal-cmd { width: 600px; max-width: 95vw; }
 
 .form-group { display: flex; flex-direction: column; gap: 4px; }
-.form-group label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.form-group label { font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary); }
 .form-group input, .form-group select {
   height: 38px;
   border: 1px solid var(--border-input);
   border-radius: 8px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   background: var(--bg-input);
   color: var(--text-primary);
 }
@@ -1286,7 +1286,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
 
 /* Pi 설치 명령 모달 */
 .setup-desc {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-muted);
   margin: 0;
 }
@@ -1294,7 +1294,7 @@ const vClickOutside: Directive<HTMLElement, () => void> = {
   background: #0d1117;
   color: #a8ff78;
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   padding: 12px;
   border-radius: 8px;
   white-space: pre-wrap;

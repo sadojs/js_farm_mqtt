@@ -183,7 +183,7 @@ watch(() => props.gatewayId, () => {
   align-items: center;
   gap: 6px;
   color: #c9d1d9;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 500;
 }
 
@@ -194,7 +194,7 @@ watch(() => props.gatewayId, () => {
 }
 
 .status-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -204,7 +204,7 @@ watch(() => props.gatewayId, () => {
 .status-badge.error      { color: #f85149; background: #2a0d0d; }
 
 .btn-reconnect {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   padding: 3px 10px;
   border-radius: 4px;
   border: 1px solid #30363d;
@@ -216,7 +216,7 @@ watch(() => props.gatewayId, () => {
 .btn-reconnect:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-close {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   background: none;
   border: none;
   color: #8b949e;
@@ -228,7 +228,7 @@ watch(() => props.gatewayId, () => {
 
 .terminal-error {
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: #f85149;
   background: #2a0d0d;
   border-bottom: 1px solid #f8514933;

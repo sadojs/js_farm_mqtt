@@ -71,13 +71,13 @@ defineEmits<{
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
 }
-.manager-desc { margin: 0; color: var(--text-secondary); font-size: 13px; }
+.manager-desc { margin: 0; color: var(--text-secondary); font-size: calc(13px * var(--content-scale, 1)); }
 .btn-primary {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 8px 14px;
   background: var(--accent); color: #fff;
   border: none; border-radius: 8px;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; cursor: pointer;
 }
 
 .type-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -97,16 +97,16 @@ defineEmits<{
   display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px;
   border-radius: 10px;
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
 }
 .type-info { min-width: 0; }
-.type-label { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-.type-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.type-label { font-size: calc(14px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.type-sub { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
 .hidden-badge {
   padding: 1px 6px;
   background: var(--bg-badge);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-muted);
 }
 

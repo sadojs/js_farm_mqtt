@@ -563,7 +563,7 @@ if (props.intent !== 'irrigation') {
 .time-range-block { display: flex; flex-direction: column; gap: 6px; }
 .time-range-row { display: flex; align-items: flex-end; gap: 8px; }
 .field-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.tilde { font-size: 18px; color: var(--text-muted); padding-bottom: 8px; }
+.tilde { font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted); padding-bottom: 8px; }
 
 .error-msg { color: var(--color-error); font-size: calc(12px * var(--content-scale, 1)); margin: -8px 0 0; }
 
@@ -631,7 +631,7 @@ if (props.intent !== 'irrigation') {
 
 .btn-remove-sm {
   background: none; border: none; color: var(--text-muted); cursor: pointer;
-  font-size: 14px; padding: 4px; line-height: 1;
+  font-size: calc(14px * var(--content-scale, 1)); padding: 4px; line-height: 1;
 }
 .btn-remove-sm:hover { color: var(--color-error); }
 

@@ -237,8 +237,8 @@ function apply() {
   .modal { max-width: 100%; padding: 18px; }
   .modal-actions { flex-direction: column-reverse; gap: 8px; }
   .modal-actions > button { width: 100%; padding: 12px 16px; }
-  .quick-chip { padding: 8px 10px; font-size: 13px; }
+  .quick-chip { padding: 8px 10px; font-size: calc(13px * var(--content-scale, 1)); }
   .num-input { width: 64px; }
-  .dir-btn { font-size: 14px; padding: 10px 8px; }
+  .dir-btn { font-size: calc(14px * var(--content-scale, 1)); padding: 10px 8px; }
 }
 </style>

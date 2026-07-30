@@ -1,0 +1,19 @@
+# Node
+node_modules/
+
+# Capacitor native 산출물 (npx cap sync 로 재생성 가능)
+ios/App/Pods/
+ios/App/App/public/
+ios/DerivedData/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+
+# 빌드 산출물
+www/
+*.log
+.DS_Store
+!www/.gitkeep

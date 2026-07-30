@@ -128,24 +128,24 @@ function resetMapping() {
   width: 100%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
 }
-.confirm-icon { font-size: 36px; text-align: center; margin-bottom: 8px; }
-.confirm-title { font-size: 16px; font-weight: 700; color: #d32f2f; text-align: center; margin: 0 0 16px; }
+.confirm-icon { font-size: calc(36px * var(--content-scale, 1)); text-align: center; margin-bottom: 8px; }
+.confirm-title { font-size: calc(16px * var(--content-scale, 1)); font-weight: 700; color: #d32f2f; text-align: center; margin: 0 0 16px; }
 .confirm-body { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 .confirm-warning {
-  font-size: 13px; line-height: 1.6; color: var(--text-primary, #333);
+  font-size: calc(13px * var(--content-scale, 1)); line-height: 1.6; color: var(--text-primary, #333);
   background: #fff3e0; border-left: 3px solid #e65100;
   padding: 8px 12px; border-radius: 4px; margin: 0;
 }
-.confirm-note { font-size: 12px; color: var(--text-secondary, #666); margin: 0; line-height: 1.5; }
+.confirm-note { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-secondary, #666); margin: 0; line-height: 1.5; }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .btn-confirm-cancel {
   padding: 8px 18px; border: 1px solid var(--border-color, #ddd);
-  background: none; border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary, #666);
+  background: none; border-radius: 8px; font-size: calc(13px * var(--content-scale, 1)); cursor: pointer; color: var(--text-secondary, #666);
 }
 .btn-confirm-cancel:hover { background: var(--bg-secondary); }
 .btn-confirm-ok {
   padding: 8px 18px; background: #d32f2f; color: #fff;
-  border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: none; border-radius: 8px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; cursor: pointer;
 }
 .btn-confirm-ok:hover { background: #b71c1c; }
 #app.theme-dark .mapping-confirm-modal { background: var(--bg-card); }

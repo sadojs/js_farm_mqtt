@@ -222,9 +222,9 @@ defineExpose({ reload })
   gap: 2px;
 }
 .kpi-label { color: var(--text-muted); font-size: var(--font-size-caption); font-weight: 600; }
-.kpi-value { font-size: 22px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
-.kpi-value small { font-size: 13px; color: var(--text-muted); margin-left: 2px; }
-.kpi-value.money { font-size: 17px; }
+.kpi-value { font-size: calc(22px * var(--content-scale, 1)); font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.kpi-value small { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); margin-left: 2px; }
+.kpi-value.money { font-size: calc(17px * var(--content-scale, 1)); }
 .period-nav {
   display: flex;
   align-items: center;
@@ -242,7 +242,7 @@ defineExpose({ reload })
   background: var(--bg-hover);
   border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
 }
 .nav-btn:disabled { opacity: 0.4; cursor: default; }
@@ -286,7 +286,7 @@ defineExpose({ reload })
 .settle-badge {
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   border-radius: 6px;
   padding: 1px 6px;
@@ -295,7 +295,7 @@ defineExpose({ reload })
 .cell.terminated { background: var(--bg-hover); opacity: 0.55; cursor: default; }
 .terminated-label {
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; color: var(--text-muted); font-weight: 600;
+  font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); font-weight: 600;
 }
 .holiday-cell {
   flex: 1;
@@ -315,7 +315,7 @@ defineExpose({ reload })
   border-radius: 6px;
   padding: 3px 10px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
 }
 .work-btn:hover { background: var(--accent); color: #fff; }
@@ -336,18 +336,18 @@ defineExpose({ reload })
   background: var(--bg-input);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-secondary);
   padding: 4px 0;
   min-width: 0;
   min-height: 28px;
 }
-.day-actions .holiday-btn { flex: 1 1 100%; font-size: 11px; }
+.day-actions .holiday-btn { flex: 1 1 100%; font-size: calc(11px * var(--content-scale, 1)); }
 .day-actions button:hover { background: var(--bg-hover); }
 .advance-chip {
   background: var(--sensor-bg);
   color: var(--sensor-accent);
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   border-radius: 6px;
   padding: 1px 6px;
@@ -361,14 +361,14 @@ defineExpose({ reload })
   /* 모바일: 세로로 쌓지 않고 한 줄(3열) 컴팩트하게 — 세로 공간 절약 */
   .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .kpi { padding: 8px 10px; }
-  .kpi-label { font-size: 11px; }
-  .kpi-value { font-size: 17px; }
-  .kpi-value small { font-size: 11px; }
-  .kpi-value.money { font-size: 13px; }
+  .kpi-label { font-size: calc(11px * var(--content-scale, 1)); }
+  .kpi-value { font-size: calc(17px * var(--content-scale, 1)); }
+  .kpi-value small { font-size: calc(11px * var(--content-scale, 1)); }
+  .kpi-value.money { font-size: calc(13px * var(--content-scale, 1)); }
   .cell { min-height: 72px; padding: 4px; }
-  .day-num { font-size: 11px; }
+  .day-num { font-size: calc(11px * var(--content-scale, 1)); }
   .day-num.with-month { padding: 1px 4px; }
-  .settle-badge { font-size: 9px; padding: 1px 4px; }
-  .hours-chip { font-size: 13px; padding: 2px 6px; }
+  .settle-badge { font-size: calc(9px * var(--content-scale, 1)); padding: 1px 4px; }
+  .hours-chip { font-size: calc(13px * var(--content-scale, 1)); padding: 2px 6px; }
 }
 </style>

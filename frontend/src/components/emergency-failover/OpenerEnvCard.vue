@@ -120,34 +120,34 @@ function changeTriggerType(next: OpenerTriggerType) {
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.card h3 { margin: 0 0 12px 0; font-size: calc(16px * var(--content-scale, 1)); display: flex; align-items: center; gap: 8px; }
 .primary-badge {
-  font-size: 11px; font-weight: 700; color: #fff; background: var(--accent, #2e7d32);
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 700; color: #fff; background: var(--accent, #2e7d32);
   border-radius: 6px; padding: 2px 8px;
 }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 14px; font-weight: 500; }
+.form-group label { font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; }
 .form-group input {
   padding: 8px; border: 1px solid var(--border-color, #ccc);
-  border-radius: 6px; font-size: 14px;
+  border-radius: 6px; font-size: calc(14px * var(--content-scale, 1));
 }
 .hint {
   background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
-  font-size: 13px; color: var(--text-secondary, #555); margin: 0; line-height: 1.5;
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); margin: 0; line-height: 1.5;
 }
-.error-msg { color: var(--danger, #d32f2f); font-size: 13px; margin: 8px 0 0 0; }
+.error-msg { color: var(--danger, #d32f2f); font-size: calc(13px * var(--content-scale, 1)); margin: 8px 0 0 0; }
 .seg-control {
   display: inline-flex; border: 1px solid var(--border-color, #ccc); border-radius: 8px;
   overflow: hidden; background: var(--bg-secondary, #f5f5f5); width: fit-content;
 }
 .seg-btn {
-  padding: 8px 14px; background: transparent; border: none; font-size: 14px; font-weight: 500;
+  padding: 8px 14px; background: transparent; border: none; font-size: calc(14px * var(--content-scale, 1)); font-weight: 500;
   color: var(--text-secondary, #555); cursor: pointer; transition: background 0.15s, color 0.15s;
 }
 .seg-btn:not(:last-child) { border-right: 1px solid var(--border-color, #ccc); }
 .seg-btn.active { background: var(--accent, #2e7d32); color: #fff; }
-.seg-hint { font-size: 12px; color: var(--text-muted, #888); margin: 4px 0 0 0; }
+.seg-hint { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted, #888); margin: 4px 0 0 0; }
 
 @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
 </style>

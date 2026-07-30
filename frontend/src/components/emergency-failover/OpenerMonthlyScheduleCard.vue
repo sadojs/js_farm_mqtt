@@ -79,15 +79,15 @@ const scheduleByMonth = computed(() => {
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.card h3 { margin: 0 0 12px 0; font-size: calc(16px * var(--content-scale, 1)); display: flex; align-items: center; gap: 8px; }
 .backup-badge {
-  font-size: 11px; font-weight: 700; color: var(--warning-text, #b45309);
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 700; color: var(--warning-text, #b45309);
   background: var(--warning-bg, #fff8ec); border: 1px solid var(--warning-border, #fde3b0);
   border-radius: 6px; padding: 2px 8px;
 }
 .hint {
   background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
-  font-size: 13px; color: var(--text-secondary, #555); line-height: 1.5;
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); line-height: 1.5;
 }
 .toggle-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
 .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -101,8 +101,8 @@ const scheduleByMonth = computed(() => {
 .month-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.06); }
 .month-card.inactive { opacity: 0.5; border-style: dashed; }
 .month-card.always-open { background: #e8f5e9; border-color: #66bb6a; }
-.month-label { font-weight: bold; font-size: 14px; }
-.month-detail { font-size: 12px; margin-top: 4px; }
+.month-label { font-weight: bold; font-size: calc(14px * var(--content-scale, 1)); }
+.month-detail { font-size: calc(12px * var(--content-scale, 1)); margin-top: 4px; }
 .month-detail.muted { color: var(--text-secondary, #999); }
 @media (max-width: 768px) { .month-grid { grid-template-columns: repeat(3, 1fr); } }
 </style>

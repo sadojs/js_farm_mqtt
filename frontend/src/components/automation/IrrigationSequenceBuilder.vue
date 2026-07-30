@@ -71,40 +71,40 @@ const totalSummary = computed(() => {
 
 <style scoped>
 .sequence-builder { margin-top: 8px; }
-.field-label { display: block; font-weight: 600; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.field-label { display: block; font-weight: 600; font-size: calc(14px * var(--content-scale, 1)); color: var(--text-secondary); margin-bottom: 12px; }
 
 .seq-step { background: var(--bg-card); border: 1px solid var(--border-input); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
 .step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.step-num { font-weight: 600; font-size: 13px; color: #4caf50; }
+.step-num { font-weight: 600; font-size: calc(13px * var(--content-scale, 1)); color: #4caf50; }
 .btn-remove {
   background: none; border: 1px solid #ef5350; color: #ef5350; border-radius: 6px;
-  padding: 2px 10px; font-size: 12px; cursor: pointer;
+  padding: 2px 10px; font-size: calc(12px * var(--content-scale, 1)); cursor: pointer;
 }
 .btn-remove:hover { background: #ef5350; color: white; }
 
 .step-row { display: flex; gap: 8px; align-items: center; }
 .form-select {
   padding: 8px 10px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 14px; color: var(--text-primary); background: var(--bg-input);
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); background: var(--bg-input);
 }
 .form-input {
   padding: 8px 10px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 14px; color: var(--text-primary);
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary);
 }
 .num-input { width: 80px; }
 .unit-select { width: 70px; }
 
-.step-arrow { text-align: center; color: #aaa; font-size: 18px; margin: 4px 0; }
+.step-arrow { text-align: center; color: #aaa; font-size: calc(18px * var(--content-scale, 1)); margin: 4px 0; }
 
 .btn-add {
   width: 100%; padding: 10px; border: 2px dashed #ccc; border-radius: 10px;
-  background: transparent; color: #888; font-size: 14px; font-weight: 500;
+  background: transparent; color: #888; font-size: calc(14px * var(--content-scale, 1)); font-weight: 500;
   cursor: pointer; margin-top: 4px;
 }
 .btn-add:hover { border-color: #4caf50; color: #4caf50; }
 
 .total-summary {
   margin-top: 12px; padding: 8px 12px; background: #e8f5e9; border-radius: 8px;
-  font-size: 13px; font-weight: 600; color: #2e7d32; text-align: center;
+  font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: #2e7d32; text-align: center;
 }
 </style>

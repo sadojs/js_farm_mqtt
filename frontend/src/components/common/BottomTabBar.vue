@@ -93,7 +93,7 @@ function isActive(path: string) {
   gap: 2px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 500;
   border: none;
   background: none;
@@ -112,7 +112,7 @@ function isActive(path: string) {
 }
 
 .tab-icon {
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
   line-height: 1;
 }
 

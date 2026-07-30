@@ -142,19 +142,19 @@ async function onDelete() {
 .head-title { display: flex; align-items: center; gap: 12px; }
 .head-emoji {
   width: 40px; height: 40px; border-radius: 12px;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 22px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: calc(22px * var(--content-scale, 1));
 }
-.modal-head h3 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.head-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.modal-head h3 { margin: 0; font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.head-sub { margin: 2px 0 0; font-size: calc(12.5px * var(--content-scale, 1)); color: var(--text-muted); }
 .close-btn {
-  background: none; border: none; font-size: 18px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px; border-radius: 8px;
 }
 .close-btn:hover { background: var(--bg-hover); }
 
 .modal-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.field label { font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary); }
 .opt { color: var(--text-muted); font-weight: 400; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .inp {
@@ -162,7 +162,7 @@ async function onDelete() {
   padding: 10px 12px;
   border: 1px solid var(--border-input); border-radius: 10px;
   background: var(--bg-input); color: var(--text-primary);
-  font-size: 14px; min-width: 0;
+  font-size: calc(14px * var(--content-scale, 1)); min-width: 0;
 }
 .inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -170,7 +170,7 @@ async function onDelete() {
 .quick-btn {
   padding: 9px 14px; border: 1px solid var(--border-input); border-radius: 10px;
   background: var(--bg-input); color: var(--text-secondary);
-  font-weight: 600; font-size: 13px; cursor: pointer; min-height: 40px;
+  font-weight: 600; font-size: calc(13px * var(--content-scale, 1)); cursor: pointer; min-height: 40px;
 }
 .quick-btn.on { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
 

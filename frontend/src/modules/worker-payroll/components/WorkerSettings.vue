@@ -460,7 +460,7 @@ async function removeAdvance(id: string) {
   font-size: var(--font-size-label); font-weight: 700;
 }
 .adv-month-head:hover { background: var(--bg-active); }
-.adv-caret { width: 14px; flex: 0 0 auto; color: var(--text-muted); font-size: 12px; }
+.adv-caret { width: 14px; flex: 0 0 auto; color: var(--text-muted); font-size: calc(12px * var(--content-scale, 1)); }
 .adv-month-label { flex: 1 1 auto; }
 .adv-month-meta { flex: 0 0 auto; font-size: var(--font-size-caption); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .adv-month-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
@@ -542,7 +542,7 @@ async function removeAdvance(id: string) {
   width: 28px; height: 28px;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   flex-shrink: 0;
 }
 .btn-ghost-sm:hover { background: var(--border-light); color: var(--text-primary); }
@@ -554,7 +554,7 @@ async function removeAdvance(id: string) {
   padding: 6px 8px;
   background: var(--bg-hover);
   border-radius: 8px;
-  font-size: 12px; font-weight: 600;
+  font-size: calc(12px * var(--content-scale, 1)); font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;

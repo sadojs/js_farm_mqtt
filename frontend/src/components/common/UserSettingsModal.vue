@@ -14,9 +14,8 @@
           <div class="setting-row">
             <span class="setting-label">글자 크기</span>
             <div class="font-size-buttons">
-              <button :class="{ active: fontSize === 'sm' }" @click="$emit('set-font', 'sm')">가</button>
-              <button :class="{ active: fontSize === 'md' }" @click="$emit('set-font', 'md')">가</button>
-              <button :class="{ active: fontSize === 'lg' }" @click="$emit('set-font', 'lg')">가</button>
+              <button :class="{ active: fontSize === 'md' }" @click="$emit('set-font', 'md')">보통</button>
+              <button :class="{ active: fontSize === 'lg' }" @click="$emit('set-font', 'lg')">크게</button>
             </div>
           </div>
 
@@ -103,7 +102,7 @@ defineProps<{
 
 defineEmits<{
   close: []
-  'set-font': [size: 'sm' | 'md' | 'lg']
+  'set-font': [size: 'md' | 'lg']
   'set-theme': [mode: 'light' | 'dark']
   'toggle-crop': []
   'toggle-feature': [key: FeatureKey]
@@ -156,7 +155,7 @@ const featureMeta = FEATURE_META
 }
 
 .modal-header h3 {
-  font-size: 17px;
+  font-size: calc(17px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary, #222);
 }
@@ -164,7 +163,7 @@ const featureMeta = FEATURE_META
 .btn-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   cursor: pointer;
   padding: 4px 8px;
@@ -186,7 +185,7 @@ const featureMeta = FEATURE_META
 }
 
 .section-title {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-secondary, #888);
   text-transform: uppercase;
@@ -195,7 +194,7 @@ const featureMeta = FEATURE_META
 }
 
 .section-desc {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   margin-bottom: 12px;
   margin-top: -8px;
@@ -215,7 +214,7 @@ const featureMeta = FEATURE_META
 }
 
 .setting-label {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-primary, #333);
 }
 
@@ -232,7 +231,7 @@ const featureMeta = FEATURE_META
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
   background: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   color: var(--text-secondary, #666);
   transition: all 0.15s;
@@ -245,9 +244,9 @@ const featureMeta = FEATURE_META
   border-color: var(--accent, #2e7d32);
 }
 
-.font-size-buttons button:nth-child(1) { font-size: 11px; }
-.font-size-buttons button:nth-child(2) { font-size: 13px; }
-.font-size-buttons button:nth-child(3) { font-size: 15px; }
+.font-size-buttons button:nth-child(1) { font-size: calc(11px * var(--content-scale, 1)); }
+.font-size-buttons button:nth-child(2) { font-size: calc(13px * var(--content-scale, 1)); }
+.font-size-buttons button:nth-child(3) { font-size: calc(15px * var(--content-scale, 1)); }
 
 /* ── 기능 행 ── */
 .feature-row {
@@ -276,14 +275,14 @@ const featureMeta = FEATURE_META
 }
 
 .feature-icon {
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
   line-height: 1.2;
   flex-shrink: 0;
 }
 
 .feature-name {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary, #222);
   margin-bottom: 2px;
@@ -291,13 +290,13 @@ const featureMeta = FEATURE_META
 
 .feature-desc {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
 }
 
 .feature-locked {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--danger, #e53935);
 }
 

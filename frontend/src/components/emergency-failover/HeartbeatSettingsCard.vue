@@ -44,14 +44,14 @@ const timeoutMinutes = computed(() => Math.round(props.heartbeatTimeoutSeconds /
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; }
+.card h3 { margin: 0 0 12px 0; font-size: calc(16px * var(--content-scale, 1)); }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 14px; font-weight: 500; }
+.form-group label { font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; }
 .form-group input {
   padding: 8px; border: 1px solid var(--border-color, #ccc);
-  border-radius: 6px; font-size: 14px;
+  border-radius: 6px; font-size: calc(14px * var(--content-scale, 1));
 }
-.form-group small { color: var(--text-secondary, #888); font-size: 12px; }
+.form-group small { color: var(--text-secondary, #888); font-size: calc(12px * var(--content-scale, 1)); }
 @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
 </style>

@@ -118,11 +118,11 @@ function inspectCount(zoneId: string): number {
   border: 1px solid var(--border-card);
   border-radius: 12px;
 }
-.legend-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-right: 4px; }
+.legend-title { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; color: var(--text-secondary); margin-right: 4px; }
 .legend-chip {
   padding: 3px 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
 }
 .legend-chip.none {
@@ -148,7 +148,7 @@ function inspectCount(zoneId: string): number {
   background: var(--bg-hover);
   padding: 14px 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-light);
@@ -186,12 +186,12 @@ function inspectCount(zoneId: string): number {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   margin-bottom: 2px;
 }
 .task-label {
   display: block;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -201,9 +201,9 @@ function inspectCount(zoneId: string): number {
   border-bottom: 1px solid var(--border-light);
 }
 .zone-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.zone-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.zone-name { font-size: calc(14px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .inspect-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--danger-badge-text);
   background: var(--danger-badge-bg);
@@ -211,7 +211,7 @@ function inspectCount(zoneId: string): number {
   padding: 1px 8px;
   white-space: nowrap;
 }
-.zone-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.zone-sub { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); margin-top: 2px; }
 
 .data-cell {
   padding: 8px 6px;
@@ -239,25 +239,25 @@ function inspectCount(zoneId: string): number {
   color: #94a3b8 !important;
   border: 1px dashed #cbd5e1;
 }
-.cell-days { font-size: 19px; font-weight: 800; white-space: nowrap; }
-.cell-sub { font-size: 11.5px; font-weight: 500; margin-top: 1px; white-space: nowrap; }
+.cell-days { font-size: calc(19px * var(--content-scale, 1)); font-weight: 800; white-space: nowrap; }
+.cell-sub { font-size: calc(11.5px * var(--content-scale, 1)); font-weight: 500; margin-top: 1px; white-space: nowrap; }
 
 .hint {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-muted);
   margin: 0;
   padding: 0 4px;
 }
 
 @media (max-width: 768px) {
-  .board-table { font-size: 12px; }
+  .board-table { font-size: calc(12px * var(--content-scale, 1)); }
   .board-table thead th.zone-col { width: 130px; padding-left: 12px; }
   .task-col { width: 92px; }
   .zone-cell { padding: 10px 12px; }
-  .zone-name { font-size: 13px; }
+  .zone-name { font-size: calc(13px * var(--content-scale, 1)); }
   .data-cell { padding: 6px 4px; }
   .cell-chip { width: 80px; height: 50px; }
-  .cell-days { font-size: 17px; }
-  .cell-sub { font-size: 11px; }
+  .cell-days { font-size: calc(17px * var(--content-scale, 1)); }
+  .cell-sub { font-size: calc(11px * var(--content-scale, 1)); }
 }
 </style>

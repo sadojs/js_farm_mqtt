@@ -273,14 +273,14 @@ async function handleSubmit() {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 600;
 }
 
 .btn-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
   color: var(--text-secondary, #888);
   padding: 4px 8px;
@@ -300,7 +300,7 @@ async function handleSubmit() {
 }
 
 .form-group label {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 500;
   color: var(--text-primary, #333);
 }
@@ -316,19 +316,19 @@ async function handleSubmit() {
   padding: 9px 12px;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   background: var(--bg-input, #fff);
   color: var(--text-primary, #333);
 }
 
 .hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
 .default-badge {
   display: inline-block;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 600;
   padding: 1px 6px;
   background: #e3f2fd;
@@ -347,7 +347,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   cursor: pointer;
 }
 
@@ -366,7 +366,7 @@ async function handleSubmit() {
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   cursor: pointer;
   white-space: nowrap;
 }
@@ -380,12 +380,12 @@ async function handleSubmit() {
   padding: 10px 12px;
   background: var(--bg-input, #f5f5f5);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 .suggestion-title {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
   font-weight: 500;
 }
@@ -396,7 +396,7 @@ async function handleSubmit() {
   color: #2e7d32;
   border: 1px solid #a5d6a7;
   border-radius: 16px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   cursor: pointer;
   margin: 2px;
 }
@@ -419,7 +419,7 @@ async function handleSubmit() {
   background: var(--border-color, #eee);
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   cursor: pointer;
 }
 
@@ -430,7 +430,7 @@ async function handleSubmit() {
   color: #fff;
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }

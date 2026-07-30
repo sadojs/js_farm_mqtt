@@ -315,13 +315,13 @@ function fmt(d: string | null) {
   border: 1px solid #ffb74d; border-radius: 8px;
   text-align: left; padding: 20px;
 }
-.error strong { display: block; margin-bottom: 8px; font-size: 16px; }
-.error-hint { margin-top: 8px; font-size: 13px; color: #e65100; }
+.error strong { display: block; margin-bottom: 8px; font-size: calc(16px * var(--content-scale, 1)); }
+.error-hint { margin-top: 8px; font-size: calc(13px * var(--content-scale, 1)); color: #e65100; }
 
 .warning-banner {
   background: #fff3e0; border: 1px solid #ffb74d;
   color: #e65100; padding: 12px 16px; border-radius: 8px;
-  margin-bottom: 16px; font-size: 14px; line-height: 1.5;
+  margin-bottom: 16px; font-size: calc(14px * var(--content-scale, 1)); line-height: 1.5;
 }
 
 .card {
@@ -329,15 +329,15 @@ function fmt(d: string | null) {
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; }
+.card h3 { margin: 0 0 12px 0; font-size: calc(16px * var(--content-scale, 1)); }
 
-.events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.events-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--content-scale, 1)); }
 .events-table th, .events-table td {
   padding: 4px 0; text-align: left; border-bottom: 1px solid var(--border-color, #eee);
 }
-.events-table code { font-size: 11px; }
+.events-table code { font-size: calc(11px * var(--content-scale, 1)); }
 .badge-event {
-  padding: 2px 8px; border-radius: 8px; font-size: 11px;
+  padding: 2px 8px; border-radius: 8px; font-size: calc(11px * var(--content-scale, 1));
   background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555);
 }
 .badge-event.badge-danger { background: #ffebee; color: #c62828; }
@@ -347,13 +347,13 @@ function fmt(d: string | null) {
 .badge-event.badge-neutral { background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555); }
 
 .info-card { background: #f0f4f8; border-color: #b0bec5; }
-.info-card p { margin: 0 0 8px 0; line-height: 1.6; font-size: 14px; color: #37474f; }
-.info-card ul { margin: 8px 0 0 20px; padding: 0; font-size: 13px; color: #455a64; line-height: 1.7; }
-.info-card code { background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+.info-card p { margin: 0 0 8px 0; line-height: 1.6; font-size: calc(14px * var(--content-scale, 1)); color: #37474f; }
+.info-card ul { margin: 8px 0 0 20px; padding: 0; font-size: calc(13px * var(--content-scale, 1)); color: #455a64; line-height: 1.7; }
+.info-card code { background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 4px; font-size: calc(12px * var(--content-scale, 1)); }
 
 .page-footer { display: flex; justify-content: flex-end; margin-top: 24px; }
 .btn-primary {
-  padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
   border: 1px solid transparent;
   background: var(--primary, #4caf50); color: #fff;
 }

@@ -220,10 +220,10 @@ const closeModal = () => {
   border-bottom: 1px solid var(--border-input);
 }
 
-.modal-header h2 { font-size: 22px; font-weight: 700; margin: 0; }
+.modal-header h2 { font-size: calc(22px * var(--content-scale, 1)); font-weight: 700; margin: 0; }
 
 .close-btn {
-  background: none; border: none; font-size: 20px;
+  background: none; border: none; font-size: calc(20px * var(--content-scale, 1));
   color: var(--text-muted); cursor: pointer; padding: 4px;
   border-radius: 4px;
 }
@@ -233,16 +233,16 @@ const closeModal = () => {
 
 .form-section { margin-bottom: 28px; }
 .form-section:last-child { margin-bottom: 0; }
-.form-section h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+.form-section h3 { font-size: calc(17px * var(--content-scale, 1)); font-weight: 600; margin-bottom: 10px; }
 
-.section-desc { font-size: 13px; color: var(--text-secondary); margin: -4px 0 14px; }
+.section-desc { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary); margin: -4px 0 14px; }
 
 .form-group { margin-bottom: 14px; }
-.form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.form-group label { display: block; font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; margin-bottom: 6px; }
 .form-input, .form-textarea {
   width: 100%; padding: 10px 12px;
   border: 1.5px solid var(--border-input);
-  border-radius: 8px; font-size: 14px;
+  border-radius: 8px; font-size: calc(14px * var(--content-scale, 1));
   background: var(--bg-input); color: var(--text-primary);
   font-family: inherit;
 }
@@ -256,7 +256,7 @@ const closeModal = () => {
   padding: 24px; text-align: center;
   background: var(--bg-secondary); border-radius: 8px;
 }
-.empty-devices p { color: var(--text-secondary); font-size: 14px; margin: 0; }
+.empty-devices p { color: var(--text-secondary); font-size: calc(14px * var(--content-scale, 1)); margin: 0; }
 
 .gateways-list { display: flex; flex-direction: column; gap: 8px; }
 
@@ -273,10 +273,10 @@ const closeModal = () => {
   background: rgba(76, 175, 80, 0.06);
 }
 
-.gw-icon { font-size: 22px; }
+.gw-icon { font-size: calc(22px * var(--content-scale, 1)); }
 .gw-info { flex: 1; }
-.gw-name { font-size: 15px; font-weight: 600; }
-.gw-meta { font-size: 12px; color: var(--text-secondary); font-family: monospace; margin-top: 2px; }
+.gw-name { font-size: calc(15px * var(--content-scale, 1)); font-weight: 600; }
+.gw-meta { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-secondary); font-family: monospace; margin-top: 2px; }
 
 .status-dot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
@@ -290,7 +290,7 @@ const closeModal = () => {
 }
 .btn-primary, .btn-secondary {
   padding: 10px 22px; border: none; border-radius: 10px;
-  font-weight: 600; font-size: 15px; cursor: pointer;
+  font-weight: 600; font-size: calc(15px * var(--content-scale, 1)); cursor: pointer;
 }
 .btn-primary { background: #4caf50; color: white; }
 .btn-primary:hover:not(:disabled) { background: #45a049; }

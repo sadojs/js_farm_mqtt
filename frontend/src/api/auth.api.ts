@@ -5,9 +5,9 @@ export const authApi = {
   login: (username: string, password: string) =>
     apiClient.post<LoginResponse>('/auth/login', { username, password }),
 
-  // 쿠키는 브라우저가 자동 전송 → body 없음
-  refresh: () =>
-    apiClient.post<TokenResponse>('/auth/refresh'),
+  // 웹: 쿠키 자동 전송(body 없음). 앱: 저장된 refresh token 을 body 로 전달.
+  refresh: (refreshToken?: string) =>
+    apiClient.post<TokenResponse>('/auth/refresh', refreshToken ? { refreshToken } : undefined),
 
   logout: () =>
     apiClient.post('/auth/logout'),

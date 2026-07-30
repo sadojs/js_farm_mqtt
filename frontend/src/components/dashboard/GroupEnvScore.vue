@@ -324,7 +324,7 @@ const recommendations = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: calc(9px * var(--content-scale, 1));
   font-weight: 700;
   margin-top: 2px;
 }

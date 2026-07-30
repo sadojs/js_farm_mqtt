@@ -63,7 +63,7 @@ function handleLogout() {
   padding: 14px 20px;
   text-decoration: none;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 500;
   border: none;
   background: none;
@@ -88,7 +88,7 @@ function handleLogout() {
 }
 
 .more-icon {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
 }
 
 @media (min-width: 769px) {

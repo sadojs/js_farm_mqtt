@@ -277,7 +277,7 @@ onMounted(async () => {
   border-radius: 6px;
   background: var(--danger-badge-bg, #fee2e2);
   color: var(--danger-badge-text, #b91c1c);
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   vertical-align: middle;
 }

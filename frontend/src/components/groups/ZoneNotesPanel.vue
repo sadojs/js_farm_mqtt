@@ -236,16 +236,16 @@ async function onDelete() {
   display: inline-flex; align-items: center; justify-content: center;
 }
 .zn-doc svg { width: 20px; height: 20px; }
-.zn-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-primary); }
-.zn-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.zn-head h3 { margin: 0; font-size: calc(17px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.zn-sub { margin: 2px 0 0; font-size: calc(12.5px * var(--content-scale, 1)); color: var(--text-muted); }
 .zn-close {
   width: 34px; height: 34px; border: none; background: var(--bg-hover);
-  border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 16px;
+  border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: calc(16px * var(--content-scale, 1));
 }
 .zn-close:hover { background: var(--border-light); }
 
 .zn-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
-.zn-state { text-align: center; padding: 40px 16px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+.zn-state { text-align: center; padding: 40px 16px; color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); line-height: 1.5; }
 
 .zn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .zn-item {
@@ -256,30 +256,30 @@ async function onDelete() {
 .zn-item:hover { border-color: var(--accent); }
 .zn-tag {
   align-self: flex-start;
-  font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px;
+  font-size: calc(12px * var(--content-scale, 1)); font-weight: 700; border-radius: 999px; padding: 2px 10px;
 }
-.zn-text { margin: 0; color: var(--text-primary); font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.zn-meta { margin: 0; font-size: 11.5px; color: var(--text-muted); }
+.zn-text { margin: 0; color: var(--text-primary); font-size: calc(14px * var(--content-scale, 1)); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.zn-meta { margin: 0; font-size: calc(11.5px * var(--content-scale, 1)); color: var(--text-muted); }
 .zn-pin { margin-right: 6px; color: var(--warning-text); font-weight: 700; }
 
 .zn-field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.zn-field label { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.zn-field label { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; color: var(--text-secondary); }
 .zn-tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .zn-tag-btn {
   border: 1px solid var(--border-input); background: var(--bg-input);
   color: var(--text-secondary); border-radius: 999px;
-  padding: 8px 14px; font-weight: 600; font-size: 13px; cursor: pointer; min-height: 40px;
+  padding: 8px 14px; font-weight: 600; font-size: calc(13px * var(--content-scale, 1)); cursor: pointer; min-height: 40px;
 }
 .zn-textarea {
   width: 100%; box-sizing: border-box; resize: vertical;
   border: 1px solid var(--border-input); border-radius: 12px;
   background: var(--bg-input); color: var(--text-primary);
-  padding: 12px; font-size: 14px; font-family: inherit; line-height: 1.5;
+  padding: 12px; font-size: calc(14px * var(--content-scale, 1)); font-family: inherit; line-height: 1.5;
 }
 .zn-textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .zn-toggle-row {
   display: flex; align-items: center; justify-content: space-between;
-  font-size: 14px; color: var(--text-primary); font-weight: 600;
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); font-weight: 600;
 }
 .zn-toggle-row small { color: var(--text-muted); font-weight: 400; }
 .zn-switch {
@@ -301,7 +301,7 @@ async function onDelete() {
 .zn-foot-right { display: flex; gap: 8px; margin-left: auto; }
 .zn-add {
   width: 100%; background: var(--accent); color: #fff; border: none;
-  border-radius: 12px; padding: 13px; font-weight: 700; font-size: 15px; cursor: pointer; min-height: 48px;
+  border-radius: 12px; padding: 13px; font-weight: 700; font-size: calc(15px * var(--content-scale, 1)); cursor: pointer; min-height: 48px;
 }
 .zn-add:hover { background: var(--accent-hover); }
 .zn-del {

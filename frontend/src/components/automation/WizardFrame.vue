@@ -171,7 +171,7 @@ onBeforeUnmount(() => {
   background: none; border: none;
   width: 32px; height: 32px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; color: var(--text-muted); cursor: pointer;
+  font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted); cursor: pointer;
   border-radius: 8px;
   transition: background 0.12s, color 0.12s;
   flex-shrink: 0;

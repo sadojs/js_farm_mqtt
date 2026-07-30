@@ -706,7 +706,7 @@ function gaugeFillStyle(value: number, min: number, max: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   font-weight: 700;
   margin-top: 2px;
 }

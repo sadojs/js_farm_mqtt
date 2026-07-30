@@ -185,12 +185,12 @@ function formatDate(dateStr: string) {
 
 .widget-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
 }
 
 .widget-link {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--primary-color, #4caf50);
   text-decoration: none;
 }
@@ -199,7 +199,7 @@ function formatDate(dateStr: string) {
   text-align: center;
   padding: 20px 0;
   color: var(--text-secondary, #888);
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
 }
 
 .btn-cta {
@@ -210,7 +210,7 @@ function formatDate(dateStr: string) {
   color: #fff;
   border-radius: 20px;
   text-decoration: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 .batch-tabs {
@@ -224,7 +224,7 @@ function formatDate(dateStr: string) {
   padding: 4px 12px;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 16px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   background: none;
   cursor: pointer;
   white-space: nowrap;
@@ -236,7 +236,7 @@ function formatDate(dateStr: string) {
 }
 
 .tab-group {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   line-height: 1;
 }
@@ -262,17 +262,17 @@ function formatDate(dateStr: string) {
 }
 
 .group-chip {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
 }
 
 .crop-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
 }
 
 .source-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
 }
 
 /* ── 간이 타임라인 바 ── */
@@ -338,7 +338,7 @@ function formatDate(dateStr: string) {
 .mini-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
 }
 
@@ -354,7 +354,7 @@ function formatDate(dateStr: string) {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 .ev-dot {
@@ -407,12 +407,12 @@ function formatDate(dateStr: string) {
 }
 
 .ev-gdd {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
 .ev-date {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--primary-color, #4caf50);
 }
@@ -422,7 +422,7 @@ function formatDate(dateStr: string) {
 }
 
 .schedule-note {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   margin: 0 0 10px;
   line-height: 1.4;
@@ -434,7 +434,7 @@ function formatDate(dateStr: string) {
   padding: 8px;
   background: var(--bg-input, #f5f5f5);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--primary-color, #4caf50);
   text-decoration: none;
   font-weight: 500;

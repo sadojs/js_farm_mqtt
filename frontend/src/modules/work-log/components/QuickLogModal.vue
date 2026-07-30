@@ -133,10 +133,10 @@ async function save() {
   padding: 18px 22px;
   border-bottom: 1px solid var(--border-light);
 }
-.modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); font-weight: 700; }
+.modal-header h3 { margin: 0; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-primary); font-weight: 700; }
 .modal-close {
   background: none; border: none;
-  font-size: 24px; cursor: pointer;
+  font-size: calc(24px * var(--content-scale, 1)); cursor: pointer;
   color: var(--text-muted); line-height: 1;
 }
 .modal-body {
@@ -145,7 +145,7 @@ async function save() {
   display: flex; flex-direction: column; gap: 20px;
 }
 
-.step-title { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; }
+.step-title { font-size: calc(14px * var(--content-scale, 1)); font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; }
 .opt { font-weight: 400; color: var(--text-muted); }
 
 .zone-grid {
@@ -158,7 +158,7 @@ async function save() {
   background: var(--bg-secondary, var(--bg-hover));
   border: 2px solid transparent;
   border-radius: 10px;
-  font-size: 14px; font-weight: 700;
+  font-size: calc(14px * var(--content-scale, 1)); font-weight: 700;
   color: var(--text-primary);
   cursor: pointer;
   text-align: center;
@@ -187,17 +187,17 @@ async function save() {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 44px;
   border-radius: 50%;
-  font-size: 22px;
+  font-size: calc(22px * var(--content-scale, 1));
 }
-.task-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
-.task-last { font-size: 11px; color: var(--text-muted); }
+.task-name { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.task-last { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); }
 
 .form-input {
   width: 100%; padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-secondary, var(--bg-card));
-  color: var(--text-primary); font-size: 14px;
+  color: var(--text-primary); font-size: calc(14px * var(--content-scale, 1));
   box-sizing: border-box;
 }
 .form-input:focus { outline: none; border-color: var(--accent); }
@@ -210,7 +210,7 @@ async function save() {
 .btn-ghost, .btn-primary {
   padding: 12px 20px;
   border-radius: 10px;
-  font-size: 14px; font-weight: 600;
+  font-size: calc(14px * var(--content-scale, 1)); font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
 }

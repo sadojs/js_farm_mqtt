@@ -174,14 +174,14 @@ function sourceNote(source: string) {
 }
 
 .harvest-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
   margin: 0 0 14px;
   color: var(--text-primary, #222);
 }
 
 .sowing-info {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 400;
   color: var(--text-secondary, #888);
   margin-left: 8px;
@@ -189,7 +189,7 @@ function sourceNote(source: string) {
 
 .loading {
   color: var(--text-secondary, #888);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 /* ── GDD 요약 ── */
@@ -203,7 +203,7 @@ function sourceNote(source: string) {
 .gdd-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 .gdd-row.highlight {
@@ -231,7 +231,7 @@ function sourceNote(source: string) {
 }
 
 .confidence-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 10px;
@@ -242,12 +242,12 @@ function sourceNote(source: string) {
 .confidence-badge.low    { background: #f3e5f5; color: #6a1b9a; }
 
 .days-elapsed {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
 .method-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   margin-left: auto;
 }
@@ -282,33 +282,33 @@ function sourceNote(source: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-secondary, #666);
   margin-bottom: 4px;
 }
 
-.card-icon { font-size: 14px; }
+.card-icon { font-size: calc(14px * var(--content-scale, 1)); }
 
 .card-main-date {
-  font-size: 17px;
+  font-size: calc(17px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary, #222);
 }
 
 .card-sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
 }
 
 .card-daily {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: #2e7d32;
   font-weight: 500;
 }
 
 .card-source {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: #1565c0;
   font-weight: 500;
 }
@@ -317,7 +317,7 @@ function sourceNote(source: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   margin-top: 2px;
 }
 
@@ -331,7 +331,7 @@ function sourceNote(source: string) {
 }
 
 .forecast-title {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-secondary, #888);
   text-transform: uppercase;
@@ -372,13 +372,13 @@ function sourceNote(source: string) {
 .bar-fill.forecast { background: #90caf9; }
 
 .bar-val {
-  font-size: 9px;
+  font-size: calc(9px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   line-height: 1;
 }
 
 .bar-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   white-space: nowrap;
 }
@@ -387,7 +387,7 @@ function sourceNote(source: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #999);
   margin-top: 6px;
 }
@@ -402,7 +402,7 @@ function sourceNote(source: string) {
 .legend-dot.forecast { background: #90caf9; }
 
 .prediction-note {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
   margin: 0;
   text-align: center;

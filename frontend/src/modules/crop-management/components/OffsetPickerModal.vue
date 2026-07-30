@@ -173,14 +173,14 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
 }
 
 .btn-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
   color: var(--text-secondary, #888);
   padding: 4px 8px;
@@ -200,13 +200,13 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
 }
 
 .current-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   margin-bottom: 4px;
 }
 
 .current-value {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
 }
 
@@ -229,7 +229,7 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
 }
 
 .section-title {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-secondary, #666);
   margin: 0;
@@ -251,13 +251,13 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
   padding: 8px 10px;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   background: var(--bg-input, #fff);
   color: var(--text-primary, #333);
 }
 
 .unit {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
@@ -267,7 +267,7 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   white-space: nowrap;
 }
@@ -277,7 +277,7 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
   align-items: center;
   padding: 5px 12px;
   border-radius: 16px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   cursor: pointer;
   margin: 2px 4px 2px 0;
   border: 1px solid;
@@ -297,14 +297,14 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
 }
 
 .hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #999);
   margin: 0;
   line-height: 1.4;
 }
 
 .loading, .no-suggestions {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   text-align: center;
   padding: 12px;

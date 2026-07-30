@@ -258,7 +258,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 13px !important;
+  font-size: calc(13px * var(--content-scale, 1)) !important;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -286,7 +286,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   border: 1px solid var(--border-color, #ddd);
   border-radius: 20px;
   background: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   white-space: nowrap;
   color: var(--text-secondary, #666);
@@ -311,7 +311,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 .empty-icon {
-  font-size: 48px;
+  font-size: calc(48px * var(--content-scale, 1));
   margin-bottom: 12px;
 }
 
@@ -322,7 +322,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   color: #fff;
   border: none;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   cursor: pointer;
 }
 
@@ -341,17 +341,17 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 .zone-icon {
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
 }
 
 .zone-name {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary, #222);
 }
 
 .zone-batch-count {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   background: var(--bg-input, #f5f5f5);
   padding: 2px 8px;
@@ -365,7 +365,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   border: 1px solid var(--primary-color, #4caf50);
   color: var(--primary-color, #4caf50);
   border-radius: 14px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   cursor: pointer;
 }
 
@@ -396,13 +396,13 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 .crop-name {
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary, #222);
 }
 
 .seedling-tag {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   padding: 2px 8px;
   background: #e8f5e9;
   color: #2e7d32;
@@ -411,7 +411,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
 }
 
 .sowing-date {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   margin-bottom: 12px;
 }
@@ -420,7 +420,7 @@ function onOffsetApplied(payload: { offset: number; source: string; borrowedGrou
   background: none;
   border: none;
   color: var(--text-secondary, #aaa);
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   cursor: pointer;
   padding: 2px 4px;
 }

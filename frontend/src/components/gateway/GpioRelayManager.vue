@@ -669,13 +669,13 @@ function getPinTitle(pin: number): string {
   padding: 10px 12px;
   text-align: center;
 }
-.summary-value { font-size: 17px; font-weight: 800; }
-.summary-label { font-size: 10px; color: var(--text-secondary, #6b7280); margin-top: 2px; }
+.summary-value { font-size: calc(17px * var(--content-scale, 1)); font-weight: 800; }
+.summary-label { font-size: calc(10px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280); margin-top: 2px; }
 
 /* 충돌 배너 */
 .conflict-banner {
   background: #fef2f2; border: 1px solid #fca5a5;
-  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #dc2626;
+  border-radius: 8px; padding: 10px 14px; font-size: calc(13px * var(--content-scale, 1)); color: #dc2626;
 }
 
 /* 툴바 */
@@ -683,10 +683,10 @@ function getPinTitle(pin: number): string {
   display: flex; align-items: center; justify-content: space-between;
   padding: 4px 0;
 }
-.toolbar-hint { font-size: 11px; color: var(--text-secondary, #9ca3af); }
+.toolbar-hint { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #9ca3af); }
 .btn-add-device {
   display: flex; align-items: center; gap: 4px;
-  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 8px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 700;
   background: transparent;
   border: 1px solid #22c55e;
   color: #16a34a;
@@ -701,9 +701,9 @@ function getPinTitle(pin: number): string {
   border-radius: 12px;
   color: var(--text-secondary, #9ca3af);
 }
-.empty-icon { font-size: 36px; margin-bottom: 10px; }
-.empty-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.empty-hint { font-size: 11px; }
+.empty-icon { font-size: calc(36px * var(--content-scale, 1)); margin-bottom: 10px; }
+.empty-title { font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; margin-bottom: 4px; }
+.empty-hint { font-size: calc(11px * var(--content-scale, 1)); }
 
 /* 장치 카드 */
 .device-card {
@@ -726,39 +726,39 @@ function getPinTitle(pin: number): string {
   background: color-mix(in srgb, var(--type-color, #3b82f6) 15%, transparent);
   display: flex; align-items: center; justify-content: center;
 }
-.card-type-icon { font-size: 20px; }
+.card-type-icon { font-size: calc(20px * var(--content-scale, 1)); }
 
 .card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .card-name-row { display: flex; align-items: center; gap: 6px; }
-.card-name { font-size: 14px; font-weight: 600; color: var(--text-primary, #111); }
-.type-label { font-size: 11px; font-weight: 600; }
-.card-meta { font-size: 11px; color: var(--text-secondary, #6b7280); }
+.card-name { font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary, #111); }
+.type-label { font-size: calc(11px * var(--content-scale, 1)); font-weight: 600; }
+.card-meta { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280); }
 
 .card-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .btn-sm.btn-timer {
   background: transparent; border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 5px; cursor: pointer; font-size: 12px;
+  border-radius: 5px; cursor: pointer; font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #555); padding: 3px 8px;
 }
 .btn-sm.btn-timer:hover { background: var(--bg-hover, #f3f4f6); }
 .btn-delete-device {
   background: none; border: 1px solid var(--border-color, #e5e7eb);
   color: var(--text-secondary, #9ca3af); border-radius: 5px;
-  padding: 2px 8px; font-size: 11px; cursor: pointer;
+  padding: 2px 8px; font-size: calc(11px * var(--content-scale, 1)); cursor: pointer;
 }
 .btn-delete-device:hover { border-color: #fca5a5; color: #ef4444; background: #fef2f2; }
-.expand-arrow { font-size: 11px; color: var(--text-secondary, #9ca3af); }
+.expand-arrow { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #9ca3af); }
 
 /* 인라인 이름 편집 */
 .name-inline-input {
   border: 1px solid var(--primary, #3b82f6); border-radius: 4px;
-  padding: 3px 8px; font-size: 14px;
+  padding: 3px 8px; font-size: calc(14px * var(--content-scale, 1));
   background: var(--bg-input, #fff); color: var(--text-primary, #111);
   width: 160px;
 }
 .btn-icon {
   background: none; border: none; cursor: pointer;
-  color: var(--text-secondary, #9ca3af); font-size: 13px; padding: 2px 4px;
+  color: var(--text-secondary, #9ca3af); font-size: calc(13px * var(--content-scale, 1)); padding: 2px 4px;
 }
 .btn-icon:hover { color: var(--text-primary, #333); }
 .btn-ok { color: #16a34a !important; }
@@ -772,11 +772,11 @@ function getPinTitle(pin: number): string {
 
 /* 배지 */
 .timer-badge {
-  font-size: 11px; color: #1d4ed8; background: #eff6ff;
+  font-size: calc(11px * var(--content-scale, 1)); color: #1d4ed8; background: #eff6ff;
   border-radius: 6px; padding: 2px 10px; display: inline-block; width: fit-content;
 }
 .interlock-warn {
-  font-size: 11px; color: #b45309; background: #fffbeb;
+  font-size: calc(11px * var(--content-scale, 1)); color: #b45309; background: #fffbeb;
   border: 1px solid #fde68a; border-radius: 6px; padding: 6px 10px;
 }
 
@@ -794,28 +794,28 @@ function getPinTitle(pin: number): string {
 .ch-num {
   width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 800; border: 1px solid;
+  font-size: calc(10px * var(--content-scale, 1)); font-weight: 800; border: 1px solid;
 }
 .ch-name {
-  font-size: 12px; color: var(--text-primary, #333);
+  font-size: calc(12px * var(--content-scale, 1)); color: var(--text-primary, #333);
   flex: 1; min-width: 70px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* 핀 선택 */
 .pin-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.pin-label { font-size: 10px; color: var(--text-secondary, #6b7280); }
+.pin-label { font-size: calc(10px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280); }
 .pin-select {
   background: var(--bg-input, #fff);
   border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 6px; padding: 3px 6px; font-size: 12px;
+  border-radius: 6px; padding: 3px 6px; font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-primary, #111); cursor: pointer; min-width: 80px;
 }
 .pin-select:focus { outline: 2px solid var(--primary, #3b82f6); outline-offset: 1px; }
 
 /* 릴레이 버튼 */
 .relay-btn {
-  padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 5px; font-size: calc(11px * var(--content-scale, 1)); font-weight: 700;
   cursor: pointer; border: 1px solid; transition: all 0.15s; flex-shrink: 0;
 }
 .relay-btn.on { background: #dcfce7; border-color: #86efac; color: #15803d; }
@@ -849,7 +849,7 @@ function getPinTitle(pin: number): string {
   padding-top: 4px; border-top: 1px solid var(--border-color, #e5e7eb);
 }
 .btn-bulk {
-  padding: 5px 12px; border-radius: 5px; font-size: 11px;
+  padding: 5px 12px; border-radius: 5px; font-size: calc(11px * var(--content-scale, 1));
   background: var(--bg-card, #fff);
   border: 1px solid var(--border-color, #d1d5db);
   color: var(--text-secondary, #6b7280); cursor: pointer;
@@ -868,19 +868,19 @@ function getPinTitle(pin: number): string {
 .rain-header { cursor: default; }
 .rain-header:hover { background: transparent; }
 .pin-fixed {
-  font-size: 11px; font-weight: 600; color: #2563eb;
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 600; color: #2563eb;
   background: #eff6ff; border-radius: 4px; padding: 1px 6px;
 }
 .rain-hint {
   border-top: 1px solid var(--border-color, #e5e7eb);
-  padding: 8px 14px; font-size: 11px; line-height: 1.5;
+  padding: 8px 14px; font-size: calc(11px * var(--content-scale, 1)); line-height: 1.5;
   color: var(--text-secondary, #6b7280);
 }
 #app.theme-dark .pin-fixed { color: #93c5fd; background: rgba(59, 130, 246, 0.15); }
 
 /* GPIO 핀 맵 */
 .pin-map-section { padding-top: 4px; }
-.pin-map-title { font-size: 11px; color: var(--text-secondary, #6b7280); margin-bottom: 8px; }
+.pin-map-title { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280); margin-bottom: 8px; }
 .pin-map-grid { display: flex; flex-wrap: wrap; gap: 5px; }
 .pin-cell {
   width: 44px; padding: 6px 4px; border-radius: 7px;
@@ -891,7 +891,7 @@ function getPinTitle(pin: number): string {
 .pin-cell.pin-irrigation { background: #eff6ff; border-color: #bfdbfe; }
 .pin-cell.pin-vent { background: #ecfdf5; border-color: #a7f3d0; }
 .pin-cell.pin-conflict { background: #fef2f2; border-color: #fca5a5; }
-.pin-num { font-size: 11px; font-weight: 800; color: var(--text-primary, #333); }
+.pin-num { font-size: calc(11px * var(--content-scale, 1)); font-weight: 800; color: var(--text-primary, #333); }
 .pin-cell.pin-free .pin-num { color: var(--text-secondary, #9ca3af); }
 .pin-cell.pin-fan .pin-num { color: #d97706; }
 .pin-cell.pin-irrigation .pin-num { color: #1d4ed8; }
@@ -920,7 +920,7 @@ function getPinTitle(pin: number): string {
 #app.theme-dark .pin-info-text { color: #93c5fd; background: rgba(59, 130, 246, 0.15); }
 #app.theme-dark .conflict-warn { color: #fbbf24; background: rgba(245, 158, 11, 0.15); }
 .pin-cell.pin-conflict .pin-num { color: #dc2626; }
-.pin-icon { font-size: 10px; margin-top: 2px; }
+.pin-icon { font-size: calc(10px * var(--content-scale, 1)); margin-top: 2px; }
 
 /* ── 모달 공통 ── */
 .modal-overlay {
@@ -937,9 +937,9 @@ function getPinTitle(pin: number): string {
   box-shadow: 0 20px 50px rgba(0,0,0,0.2);
 }
 .modal-sm { width: 300px; }
-.modal h3 { font-size: 16px; font-weight: 700; margin: 0; color: var(--text-primary, #111); }
-.modal-desc { font-size: 13px; color: var(--text-secondary, #555); margin: 0; line-height: 1.5; }
-.warn-text { color: #d97706; font-size: 12px; }
+.modal h3 { font-size: calc(16px * var(--content-scale, 1)); font-weight: 700; margin: 0; color: var(--text-primary, #111); }
+.modal-desc { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); margin: 0; line-height: 1.5; }
+.warn-text { color: #d97706; font-size: calc(12px * var(--content-scale, 1)); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ── 장치 추가 모달 ── */
@@ -948,13 +948,13 @@ function getPinTitle(pin: number): string {
   display: flex; align-items: center; justify-content: space-between;
 }
 .btn-close {
-  background: none; border: none; font-size: 18px; cursor: pointer;
+  background: none; border: none; font-size: calc(18px * var(--content-scale, 1)); cursor: pointer;
   color: var(--text-secondary, #9ca3af); line-height: 1;
 }
 .btn-close:hover { color: var(--text-primary, #333); }
 
 .field-section { display: flex; flex-direction: column; gap: 8px; }
-.field-label { font-size: 11px; color: var(--text-secondary, #6b7280); font-weight: 600; letter-spacing: 0.5px; }
+.field-label { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280); font-weight: 600; letter-spacing: 0.5px; }
 
 /* 유형 카드 목록 */
 .type-list { display: flex; flex-direction: column; gap: 8px; }
@@ -967,15 +967,15 @@ function getPinTitle(pin: number): string {
 }
 .type-card:hover { border-color: var(--primary, #3b82f6); }
 .type-card-selected { /* border/bg set via :style */ }
-.type-card-icon { font-size: 22px; flex-shrink: 0; }
+.type-card-icon { font-size: calc(22px * var(--content-scale, 1)); flex-shrink: 0; }
 .type-card-info { flex: 1; }
-.type-card-label { font-size: 13px; font-weight: 700; color: var(--text-secondary, #555); }
-.type-card-desc { font-size: 11px; color: var(--text-secondary, #9ca3af); margin-top: 2px; }
+.type-card-label { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; color: var(--text-secondary, #555); }
+.type-card-desc { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #9ca3af); margin-top: 2px; }
 
 /* 8ch / 12ch 선택 버튼 */
 .ch-selector { display: flex; gap: 6px; flex-shrink: 0; }
 .ch-opt-btn {
-  padding: 3px 10px; border-radius: 5px; font-size: 11px; cursor: pointer;
+  padding: 3px 10px; border-radius: 5px; font-size: calc(11px * var(--content-scale, 1)); cursor: pointer;
   border: 1px solid var(--border-color, #d1d5db);
   background: var(--bg-card, #fff); color: var(--text-secondary, #6b7280);
   transition: all 0.15s;
@@ -992,7 +992,7 @@ function getPinTitle(pin: number): string {
 /* 이름 입력 */
 .modal-input {
   border: 1px solid var(--border-color, #d1d5db); border-radius: 8px;
-  padding: 10px 12px; font-size: 13px;
+  padding: 10px 12px; font-size: calc(13px * var(--content-scale, 1));
   background: var(--bg-input, #fff); color: var(--text-primary, #111);
   width: 100%; box-sizing: border-box;
 }
@@ -1000,7 +1000,7 @@ function getPinTitle(pin: number): string {
 
 /* GPIO 여유 정보 */
 .gpio-info {
-  border-radius: 8px; padding: 8px 12px; font-size: 11px;
+  border-radius: 8px; padding: 8px 12px; font-size: calc(11px * var(--content-scale, 1));
 }
 .gpio-ok { background: #f0fdf4; border: 1px solid #bbf7d0; }
 .gpio-warn { background: #fef2f2; border: 1px solid #fecaca; }
@@ -1011,7 +1011,7 @@ function getPinTitle(pin: number): string {
 
 /* 추가 확인 버튼 */
 .btn-add-confirm {
-  width: 100%; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  width: 100%; padding: 12px; border-radius: 8px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 700;
   cursor: not-allowed;
   background: var(--bg-hover, #f3f4f6);
   border: 1px solid var(--border-color, #e5e7eb);
@@ -1029,14 +1029,14 @@ function getPinTitle(pin: number): string {
 
 /* 공통 버튼 */
 .btn-secondary {
-  padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  padding: 8px 16px; border-radius: 6px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 600;
   background: var(--bg-card, #fff);
   border: 1px solid var(--border-color, #d1d5db);
   color: var(--text-secondary, #555); cursor: pointer;
 }
 .btn-secondary:hover { background: var(--bg-hover, #f3f4f6); }
 .btn-danger {
-  padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  padding: 8px 16px; border-radius: 6px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 600;
   background: #ef4444; color: #fff; border: none; cursor: pointer;
 }
 .btn-danger:hover:not(:disabled) { background: #dc2626; }

@@ -68,19 +68,19 @@ const { state, handleConfirm, handleCancel } = useConfirm()
 }
 
 .confirm-icon {
-  font-size: 40px;
+  font-size: calc(40px * var(--content-scale, 1));
   margin-bottom: 12px;
 }
 
 .confirm-title {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .confirm-message {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 24px;
@@ -97,7 +97,7 @@ const { state, handleConfirm, handleCancel } = useConfirm()
   min-height: 44px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   cursor: pointer;
   border: none;
   transition: background 0.2s, transform 0.1s;

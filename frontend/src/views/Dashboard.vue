@@ -235,7 +235,7 @@ onMounted(() => {
   border: 1px solid var(--danger);
   border-radius: 12px;
   padding: 14px 18px;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
 }
 
 /* 편집 패널 */
@@ -247,7 +247,7 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 .dashboard-edit-panel h4 {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
   margin-bottom: 12px;
   color: var(--text-primary);
@@ -270,7 +270,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   cursor: pointer;
   color: var(--text-primary);
 }
@@ -291,7 +291,7 @@ onMounted(() => {
   background: var(--bg-card);
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -303,7 +303,7 @@ onMounted(() => {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: transparent;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   color: var(--text-secondary);
 }
@@ -346,16 +346,16 @@ onMounted(() => {
   gap: 10px;
 }
 
-.weather-icon-big { font-size: 28px; }
+.weather-icon-big { font-size: calc(28px * var(--content-scale, 1)); }
 
 .weather-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 700;
   margin-bottom: 2px;
 }
 
 .weather-location {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   opacity: 0.85;
 }
 
@@ -369,21 +369,21 @@ onMounted(() => {
 }
 
 .weather-temp-big {
-  font-size: 36px;
+  font-size: calc(36px * var(--content-scale, 1));
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .weather-temp-unit {
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 500;
   opacity: 0.85;
   margin-top: 2px;
 }
 
 .weather-condition {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   opacity: 0.85;
   text-align: right;
   margin-top: 2px;
@@ -405,13 +405,13 @@ onMounted(() => {
 }
 
 .detail-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   opacity: 0.85;
   font-weight: 500;
 }
 
 .detail-value {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -445,8 +445,8 @@ onMounted(() => {
   .weather-top { margin-bottom: 8px; }
   .weather-details-grid { gap: 6px; }
   .weather-detail-item { padding: 8px 10px; gap: 2px; }
-  .weather-temp-big { font-size: 32px; }
-  .detail-value { font-size: 16px; }
+  .weather-temp-big { font-size: calc(32px * var(--content-scale, 1)); }
+  .detail-value { font-size: calc(16px * var(--content-scale, 1)); }
 }
 
 /* 태블릿 — 너무 좁아지면 hero도 stack */

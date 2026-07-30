@@ -305,7 +305,7 @@ onMounted(loadAll)
 }
 .tab-btn {
   padding: 7px 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 600;
   border: none;
   background: transparent;
@@ -321,7 +321,7 @@ onMounted(loadAll)
   padding: 9px 16px;
   background: var(--accent); color: #fff;
   border: none; border-radius: 10px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; cursor: pointer;
 }
 .btn-primary:hover { background: var(--accent-hover); }
 

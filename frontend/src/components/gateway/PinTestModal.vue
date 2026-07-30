@@ -289,27 +289,27 @@ async function allOff() {
   flex-shrink: 0;
 }
 .modal-title-row { display: flex; align-items: center; gap: 12px; }
-.modal-icon { font-size: 28px; }
-.modal-title { font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); }
-.modal-subtitle { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; }
+.modal-icon { font-size: calc(28px * var(--content-scale, 1)); }
+.modal-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; margin: 0; color: var(--text-primary); }
+.modal-subtitle { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin: 2px 0 0; }
 .btn-close {
-  background: none; border: none; font-size: 18px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px;
 }
 .warn-banner {
   background: #fef3c7; color: #92400e; padding: 10px 20px;
-  font-size: 13px; font-weight: 600; flex-shrink: 0;
+  font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; flex-shrink: 0;
 }
 .auto-off-row {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 20px; border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
-.ao-label { font-size: 13px; color: var(--text-muted); white-space: nowrap; font-weight: 500; }
+.ao-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); white-space: nowrap; font-weight: 500; }
 .ao-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .ao-btn {
   padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border-color);
-  background: var(--bg-card); color: var(--text-secondary); font-size: 13px;
+  background: var(--bg-card); color: var(--text-secondary); font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer; transition: all 0.15s;
 }
 .ao-btn:hover { border-color: #6366f1; }
@@ -329,19 +329,19 @@ async function allOff() {
 .pin-badge {
   display: inline-block; padding: 3px 8px; border-radius: 6px;
   background: var(--bg-badge); color: var(--text-muted);
-  font-size: 12px; font-weight: 600; font-family: monospace;
+  font-size: calc(12px * var(--content-scale, 1)); font-weight: 600; font-family: monospace;
 }
 .ch-badge { background: #ede9fe; color: #6d28d9; }
-.pin-label-col { flex: 1; font-size: 13px; color: var(--text-secondary); min-width: 0; }
+.pin-label-col { flex: 1; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary); min-width: 0; }
 .pin-state { display: flex; align-items: center; gap: 5px; width: 52px; flex-shrink: 0; }
 .state-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dot-on { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
 .dot-off { background: var(--text-disabled, #d1d5db); }
-.state-label { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.state-label { font-size: calc(11px * var(--content-scale, 1)); font-weight: 600; color: var(--text-muted); }
 .pin-btns { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
 .btn-on, .btn-off {
   padding: 5px 14px; border-radius: 6px; border: none;
-  font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  font-size: calc(12px * var(--content-scale, 1)); font-weight: 700; cursor: pointer; transition: all 0.15s;
 }
 .btn-on { background: #22c55e; color: #fff; }
 .btn-on:hover:not(:disabled) { background: #16a34a; }
@@ -352,7 +352,7 @@ async function allOff() {
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 
 .empty-channels {
-  padding: 32px; text-align: center; color: var(--text-muted); font-size: 14px;
+  padding: 32px; text-align: center; color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1));
 }
 
 .modal-footer {
@@ -361,13 +361,13 @@ async function allOff() {
 }
 .btn-all-off {
   padding: 8px 18px; border-radius: 8px; border: 1px solid #ef4444;
-  background: #fef2f2; color: #ef4444; font-size: 13px; font-weight: 600;
+  background: #fef2f2; color: #ef4444; font-size: calc(13px * var(--content-scale, 1)); font-weight: 600;
   cursor: pointer;
 }
 .btn-all-off:hover { background: #ef4444; color: #fff; }
 .btn-close-footer {
   padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border-color);
-  background: var(--bg-card); color: var(--text-secondary); font-size: 13px;
+  background: var(--bg-card); color: var(--text-secondary); font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
 }
 </style>

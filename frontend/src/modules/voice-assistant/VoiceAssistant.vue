@@ -274,7 +274,7 @@ watch(() => messages.value.length, () => {
 
 /* ››› 슬라이드 화살표 (아이폰 전원 느낌) */
 .slide-arrows {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 300;
   color: rgba(255,255,255,0.7);
   letter-spacing: -2px;
@@ -338,14 +338,14 @@ watch(() => messages.value.length, () => {
 }
 
 .panel-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 600;
 }
 
 .btn-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
   padding: 4px 8px;
   color: var(--text-secondary, #64748b);
@@ -363,13 +363,13 @@ watch(() => messages.value.length, () => {
 .empty-hint {
   text-align: center;
   color: var(--text-secondary, #94a3b8);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   padding: 24px 0;
   line-height: 1.8;
 }
 
 .hint-small {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   opacity: 0.7;
 }
 
@@ -378,7 +378,7 @@ watch(() => messages.value.length, () => {
   align-items: flex-start;
   gap: 8px;
   margin-bottom: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   line-height: 1.5;
 }
 
@@ -402,7 +402,7 @@ watch(() => messages.value.length, () => {
 }
 
 .msg-icon {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   flex-shrink: 0;
   line-height: 1.6;
 }
@@ -431,7 +431,7 @@ watch(() => messages.value.length, () => {
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 50%;
   background: var(--bg-card, #fff);
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
   flex-shrink: 0;
   display: flex;
@@ -461,7 +461,7 @@ watch(() => messages.value.length, () => {
   padding: 8px 12px;
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   outline: none;
   min-width: 0;
 }
@@ -476,7 +476,7 @@ watch(() => messages.value.length, () => {
   border-radius: 8px;
   background: var(--primary-color, #2563eb);
   color: #fff;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;

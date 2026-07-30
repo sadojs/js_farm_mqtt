@@ -197,7 +197,7 @@ function daysUntil(targetGdd: number): number {
 .tl-loading, .tl-error {
   padding: 16px 0;
   color: var(--text-secondary, #888);
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   text-align: center;
 }
 
@@ -216,14 +216,14 @@ function daysUntil(targetGdd: number): number {
 
 .tl-gdd-val {
   display: block;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--primary-color, #4caf50);
 }
 
 .tl-gdd-label {
   display: block;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
@@ -267,7 +267,7 @@ function daysUntil(targetGdd: number): number {
 .tl-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: calc(10px * var(--content-scale, 1));
   color: var(--text-secondary, #aaa);
 }
 
@@ -337,7 +337,7 @@ function daysUntil(targetGdd: number): number {
 }
 
 .tl-event-gdd {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   margin-bottom: 2px;
 }
@@ -348,14 +348,14 @@ function daysUntil(targetGdd: number): number {
 }
 
 .tl-event-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 500;
   color: var(--text-primary, #222);
   margin-bottom: 2px;
 }
 
 .tl-event-date {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
 }
 
@@ -365,7 +365,7 @@ function daysUntil(targetGdd: number): number {
   background: rgba(255, 152, 0, 0.12);
   color: #e65100;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 500;
 }
 
@@ -375,7 +375,7 @@ function daysUntil(targetGdd: number): number {
 }
 
 .days-hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: #9e9e9e;
   margin-left: 4px;
 }

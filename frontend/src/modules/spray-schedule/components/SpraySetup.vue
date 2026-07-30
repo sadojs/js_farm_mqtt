@@ -477,7 +477,7 @@ defineExpose({ reload: load })
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-variant-numeric: tabular-nums;
 }
 .stepper {
@@ -494,7 +494,7 @@ defineExpose({ reload: load })
   border: none;
   background: var(--bg-hover);
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
 }
 .stepper .num {
