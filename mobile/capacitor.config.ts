@@ -17,12 +17,17 @@ const config: CapacitorConfig = {
   appName: 'SmartFarm',
   webDir: 'www',
   server: {
-    // dev(로컬 HTTP 백엔드) 테스트: Android 오리진을 http://localhost 로 맞춤
-    //  → 백엔드 CORS(http://localhost)와 일치 + https→http 혼합콘텐츠 차단 회피.
-    androidScheme: 'http',
+    // 프로덕션(HTTPS 도메인 https://urifarm.com:8443) 기준.
+    // Android 오리진 = https://localhost (Capacitor 기본). 평문(cleartext) 불필요.
+    //  → 백엔드 CORS 에 'https://localhost' 필요(추가돼 있음).
+    // ⚠️ dev 로컬 HTTP 백엔드로 테스트할 땐 'http' 로 바꾸고 usesCleartextTraffic=true + ATS 예외 (README 참조).
+    androidScheme: 'https',
   },
   ios: {
-    contentInset: 'always',
+    // 'never': WebView 를 전체화면으로 두고 safe-area(다이나믹 아일랜드/홈인디케이터)를
+    // CSS env(safe-area-inset-*) 로 처리한다. 'always' 는 env() 를 0 으로 만들어 헤더가
+    // 상태바와 겹치는 문제가 있었다. (index.html 은 viewport-fit=cover)
+    contentInset: 'never',
   },
   android: {
     allowMixedContent: false,

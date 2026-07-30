@@ -16,7 +16,7 @@ FRONTEND_DIR="$(cd "$MOBILE_DIR/../frontend" && pwd)"
 WWW_DIR="$MOBILE_DIR/www"
 
 # 앱 번들이 호출할 백엔드 절대주소 (현재: 프로덕션 IP / 이후: 도메인)
-API_BASE="${APP_API_BASE:-https://175.206.245.234:8443}"
+API_BASE="${APP_API_BASE:-https://urifarm.com:8443}"
 
 echo "▶ 프론트 번들 빌드"
 echo "   frontend : $FRONTEND_DIR (소스 무변경)"
