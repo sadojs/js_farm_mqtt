@@ -227,10 +227,10 @@ async function handleSave() {
   display: flex; justify-content: space-between; align-items: center;
   padding: 20px 24px 12px;
 }
-.modal-title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.modal-title { font-size: calc(20px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .btn-close {
   width: 32px; height: 32px; border-radius: 50%; border: none;
-  background: var(--bg-hover); cursor: pointer; font-size: 16px;
+  background: var(--bg-hover); cursor: pointer; font-size: calc(16px * var(--content-scale, 1));
   display: flex; align-items: center; justify-content: center;
   color: var(--text-secondary);
 }
@@ -241,7 +241,7 @@ async function handleSave() {
 }
 .edit-tab {
   flex: 1; padding: 8px 16px; border: none; border-radius: 8px;
-  background: none; font-size: 14px; font-weight: 600;
+  background: none; font-size: calc(14px * var(--content-scale, 1)); font-weight: 600;
   color: var(--text-muted); cursor: pointer; transition: all 0.2s;
 }
 .edit-tab.active {

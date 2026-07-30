@@ -454,17 +454,17 @@ watch(form, () => {
   padding: 10px 12px; background: var(--bg-secondary); border-radius: 10px;
 }
 .sched-row-header { display: flex; align-items: center; justify-content: space-between; }
-.sched-row-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.sched-row-label { font-size: calc(12px * var(--content-scale, 1)); font-weight: 600; color: var(--text-muted); }
 .sched-row-body { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sched-days { gap: 4px; }
 .btn-remove-sched {
-  background: none; border: none; color: #ef5350; font-size: 12px; cursor: pointer; padding: 2px 6px;
+  background: none; border: none; color: #ef5350; font-size: calc(12px * var(--content-scale, 1)); cursor: pointer; padding: 2px 6px;
 }
 .btn-add-sched {
   display: inline-flex; align-items: center;
   padding: 8px 14px; border: 1.5px dashed var(--border-input);
   border-radius: 8px; background: none; color: var(--text-muted);
-  font-size: 13px; cursor: pointer;
+  font-size: calc(13px * var(--content-scale, 1)); cursor: pointer;
 }
 .btn-add-sched:hover { border-color: var(--accent, #4caf50); color: var(--accent, #4caf50); }
 
@@ -729,7 +729,7 @@ watch(form, () => {
 
 /* 교반기 종속 안내 + disabled 토글 */
 .mixer-hint {
-  font-size: 12px; color: var(--text-secondary, #6b7280);
+  font-size: calc(12px * var(--content-scale, 1)); color: var(--text-secondary, #6b7280);
   margin-top: 4px; padding-left: 4px;
 }
 .toggle-btn.disabled,

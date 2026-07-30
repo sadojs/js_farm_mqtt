@@ -175,7 +175,7 @@ const confirmAdd = async () => {
 .close-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
   color: var(--text-muted);
   cursor: pointer;
   width: 32px;

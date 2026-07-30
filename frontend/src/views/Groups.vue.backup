@@ -55,11 +55,44 @@
         <div class="group-header">
           <div class="group-title">
             <span v-if="isAdmin && group.ownerName" class="farm-owner-badge">🏠 {{ group.ownerName }}</span>
-            <!-- 구역 이름/설명 변경은 환경설정(⚙) 안으로 이동됨 -->
-            <h3>{{ group.name }}</h3>
-            <p v-if="group.description" class="group-desc">{{ group.description }}</p>
+            <template v-if="renamingGroupId === group.id">
+              <div class="rename-form">
+                <input
+                  ref="renameGroupInput"
+                  v-model="renameGroupValue"
+                  class="rename-group-input"
+                  maxlength="50"
+                  placeholder="구역명"
+                  @keyup.enter="submitRenameGroup(group)"
+                  @keyup.esc="cancelRenameGroup"
+                />
+                <input
+                  v-model="renameDescValue"
+                  class="rename-desc-input"
+                  maxlength="100"
+                  placeholder="설명 (선택)"
+                  @keyup.enter="submitRenameGroup(group)"
+                  @keyup.esc="cancelRenameGroup"
+                />
+                <div class="rename-actions">
+                  <button class="btn-rename-ok" @mousedown.prevent="submitRenameGroup(group)">저장</button>
+                  <button class="btn-rename-cancel" @mousedown.prevent="cancelRenameGroup">취소</button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <h3>{{ group.name }}</h3>
+              <button
+                v-if="!isFarmUser"
+                class="btn-rename-group"
+                @click="startRenameGroup(group.id, group.name, group.description)"
+                title="이름/설명 변경"
+              >✎</button>
+            </template>
+            <p v-if="group.description && renamingGroupId !== group.id" class="group-desc">{{ group.description }}</p>
           </div>
           <div class="group-header-actions">
+            <span class="device-count-badge">{{ getGroupSensors(group).length + getGroupActuators(group).length + getGroupOpenerGroups(group).length }}개 장치</span>
             <button
               class="btn-memo"
               :class="{ 'has-notes': noteCount(group.id) > 0 }"
@@ -72,12 +105,8 @@
               <span v-if="noteCount(group.id) > 0" class="memo-count">{{ noteCount(group.id) }}</span>
             </button>
             <button v-if="!isFarmUser" class="btn-icon" @click="openEnvConfig(group)" title="환경설정" aria-label="환경설정">⚙</button>
-            <button v-if="isAdmin" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
-            <button v-if="isAdmin" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
-            <button v-if="!isFarmUser" class="btn-icon btn-edit-toggle" :class="{ active: isGroupEditing(group.id) }"
-              @click="toggleGroupEdit(group.id)"
-              :title="isGroupEditing(group.id) ? '편집 완료' : '편집 (이름변경·순서이동)'"
-              :aria-label="isGroupEditing(group.id) ? '편집 완료' : '편집'">{{ isGroupEditing(group.id) ? '완료' : '✎' }}</button>
+            <button v-if="!isFarmUser" class="btn-icon btn-add-gw-icon" @click="openAddGatewayModal(group)" title="게이트웨이 추가" aria-label="게이트웨이 추가">🍓+</button>
+            <button v-if="!isFarmUser" class="btn-icon danger" @click="deleteGroup(group)" title="구역 삭제" aria-label="삭제">🗑</button>
             <button class="btn-icon" @click="toggleCollapse(group.id)" :title="collapsedGroups.has(group.id) ? '펼치기' : '접기'" :aria-label="collapsedGroups.has(group.id) ? '펼치기' : '접기'">
               {{ collapsedGroups.has(group.id) ? '▶' : '▼' }}
             </button>
@@ -94,39 +123,9 @@
 
           <!-- 센서 목록 -->
           <template v-if="getGroupSensors(group).length > 0">
-            <div class="section-header sensor">
-              <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
-              <div class="info-guide-wrap" @click.stop>
-                <button
-                  type="button"
-                  class="info-guide-btn sensor"
-                  :class="{ open: infoGuideKey === 'sensor:' + group.id }"
-                  :aria-expanded="infoGuideKey === 'sensor:' + group.id"
-                  aria-label="측정기 아이콘 안내"
-                  @click.stop="toggleInfoGuide('sensor', group.id)"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                  <span>아이콘 안내</span>
-                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <div v-if="infoGuideKey === 'sensor:' + group.id" class="info-guide-popover sensor" role="dialog" aria-label="측정기 종류">
-                  <div class="info-guide-title sensor">측정기 종류</div>
-                  <ul class="info-guide-list">
-                    <li v-for="item in guideSensorTypes(group)" :key="item.type" class="info-guide-item">
-                      <EquipmentIcon :type="item.type" :active="true" :size="16" />
-                      <span>{{ item.label }}</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+            <div class="section-label sensor">측정기 ({{ getGroupSensors(group).length }})</div>
             <div class="device-sub-grid">
-              <div v-for="device in getGroupSensors(group)" :key="device.id"
-                :class="['sub-card sensor', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id }]"
-                :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':sensor'">
-                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
-                  @pointerdown="reorderPress($event, device.id, group.id + ':sensor', getGroupSensors(group).map(d => d.id))"></span>
+              <div v-for="device in getGroupSensors(group)" :key="device.id" class="sub-card sensor">
                 <div class="sub-card-top">
                   <!-- 타입 아이콘 칩 (헤더 순서 통일: [칩][상태점+이름+✎][배지]) -->
                   <EquipmentIcon
@@ -149,16 +148,15 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
+                    <span class="sub-card-name">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser && isGroupEditing(group.id)"
+                      v-if="!isFarmUser"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
                     >✎</button>
                   </template>
+                  <span class="type-tag sensor">측정기</span>
                 </div>
                 <div v-if="device.sensorData && Object.keys(getTopSensorData(device.sensorData)).length > 0" class="sub-card-sensor-chips">
                   <span v-for="(val, key) in getTopSensorData(device.sensorData)" :key="key" class="sensor-chip">
@@ -188,48 +186,14 @@
                 </button>
               </div>
             </div>
-            <div v-if="!isFarmUser && isGroupEditing(group.id) && getGroupSensors(group).length > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 장치(액추에이터 + 개폐기 + 관수) 목록 -->
           <template v-if="getGroupActuators(group).length > 0 || getGroupOpenerGroups(group).length > 0 || getGroupIrrigationDevices(group).length > 0">
-            <div class="section-header actuator">
-              <div class="section-label actuator">장치 ({{ getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length }})</div>
-              <div class="info-guide-wrap" @click.stop>
-                <button
-                  type="button"
-                  class="info-guide-btn actuator"
-                  :class="{ open: infoGuideKey === 'device:' + group.id }"
-                  :aria-expanded="infoGuideKey === 'device:' + group.id"
-                  aria-label="장치 아이콘 안내"
-                  @click.stop="toggleInfoGuide('device', group.id)"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                  <span>아이콘 안내</span>
-                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <div v-if="infoGuideKey === 'device:' + group.id" class="info-guide-popover actuator" role="dialog" aria-label="장치 종류">
-                  <div class="info-guide-title actuator">장치 종류</div>
-                  <ul class="info-guide-list">
-                    <li v-for="item in guideDeviceTypes(group)" :key="item.type" class="info-guide-item">
-                      <EquipmentIcon :type="item.type" :active="true" :size="16" />
-                      <span>{{ item.label }}</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+            <div class="section-label actuator">장치 ({{ getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length }})</div>
             <div class="device-sub-grid">
               <!-- 개폐기 그룹 카드 -->
-              <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === og.openDevice.id, 'timer-active': !!openerTimerOf(og) }]"
-                :style="reorderDragStyle(og.openDevice.id)"
-                :data-reorder-id="og.openDevice.id" :data-reorder-group="group.id + ':opener'"
-                @pointerdown="onTimerPress('opener', og.openDevice, isGroupEditing(group.id))"
-                @contextmenu.prevent @selectstart.prevent
-                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
-                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
-                  @pointerdown="reorderPress($event, og.openDevice.id, group.id + ':opener', getGroupOpenerGroups(group).map(o => o.openDevice.id), Object.fromEntries(getGroupOpenerGroups(group).map(o => [o.openDevice.id, o.closeDevice.id])))"></span>
+              <div v-for="og in getGroupOpenerGroups(group)" :key="og.groupName" class="sub-card actuator">
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="opener"
@@ -251,48 +215,33 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitOpenerGroupRename(og)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startOpenerGroupRename(og)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ og.groupName }}</span>
+                    <span class="sub-card-name">{{ og.groupName }}</span>
                     <button
-                      v-if="!isFarmUser && isGroupEditing(group.id)"
+                      v-if="!isFarmUser"
                       class="btn-rename-mini"
                       @click.stop="startOpenerGroupRename(og)"
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span v-if="highTempActiveZones.has(group.id)" class="hightemp-badge" title="고온 무대기 강제열림 동작 중 — 개폐기를 대기 없이 연속 개방 중입니다">
-                    🔥 고온 강제열림
-                  </span>
-                  <span v-if="openerTimerOf(og)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(og.openDevice)" title="타이머 해제 → 자동제어 복귀">
-                    <span class="timer-dot"></span>{{ openerTimerOf(og)!.direction === 'open' ? '열기' : '닫기' }} {{ formatCountdown(openerTimerOf(og)!.until) }}<span class="timer-x">✕</span>
-                  </span>
+                  <span class="type-tag actuator type-tag-opener">개폐기</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.openDevice.online }">
                   <span class="control-label">열림</span>
-                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
+                  <label class="toggle-switch" @click.prevent="og.openDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'open')">
                     <input type="checkbox" :checked="og.openDevice.online && og.openDevice.switchState === true" :disabled="!og.openDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !og.closeDevice.online }">
                   <span class="control-label">닫힘</span>
-                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
+                  <label class="toggle-switch" @click.prevent="og.closeDevice.online && !openerInterlocking && handleOpenerInterlock(og, 'close')">
                     <input type="checkbox" :checked="og.closeDevice.online && og.closeDevice.switchState === true" :disabled="!og.closeDevice.online || openerInterlocking" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
               </div>
               <!-- 관수 장치 카드 -->
-              <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id, 'timer-active': !!irrigationTimerSummary(device) }]"
-                :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':irrigation'"
-                @pointerdown="onIrrigationTimerPress(device, isGroupEditing(group.id))"
-                @contextmenu.prevent @selectstart.prevent
-                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
-                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
-                  @pointerdown="reorderPress($event, device.id, group.id + ':irrigation', getGroupIrrigationDevices(group).map(d => d.id))"></span>
+              <div v-for="device in getGroupIrrigationDevices(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
                   <EquipmentIcon
                     type="irrigation"
@@ -314,30 +263,26 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
+                    <span class="sub-card-name">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser && isGroupEditing(group.id)"
+                      v-if="!isFarmUser"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
                     >✎</button>
                   </template>
                   <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
-                  <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationTimerModal(device)" title="채널별 타이머 관리">
-                    <span class="timer-dot"></span>{{ irrigationTimerSummary(device)!.count }}채널 · {{ formatCountdown(irrigationTimerSummary(device)!.until) }}
-                  </span>
+                  <span class="type-tag actuator type-tag-irrigation">관주</span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
-                  <span class="control-label">원격제어</span>
-                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
+                  <span class="control-label">원격제어 ON/OFF</span>
+                  <label class="toggle-switch" @click.prevent="device.online && handleIrrigationControl(device, getMapping(device)['remote_control'])">
                     <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['remote_control']] === true" :disabled="!device.online || irrigationControlling === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="sub-card-control disabled">
-                  <span class="control-label">액비/교반기</span>
+                  <span class="control-label">액비/교반기 B접점</span>
                   <label class="toggle-switch">
                     <input type="checkbox" :checked="device.online && device.switchStates?.[getMapping(device)['fertilizer_b_contact']] === true" disabled />
                     <span class="toggle-slider"></span>
@@ -345,15 +290,7 @@
                 </div>
               </div>
               <!-- 일반 장치 카드 -->
-              <div v-for="device in getGroupActuators(group)" :key="device.id"
-                :class="['sub-card actuator', { reorderable: !isFarmUser && isGroupEditing(group.id), dragging: reorderDraggingId === device.id, 'timer-active': isActive(device.overrideUntil) }]"
-                :style="reorderDragStyle(device.id)"
-                :data-reorder-id="device.id" :data-reorder-group="group.id + ':actuator'"
-                @pointerdown="onTimerPress('fan', device, isGroupEditing(group.id))"
-                @contextmenu.prevent @selectstart.prevent
-                @pointerup="clearTimerPress" @pointerleave="clearTimerPress" @pointercancel="clearTimerPress">
-                <span v-if="!isFarmUser && isGroupEditing(group.id)" class="drag-grip" title="길게 눌러 순서 이동"
-                  @pointerdown="reorderPress($event, device.id, group.id + ':actuator', getGroupActuators(group).map(d => d.id))"></span>
+              <div v-for="device in getGroupActuators(group)" :key="device.id" class="sub-card actuator">
                 <div class="sub-card-top">
                   <EquipmentIcon
                     :type="device.equipmentType"
@@ -375,34 +312,29 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
+                    <span class="sub-card-name">{{ device.name }}</span>
                     <button
-                      v-if="!isFarmUser && isGroupEditing(group.id)"
+                      v-if="!isFarmUser"
                       class="btn-rename-mini"
                       @click.stop="startDeviceRename(device.id, device.name)"
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <span v-if="isActive(device.overrideUntil)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(device)" title="타이머 해제 → 자동제어 복귀">
-                    <span class="timer-dot"></span>{{ formatCountdown(device.overrideUntil) }}<span class="timer-x">✕</span>
-                  </span>
-                  <span v-else-if="device.userOverride" class="manual-override-badge"
+                  <span class="type-tag actuator">장치</span>
+                  <span v-if="device.userOverride" class="manual-override-badge"
                     title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
                     🖐 수동
                   </span>
                 </div>
                 <div class="sub-card-control" :class="{ disabled: !device.online }">
-                  <span class="control-label">{{ !device.online ? '오프라인' : (isActive(device.overrideUntil) ? '타이머 가동중' : device.switchState === true ? '가동중' : '정지') }}</span>
-                  <label class="toggle-switch" @click.prevent="!consumeLongPress() && device.online && handleControl(device.id, !device.switchState)">
+                  <span class="control-label">{{ !device.online ? '오프라인' : (device.switchState === true ? '가동중' : '정지') }}</span>
+                  <label class="toggle-switch" @click.prevent="device.online && handleControl(device.id, !device.switchState)">
                     <input type="checkbox" :checked="device.online && device.switchState === true" :disabled="!device.online || controllingId === device.id" />
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
               </div>
             </div>
-            <div v-if="!isFarmUser && isGroupEditing(group.id) && (getGroupActuators(group).length + getGroupOpenerGroups(group).length + getGroupIrrigationDevices(group).length) > 1" class="reorder-hint">⇅ 길게 눌러 순서 이동</div>
           </template>
 
           <!-- 자동 제어 설정 — D2 컴팩트 행 (Automation.vue와 동일 패턴) -->
@@ -416,19 +348,9 @@
                 v-for="rule in getGroupRules(group.id)"
                 :key="rule.id"
                 class="rule-row d2"
-                :class="{ 'is-off': !rule.enabled, reorderable: !isFarmUser && isGroupEditing(group.id), dragging: ruleReorderDraggingId === rule.id }"
-                :style="ruleReorderDragStyle(rule.id)"
-                :data-reorder-id="rule.id"
-                :data-reorder-group="'grouprules:' + group.id"
+                :class="{ 'is-off': !rule.enabled }"
                 @click="openEditRule(rule)"
               >
-                <span
-                  v-if="!isFarmUser && isGroupEditing(group.id)"
-                  class="drag-grip"
-                  title="길게 눌러 순서 이동"
-                  @click.stop
-                  @pointerdown="ruleReorderPress($event, rule.id, 'grouprules:' + group.id, getGroupRules(group.id).map(r => r.id))"
-                ></span>
                 <EquipmentIcon
                   :type="detectRuleKind(rule)"
                   :active="rule.enabled"
@@ -498,24 +420,6 @@
       :visible="showIrrigationStatusModal"
       :device="irrigationStatusDevice"
       @close="showIrrigationStatusModal = false"
-    />
-
-    <!-- 임시 타이머 시트 (팬·개폐기) -->
-    <DeviceTimerSheet
-      :visible="timerSheetOpen"
-      :title="timerSheetTitle"
-      :subtitle="timerSheetSub"
-      :show-direction="timerSheetKind === 'opener'"
-      :submitting="timerSubmitting"
-      @close="timerSheetOpen = false"
-      @start="onTimerStart"
-    />
-
-    <!-- 관수 채널별 타이머 모달 (길게누름) -->
-    <IrrigationTimerModal
-      :visible="irrigationTimerModalOpen"
-      :device-id="irrigationTimerDeviceId"
-      @close="irrigationTimerModalOpen = false"
     />
 
     <!-- 자동화 편집 모달 -->
@@ -603,8 +507,6 @@ import { useAuthStore } from '../stores/auth.store'
 import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
-import IrrigationTimerModal from '@/components/devices/IrrigationTimerModal.vue'
-import DeviceTimerSheet from '@/components/devices/DeviceTimerSheet.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import EquipmentIcon from '@/components/common/EquipmentIcon.vue'
 import EnvConfigModal from '@/components/groups/EnvConfigModal.vue'
@@ -616,9 +518,6 @@ import BulkControlModal from '@/components/groups/BulkControlModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
-import { useReorder } from '../composables/useReorder'
-import { useTimerTick } from '../composables/useTimerTick'
-import { getEquipmentLabel } from '../utils/device-labels'
 import { useNotificationStore } from '../stores/notification.store'
 import { groupApi } from '../api/group.api'
 import { deviceApi } from '../api/device.api'
@@ -630,7 +529,6 @@ import type { Device, DependencyRule, ChannelMapping } from '../types/device.typ
 import { FUNCTION_LABELS } from '../types/device.types'
 import type { AutomationRule } from '../types/automation.types'
 import { formatConditionGroup, isIrrigationConditions, formatIrrigationSchedule, formatIrrigationZones } from '../utils/automation-helpers'
-import { onHighTempOverride } from '../composables/useWebSocket'
 
 const route = useRoute()
 const groupStore = useGroupStore()
@@ -639,46 +537,55 @@ const automationStore = useAutomationStore()
 const authStore = useAuthStore()
 const { isFarmUser, isAdmin } = authStore
 const { confirm } = useConfirm()
-const { press: reorderPress, draggingId: reorderDraggingId, dragStyle: reorderDragStyle } = useReorder({
-  setOrder: (id, v) => { const d = deviceStore.devices.find(x => x.id === id); if (d) d.displayOrder = v },
-  getOrder: (id) => deviceStore.devices.find(x => x.id === id)?.displayOrder ?? 0,
-  persist: (orders) => deviceApi.reorder(orders),
-})
-// 자동제어룰 순서 드래그 (구역관리 창의 구역별 룰 목록)
-const { press: ruleReorderPress, draggingId: ruleReorderDraggingId, dragStyle: ruleReorderDragStyle } = useReorder({
-  setOrder: (id, v) => { const r = automationStore.rules.find(x => x.id === id); if (r) r.displayOrder = v },
-  getOrder: (id) => automationStore.rules.find(x => x.id === id)?.displayOrder ?? 0,
-  persist: (orders) => automationApi.reorderRules(orders),
-})
 const notify = useNotificationStore()
 const showGroupCreationModal = ref(false)
 
 // 구역명/설명 인라인 편집
-// 구역 이름/설명 변경은 환경설정 모달(EnvConfigModal)로 이동됨.
+const renamingGroupId = ref<string | null>(null)
+const renameGroupValue = ref('')
+const renameDescValue = ref('')
+const renameGroupInput = ref<HTMLInputElement | null>(null)
+
+function startRenameGroup(groupId: string, currentName: string, currentDesc?: string) {
+  renamingGroupId.value = groupId
+  renameGroupValue.value = currentName
+  renameDescValue.value = currentDesc ?? ''
+  nextTick(() => renameGroupInput.value?.focus())
+}
+
+function cancelRenameGroup() {
+  renamingGroupId.value = null
+  renameGroupValue.value = ''
+  renameDescValue.value = ''
+}
+
+async function submitRenameGroup(group: HouseGroup) {
+  const trimmed = renameGroupValue.value.trim()
+  if (!trimmed) { cancelRenameGroup(); return }
+  try {
+    await groupApi.updateGroup(group.id, { name: trimmed, description: renameDescValue.value.trim() || undefined })
+    await groupStore.fetchGroups()
+    notify.success('수정 완료', `구역 정보가 저장되었습니다`)
+  } catch {
+    notify.error('수정 실패', '저장에 실패했습니다')
+  } finally {
+    cancelRenameGroup()
+  }
+}
 
 // 장치명 인라인 편집 (sub-card 안)
 const renamingDeviceId = ref<string | null>(null)
 const renameDeviceValue = ref('')
 const renamingOpenerGroup = ref<string | null>(null)
 
-// 인라인 이름 입력에 커서 자동 포커스 + 전체 선택(사용자가 바로 타이핑 가능)
-function focusRenameInput() {
-  nextTick(() => {
-    const el = document.querySelector('.rename-input-inline') as HTMLInputElement | null
-    if (el) { el.focus(); el.select() }
-  })
-}
-
 function startDeviceRename(deviceId: string, currentName: string) {
   renamingDeviceId.value = deviceId
   renameDeviceValue.value = currentName
-  focusRenameInput()
 }
 
 function startOpenerGroupRename(og: { groupName: string; openDevice: Device; closeDevice: Device }) {
   renamingOpenerGroup.value = og.groupName
   renameDeviceValue.value = og.groupName
-  focusRenameInput()
 }
 
 function cancelDeviceRename() {
@@ -740,55 +647,12 @@ const blockingModal = ref<{
   rules: [],
 })
 // 메인 그리드는 IoT 활성 구역만 노출. 비활성 구역은 우측 상단 "구역 표시 설정" 모달에서 관리.
-const groups = computed(() => [...groupStore.iotGroups].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
-const allGroups = computed(() => [...groupStore.groups].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
+const groups = computed(() => groupStore.iotGroups)
+const allGroups = computed(() => groupStore.groups)
 const hiddenZoneCount = computed(() => groupStore.hiddenZoneCount)
 const loading = computed(() => groupStore.loading)
 const showVisibilityModal = ref(false)
 const showBulkControl = ref(false)
-
-// 섹션 헤더 "ⓘ 아이콘 안내" 팝오버 — 한 번에 하나만 열림.
-// 값 형식: 'sensor:{groupId}' | 'device:{groupId}' | null
-const infoGuideKey = ref<string | null>(null)
-function toggleInfoGuide(kind: 'sensor' | 'device', groupId: string) {
-  const key = `${kind}:${groupId}`
-  infoGuideKey.value = infoGuideKey.value === key ? null : key
-}
-function closeInfoGuideOnOutside(e: Event) {
-  if (!infoGuideKey.value) return
-  const target = e.target as HTMLElement | null
-  if (target?.closest('.info-guide-wrap')) return
-  infoGuideKey.value = null
-}
-
-// 그 구역 실재하는 측정기 종류 (중복 제거)
-function guideSensorTypes(group: HouseGroup): Array<{ type: string; label: string }> {
-  const seen = new Set<string>()
-  const list: Array<{ type: string; label: string }> = []
-  for (const d of getGroupSensors(group)) {
-    const type = isRainSensor(d) ? 'rain' : 'sensor'
-    if (seen.has(type)) continue
-    seen.add(type)
-    list.push({ type, label: type === 'rain' ? '우적센서' : '온습도' })
-  }
-  return list
-}
-
-// 그 구역 실재하는 장치 종류 (중복 제거)
-function guideDeviceTypes(group: HouseGroup): Array<{ type: string; label: string }> {
-  const seen = new Set<string>()
-  const list: Array<{ type: string; label: string }> = []
-  if (getGroupOpenerGroups(group).length > 0) { seen.add('opener'); list.push({ type: 'opener', label: '개폐기' }) }
-  if (getGroupIrrigationDevices(group).length > 0) { seen.add('irrigation'); list.push({ type: 'irrigation', label: '관수' }) }
-  for (const d of getGroupActuators(group)) {
-    const t = d.equipmentType || 'other'
-    if (seen.has(t)) continue
-    seen.add(t)
-    const label = t === 'fan' ? '유동팬' : (getEquipmentLabel(d) || '기타')
-    list.push({ type: t, label })
-  }
-  return list
-}
 
 // 일괄제어로 정지된 자동제어 룰 (원복 배너)
 const bulkStoppedRules = ref<{ id: string; name: string }[]>([])
@@ -895,13 +759,7 @@ async function confirmAddGateways() {
   }
 }
 
-// 고온 무대기 강제열림 활성 구역 (WebSocket 실시간) — 개폐기 카드 배지용
-const highTempActiveZones = ref<Set<string>>(new Set())
-let offHighTempOverride: (() => void) | null = null
-
 onMounted(async () => {
-  // 섹션 헤더 아이콘 안내 팝오버 — 바깥 클릭 시 닫기
-  document.addEventListener('pointerdown', closeInfoGuideOnOutside)
   await Promise.all([
     groupStore.fetchGroups(),
     deviceStore.fetchDevices(),
@@ -911,12 +769,6 @@ onMounted(async () => {
   automationStore.fetchIrrigationStatus()
   loadNoteCounts()
   loadBulkStopped()
-  offHighTempOverride = onHighTempOverride(({ groupId, active }) => {
-    const next = new Set(highTempActiveZones.value)
-    if (active) next.add(groupId)
-    else next.delete(groupId)
-    highTempActiveZones.value = next
-  })
   const envConfigGroupId = route.query.envConfig as string | undefined
   if (envConfigGroupId) {
     const target = groupStore.groups.find(g => g.id === envConfigGroupId)
@@ -932,22 +784,6 @@ const toggleCollapse = (groupId: string) => {
   }
 }
 
-// 구역별 편집 모드 — 켜면 드래그 손잡이 + 이름 인라인 수정이 나타남(평상시엔 숨김)
-const editingGroups = ref(new Set<string>())
-const isGroupEditing = (groupId: string): boolean => editingGroups.value.has(groupId)
-const toggleGroupEdit = (groupId: string) => {
-  if (editingGroups.value.has(groupId)) {
-    editingGroups.value.delete(groupId)
-    cancelDeviceRename() // 편집 종료 시 진행 중이던 이름 수정 취소
-  } else {
-    editingGroups.value.add(groupId)
-  }
-}
-
-// 카드 정렬 순서 — store(낙관적 업데이트 대상)의 displayOrder 우선, 없으면 group.devices 값
-const orderOf = (id: string, fallback?: number): number =>
-  deviceStore.devices.find(sd => sd.id === id)?.displayOrder ?? fallback ?? 0
-
 const getGroupSensors = (group: HouseGroup): Device[] =>
   (group.devices || []).filter(d => d.deviceType === 'sensor').map(d => {
     const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
@@ -955,7 +791,6 @@ const getGroupSensors = (group: HouseGroup): Device[] =>
       ? { ...d, sensorData: storeDevice.sensorData, online: storeDevice.online, enabled: storeDevice.enabled, rainOverrideDisabled: (storeDevice as any).rainOverrideDisabled }
       : d
   }).filter(d => d.enabled !== false)  // 비활성화된 측정기(우적센서 등)는 구역관리에서 숨김
-    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 
 // 개폐기 쌍 ID (개별 표시 제외용)
 const getOpenerPairIds = (group: HouseGroup): Set<string> => {
@@ -988,9 +823,7 @@ const getGroupOpenerGroups = (group: HouseGroup): OpenerGroupInfo[] => {
       openDevice: storeOpen ? { ...od, switchState: storeOpen.switchState, online: storeOpen.online } : od,
       closeDevice: storeClose ? { ...cd, switchState: storeClose.switchState, online: storeClose.online } : cd,
     }
-  }).filter(Boolean)
-    // 개폐기는 대표(open) 장치의 displayOrder 기준 정렬
-    .sort((a, b) => orderOf(a!.openDevice.id, a!.openDevice.displayOrder) - orderOf(b!.openDevice.id, b!.openDevice.displayOrder)) as OpenerGroupInfo[]
+  }).filter(Boolean) as OpenerGroupInfo[]
 }
 
 const getGroupActuators = (group: HouseGroup): Device[] => {
@@ -999,10 +832,8 @@ const getGroupActuators = (group: HouseGroup): Device[] => {
     .filter(d => d.deviceType === 'actuator' && !openerIds.has(d.id) && d.equipmentType !== 'irrigation')
     .map(d => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
-      // 전체 스프레드 — switchState/online 뿐 아니라 overrideUntil/userOverride 등 타이머 필드도 반영
-      return storeDevice ? { ...d, ...storeDevice } : d
+      return storeDevice ? { ...d, switchState: storeDevice.switchState, online: storeDevice.online } : d
     })
-    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 }
 
 // 관수 장치
@@ -1013,7 +844,6 @@ const getGroupIrrigationDevices = (group: HouseGroup): Device[] => {
       const storeDevice = deviceStore.devices.find(sd => sd.id === d.id)
       return storeDevice ? { ...d, ...storeDevice } : d
     })
-    .sort((a, b) => orderOf(a.id, a.displayOrder) - orderOf(b.id, b.displayOrder))
 }
 
 const irrigationControlling = ref<string | null>(null)
@@ -1198,10 +1028,41 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   const targetDevice = action === 'open' ? group.openDevice : group.closeDevice
   const oppositeDevice = action === 'open' ? group.closeDevice : group.openDevice
 
-  // ── 자동제어 룰 동작 중 수동 조작 가드 (팬과 공용 헬퍼) ──
+  // ── 자동제어 룰 동작 중 수동 조작 가드 ──
   // 개폐기는 자동제어와 수동이 공존하지 않는다(듀티사이클·인터록 충돌). 활성 룰이 있으면
-  // 먼저 정지해야 수동 제어가 유지된다. 개별 정지 → 그 개폐기 그룹만 영향(다른 그룹 유지).
-  if (!(await guardActiveRulesBeforeManual(targetDevice.id, `${group.groupName} 개폐기`))) return
+  // 먼저 정지해야 수동 제어가 유지된다. 정지하지 않으면 다음 tick에 룰이 다시 제어해버림.
+  // (재개는 사용자가 자동제어 페이지에서 직접 — 룰이 여러 개일 수 있으므로 자동 재개 없음)
+  let rulesStopped = false
+  if (!isFarmUser) {
+    try {
+      const active = (await automationApi.getActiveRulesForDevice(targetDevice.id)).data
+      if (active && active.length > 0) {
+        const names = active.map(r => `• ${r.name}`).join('\n')
+        const go = await confirm({
+          title: '자동제어 룰이 동작 중입니다',
+          message:
+            `${group.groupName} 개폐기를 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
+            `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
+            `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
+          confirmText: '정지하고 수동 제어',
+          cancelText: '취소',
+          variant: 'warning',
+        })
+        if (!go) return
+        const { stopped } = (await automationApi.stopActiveRulesForDevice(targetDevice.id)).data
+        rulesStopped = stopped.length > 0
+        if (stopped.length > 0) {
+          // 룰 목록 캐시 갱신 → 구역관리 페이지의 룰 on/off 상태가 즉시 반영
+          // (미갱신 시 새로고침/재진입 전까지 활성으로 표시되던 문제)
+          await automationStore.fetchRules().catch(() => undefined)
+          notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
+        }
+      }
+    } catch (e) {
+      // 활성 룰 조회 실패해도 수동 제어 자체는 진행 (안내만 생략)
+      console.warn('활성 룰 조회/정지 실패:', e)
+    }
+  }
 
   // ── 비 감지 자동 제어(강제 닫힘) 동작 중 수동 '열기' 가드 ──
   // 비 감지로 개폐기가 닫혀 있을 때 수동으로 열려면 먼저 비 감지 자동 제어를 꺼야
@@ -1235,10 +1096,11 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   openerInterlocking.value = true
   const loadingId = notify.add('info', '적용 중...', `${targetDevice.name} ${action === 'open' ? '열림' : '닫힘'} 명령 전송 중`, 0)
   try {
-    // 켜져있는(열림/닫힘) 방향 토글을 누르면 '중지(OFF)'. 자동 타이머도 취소.
-    // 룰을 방금 정지했더라도, 룰로 열려있던 개폐기를 끄려는 의도이므로 그대로 OFF 한다.
-    // (이전엔 룰 정지 시 여기서 강제 재-ON 해서 '중지했는데 안 꺼지던' 문제가 있었음.)
-    if (targetDevice.switchState) {
+    // 이미 ON이면 OFF만 (자동 타이머도 취소).
+    // 단 방금 룰을 정지한 경우(rulesStopped)는 sticky로 남은 '가동중' 상태를 무시하고
+    // 사용자가 누른 방향을 강제로 ON 한다. (룰이 열림을 sticky ON 표시하던 중 클릭하면
+    // '이미 ON→OFF'로 뒤집혀 여는 대신 꺼지던 문제 방지 — 수동 시 동작/대기 로직 무시)
+    if (!rulesStopped && targetDevice.switchState) {
       if (openerAutoOffTimers.has(targetDevice.id)) {
         clearTimeout(openerAutoOffTimers.get(targetDevice.id))
         openerAutoOffTimers.delete(targetDevice.id)
@@ -1304,43 +1166,10 @@ async function handleOpenerInterlock(group: OpenerGroupInfo, action: 'open' | 'c
   }
 }
 
-// 자동제어 룰 동작 중 수동 조작 가드 (개폐기와 동일) — 활성 룰이 있으면 정지 확인 팝업.
-// 반환: true=진행(룰 없음 또는 정지함), false=취소. 정지 안 하면 다음 tick에 룰이 수동값을 덮어씀.
-async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: string): Promise<boolean> {
-  if (isFarmUser) return true
-  try {
-    const active = (await automationApi.getActiveRulesForDevice(deviceId)).data
-    if (!active || active.length === 0) return true
-    const names = active.map(r => `• ${r.name}`).join('\n')
-    const go = await confirm({
-      title: '자동제어 룰이 동작 중입니다',
-      message:
-        `${deviceLabel}을(를) 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
-        `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
-        `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
-      confirmText: '정지하고 수동 제어',
-      cancelText: '취소',
-      variant: 'warning',
-    })
-    if (!go) return false
-    const { stopped } = (await automationApi.stopActiveRulesForDevice(deviceId)).data
-    if (stopped.length > 0) {
-      await automationStore.fetchRules().catch(() => undefined)
-      notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
-    }
-    return true
-  } catch (e) {
-    console.warn('활성 룰 조회/정지 실패:', e)
-    return true // 조회 실패해도 수동 제어는 진행
-  }
-}
-
 const handleControl = async (deviceId: string, turnOn: boolean) => {
   if (controllingId.value) return
-  const device = deviceStore.devices.find(d => d.id === deviceId)
-  // 자동제어 룰 동작 중이면 먼저 정지 확인 (개폐기와 동일)
-  if (!(await guardActiveRulesBeforeManual(deviceId, device?.name || '장치'))) return
   controllingId.value = deviceId
+  const device = deviceStore.devices.find(d => d.id === deviceId)
   const loadingId = notify.add('info', '적용 중...', `${device?.name || '장치'} ${turnOn ? 'ON' : 'OFF'} 명령 전송 중`, 0)
   try {
     const result = await deviceStore.controlDevice(deviceId, [{ code: 'switch_1', value: turnOn }])
@@ -1370,135 +1199,9 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
   }
 }
 
-// ── 임시 타이머 (팬·개폐기 = 장치 단위 / 관수 = 채널 단위) ──
-const { formatCountdown, isActive } = useTimerTick()
-
-type TimerKind = 'fan' | 'opener'
-const timerSheetOpen = ref(false)
-const timerSheetKind = ref<TimerKind>('fan')
-const timerSheetDevice = ref<Device | null>(null)
-const timerSheetTitle = ref('')
-const timerSheetSub = ref('')
-const timerSubmitting = ref(false)
-
-// 길게 누름(0.5s) → 타이머 시트. 짧은 탭은 기존 토글 유지.
-let timerPressTimer: ReturnType<typeof setTimeout> | null = null
-const timerLongPressed = ref(false)
-
-function clearTimerPress() {
-  if (timerPressTimer) { clearTimeout(timerPressTimer); timerPressTimer = null }
-}
-
-function onTimerPress(kind: TimerKind, device: Device, editing: boolean) {
-  if (editing || !device.online) return // 편집(정렬) 모드·오프라인은 제외
-  clearTimerPress()
-  timerLongPressed.value = false
-  timerPressTimer = setTimeout(() => {
-    timerLongPressed.value = true
-    try { window.getSelection()?.removeAllRanges() } catch { /* noop */ } // 롱프레스로 생긴 텍스트 선택 해제
-    openTimerSheet(kind, device)
-  }, 500)
-}
-
-// 길게 눌러 시트가 열렸으면 뒤따르는 토글 click 1회 무시
-function consumeLongPress(): boolean {
-  if (timerLongPressed.value) { timerLongPressed.value = false; return true }
-  return false
-}
-
-// 관수 카드 길게누름 → 채널별 타이머 모달
-const irrigationTimerModalOpen = ref(false)
-const irrigationTimerDeviceId = ref<string | null>(null)
-function onIrrigationTimerPress(device: Device, editing: boolean) {
-  if (editing || !device.online) return
-  clearTimerPress()
-  timerLongPressed.value = false
-  timerPressTimer = setTimeout(() => {
-    timerLongPressed.value = true
-    try { window.getSelection()?.removeAllRanges() } catch { /* noop */ }
-    openIrrigationTimerModal(device)
-  }, 500)
-}
-function openIrrigationTimerModal(device: Device) {
-  irrigationTimerDeviceId.value = device.id
-  irrigationTimerModalOpen.value = true
-}
-
-function openTimerSheet(kind: TimerKind, device: Device) {
-  timerSheetKind.value = kind
-  timerSheetDevice.value = device
-  if (kind === 'opener') {
-    timerSheetTitle.value = `${device.openerGroupName || device.name} 타이머`
-    timerSheetSub.value = '설정 시간 동안 방향을 유지하고, 만료 시 자동제어로 복귀합니다.'
-  } else {
-    timerSheetTitle.value = `${device.name} 타이머`
-    timerSheetSub.value = '설정 시간 동안 가동하고, 만료 시 자동제어로 복귀합니다.'
-  }
-  timerSheetOpen.value = true
-}
-
-async function onTimerStart(payload: { durationMinutes: number; direction?: 'open' | 'close' }) {
-  const device = timerSheetDevice.value
-  if (!device) return
-  timerSubmitting.value = true
-  try {
-    await deviceApi.setTimer(device.id, {
-      durationMinutes: payload.durationMinutes,
-      ...(timerSheetKind.value === 'opener' ? { direction: payload.direction } : { value: true }),
-    })
-    timerSheetOpen.value = false
-    notify.success('타이머 시작', `${device.openerGroupName || device.name} — ${Math.floor(payload.durationMinutes / 60) ? Math.floor(payload.durationMinutes / 60) + '시간 ' : ''}${payload.durationMinutes % 60 ? (payload.durationMinutes % 60) + '분' : ''}`.trim())
-    await deviceStore.fetchDevices()
-  } catch (err: any) {
-    notify.error('타이머 실패', err?.response?.data?.message || '타이머 설정에 실패했습니다')
-  } finally {
-    timerSubmitting.value = false
-  }
-}
-
-// 카드의 카운트다운 배지 ✕ — 타이머 해제(자동제어 복귀)
-async function cancelDeviceTimerFromCard(device: Device) {
-  try {
-    await deviceApi.cancelTimer(device.id)
-    notify.info('타이머 해제', `${device.openerGroupName || device.name} — 자동제어로 복귀`)
-    await deviceStore.fetchDevices()
-  } catch {
-    notify.error('해제 실패', '타이머 해제에 실패했습니다')
-  }
-}
-
-// 개폐기 그룹의 활성 타이머(둘 중 아무 device의 override) — 배지 표시용
-function openerTimerOf(og: OpenerGroupInfo): { until: string; direction: 'open' | 'close' } | null {
-  for (const d of [og.openDevice, og.closeDevice]) {
-    const store = deviceStore.devices.find(x => x.id === d.id) as any
-    if (store?.overrideUntil && isActive(store.overrideUntil)) {
-      return { until: store.overrideUntil, direction: store.overrideDirection || (d === og.openDevice ? 'open' : 'close') }
-    }
-  }
-  return null
-}
-
-// 관수 카드 헤더 배지 — 활성 채널 타이머 요약 { count, maxUntil }
-function irrigationTimerSummary(device: Device): { count: number; until: string } | null {
-  const store = deviceStore.devices.find(x => x.id === device.id) as any
-  const ov = store?.channelOverrides as Record<string, { until: string }> | undefined
-  if (!ov) return null
-  let count = 0
-  let soonest = ''
-  for (const key of Object.keys(ov)) {
-    const until = ov[key]?.until
-    if (until && isActive(until)) {
-      count++
-      if (!soonest || new Date(until).getTime() < new Date(soonest).getTime()) soonest = until
-    }
-  }
-  return count > 0 ? { count, until: soonest } : null
-}
-
 // 자동화 룰
 const getGroupRules = (groupId: string): AutomationRule[] =>
   automationStore.rules.filter(r => r.groupId === groupId)
-    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
 
 const getGroupRulesActiveCount = (groupId: string): number =>
   getGroupRules(groupId).filter(r => r.enabled).length
@@ -1753,8 +1456,6 @@ onBeforeUnmount(() => {
   // 남은 개폐기 자동 OFF 타이머 모두 취소
   for (const timerId of openerAutoOffTimers.values()) clearTimeout(timerId)
   openerAutoOffTimers.clear()
-  offHighTempOverride?.()
-  document.removeEventListener('pointerdown', closeInfoGuideOnOutside)
 })
 </script>
 
@@ -1797,12 +1498,12 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border-card);
   border-radius: 8px;
   color: var(--text-secondary);
-  font-weight: 600; font-size: calc(14px * var(--content-scale, 1));
+  font-weight: 600; font-size: 14px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 .btn-visibility:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--text-primary); }
-.badge-hidden { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); font-weight: 600; }
+.badge-hidden { font-size: 13px; color: var(--text-muted); font-weight: 600; }
 .btn-bulk-control {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 12px 18px; border-radius: 8px; cursor: pointer;
@@ -1820,7 +1521,7 @@ onBeforeUnmount(() => {
   background: var(--bg-card);
   border: 1px dashed var(--border-card);
   border-radius: 10px;
-  color: var(--text-secondary); font-size: calc(13px * var(--content-scale, 1));
+  color: var(--text-secondary); font-size: 13px;
 }
 .hidden-banner svg { color: var(--text-muted); flex-shrink: 0; }
 .hidden-banner strong { color: var(--text-primary); }
@@ -1874,7 +1575,7 @@ onBeforeUnmount(() => {
 
 .farm-owner-badge {
   display: inline-block;
-  font-size: calc(11px * var(--content-scale, 1));
+  font-size: 11px;
   font-weight: 600;
   color: #6366f1;
   background: rgba(99, 102, 241, 0.1);
@@ -1893,27 +1594,61 @@ onBeforeUnmount(() => {
   vertical-align: middle;
 }
 
-/* sub-card 안 미니 이름 편집 버튼 — 이동 버튼과 붙어 눌기 어려워 숨김.
-   대신 편집 모드에서 장치 이름 자체가 편집 가능 어포던스(.editable)를 표시한다. */
-.btn-rename-mini { display: none; }
-/* 장치명 인라인 편집 완료(✓) 버튼 — 카드 스케일에 맞춰 컴팩트하게 (기존엔 구역 rename용
-   규칙에 덮여 상대적으로 컸음. 구역 rename 은 환경설정 모달로 이동해 제거됨). */
-.btn-rename-ok {
-  flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; min-height: 28px; min-width: 28px; box-sizing: border-box;
-  background: var(--accent, #4caf50); color: #fff; border: none;
-  border-radius: 7px; font-size: calc(14px * var(--content-scale, 1)); line-height: 1;
-  font-weight: 700; cursor: pointer; margin-left: 6px; padding: 0;
-  transition: background 0.15s;
+.btn-rename-group {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 14px; cursor: pointer; padding: 0 4px;
+  vertical-align: middle; opacity: 0.6;
 }
-.btn-rename-ok:hover { background: color-mix(in srgb, var(--accent, #4caf50) 85%, #000); }
+.btn-rename-group:hover { opacity: 1; color: var(--accent, #4caf50); }
+
+/* sub-card 안 미니 이름 편집 버튼 */
+.btn-rename-mini {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 12px; cursor: pointer; padding: 0 4px;
+  opacity: 0.5; vertical-align: middle;
+}
+.btn-rename-mini:hover { opacity: 1; color: var(--accent, #4caf50); }
+.btn-rename-ok {
+  background: var(--accent, #4caf50); color: #fff; border: none;
+  border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer;
+  margin-left: 4px;
+}
 .rename-input-inline {
-  height: 28px; box-sizing: border-box;
-  padding: 2px 8px; border: 1px solid var(--accent, #4caf50);
-  border-radius: 7px; font-size: calc(13px * var(--content-scale, 1)); font-weight: 600;
+  padding: 2px 6px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 4px; font-size: 13px; font-weight: 600;
   background: var(--bg-input); color: var(--text-primary);
-  outline: none; flex: 1; min-width: 90px;
+  outline: none; flex: 1; min-width: 100px;
+}
+
+.rename-form {
+  display: flex; flex-direction: column; gap: 6px; min-width: 240px;
+}
+.rename-actions { display: flex; gap: 6px; }
+
+.rename-group-input {
+  padding: 5px 10px; border: 1px solid var(--accent, #4caf50);
+  border-radius: 6px; font-size: calc(15px * var(--content-scale, 1));
+  font-weight: 600; background: var(--bg-primary); color: var(--text-primary);
+  outline: none; width: 100%;
+}
+
+.rename-desc-input {
+  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px; font-size: calc(13px * var(--content-scale, 1));
+  background: var(--bg-primary); color: var(--text-secondary);
+  outline: none; width: 100%;
+}
+.rename-desc-input:focus { border-color: var(--accent, #4caf50); }
+
+.btn-rename-ok {
+  padding: 4px 12px; border: none;
+  background: var(--accent, #4caf50); color: #fff;
+  border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.btn-rename-cancel {
+  padding: 4px 10px; border: 1px solid var(--border-color, #d1d5db);
+  background: transparent; color: var(--text-secondary);
+  border-radius: 6px; font-size: 12px; cursor: pointer;
 }
 
 .group-desc {
@@ -1966,7 +1701,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #2e7d32;
   color: #fff;
-  font-size: calc(11px * var(--content-scale, 1));
+  font-size: 11px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -2015,91 +1750,6 @@ onBeforeUnmount(() => {
 .section-label.automation { background: var(--automation-bg); color: var(--automation-text); }
 .section-label.gateway { background: #e0f2fe; color: #0369a1; }
 
-/* ── 섹션 헤더 row + "ⓘ 아이콘 안내" 팝오버 ── */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  position: relative;
-}
-.info-guide-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.info-guide-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 8px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  font-size: calc(11px * var(--content-scale, 1));
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.info-guide-btn:hover,
-.info-guide-btn:focus-visible {
-  background: var(--bg-hover);
-  outline: none;
-}
-.info-guide-btn.sensor { color: var(--sensor-accent); }
-.info-guide-btn.actuator { color: var(--accent); }
-.info-guide-btn .chevron {
-  transition: transform 0.2s;
-}
-.info-guide-btn.open .chevron {
-  transform: rotate(180deg);
-}
-@media (max-width: 768px) {
-  .info-guide-btn { min-height: 44px; }
-}
-
-.info-guide-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  width: 200px;
-  padding: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
-  z-index: 20;
-  animation: infoGuidePop 0.12s ease-out;
-}
-@keyframes infoGuidePop {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.info-guide-title {
-  font-size: calc(12.5px * var(--content-scale, 1));
-  font-weight: 800;
-  margin: 0 0 10px;
-}
-.info-guide-title.sensor { color: var(--sensor-accent); }
-.info-guide-title.actuator { color: var(--accent); }
-.info-guide-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.info-guide-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: calc(14px * var(--content-scale, 1));
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
 .device-sub-grid {
   display: grid;
   /* minmax(0, ...) 필수 — 1fr 만 쓰면 자식의 min-content 가 viewport 를 넘쳐
@@ -2115,56 +1765,6 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border-light);
   min-width: 0;
   overflow: hidden;
-}
-
-/* 카드 드래그 정렬 (구역관리) */
-.sub-card.reorderable {
-  position: relative;
-  padding-left: 30px;
-  /* 모바일 롱프레스 시 텍스트 선택/복사 콜아웃 방지 */
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
-/* 이름 변경 입력은 선택/편집 가능하게 복원 */
-.sub-card.reorderable .rename-input-inline { user-select: text; -webkit-user-select: text; }
-.drag-grip {
-  position: absolute;
-  left: 6px;
-  top: 0;
-  bottom: 0;
-  width: 16px;
-  height: 22px;
-  margin: auto 0;
-  cursor: grab;
-  touch-action: none;         /* grip 위에서만 드래그(카드 본문은 스크롤 보존) */
-  color: var(--text-muted);
-  opacity: 0.7;
-  /* 6점(2열×3행) 그립 — 배경 도트 */
-  background-image:
-    radial-gradient(currentColor 1.3px, transparent 1.6px),
-    radial-gradient(currentColor 1.3px, transparent 1.6px);
-  background-size: 5px 7px;
-  background-position: 3px 2px, 8px 2px;
-  background-repeat: repeat-y;
-}
-.drag-grip:hover { opacity: 1; }
-.drag-grip:active { cursor: grabbing; }
-.sub-card.dragging {
-  /* transform 은 커서 추적을 위해 인라인(:style)에서 지정 */
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
-  pointer-events: none; /* 드래그 중 아래 카드를 힛테스트하도록 */
-  border-color: var(--primary, var(--accent));
-  user-select: none;
-  will-change: transform;
-}
-.sub-card.dragging .drag-grip { color: var(--primary, var(--accent)); opacity: 1; }
-.reorder-hint {
-  font-size: var(--font-size-caption, 12px);
-  color: var(--text-muted);
-  text-align: center;
-  padding: 4px 0 2px;
-  user-select: none;
 }
 
 .sub-card-top {
@@ -2194,23 +1794,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-/* 편집 모드에서 이름은 눌러서 바로 수정 가능 — 점선 테두리 칩으로 '탭하면 수정' 어포던스만 표시.
-   (별도 편집 버튼·연필 아이콘 없이 이름 자체가 편집 대상임을 나타낸다.) */
-.sub-card-name.editable {
-  cursor: text;
-  color: var(--accent, #16a34a);
-  background: color-mix(in srgb, var(--accent, #4caf50) 9%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--accent, #4caf50) 50%, transparent);
-  border-radius: 7px;
-  padding: 1px 7px;
-  text-decoration: none;
-}
-/* 구역 헤더 '편집' 토글 — 켜짐 상태 강조 */
-.btn-edit-toggle.active {
-  background: var(--accent, #4caf50);
-  color: #fff;
-  border-color: var(--accent, #4caf50);
 }
 
 .type-tag {
@@ -2245,51 +1828,6 @@ onBeforeUnmount(() => {
   color: #b45309;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-/* 임시 타이머 (시안) — 자동=초록·수동=주황과 구분 */
-.sub-card.timer-active {
-  background: #ecfeff;
-  border-color: #06b6d4;
-}
-.timer-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: calc(11px * var(--content-scale, 1));
-  font-weight: 800;
-  padding: 2px 6px 2px 7px;
-  border-radius: 999px;
-  background: #ecfeff;
-  color: #0e7490;
-  border: 1px solid #67e8f9;
-  white-space: nowrap;
-  flex-shrink: 0;
-  cursor: pointer;
-  font-variant-numeric: tabular-nums;
-}
-.hightemp-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: calc(11px * var(--content-scale, 1));
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fff1f2;
-  color: #b91c1c;
-  border: 1px solid #fca5a5;
-  white-space: nowrap;
-  flex-shrink: 0;
-  animation: timer-blink 1.2s steps(1) infinite;
-}
-.timer-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #06b6d4; flex-shrink: 0;
-  animation: timer-blink 1s steps(1) infinite;
-}
-@keyframes timer-blink { 50% { opacity: 0.25; } }
-.timer-x {
-  width: 15px; height: 15px; border-radius: 5px;
-  background: #fff; border: 1px solid #06b6d4; color: #0e7490;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: calc(9px * var(--content-scale, 1)); margin-left: 1px;
 }
 
 .sub-card-sensor-chips {
@@ -2461,22 +1999,6 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rule-row.d2:last-child { border-bottom: none; }
 .rule-row.d2:hover { background: var(--bg-hover); }
 .rule-row.d2.is-off { opacity: 0.72; }
-/* 룰 순서 드래그 (grip 은 위 .drag-grip 스타일 공용) */
-.rule-row.d2.reorderable {
-  position: relative;
-  padding-left: 38px;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
-.rule-row.d2 .drag-grip { left: 12px; }
-.rule-row.d2.dragging {
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
-  background: var(--bg-card);
-  z-index: 5;
-  pointer-events: none;
-  user-select: none;
-}
 
 .rule-row.d2 .rule-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .rule-row.d2 .rule-row-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -2574,15 +2096,15 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .gateway-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .btn-add-gw {
   background: #e0f2fe; border: none; color: #0369a1; border-radius: 6px;
-  cursor: pointer; font-size: calc(12px * var(--content-scale, 1)); padding: 3px 10px;
+  cursor: pointer; font-size: 12px; padding: 3px 10px;
 }
 .btn-add-gw:hover { background: #bae6fd; }
 .gw-card { display: flex; flex-direction: column; gap: 6px; }
-.gw-card-meta { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary); font-family: monospace; }
+.gw-card-meta { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
 .gw-id-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .gw-empty-hint {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; font-size: calc(13px * var(--content-scale, 1));
+  padding: 10px 14px; font-size: 13px;
   color: var(--text-secondary); background: var(--bg-hover);
   border-radius: 8px;
 }
@@ -2599,9 +2121,9 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   border: 1px solid var(--border-color);
 }
 .modal-sm-header { display: flex; justify-content: space-between; align-items: center; }
-.modal-sm-header h3 { margin: 0; font-size: calc(17px * var(--content-scale, 1)); font-weight: 700; }
-.modal-sm-desc { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary); margin: 0; }
-.modal-empty { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); padding: 16px; text-align: center; background: var(--bg-secondary); border-radius: 8px; }
+.modal-sm-header h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.modal-sm-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.modal-empty { font-size: 13px; color: var(--text-muted); padding: 16px; text-align: center; background: var(--bg-secondary); border-radius: 8px; }
 .gw-pick-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 260px; }
 .gw-pick-item {
   display: flex; align-items: center; gap: 10px;
@@ -2610,8 +2132,8 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 }
 .gw-pick-item:hover { background: var(--bg-hover); }
 .gw-pick-item.selected { border-color: #3b82f6; background: rgba(59,130,246,.05); }
-.gw-pick-name { flex: 1; font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; }
-.gw-pick-id { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary); font-family: monospace; }
+.gw-pick-name { flex: 1; font-size: 14px; font-weight: 600; }
+.gw-pick-id { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
 .status-dot-sm { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .status-dot-sm.online { background: #22c55e; }
 .status-dot-sm.offline { background: #d1d5db; }
@@ -2642,27 +2164,23 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     position: absolute; top: -5px; right: -5px;
     min-width: 17px; height: 17px; padding: 0 4px;
     background: #ef6c00; color: #fff; border-radius: 9px;
-    font-size: calc(10px * var(--content-scale, 1)); font-weight: 800;
+    font-size: 10px; font-weight: 800;
     display: flex; align-items: center; justify-content: center;
   }
   .page-header .header-actions .badge-hidden .hz-text { display: none; }
-  /* 모바일 2열 — minmax(0, 1fr) 필수(1fr 만으로는 자식 min-content 가 viewport 폭을 넘겨 가로 잘림).
-     측정기·장치 카드만 2열, 자동제어룰 리스트는 아래에서 1열 유지. */
-  .device-sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* 모바일: 제목 + 옵션 버튼을 한 줄에(수량 배지 제거로 공간 확보). 제목은 한 줄 말줄임,
-     버튼 묶음은 유지. 버튼은 한 줄에 들어가도록 살짝 축소. */
-  .group-header { align-items: center; gap: 6px; }
-  .group-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .farm-owner-badge { font-size: calc(10px * var(--content-scale, 1)); padding: 1px 7px; margin-right: 5px; }
+  /* minmax(0, 1fr) — 1fr 만으로는 자식 min-content 가 viewport 폭을 넘기는 흔한 함정 */
+  .device-sub-grid { grid-template-columns: minmax(0, 1fr); }
+  .group-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  /* 모바일에선 배지·메모·아이콘 버튼이 한 줄에 깔끔하게 들어오도록 사이즈·간격 압축 */
   .group-header-actions {
+    width: 100%;
     justify-content: flex-end;
     flex-wrap: nowrap;
-    gap: 3px;
-    flex-shrink: 0;
+    gap: 4px;
   }
   .group-header-actions .btn-icon {
-    min-width: 32px; min-height: 32px;
-    width: 32px; height: 32px;
+    min-width: 36px; min-height: 36px;
+    width: 36px; height: 36px;
     padding: 0;
     flex-shrink: 0;
   }
@@ -2670,8 +2188,8 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     position: relative;          /* 배지 absolute 기준 */
     /* 다른 아이콘 버튼(.btn-icon)과 완전히 동일한 박스 — 크기·모양·정렬 통일 */
     box-sizing: border-box;
-    width: 32px; height: 32px;
-    min-width: 32px; min-height: 32px;
+    width: 36px; height: 36px;
+    min-width: 36px; min-height: 36px;
     padding: 0;
     gap: 0;
     border-radius: 8px;
@@ -2686,64 +2204,24 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
     right: -4px;
     min-width: 16px; height: 16px;
     padding: 0 4px;
-    font-size: calc(10px * var(--content-scale, 1));
+    font-size: 10px;
     border: 2px solid var(--bg-card, #fff);
   }
   .group-header-actions .device-count-badge {
     padding: 0 10px;
     line-height: 30px;
     height: 32px;
-    font-size: calc(12px * var(--content-scale, 1));
+    font-size: 12px;
     flex-shrink: 0;
   }
   .btn-sm { padding: 0 18px; line-height: 1.8; }
-  /* '상태' 버튼: 2열 컴팩트 카드에선 작은 pill 로(전역 button min-height:44px 해제,
-     옆 타입태그와 높이·radius·글씨 통일) */
-  .btn-status-sm {
-    padding: 3px 9px;
-    min-height: 0;
-    line-height: 1.4;
-    font-size: calc(11px * var(--content-scale, 1));
-    border-radius: 6px;
-  }
+  .btn-status-sm { padding: 0 18px; line-height: 1.8; }
   .type-tag { padding: 0 18px; line-height: 1.8; }
   /* 카드 내부 좌우에 일정한 여백을 줘서 이름·설명·아이콘·본문이 카드 가장자리에
      붙지 않고 나란히 정렬되도록 한다. */
   .group-card { padding: 0; }
-  .group-header { padding: 11px 14px; }
-  .group-body { padding: 0 12px 12px; }
-
-  /* 모바일 2열 카드 밀도 — 여백·손잡이·토글 압축(글씨 크기는 폰트 설정 3단계 --content-scale 그대로 유지) */
-  .device-sub-grid { gap: 8px; }
-  .section-label { padding: 4px 10px; }
-  .sub-card { padding: 9px 10px; }
-  .sub-card.reorderable { padding-left: 22px; }
-  .sub-card-top { margin-bottom: 4px; gap: 5px; row-gap: 4px; }
-  .sub-card-control { padding: 3px 0; }
-  .sub-card-sensor-chips { gap: 4px; }
-  .sensor-chip { padding: 2px 8px; font-size: calc(11px * var(--content-scale, 1)); }
-  .reorder-hint { padding: 2px 0 0; }
-  /* 2열은 카드 폭이 좁아 기존 글씨면 장치명이 잘림 → 3단계 기능은 유지(--content-scale 곱셈 그대로)하고
-     2열 전용 기준 크기만 낮춰 이름이 읽히게 함. 3단계 확대/축소는 그대로 작동. */
-  /* 이름은 최소폭 보장 → 타입태그가 인라인으로 이름을 짓눌러 'ㅏ'처럼 잘리는 것 방지.
-     짧은 이름은 태그와 한 줄 유지, 긴 이름은 태그가 다음 줄로 자연스럽게 내려감. */
-  .sub-card-name { font-size: calc(12.5px * var(--content-scale, 1)); min-width: 5.5em; }
-  /* 컨트롤 라벨은 줄바꿈 금지(카드가 세로로 길어지는 것 방지) — 넘치면 말줄임 */
-  .control-label {
-    font-size: calc(12.5px * var(--content-scale, 1));
-    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .type-tag { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 7px; }
-  .sub-card-value.muted { font-size: calc(12px * var(--content-scale, 1)); }
-  /* 좁은 2열 카드에서 손잡이 폭 축소 */
-  .drag-grip { left: 4px; width: 14px; }
-  /* 컴팩트 토글(48×26 → 38×20) — 좁은 카드에서 라벨 공간 확보 */
-  .toggle-switch { width: 38px; height: 20px; }
-  .toggle-slider { border-radius: 20px; }
-  .toggle-slider:before { height: 16px; width: 16px; left: 2px; bottom: 2px; }
-  input:checked + .toggle-slider:before { transform: translateX(18px); }
-  /* 자동제어룰 행은 1열 유지 + 상하 여백만 컴팩트 */
-  .rule-row.d2 { padding: 10px 12px; min-height: 40px; }
+  .group-header { padding: 14px 16px; }
+  .group-body { padding: 0 16px 14px; }
 }
 
 /* 일괄제어 정지 룰 원복 배너 */
@@ -2752,12 +2230,12 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
   background: rgba(245, 158, 11, 0.1); border: 1px solid #fcd34d;
 }
-.brb-text { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary, #333); min-width: 0; }
-.brb-icon { font-size: calc(15px * var(--content-scale, 1)); flex-shrink: 0; }
+.brb-text { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary, #333); min-width: 0; }
+.brb-icon { font-size: 15px; flex-shrink: 0; }
 .brb-text b { color: #b45309; }
-.brb-names { color: var(--text-secondary, #6b7280); font-size: calc(12px * var(--content-scale, 1)); }
+.brb-names { color: var(--text-secondary, #6b7280); font-size: 12px; }
 .brb-restore {
-  flex-shrink: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
+  flex-shrink: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px;
   background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
 }
 .brb-restore:hover:not(:disabled) { filter: brightness(0.95); }
@@ -2768,7 +2246,7 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .rain-override-btn {
   display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%;
   margin-top: 6px; padding: 5px 8px; border-radius: 6px; cursor: pointer;
-  font-size: calc(11px * var(--content-scale, 1)); font-weight: 700; border: 1px solid; transition: filter 0.15s;
+  font-size: 11px; font-weight: 700; border: 1px solid; transition: filter 0.15s;
 }
 .rain-override-btn.is-on { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
 .rain-override-btn.is-off { background: #fef3c7; border-color: #fde68a; color: #b45309; }

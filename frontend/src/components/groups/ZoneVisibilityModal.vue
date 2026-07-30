@@ -221,16 +221,16 @@ function onCloseAttempt() {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 20px; border-bottom: 1px solid var(--border-light);
 }
-.modal-head h3 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.modal-head h3 { margin: 0; font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
 .close-btn {
-  background: none; border: none; font-size: 18px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px; border-radius: 8px;
 }
 .close-btn:hover { background: var(--bg-hover); }
 
 .modal-desc {
   padding: 14px 20px 4px;
-  font-size: 13px; color: var(--text-secondary);
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary);
   line-height: 1.55; margin: 0;
 }
 .modal-desc strong { color: var(--text-primary); font-weight: 700; }
@@ -288,11 +288,11 @@ function onCloseAttempt() {
   width: 36px; height: 36px; border-radius: 10px;
   background: var(--bg-hover);
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0; color: var(--text-secondary);
+  font-size: calc(18px * var(--content-scale, 1)); flex-shrink: 0; color: var(--text-secondary);
 }
 .row-main { flex: 1; min-width: 0; }
-.row-title { font-weight: 700; font-size: 15px; color: var(--text-primary); }
-.row-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.row-title { font-weight: 700; font-size: calc(15px * var(--content-scale, 1)); color: var(--text-primary); }
+.row-sub { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin-top: 2px; }
 
 /* 토글 */
 .toggle-wrap {
@@ -323,13 +323,13 @@ function onCloseAttempt() {
 }
 .toggle-wrap input:checked + .track .thumb { left: 22px; }
 .toggle-label {
-  font-size: 11px; font-weight: 700;
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 700;
   color: var(--text-muted);
 }
 
 .readonly-hint {
   text-align: center; padding: 6px 0 0;
-  font-size: 12px; color: var(--warning-text, var(--text-muted));
+  font-size: calc(12px * var(--content-scale, 1)); color: var(--warning-text, var(--text-muted));
 }
 
 .modal-foot {
@@ -356,18 +356,18 @@ function onCloseAttempt() {
   padding: 22px;
   box-shadow: var(--shadow-modal, 0 12px 32px rgba(0,0,0,0.25));
 }
-.confirm-modal h3 { margin: 0 0 8px; font-size: 17px; }
-.confirm-modal p { font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
+.confirm-modal h3 { margin: 0 0 8px; font-size: calc(17px * var(--content-scale, 1)); }
+.confirm-modal p { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary); margin: 6px 0; }
 .confirm-list { margin: 12px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .confirm-list li {
   background: var(--bg-hover);
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   display: flex; flex-direction: column; gap: 2px;
 }
-.confirm-list .meta { font-size: 12px; color: var(--text-muted); }
-.confirm-modal .note { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.confirm-list .meta { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); }
+.confirm-modal .note { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin-top: 8px; }
 .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .btn-danger {
   background: var(--danger); color: #fff;

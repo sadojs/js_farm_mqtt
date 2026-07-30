@@ -113,7 +113,7 @@ function formatValue(item: ResolvedValue): string {
 }
 
 .env-icon {
-  font-size: 22px;
+  font-size: calc(22px * var(--content-scale, 1));
   flex-shrink: 0;
   width: 28px;
   text-align: center;

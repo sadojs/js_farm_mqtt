@@ -152,7 +152,7 @@ onMounted(() => {
 }
 .status-modal-header h3 { font-size: calc(18px * var(--content-scale, 1)); font-weight: 600; margin: 0; }
 .close-btn {
-  background: none; border: none; font-size: 20px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(20px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
 }
 .status-modal-body { padding: 16px 24px 0; }

@@ -235,7 +235,7 @@ function toggleWeekday(day: number) {
 
 .form-select {
   padding: 7px 8px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 13px; color: var(--text-primary); background: var(--bg-input);
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary); background: var(--bg-input);
 }
 .field-select { min-width: 90px; }
 .op-select { min-width: 70px; }
@@ -243,7 +243,7 @@ function toggleWeekday(day: number) {
 
 .form-input {
   padding: 7px 8px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 13px; color: var(--text-primary);
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary);
 }
 .val-input { width: 70px; }
 
@@ -251,21 +251,21 @@ function toggleWeekday(day: number) {
 .hour-slot-row { display: flex; align-items: center; gap: 4px; }
 .btn-add-slot {
   background: none; border: 1px dashed var(--border-input);
-  border-radius: 6px; color: var(--text-muted); font-size: 13px;
+  border-radius: 6px; color: var(--text-muted); font-size: calc(13px * var(--content-scale, 1));
   padding: 3px 10px; cursor: pointer; align-self: flex-start;
 }
 .btn-add-slot:hover { color: var(--accent, #4caf50); border-color: var(--accent, #4caf50); }
-.slot-del { font-size: 11px; padding: 2px 4px; }
+.slot-del { font-size: calc(11px * var(--content-scale, 1)); padding: 2px 4px; }
 
-.sep { color: var(--text-muted); font-size: 14px; }
-.unit-label { font-size: 13px; color: #888; white-space: nowrap; }
+.sep { color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); }
+.unit-label { font-size: calc(13px * var(--content-scale, 1)); color: #888; white-space: nowrap; }
 
 .btn-group-sm,
 .repeat-toggle { display: flex; gap: 4px; }
 
 .btn-sm {
   padding: 6px 14px; border: 1px solid var(--border-input); border-radius: 6px; background: var(--bg-card);
-  font-size: 13px; cursor: pointer; color: var(--text-link);
+  font-size: calc(13px * var(--content-scale, 1)); cursor: pointer; color: var(--text-link);
 }
 .btn-sm.active { border-color: #4caf50; background: #4caf50; color: white; }
 
@@ -282,7 +282,7 @@ function toggleWeekday(day: number) {
   border-radius: 8px;
   background: var(--bg-card);
   color: var(--text-link);
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   cursor: pointer;
 }
 
@@ -293,7 +293,7 @@ function toggleWeekday(day: number) {
 }
 
 .btn-del {
-  background: none; border: none; color: #ccc; font-size: 16px; cursor: pointer;
+  background: none; border: none; color: #ccc; font-size: calc(16px * var(--content-scale, 1)); cursor: pointer;
   padding: 4px; line-height: 1;
 }
 .btn-del:hover { color: #ef5350; }

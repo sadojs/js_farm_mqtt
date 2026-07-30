@@ -145,19 +145,19 @@ const handleLogin = async () => {
 }
 
 .logo {
-  font-size: 64px;
+  font-size: calc(64px * var(--content-scale, 1));
   margin-bottom: 16px;
 }
 
 .login-header h1 {
-  font-size: 28px;
+  font-size: calc(28px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .login-header p {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-link);
   margin: 0;
 }
@@ -175,7 +175,7 @@ const handleLogin = async () => {
 }
 
 .form-group label {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -184,7 +184,7 @@ const handleLogin = async () => {
   padding: 12px 16px;
   border: 2px solid var(--border-input);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   background: var(--bg-input);
   color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -200,7 +200,7 @@ const handleLogin = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
 }
 
 .checkbox-label {
@@ -231,7 +231,7 @@ const handleLogin = async () => {
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
@@ -258,7 +258,7 @@ const handleLogin = async () => {
   background: #ffebee;
   color: #c62828;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   text-align: center;
 }
 
@@ -276,7 +276,7 @@ const handleLogin = async () => {
 }
 
 .login-footer p {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   margin: 0;
 }
@@ -287,7 +287,7 @@ const handleLogin = async () => {
   }
 
   .login-header h1 {
-    font-size: 24px;
+    font-size: calc(24px * var(--content-scale, 1));
   }
 }
 </style>

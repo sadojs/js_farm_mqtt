@@ -328,7 +328,7 @@ function getSelectedValue(roleKey: string): string {
 .device-rain-row input { width: 18px; height: 18px; flex-shrink: 0; }
 .loading-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
 .close-btn {
-  background: none; border: none; font-size: 20px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(20px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px;
   display: flex; align-items: center; justify-content: center;
 }

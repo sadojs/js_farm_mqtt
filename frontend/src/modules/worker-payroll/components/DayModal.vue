@@ -125,7 +125,7 @@ function save() {
 .dow { margin-left: 8px; font-size: var(--font-size-label); font-weight: 500; color: var(--text-muted); }
 .sheet-close {
   width: 36px; height: 36px; border: none; background: var(--bg-hover);
-  border-radius: 50%; color: var(--text-muted); cursor: pointer; font-size: 16px;
+  border-radius: 50%; color: var(--text-muted); cursor: pointer; font-size: calc(16px * var(--content-scale, 1));
 }
 .seg { display: flex; gap: 10px; }
 .seg-btn {
@@ -151,14 +151,14 @@ function save() {
 }
 .stepper button {
   width: 56px; min-height: 48px; border: none; background: var(--bg-hover);
-  color: var(--text-secondary); font-size: 22px; cursor: pointer;
+  color: var(--text-secondary); font-size: calc(22px * var(--content-scale, 1)); cursor: pointer;
 }
 .stepper button:disabled { opacity: 0.4; cursor: default; }
 .stepper .num {
-  flex: 1; text-align: center; font-weight: 800; font-size: 20px;
+  flex: 1; text-align: center; font-weight: 800; font-size: calc(20px * var(--content-scale, 1));
   color: var(--text-primary); font-variant-numeric: tabular-nums;
 }
-.stepper .num small { font-size: 14px; color: var(--text-muted); margin-left: 2px; }
+.stepper .num small { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-muted); margin-left: 2px; }
 .off-note { color: var(--text-muted); font-size: var(--font-size-label); }
 .adv-line { color: var(--sensor-accent); font-weight: 600; font-size: var(--font-size-label); }
 .btn-save {

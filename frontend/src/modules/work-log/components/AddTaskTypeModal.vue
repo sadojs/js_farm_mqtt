@@ -127,10 +127,10 @@ async function save() {
   padding: 18px 22px;
   border-bottom: 1px solid var(--border-light);
 }
-.modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); font-weight: 700; }
+.modal-header h3 { margin: 0; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-primary); font-weight: 700; }
 .modal-close {
   background: none; border: none;
-  font-size: 24px; cursor: pointer;
+  font-size: calc(24px * var(--content-scale, 1)); cursor: pointer;
   color: var(--text-muted); line-height: 1;
 }
 .modal-body {
@@ -152,13 +152,13 @@ async function save() {
   border-radius: 12px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.preview-emoji { font-size: 24px; }
-.preview-label { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.preview-sub { font-size: 11px; color: var(--text-muted); }
+.preview-emoji { font-size: calc(24px * var(--content-scale, 1)); }
+.preview-label { font-size: calc(15px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.preview-sub { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-muted); }
 
 .form-group label {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-secondary);
   margin-bottom: 8px;
@@ -171,7 +171,7 @@ async function save() {
   border-radius: 8px;
   background: var(--bg-secondary, var(--bg-card));
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   box-sizing: border-box;
 }
 .form-input:focus { outline: none; border-color: var(--accent); }
@@ -192,7 +192,7 @@ async function save() {
   border: 2px solid transparent;
   background: var(--bg-hover);
   cursor: pointer;
-  font-size: 22px;
+  font-size: calc(22px * var(--content-scale, 1));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -213,7 +213,7 @@ async function save() {
 .btn-ghost, .btn-primary {
   padding: 10px 18px;
   border-radius: 10px;
-  font-size: 14px; font-weight: 600;
+  font-size: calc(14px * var(--content-scale, 1)); font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
 }

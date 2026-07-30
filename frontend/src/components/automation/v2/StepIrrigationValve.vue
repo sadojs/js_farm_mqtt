@@ -162,14 +162,14 @@ const fertWarnings = computed<string[]>(() => {
 <style scoped>
 .step-valve { display: flex; flex-direction: column; gap: 20px; }
 .step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.step-sub { color: var(--text-secondary, #666); margin: 0; font-size: 13px; }
+.step-sub { color: var(--text-secondary, #666); margin: 0; font-size: calc(13px * var(--content-scale, 1)); }
 
 .section-block {
   background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e5e5e5);
   border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
 }
-.section-label { font-weight: 600; font-size: 14px; color: var(--text, #1f2937); }
-.sub-hint { font-weight: normal; color: var(--text-secondary, #888); font-size: 12px; margin-left: 4px; }
+.section-label { font-weight: 600; font-size: calc(14px * var(--content-scale, 1)); color: var(--text, #1f2937); }
+.sub-hint { font-weight: normal; color: var(--text-secondary, #888); font-size: calc(12px * var(--content-scale, 1)); margin-left: 4px; }
 
 /* 밸브 row */
 .valve-list { display: flex; flex-direction: column; gap: 8px; }
@@ -187,22 +187,22 @@ const fertWarnings = computed<string[]>(() => {
 .valve-row.active { background: var(--card-bg, #fff); border-color: #4caf50; }
 /* 명시적 색상 — 다크 배경/테마에서도 가독성 보장 */
 .zone-label {
-  font-weight: 700; font-size: 14px;
+  font-weight: 700; font-size: calc(14px * var(--content-scale, 1));
   color: var(--text, #1f2937);
   white-space: nowrap;
 }
 .valve-row .field { display: flex; flex-direction: column; gap: 4px; }
-.valve-row .field label { font-size: 11px; color: var(--text-secondary, #888); }
+.valve-row .field label { font-size: calc(11px * var(--content-scale, 1)); color: var(--text-secondary, #888); }
 .num-unit { display: flex; align-items: center; gap: 4px; }
 .num-unit input {
   width: 60px; padding: 6px 8px;
-  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px;
+  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: calc(13px * var(--content-scale, 1));
 }
-.num-unit span { color: var(--text-secondary, #666); font-size: 12px; }
+.num-unit span { color: var(--text-secondary, #666); font-size: calc(12px * var(--content-scale, 1)); }
 
 /* 토글 */
 .toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.toggle-desc { color: var(--text-secondary, #666); font-size: 13px; }
+.toggle-desc { color: var(--text-secondary, #666); font-size: calc(13px * var(--content-scale, 1)); }
 .toggle-btn {
   padding: 6px 16px; border-radius: 16px;
   border: 1px solid var(--border-color, #ccc);
@@ -219,23 +219,23 @@ const fertWarnings = computed<string[]>(() => {
 
 /* 액비 필드 */
 .field-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.field-label { font-size: 13px; color: var(--text-secondary, #555); }
+.field-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); }
 .input-unit-row { display: flex; align-items: center; gap: 4px; }
 .input-unit-row .num-input {
   width: 70px; padding: 6px 8px;
-  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px;
+  border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: calc(13px * var(--content-scale, 1));
 }
-.unit-label { color: var(--text-secondary, #666); font-size: 12px; }
+.unit-label { color: var(--text-secondary, #666); font-size: calc(12px * var(--content-scale, 1)); }
 
 .fert-warning {
   background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px;
-  padding: 8px 12px; font-size: 12px; color: #856404;
+  padding: 8px 12px; font-size: calc(12px * var(--content-scale, 1)); color: #856404;
 }
 .fert-warning p { margin: 0; }
 
 .btn-link-sm {
   background: none; border: none; color: #4caf50;
-  text-decoration: underline; cursor: pointer; font-size: 13px;
+  text-decoration: underline; cursor: pointer; font-size: calc(13px * var(--content-scale, 1));
   padding: 4px 0; align-self: flex-start;
 }
 

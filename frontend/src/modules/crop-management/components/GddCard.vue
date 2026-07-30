@@ -91,12 +91,12 @@ onMounted(async () => {
 
 <style scoped>
 .gdd-card {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
 }
 
 .gdd-loading, .gdd-error {
   color: var(--text-secondary, #888);
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   padding: 8px 0;
 }
 
@@ -109,11 +109,11 @@ onMounted(async () => {
 }
 
 .source-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
 }
 
 .backfill-badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--warning-text, #92400e);
   background: var(--warning-bg, #fef3c7);
@@ -131,11 +131,11 @@ onMounted(async () => {
 }
 
 .stage-emoji {
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
 }
 
 .stage-label {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary, #222);
 }
@@ -160,12 +160,12 @@ onMounted(async () => {
 }
 
 .progress-text {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
 }
 
 .daily-avg {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-secondary, #888);
   margin-bottom: 10px;
 }
@@ -176,7 +176,7 @@ onMounted(async () => {
   background: none;
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary, #666);
   cursor: pointer;
   text-align: center;
@@ -193,7 +193,7 @@ onMounted(async () => {
   padding: 6px 10px;
   border-radius: 8px;
   margin-bottom: 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   flex-wrap: wrap;
 }
 
@@ -222,7 +222,7 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid currentColor;
   background: none;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   cursor: pointer;
   color: inherit;
   white-space: nowrap;

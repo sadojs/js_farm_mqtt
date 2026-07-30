@@ -73,15 +73,15 @@ function fmt(d: string | null | undefined) {
 .status-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .status-row > div { display: flex; flex-direction: column; gap: 2px; }
 .status-row .actions { margin-left: auto; flex-direction: row; gap: 8px; }
-.status-label { font-size: 12px; color: var(--text-secondary, #888); }
-.badge { padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 13px; display: inline-block; }
+.status-label { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-secondary, #888); }
+.badge { padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: calc(13px * var(--content-scale, 1)); display: inline-block; }
 .badge-online { background: #e8f5e9; color: #2e7d32; }
 .badge-fallback { background: #ffebee; color: #c62828; }
 .badge-unknown { background: #eceff1; color: #546e7a; }
 .warn { color: var(--warning, #f57c00); }
 .synced { color: var(--success, #2e7d32); }
 .btn-secondary, .btn-danger {
-  padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
   border: 1px solid transparent;
 }
 .btn-secondary {

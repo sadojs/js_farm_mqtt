@@ -160,7 +160,7 @@ onUnmounted(() => {
   background: var(--danger);
   color: white;
   border-radius: 9px;
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -206,13 +206,13 @@ onUnmounted(() => {
 }
 
 .panel-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .btn-mark-all {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--accent);
   background: none;
   border: none;
@@ -244,7 +244,7 @@ onUnmounted(() => {
 }
 
 .panel-empty p {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
 }
 
 .panel-list {
@@ -298,7 +298,7 @@ onUnmounted(() => {
 }
 
 .item-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
@@ -306,7 +306,7 @@ onUnmounted(() => {
 }
 
 .item-message {
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   color: var(--text-secondary);
   line-height: 1.4;
   margin-bottom: 4px;
@@ -317,7 +317,7 @@ onUnmounted(() => {
 }
 
 .item-time {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-muted);
 }
 
@@ -360,7 +360,7 @@ onUnmounted(() => {
 }
 
 .btn-clear-all {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--danger);
   background: none;
   border: none;

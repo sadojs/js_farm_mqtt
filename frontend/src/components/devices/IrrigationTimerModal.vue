@@ -177,20 +177,20 @@ watch(() => props.visible, (v) => { if (!v) channelSheetOpen.value = false })
   display: flex; align-items: center; gap: 8px;
   padding: 18px 22px 10px;
 }
-.hdr-ic { color: #0e7490; font-size: 18px; }
+.hdr-ic { color: #0e7490; font-size: calc(18px * var(--content-scale, 1)); }
 .timer-modal-header h3 { font-size: calc(17px * var(--content-scale, 1)); font-weight: 700; margin: 0; flex: 1; }
 .hdr-count {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 800; color: #0e7490;
+  font-size: calc(12px * var(--content-scale, 1)); font-weight: 800; color: #0e7490;
   background: #ecfeff; border: 1px solid #67e8f9; border-radius: 999px; padding: 2px 9px;
 }
 .close-btn {
-  background: none; border: none; font-size: 20px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(20px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
 }
 .timer-modal-desc { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin: 0; padding: 0 22px 12px; line-height: 1.5; }
 .timer-modal-body { padding: 0 18px 18px; overflow-y: auto; }
-.empty { text-align: center; color: var(--text-muted); padding: 24px 0; font-size: 13px; }
+.empty { text-align: center; color: var(--text-muted); padding: 24px 0; font-size: calc(13px * var(--content-scale, 1)); }
 
 .ch-row {
   display: flex; align-items: center; gap: 10px;
@@ -201,7 +201,7 @@ watch(() => props.visible, (v) => { if (!v) channelSheetOpen.value = false })
 .ch-icon {
   width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800;
+  font-size: calc(13px * var(--content-scale, 1)); font-weight: 800;
   background: var(--bg-badge); color: var(--text-muted);
 }
 .ch-icon.zone.on, .ch-row.timer-on .ch-icon { background: #06b6d4; color: #fff; }
@@ -213,7 +213,7 @@ watch(() => props.visible, (v) => { if (!v) channelSheetOpen.value = false })
 .ch-state.on { color: #0e7490; }
 
 .btn-timer-sm {
-  flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 6px 11px; border-radius: 8px;
+  flex-shrink: 0; font-size: calc(12px * var(--content-scale, 1)); font-weight: 700; padding: 6px 11px; border-radius: 8px;
   background: #fff; border: 1px solid #67e8f9; color: #0e7490; cursor: pointer;
 }
 .btn-timer-sm:hover { background: #ecfeff; }
@@ -231,6 +231,6 @@ watch(() => props.visible, (v) => { if (!v) channelSheetOpen.value = false })
 .timer-x {
   width: 16px; height: 16px; border-radius: 5px; background: #ecfeff;
   border: 1px solid #06b6d4; color: #0e7490;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 9px; margin-left: 1px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: calc(9px * var(--content-scale, 1)); margin-left: 1px;
 }
 </style>

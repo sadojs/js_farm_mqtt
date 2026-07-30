@@ -32,7 +32,7 @@ const { connected, reconnecting, reconnectAttempts, connect: retryConnect } = us
   padding: 8px 16px;
   background: var(--danger, #ef4444);
   color: white;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 500;
 }
 
@@ -52,7 +52,7 @@ const { connected, reconnecting, reconnectAttempts, connect: retryConnect } = us
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }

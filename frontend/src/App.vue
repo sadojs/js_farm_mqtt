@@ -202,7 +202,6 @@
       <div class="mobile-brand">스마트팜</div>
       <div class="mobile-header-actions">
         <div class="mobile-fontsize-toggle" aria-label="글자 크기">
-          <button :class="['btn-font-sm', { active: fontSize === 'sm' }]" @click="setFontSize('sm')" aria-label="작게">가</button>
           <button :class="['btn-font-md', { active: fontSize === 'md' }]" @click="setFontSize('md')" aria-label="보통">가</button>
           <button :class="['btn-font-lg', { active: fontSize === 'lg' }]" @click="setFontSize('lg')" aria-label="크게">가</button>
         </div>
@@ -502,8 +501,10 @@ function updateClock() {
 }
 
 // 폰트 크기 조절 (localStorage에 저장)
-type FontSize = 'sm' | 'md' | 'lg'
-const fontSize = ref<FontSize>((localStorage.getItem('sf-font-size') as FontSize) || 'md')
+// 2단계: 보통(md, 기본) / 크게(lg). 기존 'sm'(작게)은 제거.
+type FontSize = 'md' | 'lg'
+// 기존에 저장된 'sm'(작게)은 이제 없으므로 'md'(보통)로 승격
+const fontSize = ref<FontSize>(localStorage.getItem('sf-font-size') === 'lg' ? 'lg' : 'md')
 
 function setFontSize(size: FontSize) {
   fontSize.value = size
@@ -590,7 +591,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   /* 기본 폰트 크기 확대 (45~70세 대상) */
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
 }
 
 /* ========== 테마 색상 변수 시스템 ========== */
@@ -772,16 +773,13 @@ body {
   background: var(--border-color) !important;
 }
 
-/* ========== 본문(우측 콘텐츠) 폰트 크기 조절 시스템 ========== */
-/* sm = :root 기본값 사용 */
-/* --content-scale: 기존 컴포넌트 호환 유지 */
-
+/* ========== 폰트 크기 조절 시스템 (font-size 전용, 2단계) ==========
+   방식: 모든 font-size 를 calc(px * var(--content-scale)) 로 통일 → 토글 시 --content-scale
+   만 바뀌어 '글씨 크기만' 커진다. 아이콘/토글/이미지(width·height)·여백은 그대로 유지되어
+   레이아웃 손상이 없다. (var(--font-size-*) 사용 컴포넌트도 아래에서 함께 스케일)
+   보통(md, 기본)=1.0 / 크게(lg)=1.2배. */
 #app {
   --content-scale: 1;
-}
-
-#app.content-size-md {
-  --content-scale: 1.1;
   --font-size-display: 38px;
   --font-size-title: 26px;
   --font-size-subtitle: 22px;
@@ -791,15 +789,34 @@ body {
   --font-size-tiny: 13px;
 }
 
-#app.content-size-lg {
+/* 크게(lg): '본문(.main-content)' 글씨만 1.2배. 헤더/사이드바(chrome)는 main-content 밖이라
+   자동으로 기본 크기 유지. 변수만 바뀌므로 아이콘/토글/여백 등 레이아웃은 그대로. */
+#app.content-size-lg .main-content {
   --content-scale: 1.2;
-  --font-size-display: 41px;
-  --font-size-title: 28px;
-  --font-size-subtitle: 24px;
-  --font-size-body: 19px;
-  --font-size-label: 17px;
-  --font-size-caption: 15px;
-  --font-size-tiny: 14px;
+  --font-size-display: 46px;
+  --font-size-title: 31px;
+  --font-size-subtitle: 26px;
+  --font-size-body: 22px;
+  --font-size-label: 19px;
+  --font-size-caption: 17px;
+  --font-size-tiny: 16px;
+}
+
+/* 제목줄(페이지/카드/섹션)은 확대 제외 → 변수만 기본값으로 되돌린다.
+   variable 상속이라 그 안의 텍스트·이모지·아이콘·여백이 전부 기본 크기가 되고,
+   zoom 방식과 달리 오프셋/이중축소/여백팽창이 전혀 없다. */
+#app.content-size-lg .main-content :is(
+  .page-header, .card-header, .section-header, .panel-header,
+  .card-title, .section-title, .widget-title, .page-title
+) {
+  --content-scale: 1;
+  --font-size-display: 38px;
+  --font-size-title: 26px;
+  --font-size-subtitle: 22px;
+  --font-size-body: 18px;
+  --font-size-label: 16px;
+  --font-size-caption: 14px;
+  --font-size-tiny: 13px;
 }
 
 #app {
@@ -850,14 +867,14 @@ body {
 }
 
 .brand-text h1 {
-  font-size: 20px;
+  font-size: calc(20px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--accent);
   line-height: 1.2;
 }
 
 .brand-sub {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
 }
 
@@ -922,7 +939,7 @@ body {
 
 /* 섹션 그룹 라벨 */
 .nav-section-label {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -954,7 +971,7 @@ body {
 
 .font-size-label {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   margin-bottom: 8px;
   font-weight: 500;
@@ -977,9 +994,9 @@ body {
   padding: 6px 0;
 }
 
-.font-size-buttons button:nth-child(1) { font-size: 13px; }
-.font-size-buttons button:nth-child(2) { font-size: 16px; }
-.font-size-buttons button:nth-child(3) { font-size: 19px; }
+.font-size-buttons button:nth-child(1) { font-size: calc(13px * var(--content-scale, 1)); }
+.font-size-buttons button:nth-child(2) { font-size: calc(16px * var(--content-scale, 1)); }
+.font-size-buttons button:nth-child(3) { font-size: calc(19px * var(--content-scale, 1)); }
 
 .font-size-buttons button.active {
   background: var(--accent-bg);
@@ -999,7 +1016,7 @@ body {
 
 .theme-label {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   margin-bottom: 8px;
   font-weight: 500;
@@ -1018,7 +1035,7 @@ body {
   cursor: pointer;
   color: var(--text-link);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   padding: 6px 0;
   transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
@@ -1046,7 +1063,7 @@ body {
 }
 
 .sidebar-notification-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -1059,14 +1076,14 @@ body {
 }
 
 .sidebar-clock {
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
 .sidebar-version {
-  font-size: 11px;
+  font-size: calc(11px * var(--content-scale, 1));
   color: var(--text-muted);
 }
 
@@ -1093,7 +1110,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 16px;
+  font-size: calc(16px * var(--content-scale, 1));
   flex-shrink: 0;
 }
 
@@ -1104,7 +1121,7 @@ body {
 }
 
 .user-name {
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -1113,7 +1130,7 @@ body {
 }
 
 .user-role {
-  font-size: 13px;
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
 }
 
@@ -1123,7 +1140,7 @@ body {
   background: var(--bg-hover);
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   font-weight: 500;
   color: var(--text-link);
   cursor: pointer;
@@ -1246,7 +1263,8 @@ body {
 
   #app.has-sidebar .main-content {
     margin-left: 0;
-    padding-top: 60px;
+    /* 고정 헤더(60px) + iOS 세이프에어리어(다이나믹 아일랜드) 만큼 본문을 내린다 */
+    padding-top: calc(60px + env(safe-area-inset-top, 0px));
     /* 모바일은 사이드바가 없으므로 본문 pane 스크롤을 해제하고 일반 페이지(window) 스크롤 사용 */
     height: auto;
     overflow-y: visible;
@@ -1256,7 +1274,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 60px;
+    /* 총 높이 = 세이프에어리어 + 60px 콘텐츠. padding-top 이 콘텐츠를 아일랜드 아래로 민다.
+       (height 60px 고정 + padding-top 조합은 box-sizing:border-box 에서 콘텐츠가 찌그러졌음) */
+    height: calc(60px + env(safe-area-inset-top, 0px));
     padding: 0 16px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-light);
@@ -1291,7 +1311,7 @@ body {
   }
 
   .mobile-brand {
-    font-size: 18px;
+    font-size: calc(18px * var(--content-scale, 1));
     font-weight: 700;
     color: var(--accent);
   }
@@ -1322,9 +1342,9 @@ body {
     justify-content: center;
   }
 
-  .btn-font-sm { font-size: 11px; }
-  .btn-font-md { font-size: 13px; }
-  .btn-font-lg { font-size: 15px; }
+  .btn-font-sm { font-size: calc(11px * var(--content-scale, 1)); }
+  .btn-font-md { font-size: calc(13px * var(--content-scale, 1)); }
+  .btn-font-lg { font-size: calc(15px * var(--content-scale, 1)); }
 
   .mobile-fontsize-toggle button.active {
     background: var(--accent-bg);
@@ -1382,7 +1402,7 @@ body {
     justify-content: center;
     background: none;
     border: none;
-    font-size: 18px;
+    font-size: calc(18px * var(--content-scale, 1));
     color: var(--text-muted);
     cursor: pointer;
     border-radius: 8px;

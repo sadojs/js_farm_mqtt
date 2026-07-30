@@ -207,7 +207,7 @@ onMounted(async () => {
   border-color: rgba(245, 158, 11, 0.35);
   color: var(--text-primary);
 }
-.hint-icon { flex-shrink: 0; font-size: 14px; line-height: 1.4; }
+.hint-icon { flex-shrink: 0; font-size: calc(14px * var(--content-scale, 1)); line-height: 1.4; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 </style>

@@ -150,7 +150,7 @@ defineExpose({ reload: load })
   border-radius: 12px;
   padding: 14px 16px;
 }
-.rb-icon { font-size: 22px; }
+.rb-icon { font-size: calc(22px * var(--content-scale, 1)); }
 .rb-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .rb-text strong { color: var(--text-primary); }
 .rb-text span { color: var(--warning-text); font-size: var(--font-size-caption); }

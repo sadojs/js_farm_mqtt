@@ -145,18 +145,18 @@ const scheduleSummary = computed(() => {
 <style scoped>
 .step-review { display: flex; flex-direction: column; gap: 16px; }
 .step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
-.step-desc { font-size: 14px; color: var(--text-muted); margin: 0; }
+.step-desc { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-muted); margin: 0; }
 
 .form-field { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.field-label { font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary); }
 .field-input {
   padding: 10px 14px; border: 1px solid var(--border-input); border-radius: 10px;
-  font-size: 15px; background: var(--bg-input); color: var(--text-primary);
+  font-size: calc(15px * var(--content-scale, 1)); background: var(--bg-input); color: var(--text-primary);
 }
 .field-input:focus { outline: none; border-color: #4caf50; }
 .field-textarea {
   padding: 10px 14px; border: 1px solid var(--border-input); border-radius: 10px;
-  font-size: 14px; resize: vertical; background: var(--bg-input); color: var(--text-primary);
+  font-size: calc(14px * var(--content-scale, 1)); resize: vertical; background: var(--bg-input); color: var(--text-primary);
 }
 .field-textarea:focus { outline: none; border-color: #4caf50; }
 
@@ -164,15 +164,15 @@ const scheduleSummary = computed(() => {
   background: var(--bg-secondary); border-radius: 12px; padding: 16px;
   border: 1px solid var(--border-light);
 }
-.summary-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
+.summary-title { font-size: calc(15px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
 
 .summary-row {
   display: flex; justify-content: space-between; align-items: flex-start;
   padding: 8px 0; border-bottom: 1px solid var(--border-light);
 }
 .summary-row:last-child { border-bottom: none; }
-.summary-label { font-size: 14px; color: var(--text-muted); min-width: 60px; }
-.summary-value { font-size: 14px; color: var(--text-primary); font-weight: 500; text-align: right; flex: 1; }
+.summary-label { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-muted); min-width: 60px; }
+.summary-value { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); font-weight: 500; text-align: right; flex: 1; }
 .summary-value.cmd.on { color: #4caf50; font-weight: 700; }
 .summary-value.cmd.off { color: #f44336; font-weight: 700; }
 </style>

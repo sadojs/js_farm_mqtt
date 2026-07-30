@@ -82,16 +82,16 @@ function zoneName(log: WorkLog) { return props.zones[log.zoneId]?.name ?? '?' }
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 20px; border-bottom: 1px solid var(--border-light);
 }
-.modal-head h3 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.dow { margin-left: 8px; font-size: 14px; font-weight: 500; color: var(--text-muted); }
+.modal-head h3 { margin: 0; font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); }
+.dow { margin-left: 8px; font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; color: var(--text-muted); }
 .close-btn {
-  background: none; border: none; font-size: 18px; color: var(--text-muted);
+  background: none; border: none; font-size: calc(18px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px; border-radius: 8px;
 }
 .close-btn:hover { background: var(--bg-hover); }
 
 .modal-body { padding: 14px 16px; overflow-y: auto; }
-.count-line { margin: 0 4px 10px; font-size: 13px; color: var(--text-muted); }
+.count-line { margin: 0 4px 10px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
 .empty { text-align: center; padding: 28px; color: var(--text-muted); }
 .log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .log-row {
@@ -102,12 +102,12 @@ function zoneName(log: WorkLog) { return props.zones[log.zoneId]?.name ?? '?' }
 .log-row:hover { background: var(--bg-hover); border-color: var(--accent); }
 .row-emoji {
   width: 40px; height: 40px; border-radius: 12px;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; font-size: calc(20px * var(--content-scale, 1)); flex-shrink: 0;
 }
 .row-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .row-task { font-weight: 700; color: var(--text-primary); }
-.row-zone { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-edit { color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.row-zone { font-size: calc(12.5px * var(--content-scale, 1)); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-edit { color: var(--accent); font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; white-space: nowrap; }
 
 .modal-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

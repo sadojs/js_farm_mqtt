@@ -30,11 +30,11 @@ const emit = defineEmits<{
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
-.card h3 { margin: 0 0 12px 0; font-size: 16px; }
+.card h3 { margin: 0 0 12px 0; font-size: calc(16px * var(--content-scale, 1)); }
 .toggle-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
 .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .hint {
   background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
-  font-size: 13px; color: var(--text-secondary, #555); margin: 8px 0 0 0;
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); margin: 8px 0 0 0;
 }
 </style>

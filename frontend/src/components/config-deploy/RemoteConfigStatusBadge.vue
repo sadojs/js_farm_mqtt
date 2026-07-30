@@ -47,7 +47,7 @@ const cls = computed(() => {
   gap: 6px;
   padding: 2px 8px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--content-scale, 1));
   font-weight: 500;
   line-height: 1.5;
   border: 1px solid currentColor;

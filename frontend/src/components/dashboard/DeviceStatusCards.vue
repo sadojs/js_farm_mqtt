@@ -483,7 +483,7 @@ onMounted(async () => {
 }
 .rain-toggle-btn.is-off:hover { background: rgba(156,163,175,.2); }
 
-.rain-toggle-icon { font-size: 18px; line-height: 1; }
+.rain-toggle-icon { font-size: calc(18px * var(--content-scale, 1)); line-height: 1; }
 .rain-toggle-text { display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
 .rain-toggle-label { font-size: calc(11px * var(--content-scale, 1)); opacity: 0.8; font-weight: 500; }
 .rain-toggle-state { font-size: calc(13px * var(--content-scale, 1)); font-weight: 700; }
@@ -522,7 +522,7 @@ onMounted(async () => {
   .detail-item { padding: 8px 14px; }
   /* 우적 토글: 모바일에서도 한눈에 보이도록 약간 작게 + 더 명확하게 */
   .rain-toggle-btn { padding: 5px 9px 5px 7px; gap: 7px; }
-  .rain-toggle-icon { font-size: 16px; }
+  .rain-toggle-icon { font-size: calc(16px * var(--content-scale, 1)); }
   .rain-toggle-switch { width: 30px; height: 16px; }
   .rain-toggle-knob { width: 12px; height: 12px; }
   .rain-toggle-btn.is-on .rain-toggle-knob { transform: translateX(14px); }

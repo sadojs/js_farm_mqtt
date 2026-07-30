@@ -192,7 +192,7 @@ const timingText = computed(() => {
 .summary-section.clickable:hover { background: var(--bg-secondary); }
 .summary-section.clickable:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 
-.section-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.section-icon { font-size: calc(18px * var(--content-scale, 1)); flex-shrink: 0; margin-top: 1px; }
 .section-body { flex: 1; }
 .section-text { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); flex: 1; line-height: 1.6; }
 .edit-hint { font-size: calc(12px * var(--content-scale, 1)); color: var(--color-primary); flex-shrink: 0; margin-top: 2px; }

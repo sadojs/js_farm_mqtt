@@ -152,7 +152,7 @@ function onDrop(date: string) {
 .nav-btn {
   width: 32px; height: 32px; border: none;
   background: var(--bg-hover); border-radius: 8px;
-  color: var(--text-secondary); font-size: 18px; cursor: pointer;
+  color: var(--text-secondary); font-size: calc(18px * var(--content-scale, 1)); cursor: pointer;
 }
 .nav-btn:hover { background: var(--border-light); }
 .month-label { font-weight: 700; color: var(--text-primary); min-width: 110px; text-align: center; }

@@ -115,7 +115,7 @@ onMounted(async () => {
 .avatar {
   width: 44px; height: 44px; border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;
+  color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(18px * var(--content-scale, 1));
 }
 .self-head h2 { font-size: var(--font-size-title); font-weight: 800; color: var(--text-primary); }
 .sub { color: var(--text-muted); font-size: var(--font-size-label); }
@@ -140,13 +140,13 @@ onMounted(async () => {
   gap: 6px;
 }
 .hero-label { font-size: var(--font-size-label); opacity: 0.92; }
-.hero-net { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.hero-net { font-size: calc(38px * var(--content-scale, 1)); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .hero-stats { display: flex; gap: 28px; margin-top: 8px; flex-wrap: wrap; }
 .hero-stats > div { display: flex; flex-direction: column; gap: 2px; }
 .hs-label { font-size: var(--font-size-caption); opacity: 0.85; }
 .hs-val { font-size: var(--font-size-subtitle); font-weight: 700; font-variant-numeric: tabular-nums; }
 @media (max-width: 768px) {
-  .hero-net { font-size: 30px; }
+  .hero-net { font-size: calc(30px * var(--content-scale, 1)); }
   .hero-stats { gap: 18px; }
 }
 </style>

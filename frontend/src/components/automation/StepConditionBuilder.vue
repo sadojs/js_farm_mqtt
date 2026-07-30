@@ -793,7 +793,7 @@ function addGroup() {
 <style scoped>
 .step-condition { display: flex; flex-direction: column; gap: 16px; }
 .step-title { font-size: calc(18px * var(--content-scale, 1)); font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
-.step-desc { font-size: 14px; color: var(--text-muted); margin: 0; }
+.step-desc { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-muted); margin: 0; }
 
 .condition-groups { display: flex; flex-direction: column; gap: 12px; }
 
@@ -803,9 +803,9 @@ function addGroup() {
 
 .logic-select {
   padding: 6px 12px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 13px; color: var(--text-secondary); background: var(--bg-input); cursor: pointer;
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary); background: var(--bg-input); cursor: pointer;
 }
-.logic-select.small { padding: 4px 8px; font-size: 12px; }
+.logic-select.small { padding: 4px 8px; font-size: calc(12px * var(--content-scale, 1)); }
 
 .group-box {
   border: 1px solid var(--border-input); border-radius: 12px; padding: 16px;
@@ -827,7 +827,7 @@ function addGroup() {
 }
 
 .field-label-static {
-  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  font-size: calc(14px * var(--content-scale, 1)); font-weight: 600; color: var(--text-primary);
   padding: 8px 12px; background: var(--bg-input); border-radius: 8px;
   white-space: nowrap;
 }
@@ -835,12 +835,12 @@ function addGroup() {
 /* 모든 자식은 압축되지 않도록 — 잘림 방지 */
 .field-select, .op-select, .value-input, .device-select {
   padding: 8px 12px; border: 1px solid var(--border-input); border-radius: 8px;
-  font-size: 14px; background: var(--bg-input); color: var(--text-primary);
+  font-size: calc(14px * var(--content-scale, 1)); background: var(--bg-input); color: var(--text-primary);
   flex-shrink: 0;
 }
 .field-select { min-width: 140px; }
 .op-select { min-width: 80px; }
-.device-select { min-width: 130px; font-size: 13px; border-style: dashed; }
+.device-select { min-width: 130px; font-size: calc(13px * var(--content-scale, 1)); border-style: dashed; }
 .value-input { min-width: 80px; max-width: 120px; }
 .value-input.small { min-width: 60px; max-width: 80px; }
 /* type="time" 입력: 시계 아이콘 + AM/PM + HH:MM 모두 잘리지 않도록 충분한 폭 확보 */
@@ -852,24 +852,24 @@ function addGroup() {
   font-variant-numeric: tabular-nums;
 }
 
-.range-sep { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
-.unit { font-size: 13px; color: var(--text-muted); }
+.range-sep { color: var(--text-muted); font-size: calc(14px * var(--content-scale, 1)); flex-shrink: 0; }
+.unit { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
 
 .btn-remove {
-  background: none; border: none; color: #f44336; font-size: 16px;
+  background: none; border: none; color: #f44336; font-size: calc(16px * var(--content-scale, 1));
   cursor: pointer; padding: 4px 8px; border-radius: 6px;
 }
 .btn-remove:hover { background: rgba(244, 67, 54, 0.1); }
 
 .btn-add-condition {
   background: none; border: 1px dashed var(--border-input); border-radius: 8px;
-  padding: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer;
+  padding: 8px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); cursor: pointer;
 }
 .btn-add-condition:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 
 .btn-add-group {
   background: none; border: 1px dashed var(--border-input); border-radius: 10px;
-  padding: 10px; font-size: 14px; color: var(--text-muted); cursor: pointer;
+  padding: 10px; font-size: calc(14px * var(--content-scale, 1)); color: var(--text-muted); cursor: pointer;
 }
 .btn-add-group:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 
@@ -878,10 +878,10 @@ function addGroup() {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
 .hysteresis-row label {
-  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary);
 }
 .hysteresis-preview {
-  width: 100%; font-size: 12px; color: var(--accent); background: var(--accent-bg);
+  width: 100%; font-size: calc(12px * var(--content-scale, 1)); color: var(--accent); background: var(--accent-bg);
   padding: 6px 10px; border-radius: 6px; margin-top: 4px;
 }
 
@@ -891,7 +891,7 @@ function addGroup() {
 }
 .relay-toggle {
   display: flex; align-items: center; gap: 8px;
-  font-size: 14px; color: var(--text-secondary); cursor: pointer;
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-secondary); cursor: pointer;
 }
 .relay-toggle input { width: 18px; height: 18px; cursor: pointer; }
 
@@ -901,18 +901,18 @@ function addGroup() {
   background: var(--bg-secondary); display: flex; flex-direction: column; gap: 12px;
 }
 .scheduler-header { display: flex; justify-content: space-between; align-items: center; }
-.scheduler-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.scheduler-hint { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.scheduler-title { font-size: calc(15px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); margin: 0; }
+.scheduler-hint { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); margin: 0; line-height: 1.5; }
 .btn-remove-section {
   background: none; border: none; color: var(--text-muted); cursor: pointer;
-  font-size: 13px; padding: 4px 8px; border-radius: 6px;
+  font-size: calc(13px * var(--content-scale, 1)); padding: 4px 8px; border-radius: 6px;
 }
 .btn-remove-section:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .btn-add-scheduler {
   display: block; width: 100%; padding: 10px 14px;
   background: none; border: 1.5px dashed var(--border-input); border-radius: 8px;
-  color: var(--text-muted); font-size: 13px; cursor: pointer;
+  color: var(--text-muted); font-size: calc(13px * var(--content-scale, 1)); cursor: pointer;
   transition: all 0.15s;
 }
 .btn-add-scheduler:hover { border-color: var(--accent); color: var(--accent); }
@@ -926,7 +926,7 @@ function addGroup() {
 }
 .day-btn {
   padding: 6px 12px; border: 1px solid var(--border-input); border-radius: 8px;
-  background: var(--bg-card); font-size: 13px; cursor: pointer;
+  background: var(--bg-card); font-size: calc(13px * var(--content-scale, 1)); cursor: pointer;
   color: var(--text-primary); transition: all 0.15s;
 }
 .day-btn.active {
@@ -935,7 +935,7 @@ function addGroup() {
 
 .repeat-toggle {
   display: flex; align-items: center; gap: 8px;
-  font-size: 14px; color: var(--text-secondary); cursor: pointer;
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-secondary); cursor: pointer;
 }
 .repeat-toggle input { width: 18px; height: 18px; cursor: pointer; }
 
@@ -952,7 +952,7 @@ function addGroup() {
 }
 .day-selector-label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-primary, #1f2937);
 }
 </style>

@@ -219,7 +219,7 @@ function onDrop(date: string) {
   background: var(--bg-hover);
   border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: calc(18px * var(--content-scale, 1));
   cursor: pointer;
 }
 .month-label { font-weight: 700; color: var(--text-primary); min-width: 110px; text-align: center; }
@@ -341,7 +341,7 @@ function onDrop(date: string) {
 @media (max-width: 768px) {
   .cell { min-height: 64px; padding: 4px; }
   /* 상단 컨트롤 컴팩트화 — 월이동+단건추가 한 줄, 구역칩은 가로 스크롤 한 줄 */
-  .nav-btn { width: 28px; height: 28px; font-size: 16px; }
+  .nav-btn { width: 28px; height: 28px; font-size: calc(16px * var(--content-scale, 1)); }
   .month-label { min-width: 84px; font-size: var(--font-size-label); }
   .btn-add-single { margin-left: 0; padding: 7px 12px; font-size: var(--font-size-caption); white-space: nowrap; flex-shrink: 0; }
   .zone-filter {

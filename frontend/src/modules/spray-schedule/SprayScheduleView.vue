@@ -362,7 +362,7 @@ onMounted(reloadCalendar)
 }
 .btn-brief:hover:not(:disabled) { background: var(--accent); color: #fff; }
 .btn-brief:disabled { opacity: 0.6; cursor: default; }
-.brief-ico { font-size: 15px; }
+.brief-ico { font-size: calc(15px * var(--content-scale, 1)); }
 .brief-hint {
   color: var(--text-muted);
   font-size: var(--font-size-caption);

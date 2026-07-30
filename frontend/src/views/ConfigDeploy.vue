@@ -902,14 +902,14 @@ onMounted(() => {
   border-bottom: 1px dashed var(--color-border, #cbd5e0);
 }
 .workflow-group-header h2 {
-  margin: 0 0 8px; font-size: 18px; color: var(--color-text, #1f2937);
+  margin: 0 0 8px; font-size: calc(18px * var(--content-scale, 1)); color: var(--color-text, #1f2937);
 }
 .workflow-scope {
-  font-size: 13px; color: var(--color-text-secondary, #6b7280);
+  font-size: calc(13px * var(--content-scale, 1)); color: var(--color-text-secondary, #6b7280);
   font-weight: 400;
 }
 .workflow-description {
-  margin: 0; font-size: 13px; line-height: 1.6;
+  margin: 0; font-size: calc(13px * var(--content-scale, 1)); line-height: 1.6;
   color: var(--color-text-secondary, #4b5563);
 }
 .workflow-description strong { color: var(--color-text, #1f2937); }
@@ -922,7 +922,7 @@ onMounted(() => {
   border-radius: 8px;
 }
 .info-footer summary {
-  cursor: pointer; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-size: calc(14px * var(--content-scale, 1)); font-weight: 600;
   color: var(--color-text, #1f2937);
   list-style: none; user-select: none;
 }
@@ -933,7 +933,7 @@ onMounted(() => {
 }
 .info-footer[open] summary::before { transform: rotate(90deg); }
 .info-footer-hint {
-  font-size: 11px; color: var(--color-text-secondary, #9ca3af);
+  font-size: calc(11px * var(--content-scale, 1)); color: var(--color-text-secondary, #9ca3af);
   font-weight: 400; margin-left: 4px;
 }
 .info-footer[open] .info-footer-hint { display: none; }
