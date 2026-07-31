@@ -18,6 +18,7 @@ import { GatewayManagerModule } from './modules/gateway-manager/gateway-manager.
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { SensorAlertsModule } from './modules/sensor-alerts/sensor-alerts.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
 import { HealthModule } from './modules/health/health.module';
@@ -66,6 +67,7 @@ import { RetentionService } from './common/retention.service';
     DashboardModule,
     WeatherModule,
     SensorAlertsModule,
+    NotificationsModule,
     EnvConfigModule,
     ConfigDeployModule,
     HealthModule,
