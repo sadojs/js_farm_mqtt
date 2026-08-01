@@ -439,6 +439,8 @@ const groups = ref<HouseGroupWithOwner[]>([])
 const form = ref({ gatewayId: '', name: '', location: '', rpiIp: '', userId: '', houseId: '' })
 
 const SERVER_HOST = import.meta.env.VITE_SERVER_HOST || (window.location.hostname === 'localhost' ? '172.30.1.42' : window.location.hostname)
+// 리버스 SSH 터널의 서버측 계정. dev 기본값(ohjeongseok)은 소스에 유지, 프로덕션은 빌드타임 VITE_SERVER_USER 주입.
+const SERVER_USER = import.meta.env.VITE_SERVER_USER || 'ohjeongseok'
 
 function handleGatewayStatus(data: { gatewayId: string; agentStatus: string }) {
   const gw = gateways.value.find(g => g.id === data.gatewayId)
@@ -488,7 +490,7 @@ function groupsForGateway(gw: GatewayWithTunnel): HouseGroupWithOwner[] {
 function buildSetupCommand(gw: GatewayWithTunnel) {
   const backendUrl = `http://${SERVER_HOST}:3100`
   const scriptUrl = `${backendUrl}/api/gateways/setup/tunnel-setup.sh`
-  return `curl -fsSL "${scriptUrl}" -o /tmp/tunnel-setup.sh && \\\nsudo env GATEWAY_ID=${gw.gatewayId} \\\n  BACKEND_URL=${backendUrl} \\\n  SERVER_HOST=${SERVER_HOST} \\\n  SERVER_USER=ohjeongseok \\\n  bash /tmp/tunnel-setup.sh`
+  return `curl -fsSL "${scriptUrl}" -o /tmp/tunnel-setup.sh && \\\nsudo env GATEWAY_ID=${gw.gatewayId} \\\n  BACKEND_URL=${backendUrl} \\\n  SERVER_HOST=${SERVER_HOST} \\\n  SERVER_USER=${SERVER_USER} \\\n  bash /tmp/tunnel-setup.sh`
 }
 
 async function copyCommand(gw: GatewayWithTunnel) {

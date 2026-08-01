@@ -18,15 +18,24 @@ WWW_DIR="$MOBILE_DIR/www"
 # 앱 번들이 호출할 백엔드 절대주소 (현재: 프로덕션 IP / 이후: 도메인)
 API_BASE="${APP_API_BASE:-https://urifarm.com:8443}"
 
+# 게이트웨이(Pi) 셋업 커맨드용 서버 주소/계정.
+#   frontend 소스엔 dev 폴백(172.30.1.42 / ohjeongseok)이 남아 있으므로, 프로덕션 앱 번들엔
+#   반드시 주입해서 dev 값이 새지 않게 한다. (SERVER_HOST 는 API_BASE 호스트에서 유도)
+SERVER_HOST_INJ="${APP_SERVER_HOST:-$(printf '%s' "$API_BASE" | sed -E 's#^https?://##; s#[:/].*$##')}"
+SERVER_USER_INJ="${APP_SERVER_USER:-jeongseok}"
+
 echo "▶ 프론트 번들 빌드"
 echo "   frontend : $FRONTEND_DIR (소스 무변경)"
 echo "   출력     : $WWW_DIR"
 echo "   API_BASE : $API_BASE"
+echo "   SERVER   : $SERVER_USER_INJ@$SERVER_HOST_INJ (게이트웨이 셋업 커맨드용)"
 
 cd "$FRONTEND_DIR"
 # vue-tsc 타입체크는 건너뛰고 vite build 만 실행(번들 검증 목적). 산출물은 mobile/www 로.
 VITE_API_URL="$API_BASE/api" \
 VITE_WS_URL="$API_BASE" \
+VITE_SERVER_HOST="$SERVER_HOST_INJ" \
+VITE_SERVER_USER="$SERVER_USER_INJ" \
 npx vite build --outDir "$WWW_DIR" --emptyOutDir
 
 # --- PWA 서비스워커 제거 (Capacitor 네이티브 전용) ---

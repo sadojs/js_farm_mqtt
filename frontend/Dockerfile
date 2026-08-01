@@ -6,6 +6,13 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# 게이트웨이 셋업 커맨드용 서버 주소/계정 — docker 빌드는 프로덕션 배포이므로 프로덕션 기본값을 baked.
+#   (소스 폴백은 dev값: 172.30.1.42 / ohjeongseok. dev 는 npm run dev 로 docker 미경유 → 영향 없음)
+#   필요 시: docker compose build --build-arg VITE_SERVER_USER=... --build-arg VITE_SERVER_HOST=...
+ARG VITE_SERVER_HOST=urifarm.com
+ARG VITE_SERVER_USER=jeongseok
+ENV VITE_SERVER_HOST=$VITE_SERVER_HOST
+ENV VITE_SERVER_USER=$VITE_SERVER_USER
 RUN npm run build
 
 # ---- Production Stage ----
