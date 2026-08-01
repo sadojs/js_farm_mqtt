@@ -121,7 +121,7 @@ onMounted(async () => {
   color: var(--accent);
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: calc(12px * var(--content-scale, 1));
+  font-size: calc(13px * var(--content-scale, 1));
   font-weight: 600;
 }
 
@@ -139,7 +139,7 @@ onMounted(async () => {
 .log-status {
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: calc(11px * var(--content-scale, 1));
+  font-size: calc(12.5px * var(--content-scale, 1));
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -149,7 +149,7 @@ onMounted(async () => {
 .log-status.cancelled { background: #fff3e0; color: #e65100; }
 .log-name {
   flex: 1;
-  font-size: calc(12px * var(--content-scale, 1));
+  font-size: calc(14px * var(--content-scale, 1));
   color: var(--text-primary);
   font-weight: 500;
   overflow: hidden;
@@ -157,7 +157,7 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .log-time {
-  font-size: calc(12px * var(--content-scale, 1));
+  font-size: calc(13px * var(--content-scale, 1));
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -170,7 +170,7 @@ onMounted(async () => {
   padding-left: 4px;
 }
 .summary-chip {
-  font-size: calc(11px * var(--content-scale, 1));
+  font-size: calc(12.5px * var(--content-scale, 1));
   color: var(--text-secondary);
   background: var(--bg-badge);
   padding: 2px 8px;
