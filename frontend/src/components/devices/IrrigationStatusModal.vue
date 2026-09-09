@@ -27,7 +27,7 @@
           </span>
           <div class="status-row-right">
             <span
-              v-if="device.switchStates?.[mapping[fnKey] ?? ''] && deviceStatus?.isRunning"
+              v-if="isOn(fnKey) && deviceStatus?.isRunning"
               class="badge-running"
             >가동중</span>
             <!-- 제어 가능 채널(구역·교반기·액비모터): 수동 On/Off 토글 -->
@@ -93,9 +93,15 @@ const emit = defineEmits<{ close: []; control: [switchCode: string] }>()
 function controllable(fnKey: string): boolean {
   return isZoneOrControl(fnKey)
 }
-/** 현재 스위치 ON 여부 */
+// 스토어의 최신 device 를 반응형으로 참조 — 웹소켓/낙관적 갱신이 모달에 즉시 반영되도록
+// (props.device 는 열었을 때의 스냅샷이라 이후 스토어가 객체를 교체하면 stale 이 됨)
+const liveDevice = computed<Device | null>(() =>
+  props.device ? (deviceStore.devices.find(d => d.id === props.device!.id) ?? props.device) : null
+)
+
+/** 현재 스위치 ON 여부 (live 스토어 상태 기준) */
 function isOn(fnKey: string): boolean {
-  return !!props.device?.switchStates?.[mapping.value[fnKey] ?? '']
+  return !!liveDevice.value?.switchStates?.[mapping.value[fnKey] ?? '']
 }
 /** 토글 → 부모의 검증된 제어(handleIrrigationControl)로 위임 (인터록·확인·검증 재사용) */
 function onToggle(fnKey: string): void {

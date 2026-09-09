@@ -33,14 +33,20 @@
           <span>정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b></span>
         </div>
         <button class="brb-restore" :disabled="restoringBulk || !!restoringOne" @click="restoreBulk">
-          {{ restoringBulk ? '원복 중…' : '↩ 전체 원복' }}
+          <template v-if="restoringBulk">원복 중…</template>
+          <template v-else>
+            <svg class="ic-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+            전체 원복
+          </template>
         </button>
       </div>
       <div class="brb-rules">
         <span v-for="r in bulkStoppedRules" :key="r.id" class="brb-rule-chip">
           <span class="brb-rule-name">{{ r.name }}</span>
           <button class="brb-rule-restore" :disabled="restoringBulk || restoringOne === r.id"
-                  title="이 룰만 원복" @click="restoreOne(r.id)">↩</button>
+                  title="이 룰만 원복" @click="restoreOne(r.id)">
+            <svg class="ic-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+          </button>
         </span>
       </div>
     </div>
@@ -1115,16 +1121,24 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
       if (!storeDevice.switchStates) storeDevice.switchStates = {}
       storeDevice.switchStates[switchCode] = newVal
     }
-    const verification = await deviceStore.verifyDeviceStatus(device.id, switchCode, newVal)
-    notify.remove(loadingId)
-    if (verification.verified) {
-      notify.success('적용 완료', `${label} ${newVal ? 'ON' : 'OFF'}`)
-    } else if (verification.actualValue !== undefined && storeDevice) {
-      notify.warning('상태 미변경', '명령은 전달되었으나 장치 상태가 변경되지 않았습니다')
-      if (!storeDevice.switchStates) storeDevice.switchStates = {}
-      storeDevice.switchStates[switchCode] = verification.actualValue
+    if (isRemoteControl) {
+      // 원격제어: 페어(B접점) 로직이 있어 실제 상태를 엄격 검증(오차 시 되돌림).
+      const verification = await deviceStore.verifyDeviceStatus(device.id, switchCode, newVal)
+      notify.remove(loadingId)
+      if (verification.verified) {
+        notify.success('적용 완료', `${label} ${newVal ? 'ON' : 'OFF'}`)
+      } else if (verification.actualValue !== undefined && storeDevice) {
+        notify.warning('상태 미변경', '명령은 전달되었으나 장치 상태가 변경되지 않았습니다')
+        if (!storeDevice.switchStates) storeDevice.switchStates = {}
+        storeDevice.switchStates[switchCode] = verification.actualValue
+      } else {
+        notify.warning('상태 확인 실패', '장치 상태를 확인할 수 없습니다')
+      }
     } else {
-      notify.warning('상태 확인 실패', '장치 상태를 확인할 수 없습니다')
+      // 구역·교반기·액비모터: 지그비 릴레이는 상태 회신이 1초보다 느려 즉시 검증이 오탐('상태 미변경')을
+      // 내며 낙관적 토글을 되돌린다. 명령 성공(result.success)을 신뢰하고 웹소켓 동기화에 맡긴다.
+      notify.remove(loadingId)
+      notify.success('적용 완료', `${label} ${newVal ? 'ON' : 'OFF'}`)
     }
 
     // FR-04: 원격제어 OFF 후 설정 일괄 비활성화
@@ -2790,9 +2804,11 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .brb-icon { font-size: calc(15px * var(--content-scale, 1)); flex-shrink: 0; }
 .brb-text b { color: #b45309; }
 .brb-restore {
-  flex-shrink: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
-  background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
+  line-height: 1.2; background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
 }
+.ic-undo { width: 1em; height: 1em; display: block; flex-shrink: 0; }
 .brb-restore:hover:not(:disabled) { filter: brightness(0.95); }
 .brb-restore:disabled { opacity: 0.6; cursor: not-allowed; }
 /* 룰별 개별 원복 칩 */
