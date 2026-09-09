@@ -29,7 +29,7 @@
     <div v-if="!isFarmUser && bulkStoppedRules.length > 0" class="bulk-restore-banner">
       <div class="brb-main">
         <div class="brb-text">
-          <span class="brb-icon">⏸</span>
+          <svg class="brb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
           <span>정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b></span>
         </div>
         <button class="brb-restore" :disabled="restoringBulk || !!restoringOne" @click="restoreBulk">
@@ -197,7 +197,7 @@
                     : '비 감지 시 개폐기를 자동으로 닫습니다. 오동작 시 끄면 강제로 열 수 있습니다.'"
                 >
                   <span>{{ (device as any).rainOverrideDisabled ? '🌂' : '☔' }}</span>
-                  <span>비 감지 자동 제어 {{ (device as any).rainOverrideDisabled ? '꺼짐' : '켜짐' }}</span>
+                  <span>비감지 제어 {{ (device as any).rainOverrideDisabled ? '꺼짐' : '켜짐' }}</span>
                 </button>
               </div>
             </div>
@@ -2801,12 +2801,12 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 }
 .brb-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brb-text { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary, #333); min-width: 0; white-space: nowrap; }
-.brb-icon { font-size: calc(15px * var(--content-scale, 1)); flex-shrink: 0; }
+.brb-icon { width: calc(16px * var(--content-scale, 1)); height: calc(16px * var(--content-scale, 1)); color: #d97706; flex-shrink: 0; display: block; }
 .brb-text b { color: #b45309; }
 .brb-restore {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
-  line-height: 1.2; background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
+  padding: 4px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
+  line-height: 1; background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
 }
 .ic-undo { width: 1em; height: 1em; display: block; flex-shrink: 0; }
 .brb-restore:hover:not(:disabled) { filter: brightness(0.95); }

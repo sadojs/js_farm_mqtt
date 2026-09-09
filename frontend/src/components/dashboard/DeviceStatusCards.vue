@@ -112,7 +112,7 @@
               >
                 <span class="rain-toggle-icon">{{ (device as any).rainOverrideDisabled ? '🌂' : '☔' }}</span>
                 <span class="rain-toggle-text">
-                  <span class="rain-toggle-label">비 감지 자동 제어</span>
+                  <span class="rain-toggle-label">비감지 제어</span>
                   <span class="rain-toggle-state">{{ (device as any).rainOverrideDisabled ? '꺼짐' : '켜짐' }}</span>
                 </span>
                 <span class="rain-toggle-switch" aria-hidden="true">
