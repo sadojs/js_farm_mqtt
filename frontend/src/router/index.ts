@@ -1,6 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import { useNotificationStore } from '../stores/notification.store'
+import { resolveMode, type LayoutPref } from '../composables/useLayoutMode'
+
+/**
+ * 로그인/루트 진입 시 기본 페이지 — 태블릿 모드는 구역 관리(하우스 고정 기기 용도),
+ * 그 외(모바일·데스크탑)는 우리 농장(대시보드).
+ * 라우터는 composable 밖이므로 localStorage + innerWidth 로 직접 판정한다.
+ */
+export function defaultAuthedPath(): string {
+  const pref = (typeof window !== 'undefined'
+    ? (localStorage.getItem('sf-layout-mode') as LayoutPref | null)
+    : null) ?? 'auto'
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1280
+  return resolveMode(pref, w) === 'tablet' ? '/groups' : '/dashboard'
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,7 +27,7 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/dashboard'
+      redirect: () => defaultAuthedPath(),
     },
     {
       path: '/change-password',

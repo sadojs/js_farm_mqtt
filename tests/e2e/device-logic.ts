@@ -30,11 +30,14 @@ async function api(page: Page, method: string, path: string, body?: any) {
   const { browser, page } = await setupBrowser();
   try {
     const gws = await api(page, 'GET', '/gateways');
-    const lgw = gws.data?.find((g: any) => g.gatewayId === 'lgw-dev');
+    const gwList = (gws.data ?? gws) as any[];
+    // 게이트웨이 자동 감지 — TEST_GW 우선, 없으면 첫 게이트웨이 (환경마다 이름 다름)
+    const lgw = gwList?.find((g: any) => g.gatewayId === (process.env.TEST_GW || 'lgw-dev')) ?? gwList?.[0];
     if (!lgw) {
-      record({ name: 'lgw-dev 없음', category: 'setup', status: 'FAIL' });
+      record({ name: '게이트웨이 없음(빈 목록)', category: 'setup', status: 'FAIL' });
       saveReport(); await browser.close(); return;
     }
+    record({ name: `게이트웨이 자동감지: ${lgw.gatewayId}`, category: 'setup', status: 'PASS' });
 
     // 모든 장치 조회
     const devs = await api(page, 'GET', '/devices');

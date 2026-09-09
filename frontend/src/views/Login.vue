@@ -104,7 +104,8 @@ const handleLogin = async () => {
     const username = loginData.value.username.trim().toLowerCase()
     await authStore.login(username, loginData.value.password)
     // 로그인 성공은 라우팅으로 즉시 인지 가능 — 별도 알림 노출하지 않음
-    router.push('/dashboard')
+    // '/' 루트 리다이렉트가 레이아웃 모드에 맞게 분기(태블릿→구역 관리 / 그 외→우리 농장)
+    router.push('/')
   } catch (err: any) {
     const status = err.response?.status
     if (status === 429) {
