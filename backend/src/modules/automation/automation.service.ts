@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, In } from 'typeorm';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { CreateRuleDto, UpdateRuleDto } from './dto/create-rule.dto';
 import { AutomationLog } from './entities/automation-log.entity';
@@ -465,6 +465,10 @@ export class AutomationService {
       const rule = await this.rulesRepo.findOne({ where: { id } });
       if (!rule || !rule.enabled) continue;
       rule.enabled = false;
+      // 원복 마커: 개별 수동제어로 정지된 룰도 '자동제어 원복' 배너에 누적/표시되게 한다.
+      // ('manual' 로 구분하되 일괄('bulk')과 같은 배너/원복 인프라 공유)
+      rule.disabledReason = 'manual';
+      rule.disabledAt = new Date();
       const saved = await this.rulesRepo.save(rule);
       // 개별 제어: 룰 캐시 무효화 + '이 장치(+개폐기 페어)'의 sticky 만 해제.
       // 룰의 다른 대상 장치는 건드리지 않아 현재 상태 유지 (일괄제어와 구분).
@@ -526,23 +530,25 @@ export class AutomationService {
     return { stopped };
   }
 
-  /** 일괄제어로 정지된('bulk') 룰 목록 — 원복 배너용 (새로고침에도 유지) */
+  /** 일괄/수동 제어로 정지된('bulk'|'manual') 룰 목록 — 원복 배너용 (새로고침에도 유지) */
   async getBulkStoppedRules(userId: string | null): Promise<{ id: string; name: string }[]> {
     const rules = await this.rulesRepo.find({
       where: userId
-        ? { userId, enabled: false, disabledReason: 'bulk' }
-        : { enabled: false, disabledReason: 'bulk' },
+        ? { userId, enabled: false, disabledReason: In(['bulk', 'manual']) }
+        : { enabled: false, disabledReason: In(['bulk', 'manual']) },
     });
     return rules.map((r) => ({ id: r.id, name: r.name }));
   }
 
-  /** 일괄제어로 정지된 룰 원복(재활성화). ruleIds 미지정 시 'bulk' 전체 원복. */
+  /** 일괄/수동 제어로 정지된 룰 원복(재활성화). ruleIds 지정 시 해당 룰만(개별 원복). */
   async restoreBulkStoppedRules(
     userId: string | null,
     ruleIds?: string[],
   ): Promise<{ restored: { id: string; name: string }[] }> {
     let rules = await this.rulesRepo.find({
-      where: userId ? { userId, disabledReason: 'bulk' } : { disabledReason: 'bulk' },
+      where: userId
+        ? { userId, disabledReason: In(['bulk', 'manual']) }
+        : { disabledReason: In(['bulk', 'manual']) },
     });
     if (ruleIds?.length) {
       const set = new Set(ruleIds);
