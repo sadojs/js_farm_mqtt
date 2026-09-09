@@ -1040,6 +1040,27 @@ export class DevicesService {
           ? await this.gatewayRepo.findOne({ where: { id: paired.gatewayId } })
           : gateway;
         if (pairedGw) {
+          // ① 반대편 상태를 먼저 OFF로 정리(DB+화면) — 반드시 릴레이 OFF publish 이전에.
+          //    안 그러면 곧 도착할 반대편 GPIO OFF 피드백이, 남아있는 relayActivePhase(자동제어
+          //    듀티사이클 마커) 때문에 '대기 phase OFF skip'으로 무시돼(sticky ON), 실제로는
+          //    꺼졌는데 UI엔 계속 ON으로 남아 열림·닫힘이 둘 다 켜진 것처럼 보인다.
+          //    (relayActivePhase 를 미리 지워두면 그 피드백이 정상적으로 OFF 로 반영됨.)
+          const ps: any = paired.deviceSettings || {};
+          ps.switchState = false;
+          ps.switchStates = { ...(ps.switchStates || {}), state: false, switch_1: false };
+          ps.relayActivePhase = null;
+          ps.relayActiveUntil = null;
+          ps.relayActiveRuleId = null;
+          ps.lastCommandAt = new Date().toISOString();
+          paired.deviceSettings = ps;
+          await this.devicesRepo.save(paired).catch(() => undefined);
+          this.eventsGateway.broadcastDeviceSwitchUpdate(paired.userId, {
+            deviceId: paired.id,
+            switchState: false,
+            switchStates: ps.switchStates,
+          });
+
+          // ② 그 다음 실제 반대편 릴레이를 OFF → 1초 대기
           if (paired.source === 'onboard' && paired.onboardDeviceId) {
             // paired가 onboard 장치면 GPIO 토픽으로 OFF
             const pairedSlot = await this.onboardRepo.findOne({ where: { id: paired.onboardDeviceId } });
@@ -1060,23 +1081,6 @@ export class DevicesService {
             this.logger.log(`개폐기 인터록 (Zigbee): ${paired.name} OFF (key=${switchCode}) → 1초 대기`);
           }
           await new Promise(r => setTimeout(r, 1000));
-
-          // 반대편(페어) device의 상태도 OFF로 정리 — 안 하면 자동제어 열림 + 수동 닫힘 시
-          // 열림 device의 switchState/relayActivePhase가 stale하게 남아 UI에 둘 다 활성으로 보임.
-          const ps: any = paired.deviceSettings || {};
-          ps.switchState = false;
-          ps.switchStates = { ...(ps.switchStates || {}), state: false, switch_1: false };
-          ps.relayActivePhase = null;
-          ps.relayActiveUntil = null;
-          ps.relayActiveRuleId = null;
-          ps.lastCommandAt = new Date().toISOString();
-          paired.deviceSettings = ps;
-          await this.devicesRepo.save(paired).catch(() => undefined);
-          this.eventsGateway.broadcastDeviceSwitchUpdate(paired.userId, {
-            deviceId: paired.id,
-            switchState: false,
-            switchStates: ps.switchStates,
-          });
         }
       }
     }
