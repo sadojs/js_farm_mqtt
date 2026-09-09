@@ -26,6 +26,51 @@
               <button :class="{ active: theme === 'dark' }" @click="$emit('set-theme', 'dark')">어둡게</button>
             </div>
           </div>
+
+          <!-- 화면 레이아웃 — 모바일에서는 숨김(사이드바가 물리적으로 안 들어가 의미 없음).
+               데스크탑/태블릿 크기에서만 노출 -->
+          <template v-if="layoutMode !== 'mobile'">
+            <div class="setting-row">
+              <span class="setting-label">화면 레이아웃</span>
+              <div class="layout-buttons">
+                <button :class="{ active: layoutPref === 'auto' }" @click="setLayoutPref('auto')">자동</button>
+                <button :class="{ active: layoutPref === 'tablet' }" @click="setLayoutPref('tablet')">태블릿</button>
+                <button :class="{ active: layoutPref === 'desktop' }" @click="setLayoutPref('desktop')">데스크탑</button>
+              </div>
+            </div>
+            <p class="setting-hint">{{ LAYOUT_HINTS[layoutPref] }}</p>
+            <p class="setting-now">지금: {{ layoutModeLabel }} 모드 · {{ viewportWidth }}px</p>
+          </template>
+        </section>
+
+        <!-- ── 고정 설치 (태블릿 모드 전용) ── -->
+        <section v-if="layoutMode === 'tablet'" class="settings-section">
+          <h4 class="section-title">고정 설치</h4>
+          <p class="section-desc">하우스에 고정해 둔 기기에서 사용합니다.</p>
+
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-label">확대/축소 잠금</span>
+              <span class="setting-sub">손가락으로 화면 크기가 바뀌지 않게 합니다</span>
+            </div>
+            <button class="toggle-btn" :class="{ on: noZoom }" @click="setNoZoom(!noZoom)" aria-label="확대 잠금"><span class="toggle-knob" /></button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-label">전체화면 고정</span>
+              <span class="setting-sub">브라우저 주소창을 숨깁니다 (기기 재시작 후에는 다시 눌러야 합니다)</span>
+            </div>
+            <button class="toggle-btn" :class="{ on: fullscreen }" @click="setFullscreen(!fullscreen)" aria-label="전체화면"><span class="toggle-knob" /></button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-label">야간 자동 감광</span>
+              <span class="setting-sub">밤에는 화면을 어둡게 표시합니다 (기기 밝기는 태블릿 설정에서 조절)</span>
+            </div>
+            <button class="toggle-btn" :class="{ on: dimming }" @click="setDimming(!dimming)" aria-label="야간 감광"><span class="toggle-knob" /></button>
+          </div>
         </section>
 
         <!-- ── 기능 설정 (farm_admin만) ── -->
@@ -90,7 +135,24 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { FEATURE_META, type FeatureKey, type FeatureState } from '../../composables/useFeatureFlags'
+import { useLayoutMode, type LayoutPref } from '../../composables/useLayoutMode'
+import { useKioskMode } from '../../composables/useKioskMode'
+
+// 화면 레이아웃(자동/태블릿/데스크탑) — 모바일에선 UI 숨김(템플릿 v-if)
+const { pref: layoutPref, setPref: setLayoutPref, mode: layoutMode, viewportWidth } = useLayoutMode()
+// 하우스 고정 설치 옵션 — 태블릿 모드에서만 노출
+const { noZoom, fullscreen, dimming, setNoZoom, setFullscreen, setDimming } = useKioskMode()
+
+const LAYOUT_HINTS: Record<LayoutPref, string> = {
+  auto: '화면 크기에 맞춰 자동으로 정합니다. 769~1366px는 태블릿, 1367px 이상은 데스크탑입니다.',
+  tablet: '메뉴를 접어 화면을 넓게 씁니다. 하우스에 설치한 기기에 권장합니다.',
+  desktop: '메뉴를 항상 왼쪽에 보여줍니다.',
+}
+const layoutModeLabel = computed(() =>
+  layoutMode.value === 'tablet' ? '태블릿' : layoutMode.value === 'mobile' ? '모바일' : '데스크탑',
+)
 
 defineProps<{
   fontSize: string
@@ -218,15 +280,18 @@ const featureMeta = FEATURE_META
   color: var(--text-primary, #333);
 }
 
-/* ── 폰트/테마 버튼 ── */
+/* ── 폰트/테마/레이아웃 버튼 ── */
 .font-size-buttons,
-.theme-buttons {
+.theme-buttons,
+.layout-buttons {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .font-size-buttons button,
-.theme-buttons button {
+.theme-buttons button,
+.layout-buttons button {
   padding: 6px 12px;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
@@ -238,10 +303,36 @@ const featureMeta = FEATURE_META
 }
 
 .font-size-buttons button.active,
-.theme-buttons button.active {
+.theme-buttons button.active,
+.layout-buttons button.active {
   background: var(--accent, #2e7d32);
   color: #fff;
   border-color: var(--accent, #2e7d32);
+}
+
+/* ── 화면 레이아웃 안내 문구 ── */
+.setting-hint {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.setting-now {
+  font-size: calc(12px * var(--content-scale, 1));
+  color: var(--text-muted);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 고정 설치(키오스크) 행: 라벨 + 보조설명 ── */
+.setting-text { min-width: 0; padding-right: 12px; }
+.setting-sub {
+  display: block;
+  font-size: calc(11px * var(--content-scale, 1));
+  color: var(--text-muted);
+  margin-top: 2px;
+  max-width: 34ch;
+  line-height: 1.4;
 }
 
 .font-size-buttons button:nth-child(1) { font-size: calc(11px * var(--content-scale, 1)); }

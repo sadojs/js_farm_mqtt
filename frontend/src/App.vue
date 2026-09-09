@@ -1,5 +1,5 @@
 <template>
-  <div id="app" :class="['content-size-' + fontSize, { 'has-sidebar': showShell, 'theme-dark': theme === 'dark' }]">
+  <div id="app" :class="['content-size-' + fontSize, 'layout-' + mode, { 'has-sidebar': showShell, 'theme-dark': theme === 'dark' }]">
     <!-- 데스크탑 사이드바 -->
     <aside v-if="showShell" class="sidebar">
       <div class="sidebar-brand">
@@ -191,6 +191,14 @@
         </button>
       </div>
     </aside>
+
+    <!-- 태블릿 헤더 (태블릿 모드 전용 — 사이드바 접힘, 페이지명·연결상태 표시) -->
+    <TabletHeader
+      v-if="showShell && mode === 'tablet'"
+      :connected="connected"
+      @open-drawer="isDrawerOpen = true"
+      @open-settings="showSettings = true"
+    />
 
     <!-- 모바일 헤더 -->
     <header v-if="showShell" class="mobile-header">
@@ -439,6 +447,8 @@ import ToastContainer from './components/common/ToastContainer.vue'
 import NotificationCenter from './components/common/NotificationCenter.vue'
 import VoiceAssistant from './modules/voice-assistant/VoiceAssistant.vue'
 import UserSettingsModal from './components/common/UserSettingsModal.vue'
+import TabletHeader from './components/common/TabletHeader.vue'
+import { useLayoutMode } from './composables/useLayoutMode'
 import { useCropFeature } from './modules/crop-management/composables/useCropFeature'
 import { useFeatureFlags, type FeatureKey } from './composables/useFeatureFlags'
 
@@ -446,7 +456,10 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
-const { connect, disconnect } = useWebSocket()
+const { connect, disconnect, connected } = useWebSocket()
+
+// 레이아웃 모드(모바일/태블릿/데스크탑) — #app 클래스 바인딩 + 태블릿 헤더 렌더 판정
+const { mode } = useLayoutMode()
 
 useNoDoubleTapZoom()
 
@@ -1427,4 +1440,79 @@ body {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   태블릿 모드 (하우스 고정 설치용, 1280×800) — 클래스 기반 분리
+   ⚠️ 위 @media (max-width: 768px) 블록은 수정하지 않음. 모바일 동작 그대로.
+      태블릿은 #app.layout-tablet 클래스로만 분리하고, 드로어 공통 규칙을
+      layout-mobile / layout-tablet 이 공유하도록 클래스로 끌어올린다.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 사이드바 접기 + 태블릿 헤더 만큼 본문 내림 ── */
+#app.layout-tablet .sidebar { display: none; }
+#app.layout-tablet.has-sidebar .main-content {
+  margin-left: 0;
+  padding-top: 62px;   /* TabletHeader 높이 */
+}
+/* 태블릿은 TabletHeader 를 쓰므로 모바일 헤더는 숨김 */
+#app.layout-tablet .mobile-header { display: none; }
+
+/* ── 드로어 공통화 (모바일·태블릿 공유) ── */
+#app.layout-mobile .drawer-overlay,
+#app.layout-tablet .drawer-overlay {
+  display: block;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--overlay);
+  z-index: 200;
+}
+#app.layout-mobile .drawer,
+#app.layout-tablet .drawer {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  background: var(--bg-secondary);
+  z-index: 210;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+#app.layout-mobile .drawer.open,
+#app.layout-tablet .drawer.open { transform: translateX(0); }
+#app.layout-mobile .drawer { width: 280px; }
+#app.layout-tablet .drawer { width: 292px; }
+#app.layout-mobile .drawer .sidebar-link,
+#app.layout-tablet .drawer .sidebar-link {
+  font-size: 1.05em;
+  padding: 16px 16px;
+  min-height: 48px;
+}
+#app.layout-mobile .drawer .sidebar-footer,
+#app.layout-tablet .drawer .sidebar-footer {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* 하단 탭바는 모바일 전용 유지 (태블릿은 드로어만) */
+#app.layout-tablet .bottom-tab-bar { display: none; }
+
+/* ── 구역 관리 장치 그리드 폭 확보 (사이드바 접힘 → 4열) ──
+   실측해 3열이면 아래 패딩 축소가 가용폭을 넓혀 4열로 만든다.
+   .device-sub-grid 의 minmax 260px 는 절대 바꾸지 않음 (카드 내 토글 2개 최소폭). */
+#app.layout-tablet .page-container {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+#app.layout-tablet .group-body {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* ── 구역 헤더 버튼 6개 유지 + 터치 타깃 확대(44px, 48px는 헤더를 밀어냄) ── */
+#app.layout-tablet .group-header-actions .btn-icon { width: 44px; height: 44px; }
+#app.layout-tablet .group-header-actions .btn-memo { min-height: 44px; }
+
+/* ── 헤더 액션 3개 라벨 유지 (모바일 .btn-label{display:none} 이 새지 않도록) ── */
+#app.layout-tablet .header-actions .btn-label { display: inline; }
+#app.layout-tablet .header-actions button { min-height: 48px; }
 </style>
