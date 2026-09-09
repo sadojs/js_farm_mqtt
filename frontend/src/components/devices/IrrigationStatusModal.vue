@@ -30,14 +30,28 @@
               v-if="device.switchStates?.[mapping[fnKey] ?? ''] && deviceStatus?.isRunning"
               class="badge-running"
             >가동중</span>
-            <span
-              class="status-row-value"
-              :class="device.switchStates?.[mapping[fnKey] ?? ''] ? 'on' : 'off'"
+            <!-- 제어 가능 채널(구역·교반기·액비모터): 수동 On/Off 토글 -->
+            <label
+              v-if="controllable(fnKey)"
+              class="ctrl-toggle"
+              :class="{ disabled: !device.online || controlling }"
+              @click.prevent="(device.online && !controlling) && onToggle(fnKey)"
+              :title="!device.online ? '오프라인' : (isOn(fnKey) ? '눌러서 끄기' : '눌러서 켜기')"
             >
-              {{ device.switchStates?.[mapping[fnKey] ?? ''] ? 'ON' : 'OFF' }}
+              <input type="checkbox" :checked="isOn(fnKey)" :disabled="!device.online || controlling" />
+              <span class="ctrl-slider"></span>
+            </label>
+            <!-- 읽기전용 채널(원격제어·B접점): 상태 배지 -->
+            <span
+              v-else
+              class="status-row-value"
+              :class="isOn(fnKey) ? 'on' : 'off'"
+            >
+              {{ isOn(fnKey) ? 'ON' : 'OFF' }}
             </span>
           </div>
         </div>
+        <p class="ctrl-hint">구역·교반기·액비모터는 토글로 직접 켜고 끌 수 있습니다. (액비·교반기 켜기는 확인 후 실행)</p>
       </div>
       <!-- 자동화 요약 섹션 -->
       <div v-if="deviceStatus" class="automation-summary">
@@ -70,8 +84,24 @@ import { useAutomationStore } from '@/stores/automation.store'
 const props = defineProps<{
   visible: boolean
   device: Device | null
+  /** 부모가 이 장치를 제어 중이면 true — 토글 비활성화(중복 방지) */
+  controlling?: boolean
 }>()
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; control: [switchCode: string] }>()
+
+/** 수동 On/Off 가능한 채널 = 물리 채널(구역·교반기·액비모터). 원격제어·B접점(논리 슬롯)은 제외. */
+function controllable(fnKey: string): boolean {
+  return isZoneOrControl(fnKey)
+}
+/** 현재 스위치 ON 여부 */
+function isOn(fnKey: string): boolean {
+  return !!props.device?.switchStates?.[mapping.value[fnKey] ?? '']
+}
+/** 토글 → 부모의 검증된 제어(handleIrrigationControl)로 위임 (인터록·확인·검증 재사용) */
+function onToggle(fnKey: string): void {
+  const code = mapping.value[fnKey]
+  if (code) emit('control', code)
+}
 
 const deviceStore = useDeviceStore()
 const automationStore = useAutomationStore()
@@ -189,6 +219,25 @@ onMounted(() => {
 .badge-running {
   font-size: calc(11px * var(--content-scale, 1)); font-weight: 600; padding: 2px 8px;
   border-radius: 4px; background: #e3f2fd; color: #1565c0;
+}
+
+/* 수동 제어 토글 (구역·교반기·액비모터) */
+.ctrl-toggle { position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0; }
+.ctrl-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.ctrl-slider {
+  position: absolute; inset: 0; border-radius: 24px; background: var(--bg-badge, #cbd5e1);
+  transition: background 0.2s;
+}
+.ctrl-slider::before {
+  content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+  border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.ctrl-toggle input:checked + .ctrl-slider { background: var(--accent, #14b8a6); }
+.ctrl-toggle input:checked + .ctrl-slider::before { transform: translateX(20px); }
+.ctrl-toggle.disabled { cursor: not-allowed; opacity: 0.5; }
+.ctrl-hint {
+  margin: 12px 0 0; font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .automation-summary {

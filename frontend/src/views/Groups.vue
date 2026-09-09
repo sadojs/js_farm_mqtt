@@ -25,17 +25,24 @@
       </div>
     </header>
 
-    <!-- 일괄제어로 정지된 자동제어 룰 원복 배너 -->
+    <!-- 일괄·수동 제어로 정지된 자동제어 룰 원복 배너 (룰별 개별 원복 + 전체 원복) -->
     <div v-if="!isFarmUser && bulkStoppedRules.length > 0" class="bulk-restore-banner">
-      <div class="brb-text">
-        <span class="brb-icon">⏸</span>
-        <span>일괄제어로 정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b> —
-          <span class="brb-names">{{ bulkStoppedRules.map(r => r.name).join(', ') }}</span>
+      <div class="brb-main">
+        <div class="brb-text">
+          <span class="brb-icon">⏸</span>
+          <span>정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b></span>
+        </div>
+        <button class="brb-restore" :disabled="restoringBulk || !!restoringOne" @click="restoreBulk">
+          {{ restoringBulk ? '원복 중…' : '↩ 전체 원복' }}
+        </button>
+      </div>
+      <div class="brb-rules">
+        <span v-for="r in bulkStoppedRules" :key="r.id" class="brb-rule-chip">
+          <span class="brb-rule-name">{{ r.name }}</span>
+          <button class="brb-rule-restore" :disabled="restoringBulk || restoringOne === r.id"
+                  title="이 룰만 원복" @click="restoreOne(r.id)">↩</button>
         </span>
       </div>
-      <button class="brb-restore" :disabled="restoringBulk" @click="restoreBulk">
-        {{ restoringBulk ? '원복 중…' : '↩ 자동제어 원복' }}
-      </button>
     </div>
 
     <div v-if="loading" class="loading-state">구역 목록을 불러오는 중...</div>
@@ -314,9 +321,12 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
+                    <span class="irrig-name-tap" :class="{ tappable: !isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) ? startDeviceRename(device.id, device.name) : openIrrigationStatusModal(device)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : '눌러서 상태·수동 제어'">
+                      <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }">{{ device.name }}</span>
+                      <span v-if="!isGroupEditing(group.id)" class="name-chevron" aria-hidden="true">›</span>
+                    </span>
                     <button
                       v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
@@ -324,7 +334,6 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
-                  <button class="btn-status-sm" @click="openIrrigationStatusModal(device)">상태</button>
                   <span v-if="irrigationTimerSummary(device)" class="timer-badge" @click.stop="openIrrigationTimerModal(device)" title="채널별 타이머 관리">
                     <span class="timer-dot"></span>{{ irrigationTimerSummary(device)!.count }}채널 · {{ formatCountdown(irrigationTimerSummary(device)!.until) }}
                   </span>
@@ -497,7 +506,9 @@
     <IrrigationStatusModal
       :visible="showIrrigationStatusModal"
       :device="irrigationStatusDevice"
+      :controlling="irrigationControlling === irrigationStatusDevice?.id"
       @close="showIrrigationStatusModal = false"
+      @control="(switchCode: string) => irrigationStatusDevice && handleIrrigationControl(irrigationStatusDevice, switchCode)"
     />
 
     <!-- 임시 타이머 시트 (팬·개폐기) -->
@@ -793,6 +804,7 @@ function guideDeviceTypes(group: HouseGroup): Array<{ type: string; label: strin
 // 일괄제어로 정지된 자동제어 룰 (원복 배너)
 const bulkStoppedRules = ref<{ id: string; name: string }[]>([])
 const restoringBulk = ref(false)
+const restoringOne = ref<string | null>(null)
 
 async function loadBulkStopped() {
   if (isFarmUser) return
@@ -823,6 +835,21 @@ async function restoreBulk() {
     notify.error('오류', '자동제어 원복에 실패했습니다.')
   } finally {
     restoringBulk.value = false
+  }
+}
+
+// 룰별 개별 원복 — 배너에서 특정 룰만 재활성화 (나머지 정지 상태는 유지)
+async function restoreOne(ruleId: string) {
+  if (restoringOne.value || restoringBulk.value) return
+  restoringOne.value = ruleId
+  try {
+    const { restored } = (await automationApi.restoreBulkStoppedRules([ruleId])).data
+    await onBulkRulesChanged()
+    notify.success('자동제어 원복', `${restored[0]?.name ?? '룰'}을(를) 다시 켰습니다.`)
+  } catch {
+    notify.error('오류', '자동제어 원복에 실패했습니다.')
+  } finally {
+    restoringOne.value = null
   }
 }
 
@@ -1058,6 +1085,19 @@ const handleIrrigationControl = async (device: Device, switchCode: string) => {
       })
       if (!ok) return
     }
+  }
+
+  // 액비모터·교반기 수동 ON 안전 확인 (약품 주입/기계 동작) — 모달 토글 등에서 진입
+  const isFertilizer = mapping['fertilizer_motor'] === switchCode
+  const isMixer = mapping['mixer'] === switchCode
+  if ((isFertilizer || isMixer) && newVal) {
+    const ok = await confirm({
+      title: `${getMappingLabel(device, switchCode)} 켜기`,
+      message: `${getMappingLabel(device, switchCode)}를 수동으로 켭니다. 계속할까요?`,
+      confirmText: '켜기',
+      variant: 'warning',
+    })
+    if (!ok) return
   }
 
   irrigationControlling.value = device.id
@@ -1317,7 +1357,7 @@ async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: strin
       message:
         `${deviceLabel}을(를) 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
         `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
-        `(다시 사용하려면 자동 제어 페이지에서 룰을 켜세요.)`,
+        `(정지된 룰은 상단 '자동제어 원복'에서 되돌릴 수 있습니다.)`,
       confirmText: '정지하고 수동 제어',
       cancelText: '취소',
       variant: 'warning',
@@ -1325,8 +1365,9 @@ async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: strin
     if (!go) return false
     const { stopped } = (await automationApi.stopActiveRulesForDevice(deviceId)).data
     if (stopped.length > 0) {
-      await automationStore.fetchRules().catch(() => undefined)
-      notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 재개하려면 자동 제어에서 다시 켜세요.`)
+      // 정지된 룰이 상단 '자동제어 원복' 배너에 즉시 누적되도록 갱신 (일괄제어와 동일)
+      await onBulkRulesChanged()
+      notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 상단 '자동제어 원복'에서 되돌릴 수 있습니다.`)
     }
     return true
   } catch (e) {
@@ -2552,22 +2593,14 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 }
 .btn-env:hover { background: var(--bg-hover, #f3f4f6); }
 
-/* 관수 상태 버튼 (소형) */
-.btn-status-sm {
-  padding: 2px 8px;
-  background: var(--bg-secondary);
-  color: var(--text-link);
-  border: 1px solid var(--border-input);
-  border-radius: 4px;
-  font-size: calc(12px * var(--content-scale, 1));
-  font-weight: 600;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: border-color 0.2s, background 0.2s;
-}
-.btn-status-sm:hover {
-  border-color: var(--accent);
-  background: var(--accent-bg);
+/* 관수 상태 열기 — 이름+chevron 를 한 덩어리로 묶어 탭 (버튼 없음 → 줄바꿈·찌그러짐 방지) */
+.irrig-name-tap { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 4px; }
+.irrig-name-tap.tappable { cursor: pointer; }
+.irrig-name-tap .sub-card-name { flex: 0 1 auto; min-width: 0; }
+.irrig-name-tap.tappable:hover .sub-card-name { text-decoration: underline; text-underline-offset: 2px; }
+.name-chevron {
+  flex-shrink: 0; color: var(--text-link); font-weight: 700; line-height: 1;
+  font-size: calc(15px * var(--content-scale, 1));
 }
 
 /* Gateway section */
@@ -2748,21 +2781,39 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 
 /* 일괄제어 정지 룰 원복 배너 */
 .bulk-restore-banner {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; flex-direction: column; gap: 8px;
   margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
   background: rgba(245, 158, 11, 0.1); border: 1px solid #fcd34d;
 }
-.brb-text { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary, #333); min-width: 0; }
+.brb-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brb-text { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary, #333); min-width: 0; white-space: nowrap; }
 .brb-icon { font-size: calc(15px * var(--content-scale, 1)); flex-shrink: 0; }
 .brb-text b { color: #b45309; }
-.brb-names { color: var(--text-secondary, #6b7280); font-size: calc(12px * var(--content-scale, 1)); }
 .brb-restore {
   flex-shrink: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: calc(13px * var(--content-scale, 1));
   background: #f59e0b; color: #fff; border: none; transition: filter 0.15s;
 }
 .brb-restore:hover:not(:disabled) { filter: brightness(0.95); }
 .brb-restore:disabled { opacity: 0.6; cursor: not-allowed; }
+/* 룰별 개별 원복 칩 */
+.brb-rules { display: flex; flex-wrap: wrap; gap: 6px; }
+.brb-rule-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px;
+  border-radius: 999px; background: rgba(245, 158, 11, 0.16); border: 1px solid #fcd34d;
+  font-size: calc(12px * var(--content-scale, 1)); color: var(--text-primary, #333);
+}
+.brb-rule-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brb-rule-restore {
+  flex: 0 0 auto; box-sizing: border-box; padding: 0;
+  width: 22px; height: 22px; min-width: 22px; min-height: 22px; aspect-ratio: 1 / 1;
+  border-radius: 50%; border: none; cursor: pointer;
+  background: #f59e0b; color: #fff; font-size: calc(12px * var(--content-scale, 1)); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; transition: filter 0.15s;
+}
+.brb-rule-restore:hover:not(:disabled) { filter: brightness(0.95); }
+.brb-rule-restore:disabled { opacity: 0.5; cursor: not-allowed; }
 #app.theme-dark .bulk-restore-banner { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.45); }
+#app.theme-dark .brb-rule-chip { background: rgba(245,158,11,0.2); border-color: rgba(245,158,11,0.45); }
 
 /* 우적센서: 비 감지 자동 제어 토글 버튼 (측정기 카드) */
 .rain-override-btn {
