@@ -43,16 +43,33 @@ const rec = (n: string, s: string, m = '') => results.push({ n, s, m });
     rec('[#2] 고온 트리거 실동작(고온→강제개방→복귀)', 'SKIP', '온도 조건·시간 의존 — live-trigger/수동 검증');
   }
 
-  // ── [#7] 온보드 슬롯 ──
-  if (gw) {
-    const onboard = arr((await req('GET', `/gateway-env/${gw.gatewayId ?? gw.id}/onboard`, tok)).data);
-    rec('[#7] 온보드 슬롯 목록 조회', Array.isArray(onboard) ? 'PASS' : 'WARN', `${onboard.length}개`);
-    rec('[#7][갭] 온보드 슬롯 삭제는 룰 의존성 미체크', 'WARN', 'gateway-env.service.deleteOnboardDevice 는 assertNoAutomationDependency 미호출 — 룰 참조 중에도 삭제됨(회귀 후보)');
-    rec('[#7] 슬롯 삭제→고아 device 정리 실검증', 'SKIP', '실 슬롯 생성/삭제 필요(파괴적) — 전용 케이스로 별도 작성 권장');
+  const devices = arr((await req('GET', '/devices', tok)).data);
+
+  // ── [#7] 온보드 슬롯 삭제 룰 의존성 차단 (수정 반영: zigbee 처럼 409) ──
+  {
+    const rules = arr((await req('GET', '/automation/rules', tok)).data);
+    const ref = new Set<string>();
+    for (const r of rules) {
+      const a = r.actions ?? {};
+      for (const x of (Array.isArray(a) ? a : [a])) {
+        if (x?.targetDeviceId) ref.add(x.targetDeviceId);
+        (x?.targetDeviceIds ?? []).forEach((i: string) => ref.add(i));
+      }
+    }
+    const target = devices.find((d: any) => ref.has(d.id) && d.source === 'onboard' && d.onboardDeviceId);
+    if (target) {
+      const del = await req('DELETE', `/gateway-env/${target.gatewayId}/onboard/${target.onboardDeviceId}`, tok);
+      const deps = del.data?.dependencies?.automationRules ?? [];
+      rec('[#7] 룰 참조 온보드 슬롯 삭제 → 409 차단', del.st === 409 ? 'PASS' : 'FAIL', `HTTP ${del.st}`);
+      rec('[#7] 409 body 에 룰 목록(프론트 팝업용)', deps.length > 0 ? 'PASS' : 'FAIL', `${deps.length}개: ${deps.map((r: any) => r.name).join(',')}`);
+      const still = devices.some((d: any) => d.id === target.id) && arr((await req('GET', '/devices', tok)).data).some((d: any) => d.id === target.id);
+      rec('[#7] 차단 후 장치 잔존', still ? 'PASS' : 'FAIL');
+    } else {
+      rec('[#7] 온보드 삭제 의존성', 'SKIP', '룰 참조 온보드 장치 없음(데이터)');
+    }
   }
 
   // ── [#8] 채널매핑 (관수/8·12ch 컨트롤러) ──
-  const devices = arr((await req('GET', '/devices', tok)).data);
   const irr = devices.find((d: any) => d.equipmentType === 'irrigation');
   if (irr) {
     const cm = irr.channelMapping ?? {};

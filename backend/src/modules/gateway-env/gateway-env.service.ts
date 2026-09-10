@@ -2,7 +2,7 @@ import {
   BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { DEFAULT_CHANNEL_MAPPING_8CH_ZIGBEE, DEFAULT_CHANNEL_MAPPING_12CH } from '../devices/channel-mapping.constants';
 import { GatewayOnboardDevice, SlotType } from './entities/gateway-onboard-device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
@@ -431,19 +431,25 @@ export class GatewayEnvService {
     const device = await this.onboardRepo.findOne({ where: { id, gatewayId } });
     if (!device) throw new NotFoundException('온보드 장치를 찾을 수 없습니다.');
 
+    // 삭제 대상 슬롯 목록 산정 (그룹/팬/레거시관수)
+    let slotsToDelete: GatewayOnboardDevice[];
     if (device.pairKey) {
       // 동적 그룹: 같은 pairKey를 가진 모든 슬롯 삭제
-      const group = await this.onboardRepo.find({ where: { gatewayId, pairKey: device.pairKey } });
-      await this.onboardRepo.remove(group);
+      slotsToDelete = await this.onboardRepo.find({ where: { gatewayId, pairKey: device.pairKey } });
     } else if (device.slotType === 'fan') {
       // 레거시 팬: 단일 슬롯만 삭제
-      await this.onboardRepo.remove(device);
+      slotsToDelete = [device];
     } else {
       // 레거시 관수 그룹: pairKey=null인 팬 제외 모든 슬롯 삭제
       const legacyAll = await this.onboardRepo.find({ where: { gatewayId, pairKey: IsNull() } });
-      const toDelete = legacyAll.filter(s => s.slotType !== 'fan');
-      if (toDelete.length > 0) await this.onboardRepo.remove(toDelete);
+      slotsToDelete = legacyAll.filter(s => s.slotType !== 'fan');
     }
+
+    // 자동화 룰 의존성 차단(zigbee 삭제와 동일 정책): 삭제될 슬롯에 연결된 device 를
+    // 룰이 참조하면 409 로 막고 "먼저 룰을 삭제" 안내. (온보드도 zigbee 처럼 선삭제 요구)
+    await this.assertNoOnboardAutomationDependency(gw.userId, gatewayId, slotsToDelete);
+
+    if (slotsToDelete.length > 0) await this.onboardRepo.remove(slotsToDelete);
 
     // devices 테이블 동기화: 남은 슬롯 기반으로 actuator 정리
     // (이전에는 syncOnboardToDevices가 호출되지 않아 devices 테이블에 관주/팬 actuator가 남아 그룹 페이지에서 계속 보임)
@@ -454,6 +460,44 @@ export class GatewayEnvService {
 
     // rpi-fallback-channel-sync: 삭제 후 폴백 매핑 재동기화
     void this.emitDeviceChanged(gatewayId);
+  }
+
+  /**
+   * 온보드 슬롯 삭제 시 자동화 룰 의존성 차단 — 삭제될 슬롯에 연결된 device 를 룰이 참조하면 409.
+   *  - 팬/개폐기: device.onboardDeviceId 로 직접 연결 (+ 개폐기 페어)
+   *  - 관수: onboardDeviceId 없이 channelMapping 으로 여러 슬롯에 매핑 → 게이트웨이 irrigation device 포함
+   * (zigbee 삭제의 assertNoAutomationDependency 와 동일한 409 shape)
+   */
+  private async assertNoOnboardAutomationDependency(
+    ownerId: string,
+    gatewayId: string,
+    slots: GatewayOnboardDevice[],
+  ): Promise<void> {
+    if (!slots.length) return;
+    const slotIds = slots.map((s) => s.id);
+    const ids = new Set<string>();
+
+    const linked = await this.deviceRepo.find({ where: { onboardDeviceId: In(slotIds), gatewayId } as any });
+    for (const d of linked) {
+      ids.add(d.id);
+      if ((d as any).pairedDeviceId) ids.add((d as any).pairedDeviceId);
+    }
+
+    const IRRIGATION_SLOT_TYPES = new Set(['remote_control', 'fertilizer_contact', 'irrigation_zone', 'mixer', 'fertilizer_motor']);
+    if (slots.some((s) => IRRIGATION_SLOT_TYPES.has(s.slotType))) {
+      const irr = await this.deviceRepo.findOne({ where: { gatewayId, source: 'onboard', equipmentType: 'irrigation' } as any });
+      if (irr) ids.add(irr.id);
+    }
+
+    if (!ids.size) return;
+    const rules: { id: string; name: string; enabled: boolean }[] =
+      await this.deviceRepo.query(GATEWAY_ENV_DEVICE_DEP_SQL, [ownerId, Array.from(ids)]);
+    if (rules.length > 0) {
+      throw new ConflictException({
+        message: '자동화 룰에서 사용 중인 장비는 삭제할 수 없습니다. 먼저 해당 자동제어 룰을 삭제한 뒤 장치를 삭제해 주세요.',
+        dependencies: { automationRules: rules },
+      });
+    }
   }
 
   // ── 온보드 장치 → devices 테이블 동기화 ────────────────────

@@ -19,11 +19,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | object = '서버 내부 오류가 발생했습니다.';
+    // object 형태 예외의 커스텀 필드(dependencies 등)를 응답에 보존
+    // (장치 삭제 차단 409 의 dependencies.automationRules 를 프론트 팝업이 사용)
+    let extra: Record<string, any> = {};
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as any).message || res;
+      if (typeof res === 'string') {
+        message = res;
+      } else {
+        const { message: m, statusCode: _sc, error: _err, ...rest } = res as any;
+        message = m ?? res;
+        extra = rest;
+      }
     }
 
     // 500 에러만 상세 로그 (스택 트레이스 포함)
@@ -39,6 +48,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      ...extra,
       timestamp: new Date().toISOString(),
       path: request.url,
     });
