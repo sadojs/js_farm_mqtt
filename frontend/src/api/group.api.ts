@@ -55,6 +55,16 @@ export const groupApi = {
   getDependencies: (id: string) =>
     apiClient.get<GroupDependenciesResponse>(`/groups/${id}/dependencies`),
 
+  // ── 방재 모드 (하우스 밀폐 타이머) ──
+  startProtection: (id: string, body: { durationMinutes: number; closeOpeners?: boolean; stopFans?: boolean }) =>
+    apiClient.post<{ ok: boolean; until: string; applied: { openers: number; fans: number } }>(`/groups/${id}/protection`, body),
+  getProtection: (id: string) =>
+    apiClient.get<{ active: boolean; until?: string; remainingMinutes?: number; openers?: number; fans?: number }>(`/groups/${id}/protection`),
+  extendProtection: (id: string, addMinutes = 30) =>
+    apiClient.post<{ ok: boolean; until: string; extended: number }>(`/groups/${id}/protection/extend`, { addMinutes }),
+  cancelProtection: (id: string) =>
+    apiClient.delete<{ ok: boolean; cancelled: number }>(`/groups/${id}/protection`),
+
   // admin 전용
   adminGetAllGroups: () =>
     apiClient.get<HouseGroupWithOwner[]>('/groups'),

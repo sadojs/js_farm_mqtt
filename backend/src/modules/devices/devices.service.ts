@@ -306,6 +306,7 @@ export class DevicesService {
     userId: string,
     dto: { channelKey?: string; direction?: 'open' | 'close'; value?: boolean; durationMinutes: number },
     role?: string,
+    reason?: string, // 'protection' 등 — 그룹 방재 타이머 식별/일괄관리용
   ) {
     const minutes = Math.round(Number(dto.durationMinutes));
     if (!minutes || minutes < 1 || minutes > 720) {
@@ -354,6 +355,7 @@ export class DevicesService {
         if (!d) continue;
         const s: any = d.deviceSettings || {};
         s.userOverride = true; s.overrideUntil = until; s.overrideDirection = dto.direction;
+        if (reason) s.overrideReason = reason; else delete s.overrideReason;
         d.deviceSettings = s;
         await this.devicesRepo.save(d);
       }
@@ -366,6 +368,7 @@ export class DevicesService {
     const fresh = await this.devicesRepo.findOne({ where: { id } });
     const fs: any = fresh?.deviceSettings || settings;
     fs.userOverride = true; fs.overrideUntil = until; fs.overrideValue = value;
+    if (reason) fs.overrideReason = reason; else delete fs.overrideReason;
     if (fresh) { fresh.deviceSettings = fs; await this.devicesRepo.save(fresh); }
     return { ok: true, value, until };
   }
@@ -389,7 +392,7 @@ export class DevicesService {
       const d = did === device.id ? device : await this.devicesRepo.findOne({ where: { id: did } });
       if (!d) continue;
       const s: any = d.deviceSettings || {};
-      s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue;
+      s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue; delete s.overrideReason;
       d.deviceSettings = s;
       await this.devicesRepo.save(d);
     }

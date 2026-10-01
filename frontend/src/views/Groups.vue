@@ -10,6 +10,9 @@
         <button class="btn-bulk-control" @click="showBulkControl = true" title="일괄 제어 — 유동팬·개폐기를 한 번에 제어">
           <span class="bc-bolt">⚡</span><span class="btn-label">일괄 제어</span>
         </button>
+        <button v-if="!isFarmUser" class="btn-protection" @click="showProtection = true" title="방재 — 하우스를 지정 시간 밀폐 (개폐기 닫기·유동팬 정지)">
+          <span class="bc-shield">🛡</span><span class="btn-label">방재</span>
+        </button>
         <button
           class="btn-secondary btn-visibility"
           @click="showVisibilityModal = true"
@@ -48,6 +51,20 @@
             <svg class="ic-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
           </button>
         </span>
+      </div>
+    </div>
+
+    <!-- 방재 진행 배너 (하우스별 카운트다운 + 30분 연장 / 즉시 정지) -->
+    <div v-for="p in activeProtections" :key="p.groupId" class="protection-banner">
+      <div class="pb-text">
+        <span class="pb-shield">🛡</span>
+        <span class="pb-title"><b>{{ p.groupName }}</b> 방재 중</span>
+        <span class="pb-remain">남은 시간 {{ formatCountdown(p.until) || '종료 중…' }}</span>
+        <span class="pb-detail">개폐기 {{ p.openers }} · 유동팬 {{ p.fans }}</span>
+      </div>
+      <div v-if="!isFarmUser" class="pb-actions">
+        <button class="pb-extend" :disabled="protBusy === p.groupId" @click="extendProtection(p.groupId)">+30분 연장</button>
+        <button class="pb-stop" :disabled="protBusy === p.groupId" @click="stopProtection(p.groupId)">정지</button>
       </div>
     </div>
 
@@ -487,6 +504,13 @@
       @rules-changed="onBulkRulesChanged"
     />
 
+    <ProtectionModal
+      v-if="showProtection"
+      :groups="groups"
+      @close="showProtection = false"
+      @started="onProtectionChanged"
+    />
+
     <ZoneVisibilityModal
       v-if="showVisibilityModal"
       :groups="allGroups"
@@ -630,6 +654,7 @@ import { zoneNotesApi } from '@/api/zone-notes.api'
 import RemoveDeviceModal from '@/components/groups/RemoveDeviceModal.vue'
 import ZoneVisibilityModal from '@/components/groups/ZoneVisibilityModal.vue'
 import BulkControlModal from '@/components/groups/BulkControlModal.vue'
+import ProtectionModal from '@/components/groups/ProtectionModal.vue'
 import AutomationEditModal from '@/components/automation/AutomationEditModal.vue'
 import DeleteBlockingModal from '@/components/common/DeleteBlockingModal.vue'
 import { useConfirm } from '../composables/useConfirm'
@@ -859,6 +884,78 @@ async function restoreOne(ruleId: string) {
   }
 }
 
+// ── 방재 모드 (하우스 밀폐 타이머) ──
+const showProtection = ref(false)
+const protBusy = ref<string | null>(null)
+type ProtInfo = { groupId: string; groupName: string; until: string; openers: number; fans: number }
+const protections = ref<ProtInfo[]>([])
+// 미만료 방재만 표시 (useTimerTick의 now로 매초 재평가 → 만료 즉시 사라짐)
+const activeProtections = computed(() =>
+  protections.value.filter(p => new Date(p.until).getTime() > now.value)
+)
+
+async function loadProtections() {
+  try {
+    const results = await Promise.all(
+      groups.value.map(async (g) => {
+        try {
+          const { data } = await groupApi.getProtection(g.id)
+          if (!data?.active || !data.until) return null
+          return { groupId: g.id, groupName: g.name, until: data.until, openers: data.openers ?? 0, fans: data.fans ?? 0 } as ProtInfo
+        } catch { return null }
+      })
+    )
+    protections.value = results.filter((r): r is ProtInfo => !!r)
+  } catch {
+    protections.value = []
+  }
+}
+
+// 방재 시작/연장/정지 후 배너 + 장치 상태 동기화
+async function onProtectionChanged() {
+  await Promise.all([
+    loadProtections(),
+    deviceStore.fetchDevices().catch(() => undefined),
+  ])
+}
+
+async function extendProtection(groupId: string) {
+  if (protBusy.value) return
+  protBusy.value = groupId
+  try {
+    const { data } = await groupApi.extendProtection(groupId, 30)
+    notify.success('방재 연장', `30분 연장 — ${formatCountdown(data.until) ?? ''} 남음`)
+    await loadProtections()
+  } catch (e: any) {
+    notify.error('연장 실패', e?.response?.data?.message || '방재 연장에 실패했습니다.')
+  } finally {
+    protBusy.value = null
+  }
+}
+
+async function stopProtection(groupId: string) {
+  if (protBusy.value) return
+  const p = protections.value.find(x => x.groupId === groupId)
+  const ok = await confirm({
+    title: '방재 정지',
+    message: `${p?.groupName ?? '하우스'}의 방재를 지금 정지할까요? 밀폐된 장치가 즉시 자동제어로 복귀합니다.`,
+    confirmText: '정지',
+    cancelText: '취소',
+    variant: 'danger',
+  })
+  if (!ok) return
+  protBusy.value = groupId
+  try {
+    const { data } = await groupApi.cancelProtection(groupId)
+    notify.success('방재 정지', `장치 ${data.cancelled}개를 자동제어로 복귀했습니다.`)
+    await onProtectionChanged()
+  } catch (e: any) {
+    notify.error('정지 실패', e?.response?.data?.message || '방재 정지에 실패했습니다.')
+  } finally {
+    protBusy.value = null
+  }
+}
+
 const collapsedGroups = ref(new Set<string>())
 
 // 장치 추가 모달
@@ -944,6 +1041,7 @@ onMounted(async () => {
   automationStore.fetchIrrigationStatus()
   loadNoteCounts()
   loadBulkStopped()
+  loadProtections()
   offHighTempOverride = onHighTempOverride(({ groupId, active }) => {
     const next = new Set(highTempActiveZones.value)
     if (active) next.add(groupId)
@@ -1426,7 +1524,7 @@ const handleControl = async (deviceId: string, turnOn: boolean) => {
 }
 
 // ── 임시 타이머 (팬·개폐기 = 장치 단위 / 관수 = 채널 단위) ──
-const { formatCountdown, isActive } = useTimerTick()
+const { now, formatCountdown, isActive } = useTimerTick()
 
 type TimerKind = 'fan' | 'opener'
 const timerSheetOpen = ref(false)
@@ -1787,6 +1885,7 @@ function startStatusPolling() {
     await Promise.all([
       automationStore.fetchIrrigationStatus(),
       deviceStore.fetchDevices(),
+      loadProtections(),
     ])
   }, 15000)
 }
@@ -1867,6 +1966,16 @@ onBeforeUnmount(() => {
 }
 .btn-bulk-control:hover { background: #e65100; }
 .btn-bulk-control .bc-bolt { font-size: calc(15px * var(--content-scale, 1)); }
+
+.btn-protection {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 12px 18px; border-radius: 8px; cursor: pointer;
+  background: #0369a1; color: #fff; border: none;
+  font-weight: 700; font-size: calc(14px * var(--content-scale, 1));
+  transition: background 0.15s;
+}
+.btn-protection:hover { background: #075985; }
+.btn-protection .bc-shield { font-size: calc(15px * var(--content-scale, 1)); }
 
 .hidden-banner {
   margin-top: 14px;
@@ -2831,6 +2940,29 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
 .brb-rule-restore:disabled { opacity: 0.5; cursor: not-allowed; }
 #app.theme-dark .bulk-restore-banner { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.45); }
 #app.theme-dark .brb-rule-chip { background: rgba(245,158,11,0.2); border-color: rgba(245,158,11,0.45); }
+
+/* 방재 진행 배너 */
+.protection-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(3, 105, 161, 0.1); border: 1px solid #7dd3fc;
+}
+.pb-text { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; font-size: calc(13px * var(--content-scale, 1)); color: var(--text-primary, #333); }
+.pb-shield { font-size: calc(16px * var(--content-scale, 1)); flex-shrink: 0; }
+.pb-title b { color: #075985; }
+.pb-remain { font-weight: 700; color: #0369a1; font-variant-numeric: tabular-nums; }
+.pb-detail { color: var(--text-secondary, #666); font-size: calc(12px * var(--content-scale, 1)); }
+.pb-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.pb-extend, .pb-stop {
+  display: inline-flex; align-items: center; padding: 6px 14px; min-height: 0;
+  border-radius: 8px; cursor: pointer; font-weight: 700; line-height: 1;
+  font-size: calc(13px * var(--content-scale, 1)); border: none; transition: filter 0.15s;
+}
+.pb-extend { background: #0ea5e9; color: #fff; }
+.pb-stop { background: #dc2626; color: #fff; }
+.pb-extend:hover:not(:disabled), .pb-stop:hover:not(:disabled) { filter: brightness(0.95); }
+.pb-extend:disabled, .pb-stop:disabled { opacity: 0.6; cursor: not-allowed; }
+#app.theme-dark .protection-banner { background: rgba(3,105,161,0.18); border-color: rgba(125,211,252,0.4); }
 
 /* 우적센서: 비 감지 자동 제어 토글 버튼 (측정기 카드) */
 .rain-override-btn {

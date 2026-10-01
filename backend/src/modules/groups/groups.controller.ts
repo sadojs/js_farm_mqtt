@@ -145,6 +145,38 @@ export class GroupsController {
     return this.groupsService.controlGroup(id, this.getEffectiveUserId(user), body.commands);
   }
 
+  // ── 방재 모드 (하우스 밀폐 타이머) ──
+  @Post(':id/protection')
+  @Roles('admin', 'farm_admin')
+  startProtection(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { durationMinutes: number; closeOpeners?: boolean; stopFans?: boolean },
+  ) {
+    return this.groupsService.startProtection(id, this.getEffectiveUserId(user), body, user.role);
+  }
+
+  @Get(':id/protection')
+  getProtection(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.groupsService.getProtection(id, this.getEffectiveUserId(user), user.role);
+  }
+
+  @Post(':id/protection/extend')
+  @Roles('admin', 'farm_admin')
+  extendProtection(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { addMinutes?: number },
+  ) {
+    return this.groupsService.extendProtection(id, this.getEffectiveUserId(user), body, user.role);
+  }
+
+  @Delete(':id/protection')
+  @Roles('admin', 'farm_admin')
+  cancelProtection(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.groupsService.cancelProtection(id, this.getEffectiveUserId(user), user.role);
+  }
+
   @Post(':id/gateway')
   assignGateway(
     @Param('id') id: string,

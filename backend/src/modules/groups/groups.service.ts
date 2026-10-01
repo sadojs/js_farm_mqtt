@@ -1,6 +1,7 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, forwardRef, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { DevicesService } from '../devices/devices.service';
 import { HouseGroup } from './entities/house-group.entity';
 import { House } from './entities/house.entity';
 import { Device } from '../devices/entities/device.entity';
@@ -20,6 +21,7 @@ export class GroupsService {
     @InjectRepository(AutomationRule) private rulesRepo: Repository<AutomationRule>,
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     @InjectRepository(User) private usersRepo: Repository<User>,
+    @Inject(forwardRef(() => DevicesService)) private devicesService: DevicesService,
     @Optional() @Inject(MqttService) private mqttService?: MqttService,
   ) {}
 
@@ -414,6 +416,139 @@ export class GroupsService {
     }
 
     return { groupId, controlled: results.length, results };
+  }
+
+  // ── 방재 모드 (하우스 밀폐 타이머) ──────────────────────────
+  // 선택 하우스의 개폐기 닫기 + 유동팬 정지를 N분 타이머로 적용. 타이머는 overrideReason='protection'
+  // 으로 태깅돼 자동화룰이 해당 장치를 건드리지 못하고(기존 타이머 override 메커니즘 재사용),
+  // 만료 시 자동 복귀. 즉시 정지/연장은 이 태그로 그룹 범위를 식별한다.
+
+  private async loadGroupActuators(groupId: string, userId: string, role?: string) {
+    // 그룹-장치 연결은 group_devices(M2M) + gateway→house→group 체인 두 경로 (findAllGroups 와 동일).
+    const isAdmin = role === 'admin';
+    const where: any = isAdmin ? { id: groupId } : { id: groupId, userId };
+    const group = await this.groupsRepo.findOne({ where, relations: ['houses', 'devices'] });
+    if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
+    const devices: Device[] = [...(group.devices || [])];
+    const houseIds = (group.houses || []).map((h) => h.id);
+    if (houseIds.length > 0) {
+      const gateways = await this.gatewayRepo.find({ where: { houseId: In(houseIds) } });
+      const gwIds = gateways.map((g) => g.id);
+      if (gwIds.length > 0) {
+        const gwDevices = await this.devicesRepo.find({
+          where: isAdmin ? { gatewayId: In(gwIds) } : { gatewayId: In(gwIds), userId },
+        });
+        const existing = new Set(devices.map((d) => d.id));
+        for (const d of gwDevices) if (!existing.has(d.id)) devices.push(d);
+      }
+    }
+    const acts = devices.filter((d) => d.deviceType === 'actuator');
+    return {
+      openers: acts.filter((d) => d.equipmentType === 'opener_open' || d.equipmentType === 'opener_close'),
+      fans: acts.filter((d) => d.equipmentType === 'fan'),
+    };
+  }
+
+  private isProtectionActive(d: Device, now: number): boolean {
+    const s: any = d.deviceSettings || {};
+    return s.overrideReason === 'protection' && !!s.overrideUntil && new Date(s.overrideUntil).getTime() > now;
+  }
+
+  async startProtection(
+    groupId: string,
+    userId: string,
+    dto: { durationMinutes: number; closeOpeners?: boolean; stopFans?: boolean },
+    role?: string,
+  ) {
+    const minutes = Math.round(Number(dto.durationMinutes));
+    if (!minutes || minutes < 1 || minutes > 720) throw new BadRequestException('방재 시간은 1~720분이어야 합니다.');
+    const closeOpeners = dto.closeOpeners !== false;
+    const stopFans = dto.stopFans !== false;
+    if (!closeOpeners && !stopFans) throw new BadRequestException('개폐기 닫기 또는 유동팬 정지 중 하나는 선택해야 합니다.');
+
+    const { openers, fans } = await this.loadGroupActuators(groupId, userId, role);
+    let appliedOpeners = 0;
+    let appliedFans = 0;
+
+    if (closeOpeners) {
+      const seen = new Set<string>();
+      for (const o of openers) {
+        if (seen.has(o.id)) continue;
+        seen.add(o.id);
+        if (o.pairedDeviceId) seen.add(o.pairedDeviceId);
+        try {
+          await this.devicesService.setDeviceTimer(o.id, userId, { direction: 'close', durationMinutes: minutes }, role, 'protection');
+          appliedOpeners++;
+        } catch (e: any) { this.logger.warn(`[protection] 개폐기 타이머 실패 ${o.name}: ${e.message}`); }
+      }
+    }
+    if (stopFans) {
+      for (const f of fans) {
+        try {
+          await this.devicesService.setDeviceTimer(f.id, userId, { value: false, durationMinutes: minutes }, role, 'protection');
+          appliedFans++;
+        } catch (e: any) { this.logger.warn(`[protection] 팬 타이머 실패 ${f.name}: ${e.message}`); }
+      }
+    }
+    const until = new Date(Date.now() + minutes * 60000).toISOString();
+    this.logger.log(`[protection] group=${groupId} 방재 시작 ${minutes}분 — 개폐기 ${appliedOpeners} / 팬 ${appliedFans}`);
+    return { ok: true, until, applied: { openers: appliedOpeners, fans: appliedFans } };
+  }
+
+  async getProtection(groupId: string, userId: string, role?: string) {
+    const { openers, fans } = await this.loadGroupActuators(groupId, userId, role);
+    const now = Date.now();
+    const prot = [...openers, ...fans].filter((d) => this.isProtectionActive(d, now));
+    if (!prot.length) return { active: false };
+    const untilMs = Math.max(...prot.map((d) => new Date((d.deviceSettings as any).overrideUntil).getTime()));
+    return {
+      active: true,
+      until: new Date(untilMs).toISOString(),
+      remainingMinutes: Math.max(0, Math.ceil((untilMs - now) / 60000)),
+      openers: openers.filter((d) => this.isProtectionActive(d, now)).length,
+      fans: fans.filter((d) => this.isProtectionActive(d, now)).length,
+    };
+  }
+
+  async extendProtection(groupId: string, userId: string, dto: { addMinutes?: number }, role?: string) {
+    const add = Math.round(Number(dto.addMinutes)) || 30;
+    if (add < 1 || add > 720) throw new BadRequestException('연장 시간이 올바르지 않습니다.');
+    const { openers, fans } = await this.loadGroupActuators(groupId, userId, role);
+    const now = Date.now();
+    const MAX = now + 720 * 60000; // 현재 기준 최대 12시간
+    let extended = 0;
+    let newUntil = 0;
+    for (const d of [...openers, ...fans]) {
+      if (!this.isProtectionActive(d, now)) continue;
+      const s: any = d.deviceSettings || {};
+      const next = Math.min(new Date(s.overrideUntil).getTime() + add * 60000, MAX);
+      s.overrideUntil = new Date(next).toISOString();
+      d.deviceSettings = s;
+      await this.devicesRepo.save(d);
+      newUntil = Math.max(newUntil, next);
+      extended++;
+    }
+    if (!extended) throw new BadRequestException('진행 중인 방재가 없습니다.');
+    this.logger.log(`[protection] group=${groupId} 방재 ${add}분 연장 — ${extended}개 장치`);
+    return { ok: true, until: new Date(newUntil).toISOString(), extended };
+  }
+
+  async cancelProtection(groupId: string, userId: string, role?: string) {
+    const { openers, fans } = await this.loadGroupActuators(groupId, userId, role);
+    const prot = [...openers, ...fans].filter((d) => (d.deviceSettings as any)?.overrideReason === 'protection');
+    let cancelled = 0;
+    const seen = new Set<string>();
+    for (const d of prot) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      if (d.pairedDeviceId) seen.add(d.pairedDeviceId);
+      try {
+        await this.devicesService.cancelDeviceTimer(d.id, userId, {}, role);
+        cancelled++;
+      } catch (e: any) { this.logger.warn(`[protection] 정지 실패 ${d.name}: ${e.message}`); }
+    }
+    this.logger.log(`[protection] group=${groupId} 방재 정지 — ${cancelled}개 해제`);
+    return { ok: true, cancelled };
   }
 
   async assignDevices(groupId: string, userId: string, deviceIds: string[]) {

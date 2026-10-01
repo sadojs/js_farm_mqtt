@@ -10,12 +10,14 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { User } from '../users/entities/user.entity';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { DevicesModule } from '../devices/devices.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([HouseGroup, House, Device, AutomationRule, Gateway, User]),
     forwardRef(() => MqttModule),
     ActivityLogModule,
+    forwardRef(() => DevicesModule),
   ],
   controllers: [GroupsController],
   providers: [GroupsService],
