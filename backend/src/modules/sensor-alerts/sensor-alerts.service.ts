@@ -6,6 +6,8 @@ import { SensorAlert } from './entities/sensor-alert.entity';
 import { SensorStandby } from './entities/sensor-standby.entity';
 import { Device } from '../devices/entities/device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
+import { EventsGateway } from '../gateway/events.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   SENSOR_ALERT_RULES, AlertRuleParams,
   NO_DATA_WARNING_MINUTES, NO_DATA_CRITICAL_MINUTES,
@@ -23,7 +25,50 @@ export class SensorAlertsService {
     @InjectRepository(Device) private deviceRepo: Repository<Device>,
     @InjectRepository(Gateway) private gatewayRepo: Repository<Gateway>,
     private dataSource: DataSource,
+    private eventsGateway: EventsGateway,
+    private notifications: NotificationsService,
   ) {}
+
+  // ── 알림 전달 (웹소켓 + 모바일 푸시) ──
+  // 알림 row 생성/승격 시점에만 호출(엣지 트리거) → 분당 반복 발송 방지.
+
+  private alertTitle(sensorType: string, severity: string): string {
+    switch (sensorType) {
+      case 'gateway_offline': return '🔌 게이트웨이 오프라인';
+      case 'sensor_offline': return '📡 센서 오프라인';
+      case 'actuator_offline': return '⚙️ 장비 오프라인';
+      default: return severity === 'critical' ? '🚨 센서 경고' : '⚠️ 센서 알림';
+    }
+  }
+
+  private async deliverAlert(a: {
+    userId?: string | null;
+    sensorType?: string | null;
+    severity?: string | null;
+    message?: string | null;
+  }) {
+    if (!a.userId) return;
+    const sensorType = a.sensorType || 'sensor_alert';
+    const severity = a.severity || 'warning';
+    const title = this.alertTitle(sensorType, severity);
+    const message = a.message || '';
+    // 실시간 — 알림센터/토스트 (user room)
+    try {
+      this.eventsGateway.sendNotification(a.userId, { type: sensorType, title, message });
+    } catch (e) {
+      this.logger.error(`[Alert Deliver] 웹소켓 전송 실패: ${(e as Error).message}`);
+    }
+    // 모바일 푸시 — 자격증명 미설정 시 안전하게 no-op
+    try {
+      await this.notifications.sendToUser(a.userId, {
+        title,
+        body: message,
+        data: { type: sensorType, severity },
+      });
+    } catch (e) {
+      this.logger.error(`[Alert Deliver] 푸시 전송 실패: ${(e as Error).message}`);
+    }
+  }
 
   // ── 센서 목록 + 대기 관리 ──
 
@@ -249,6 +294,7 @@ export class SensorAlertsService {
       });
       await this.alertRepo.save(alert);
       this.logger.warn(`[Actuator Offline] ${actuator.name}: offline for ${Math.round(minutesAgo)} minutes (${severity})`);
+      await this.deliverAlert(alert);
     }
   }
 
@@ -321,6 +367,7 @@ export class SensorAlertsService {
       });
       await this.alertRepo.save(alert);
       this.logger.warn(`[Sensor Offline] ${sensor.name}: offline ${Math.round(minutesAgo)}분 (${severity})`);
+      await this.deliverAlert(alert);
     }
   }
 
@@ -397,6 +444,7 @@ export class SensorAlertsService {
       });
       await this.alertRepo.save(alert);
       this.logger.warn(`[Gateway Offline] ${gw.name} (${gw.gatewayId}): offline ${Math.round(minutesAgo)}분 (${severity})`);
+      await this.deliverAlert(alert);
     }
   }
 
@@ -711,5 +759,6 @@ export class SensorAlertsService {
     });
     await this.alertRepo.save(alert);
     this.logger.warn(`[Alert] ${device.name} / ${sensorType}: ${message}`);
+    await this.deliverAlert(alert);
   }
 }
