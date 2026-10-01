@@ -1079,6 +1079,12 @@ export class AutomationRunnerService {
       }
       for (const t of targets) {
         const settings: any = t.deviceSettings || {};
+        // 활성 타이머 override(overrideUntil 미래)는 룰 inactive 전환이 지우면 안 된다.
+        // 타이머는 사용자가 시간제로 건 독립 의도(만료/취소로만 해제) — 여기서 userOverride 를
+        // 지우면 다음 틱에 러너가 장치를 다시 잡아 '타이머 중 자동화룰 동작' 버그가 발생한다.
+        if (settings.overrideUntil && new Date(settings.overrideUntil).getTime() > Date.now()) {
+          continue;
+        }
         if (settings.relayActivePhase || settings.switchState
           || settings.ruleIntendedState != null || settings.userOverride) {
           settings.relayActivePhase = null;
