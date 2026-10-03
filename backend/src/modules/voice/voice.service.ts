@@ -116,7 +116,19 @@ export class VoiceService {
 
   private async askClaude(prompt: string): Promise<any> {
     return new Promise((resolve, reject) => {
+      // 격리된 작업 디렉터리에서 실행한다.
+      // 이유: 프로젝트 디렉터리의 .claude/settings.local.json 에 누적된 권한 규칙이
+      // (대화형 세션에서 자동 추가되며) 잘못된 패턴을 포함하면 claude CLI 가 시작 시 종료코드 1 로
+      // 죽어 음성 AI 전체가 먹통이 된다. 인증은 Keychain/env 기반이라 cwd 와 무관하므로,
+      // 프로젝트 설정을 로드하지 않는 임시 디렉터리에서 실행해 영향받지 않게 한다.
+      const os = require('os');
+      const path = require('path');
+      const fs = require('fs');
+      const cwd = path.join(os.tmpdir(), 'smartfarm-voice-ai');
+      try { fs.mkdirSync(cwd, { recursive: true }); } catch { /* noop */ }
+
       const child = require('child_process').spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text'], {
+        cwd,
         timeout: 30000,
         env: { ...process.env, LANG: 'ko_KR.UTF-8' },
       });
