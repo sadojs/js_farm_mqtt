@@ -47,3 +47,8 @@ temp/
 
 # OS
 Thumbs.db
+
+# push 자격증명(서비스계정 JSON, APNs .p8) — 절대 커밋 금지
+backend/secrets/
+*.p8
+fcm-service-account*.json
