@@ -1,5 +1,6 @@
 import { ref, onUnmounted, readonly } from 'vue'
 import { io, Socket } from 'socket.io-client'
+import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '../stores/auth.store'
 import { useSensorStore } from '../stores/sensor.store'
 import { useDeviceStore } from '../stores/device.store'
@@ -116,8 +117,9 @@ export function useWebSocket() {
       _reconnecting.value = false
       _reconnectAttempts.value = 0
       // 짧은 끊김(앱 재개·모바일 네트워크 전환)엔 조용히. 장시간 끊김 복구만 안내.
+      // 네이티브 앱은 백그라운드 전환마다 소켓이 끊겨 재개 시 매번 뜨므로, 앱에선 표시하지 않는다.
       const downMs = _disconnectedAt ? Date.now() - _disconnectedAt : 0
-      if (downMs >= RECONNECT_TOAST_MIN_MS) {
+      if (!Capacitor.isNativePlatform() && downMs >= RECONNECT_TOAST_MIN_MS) {
         useNotificationStore().success('연결 복구', '서버와 다시 연결되었습니다.')
       }
       _disconnectedAt = 0
