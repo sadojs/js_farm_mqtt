@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>플랫폼 개요 · 관리자 콘솔 시안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<!-- 디자인 시안 (정적 HTML). 수치/이름은 2026-10-03 localhost:5174 실데이터 스냅샷. 구현 시 API 데이터로 대체 -->
+<div class="c-root">
+  <input type="checkbox" id="nav" class="nav-toggle" aria-label="메뉴 토글">
+  <label for="nav" class="c-scrim" aria-hidden="true"></label>
+  <aside class="c-side">
+    <div class="c-brand">
+      <div class="c-logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"></path><path d="M12 12C12 7 8 4 3 4c0 5 4 8 9 8z"></path><path d="M12 12c0-4 3-7 8-7 0 4-3 7-8 7z"></path></svg></div>
+      <div class="c-brand-t"><b>스마트팜 콘솔</b><span>Platform Admin</span></div>
+    </div>
+    <div class="c-sec">콘솔</div>
+    <a class="c-link on" href="01-overview.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>플랫폼 개요</a>
+    <div class="c-sec">플랫폼 운영</div>
+    <a class="c-link" href="02-users.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>사용자<span class="cnt">8</span></a>
+    <a class="c-link" href="03-farms.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>농장<span class="cnt">3</span></a>
+    <a class="c-link" href="04-gateways.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="12" rx="2"></rect><line x1="8" y1="20" x2="16" y2="20"></line><line x1="12" y1="16" x2="12" y2="20"></line></svg>게이트웨이<span class="cnt">1</span></a>
+    <a class="c-link" href="04-gateways.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path><polyline points="7 11 12 16 17 11"></polyline><line x1="12" y1="4" x2="12" y2="16"></line></svg>설정 배포</a>
+    <a class="c-link" href="04-gateways.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12" y2="17"></line></svg>이머전시 페일오버</a>
+    <div class="c-sec">농장 보기</div>
+    <a class="c-farmpick" href="05-farm-view.html"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.6" y2="16.6"></line></svg>농장을 선택하세요</a>
+    <span class="c-link dis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>대시보드</span>
+    <span class="c-link dis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V10l7-5 7 5v11"></path></svg>구역 관리</span>
+    <span class="c-link dis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>자동 제어</span>
+    <div class="c-side-foot">
+      <div class="row"><span class="led" style="background:#4CAF7A"></span>API 정상 · MQTT 연결</div>
+      <div class="row mono" style="font-size:11px">v0.1.0 · 19:40 KST</div>
+    </div>
+  </aside>
+
+  <main class="c-main">
+    <div class="c-top">
+      <label for="nav" class="c-icon-btn c-burger" aria-label="메뉴 열기"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></label>
+      <div class="c-crumb">콘솔 <span>/</span> <b>플랫폼 개요</b></div>
+      <label class="c-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.6" y2="16.6"></line></svg><input placeholder="사용자, 농장, 게이트웨이 검색" aria-label="전체 검색"><span class="kbd">⌘K</span></label>
+      <button class="c-icon-btn" aria-label="알림"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg><span class="dot"></span></button>
+      <div class="c-user"><div class="av">관</div><div>관리자<span>플랫폼 관리자</span></div></div>
+    </div>
+
+    <div class="c-body">
+      <div class="c-head">
+        <div>
+          <h1 class="c-h1">플랫폼 개요</h1>
+          <p class="c-sub">전체 농장 · 사용자 · 게이트웨이 상태를 한 화면에서 확인합니다</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"></path></svg>새로고침</button>
+          <a class="btn btn-pri" href="02-users.html"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>사용자 추가</a>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+        <div class="card kpi"><div class="l">농장</div><div class="v">3</div><div class="s">농장 관리자 계정 기준</div></div>
+        <div class="card kpi"><div class="l">사용자</div><div class="v">8</div><div class="s">관리자 1 · 농장관리자 3 · 농장사용자 4</div></div>
+        <div class="card kpi"><div class="l"><span class="led" style="background:#2E7D4F"></span>게이트웨이 온라인</div><div class="v">1<small> / 1</small></div><div class="s">점검 필요 0</div></div>
+        <div class="card kpi"><div class="l"><span class="led" style="background:#C2410C"></span>측정기 온라인</div><div class="v">1<small> / 2</small></div><div class="s">오프라인 1 · HK_온습도</div></div>
+        <div class="card kpi"><div class="l">페일오버</div><div class="v" style="font-size:20px;padding:4px 0">ONLINE</div><div class="s">동기화 진행 1건 (v66 → v68)</div></div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+        <div class="card" style="flex:2 1 560px">
+          <div class="card-h">농장 현황 <a href="03-farms.html" style="font-size:12px;font-weight:500">전체 보기 →</a></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>농장</th><th>관리자 계정</th><th>구역</th><th>게이트웨이</th><th>구성원</th><th>상태</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><b>ohgane</b></td><td class="mono">@mtest</td><td class="mono">8</td><td><span class="pill p-ok"><span class="led" style="background:#2E7D4F"></span>hk-house</span></td><td class="mono">4</td><td><span class="pill p-ok">운영 중</span></td><td style="text-align:right"><a class="btn btn-sm" href="05-farm-view.html">농장 보기</a></td></tr>
+                <tr><td><b>test2</b></td><td class="mono">@mtest2</td><td class="mono">0</td><td class="muted">미할당</td><td class="mono">0</td><td><span class="pill p-warn">설정 필요</span></td><td style="text-align:right"><a class="btn btn-sm" href="03-farms.html">설정</a></td></tr>
+                <tr><td><b>테스터</b></td><td class="mono">@test01</td><td class="mono">0</td><td class="muted">미할당</td><td class="mono">0</td><td><span class="pill p-warn">설정 필요</span></td><td style="text-align:right"><a class="btn btn-sm" href="03-farms.html">설정</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="flex:1 1 300px">
+          <div class="card-h">주의 필요 <small>3건</small></div>
+          <div class="alert-i"><div class="ico" style="background:#FCE8E6;color:#A61B12"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.7 11.1A11 11 0 0 1 19 12.6M5 12.6a11 11 0 0 1 5.2-2.5M10.7 5a16 16 0 0 1 12.2 3.6M1.4 8.7a16 16 0 0 1 4.4-2.8M8.5 16.1a6 6 0 0 1 7 0"></path></svg></div><div><div class="t">HK_온습도 오프라인</div><div class="d">ohgane · 하교하우스 측정기</div></div></div>
+          <div class="alert-i"><div class="ico" style="background:#FDF0E1;color:#924509"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"></path></svg></div><div><div class="t">페일오버 설정 동기화 중</div><div class="d">hk-house · RPi v66 → 서버 v68</div></div></div>
+          <div class="alert-i"><div class="ico" style="background:#EEF0F3;color:#4A5160"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12" y2="16"></line></svg></div><div><div class="t">구역 · 게이트웨이 미할당 농장 2곳</div><div class="d">test2, 테스터</div></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">게이트웨이 상태 <a href="04-gateways.html" style="font-size:12px;font-weight:500">게이트웨이 관리 →</a></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>게이트웨이</th><th>농장</th><th>연결 구역</th><th>Agent</th><th>Zigbee</th><th>SSH</th><th>페일오버</th><th>마지막 하트비트</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><b>hk-house</b> <span class="mono muted">hk-house</span></td><td>ohgane</td><td>하교하우스</td><td><span class="pill p-ok"><span class="led" style="background:#2E7D4F"></span>온라인</span></td><td><span class="pill p-ok">연결</span></td><td class="mono">:22202</td><td><span class="pill p-ok">ONLINE v68</span> <span class="pill p-warn">동기화 중</span></td><td class="mono">2026-10-03 07:31:35</td><td style="text-align:right;display:flex;gap:6px;justify-content:flex-end"><a class="btn btn-sm" href="04-gateways.html">터미널</a><a class="btn btn-sm" href="04-gateways.html">상세</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

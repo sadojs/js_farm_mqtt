@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 콘솔 디자인 시안</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; background: #E9EBEE; color: #1A1D23; }
+  header { background: #141821; color: #fff; padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0; }
+  header p { margin: 0; font-size: 12px; color: #8A93A3; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #E3E6EA; align-items: center; }
+  .bar button { font: inherit; font-size: 13px; height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid #D5D9DF; background: #fff; cursor: pointer; }
+  .bar button.on { background: #1A1D23; color: #fff; border-color: #1A1D23; }
+  .bar .sep { width: 1px; height: 24px; background: #E3E6EA; margin: 0 4px; }
+  .bar a { font-size: 13px; margin-left: auto; }
+  .stage { padding: 20px; overflow: auto; }
+  .frame { margin: 0 auto; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12); transition: width .2s; }
+  iframe { display: block; width: 100%; height: 900px; border: 0; }
+  .note { font-size: 12px; color: #5B6270; text-align: center; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>스마트팜 플랫폼 관리자 콘솔 — 디자인 시안</h1>
+  <p>다크 사이드바 + 밝은 본문 · PC/태블릿 반응형 · 데이터는 2026-10-03 스냅샷</p>
+</header>
+<div class="bar" id="pages">
+  <button data-p="01-overview.html" class="on">01 플랫폼 개요</button>
+  <button data-p="02-users.html">02 사용자</button>
+  <button data-p="03-farms.html">03 농장</button>
+  <button data-p="04-gateways.html">04 게이트웨이</button>
+  <button data-p="05-farm-view.html">05 농장 보기</button>
+  <span class="sep"></span>
+  <button data-w="1440" class="on" data-kind="w">PC 1440</button>
+  <button data-w="1180" data-kind="w">태블릿 가로 1180</button>
+  <button data-w="820" data-kind="w">태블릿 세로 820</button>
+  <a id="open" href="01-overview.html" target="_blank" rel="noopener">새 탭에서 열기 ↗</a>
+</div>
+<div class="stage">
+  <div class="frame" id="frame" style="width:1440px"><iframe id="ifr" src="01-overview.html" title="시안 미리보기"></iframe></div>
+  <div class="note" id="note">1440px</div>
+</div>
+<script>
+  const ifr = document.getElementById('ifr'), frame = document.getElementById('frame'), note = document.getElementById('note'), open = document.getElementById('open');
+  document.querySelectorAll('#pages button').forEach(b => b.addEventListener('click', () => {
+    const group = b.dataset.kind === 'w' ? '[data-kind="w"]' : '[data-p]';
+    document.querySelectorAll('#pages button' + group).forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    if (b.dataset.p) { ifr.src = b.dataset.p; open.href = b.dataset.p; }
+    if (b.dataset.w) { frame.style.width = b.dataset.w + 'px'; note.textContent = b.dataset.w + 'px'; }
+  }));
+</script>
+</body>
+</html>
