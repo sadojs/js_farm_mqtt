@@ -190,12 +190,18 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { sensorAlertsApi, type SensorAlert, type SensorEntry, type AlertDetail } from '../api/sensor-alerts.api'
 import { useNotificationStore } from '../stores/notification.store'
 
 const notificationStore = useNotificationStore()
+const route = useRoute()
 
-const activeTab = ref('sensors')
+// 푸시 알림 탭 등에서 ?tab=alerts 로 들어오면 해당 탭을 바로 연다
+const initialTab = ['sensors', 'alerts', 'standby'].includes(route.query.tab as string)
+  ? (route.query.tab as string)
+  : 'sensors'
+const activeTab = ref(initialTab)
 const loading = ref(true)
 const sensorsLoading = ref(true)
 const alerts = ref<SensorAlert[]>([])

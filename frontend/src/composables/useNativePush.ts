@@ -11,6 +11,19 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import apiClient from '../api/client'
+import router from '../router'
+
+/** 알림 data.type → 이동할 앱 내 경로. 현재 푸시는 모두 이상 알림 계열이라 알림 화면으로. */
+function routeForPush(data: Record<string, any>): string {
+  const type = String(data?.type || '')
+  switch (type) {
+    case 'gateway_offline':
+    case 'sensor_offline':
+    case 'actuator_offline':
+    default:
+      return '/alerts?tab=alerts'
+  }
+}
 
 export const isNativeApp = () => Capacitor.isNativePlatform()
 
@@ -60,9 +73,19 @@ export async function initNativePush(): Promise<void> {
       console.error('[push] 토큰 발급 실패:', JSON.stringify(err))
     })
 
-    // 3) 백그라운드에서 도착한 알림을 탭했을 때
+    // 3) 백그라운드에서 도착한 알림을 탭했을 때 → 관련 화면(이상 알림)으로 이동
     await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('[push] 알림 탭:', JSON.stringify(action.notification?.data ?? {}))
+      const data = action.notification?.data ?? {}
+      console.log('[push] 알림 탭:', JSON.stringify(data))
+      const target = routeForPush(data)
+      try {
+        // 콜드 스타트 시 라우터 초기화 직후 이동이 유실되지 않도록 다음 틱에 push
+        setTimeout(() => {
+          if (router.currentRoute.value.path !== target) void router.push(target)
+        }, 300)
+      } catch (e) {
+        console.warn('[push] 알림 탭 라우팅 실패(무시):', e)
+      }
     })
 
     // 4) 앱이 포그라운드인 동안 수신 — 인앱 알림(Socket.io)과 중복되므로 로그만 남긴다.
