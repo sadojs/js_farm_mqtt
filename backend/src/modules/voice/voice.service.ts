@@ -116,19 +116,13 @@ export class VoiceService {
 
   private async askClaude(prompt: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      // 프로젝트 디렉터리의 .claude/settings.local.json 에 누적된 잘못된 권한 규칙이 claude CLI 를
-      // 시작 시 죽이는 것을 피하기 위해, 프로젝트 설정을 로드하지 않는 임시 디렉터리에서 실행한다.
-      const os = require('os');
-      const path = require('path');
-      const fs = require('fs');
-      const cwd = path.join(os.tmpdir(), 'smartfarm-voice-ai');
-      try { fs.mkdirSync(cwd, { recursive: true }); } catch { /* noop */ }
-
+      // claude CLI 인증은 프로젝트 디렉터리 기준이라 cwd 를 바꾸면 'Not logged in' 이 되므로
+      // 프로젝트 cwd 에서 실행한다. 단, 프로젝트 .claude/settings.local.json 에 잘못된 권한 규칙이
+      // 누적되면 claude 가 시작 시 종료코드 1 로 죽으니 해당 파일을 깨끗하게 유지해야 한다.
       const child = require('child_process').spawn(
         'claude',
         ['-p', '--model', 'sonnet', '--output-format', 'text'],
         {
-          cwd,
           timeout: 30000,
           env: { ...process.env, LANG: 'ko_KR.UTF-8' },
         },
