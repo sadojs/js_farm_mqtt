@@ -53,8 +53,11 @@ export class SensorAlertsService {
     const title = this.alertTitle(sensorType, severity);
     const message = a.message || '';
     // 실시간 — 알림센터/토스트 (user room)
+    // 프론트 알림센터(종)는 type 이 'error'|'warning' 일 때만 영구 보관하므로,
+    // sensorType(gateway_offline 등)이 아니라 심각도를 UI 타입으로 매핑해 보낸다.
+    const uiType = severity === 'critical' ? 'error' : 'warning';
     try {
-      this.eventsGateway.sendNotification(a.userId, { type: sensorType, title, message });
+      this.eventsGateway.sendNotification(a.userId, { type: uiType, title, message });
     } catch (e) {
       this.logger.error(`[Alert Deliver] 웹소켓 전송 실패: ${(e as Error).message}`);
     }
