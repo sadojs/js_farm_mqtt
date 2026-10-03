@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as http2 from 'http2';
+import * as fs from 'fs';
 import * as jwt from 'jsonwebtoken';
 import { App, cert, getApp, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
@@ -26,19 +27,21 @@ export interface SendResult {
  *
  *  APNs (iOS):
  *    APNS_KEY_P8      - .p8 인증키 내용(개행은 \n 이스케이프 허용)
+ *    APNS_KEY_P8_PATH - (대안) .p8 파일 경로. 위 값 미설정 시 이 파일을 읽음
  *    APNS_KEY_ID      - 10자 Key ID
  *    APNS_TEAM_ID     - 10자 Team ID
  *    APNS_BUNDLE_ID   - (선택) 기본 com.jeongseokoh.smartfarm
  *    APNS_PRODUCTION  - 'true'면 운영 APNs, 아니면 sandbox
  *
  *  FCM (Android):
- *    FIREBASE_SERVICE_ACCOUNT - 서비스계정 JSON 문자열
+ *    FIREBASE_SERVICE_ACCOUNT      - 서비스계정 JSON 문자열(한 줄)
+ *    FIREBASE_SERVICE_ACCOUNT_PATH - (대안) 서비스계정 JSON 파일 경로. 위 값 미설정 시 읽음
  */
 @Injectable()
 export class PushSenderService {
   private readonly logger = new Logger(PushSenderService.name);
 
-  private readonly apnsKey = process.env.APNS_KEY_P8?.replace(/\\n/g, '\n');
+  private readonly apnsKey = PushSenderService.envOrFile('APNS_KEY_P8', 'APNS_KEY_P8_PATH')?.replace(/\\n/g, '\n');
   private readonly apnsKeyId = process.env.APNS_KEY_ID;
   private readonly apnsTeamId = process.env.APNS_TEAM_ID;
   private readonly apnsBundleId = process.env.APNS_BUNDLE_ID || 'com.jeongseokoh.smartfarm';
@@ -51,6 +54,21 @@ export class PushSenderService {
   private fcmApp: App | null = null;
   private fcmConfigured = false;
 
+  /** env 값이 있으면 그 값을, 없고 *_PATH 가 가리키는 파일이 있으면 그 파일 내용을 반환. */
+  private static envOrFile(valKey: string, pathKey: string): string | undefined {
+    const direct = process.env[valKey];
+    if (direct) return direct;
+    const path = process.env[pathKey];
+    if (path) {
+      try {
+        return fs.readFileSync(path, 'utf8').trim();
+      } catch (e) {
+        new Logger(PushSenderService.name).error(`${pathKey} 파일 읽기 실패(${path}): ${(e as Error).message}`);
+      }
+    }
+    return undefined;
+  }
+
   constructor() {
     this.initFcm();
     if (!this.apnsConfigured) {
@@ -62,7 +80,7 @@ export class PushSenderService {
   }
 
   private initFcm(): void {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const raw = PushSenderService.envOrFile('FIREBASE_SERVICE_ACCOUNT', 'FIREBASE_SERVICE_ACCOUNT_PATH');
     if (!raw) return;
     try {
       const svc = JSON.parse(raw);
