@@ -1,0 +1,14 @@
+# 빌드 컨텍스트는 저장소 루트(기존 frontend/src 를 함께 빌드하기 위해).
+# 이 파일은 admin-console/Dockerfile 전용 ignore (BuildKit). 루트 .dockerignore 는 만들지 않는다.
+**
+!admin-console/package.json
+!admin-console/package-lock.json
+!admin-console/index.html
+!admin-console/vite.config.ts
+!admin-console/tsconfig.json
+!admin-console/tsconfig.node.json
+!admin-console/nginx.conf
+!admin-console/public/**
+!admin-console/src/**
+!frontend/src/**
+!frontend/public/**

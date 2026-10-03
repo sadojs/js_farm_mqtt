@@ -1,0 +1,5 @@
+node_modules
+dist
+# 루트 .gitignore 는 package-lock.json 을 무시하지만, 콘솔은 재현 가능한 Docker 빌드(npm ci)를 위해 lockfile 을 커밋한다.
+!package-lock.json
+docs/screenshots/*.tmp.png
