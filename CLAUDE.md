@@ -126,6 +126,18 @@ frontend/src/
 - Refresh token in DB with expiration
 - Guards: JwtAuthGuard, RolesGuard
 
+### 관리자 농장 컨텍스트 (`X-Farm-Context`, 옵트인)
+
+- 플랫폼 관리자(`admin`)가 요청 헤더 `X-Farm-Context: <farm_admin userId>` 를 보내면 그 요청은 **그 농장 관리자로 로그인한 것과 동일**하게 처리된다(전역 인터셉터 `backend/src/common/farm-context/`). 관리자 콘솔(`admin-console/`)의 "농장 보기"가 사용한다.
+- **헤더가 없으면 기존과 100% 동일** — 기존 frontend·모바일 앱·RPi agent 는 헤더를 보내지 않는다.
+- 규칙: 비관리자+헤더 → 403 `FARM_CONTEXT_FORBIDDEN` / 잘못된 대상 → 400 `FARM_CONTEXT_INVALID`·`FARM_CONTEXT_NOT_FARM_ADMIN`·`FARM_CONTEXT_INACTIVE`, 404 `FARM_CONTEXT_NOT_FOUND` / 공개 라우트는 헤더 무시 / 적용 시 응답 헤더 `X-Farm-Context-Applied: <farmId>`(플랫폼 라우트는 `none`).
+- **플랫폼 전용 라우트**(헤더가 있어도 원래 admin 으로 실행): `@Roles` 에 `farm_admin` 이 없는 라우트(자동) + `@PlatformScope()` 표시 — auth·users·notifications·config-deploy·fallback-config 전체, `PATCH /features/:feature`, `GET /features/users/:id`, `PATCH /features/:feature/users/:id`, crop-management 의 `feature`·`feature/users/:id`·`feature/all`·`climate-normals/refresh`, `GET /worker-payroll/me`, `POST·PUT·DELETE /gateways`, `PATCH /gateways/:id/zone`.
+  - 새 라우트가 **본인 정보·플랫폼 운영 기능**이면 `@PlatformScope()` 를 붙일 것. 핸들러 안에서 `role !== 'admin'` 으로 직접 막는 라우트는 특히 필수(교체 후 403 이 됨).
+- 감사: 농장 컨텍스트 쓰기는 activity-log `details.actingAdminId`/`actingAdminUsername`/`farmContext:true` 에 실제 수행자가 남는다(스키마 변경 없음).
+- 소켓(옵트인): admin 이 `subscribe:farm {farmId}` → `admins` room 퇴장 + `user:<farmId>` 입장(`farm:joined`), `unsubscribe {channel:'farm'}` → 복귀(`farm:left`), 실패 `farm:error {code}`.
+- 계약서: `admin-console/docs/FARM_SCOPE_DESIGN.md`. 테스트: `cd backend && npm test` (일회용 `*_test` DB 자동 생성·삭제, MQTT mock — 실제 DB·브로커 미접속).
+- 롤백: 이 기능 커밋들을 `git revert` 하면 끝(DB 스키마 변경 없음, 헤더를 안 보내는 기존 클라이언트는 영향 없음).
+
 ## Sensor Types
 
 temperature, humidity, co2, illuminance_lux, soil_moisture, soil_temperature,
