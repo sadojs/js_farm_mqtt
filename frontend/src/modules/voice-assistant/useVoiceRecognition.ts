@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { Capacitor } from '@capacitor/core'
 
 // Web Speech API 타입 (브라우저 내장)
 declare global {
@@ -10,7 +11,11 @@ declare global {
 
 export function useVoiceRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  const isSupported = !!SpeechRecognition
+  // 네이티브 앱(Capacitor WebView)은 Web Speech API 음성인식을 지원하지 않는다(WebView엔 음성 서비스 미연결 →
+  // webkitSpeechRecognition.start() 가 'not-allowed' 로 실패). 그래서 앱에선 네이티브 플러그인
+  // (@capacitor-community/speech-recognition: Android SpeechRecognizer / iOS SFSpeechRecognizer)을 쓴다.
+  const isNative = Capacitor.isNativePlatform()
+  const isSupported = isNative || !!SpeechRecognition
 
   const isListening = ref(false)
   const transcript = ref('')
@@ -18,9 +23,78 @@ export function useVoiceRecognition() {
 
   let recognition: any = null
 
+  // ── 네이티브(Capacitor) 경로 ──
+  let nativeSpeech: any = null
+  let nativePartialH: any = null
+  let nativeStateH: any = null
+  let nativeFinish: ((ok: boolean) => void) | null = null
+
+  async function loadNativeSpeech() {
+    if (!nativeSpeech) {
+      const mod = await import('@capacitor-community/speech-recognition')
+      nativeSpeech = mod.SpeechRecognition
+    }
+    return nativeSpeech
+  }
+
+  async function startNative(): Promise<string> {
+    const Speech = await loadNativeSpeech()
+    let perm = await Speech.checkPermissions().catch(() => ({ speechRecognition: 'prompt' }))
+    if (perm.speechRecognition !== 'granted') {
+      perm = await Speech.requestPermissions().catch(() => ({ speechRecognition: 'denied' }))
+    }
+    if (perm.speechRecognition !== 'granted') {
+      throw new Error('마이크 권한이 필요합니다. 설정 > 앱 권한에서 마이크를 허용해주세요.')
+    }
+
+    isListening.value = true
+    transcript.value = ''
+    interimText.value = ''
+
+    return new Promise<string>((resolve, reject) => {
+      let last = ''
+      let settled = false
+      const finish = (ok: boolean) => {
+        if (settled) return
+        settled = true
+        isListening.value = false
+        nativePartialH?.remove?.(); nativePartialH = null
+        nativeStateH?.remove?.(); nativeStateH = null
+        nativeFinish = null
+        if (ok && last) { transcript.value = last; resolve(last) }
+        else reject(new Error('음성을 인식하지 못했습니다.'))
+      }
+      nativeFinish = finish
+      ;(async () => {
+        nativePartialH = await Speech.addListener('partialResults', (data: any) => {
+          const m = data?.matches?.[0]
+          if (m) { last = m; interimText.value = m }
+        })
+        nativeStateH = await Speech.addListener('listeningState', (data: any) => {
+          if (data?.status === 'stopped') finish(true)
+        })
+        try {
+          await Speech.start({ language: 'ko-KR', partialResults: true, popup: false, maxResults: 1 })
+        } catch {
+          finish(false)
+        }
+      })()
+    })
+  }
+
+  async function stopNative() {
+    try {
+      const Speech = await loadNativeSpeech()
+      await Speech.stop()
+    } catch { /* noop */ }
+    // listeningState 'stopped' 이벤트가 안 오는 기기 대비 폴백
+    setTimeout(() => nativeFinish?.(true), 600)
+  }
+
   function startListening(): Promise<string> {
+    if (isNative) return startNative()
     return new Promise((resolve, reject) => {
-      if (!isSupported) {
+      if (!SpeechRecognition) {
         reject(new Error('음성 인식을 지원하지 않는 브라우저입니다.'))
         return
       }
@@ -75,6 +149,10 @@ export function useVoiceRecognition() {
   }
 
   function stopListening() {
+    if (isNative) {
+      void stopNative()
+      return
+    }
     if (recognition) {
       recognition.stop()
       isListening.value = false
