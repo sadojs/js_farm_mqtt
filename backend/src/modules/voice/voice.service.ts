@@ -61,7 +61,7 @@ export class VoiceService {
       }
 
       // 3. 실행이 필요한 액션만 처리
-      const result = await this.executeAction(effectiveUserId, parsed);
+      const result = await this.executeAction(effectiveUserId, parsed, user?.role);
 
       // 4. 장치 제어 성공 시 별칭 학습
       if (result.success && parsed.action === 'control' && parsed.deviceId) {
@@ -220,6 +220,12 @@ export class VoiceService {
       ? context.workBoard.map((w: any) => `  - ${w.task} | ${w.zoneName} | ${w.elapsedDays}일 전 (마지막 ${w.lastDoneAt})`).join('\n')
       : '  (농작업 기록 없음)';
 
+    const protectionInfo = (context.protectionHouses || []).length > 0
+      ? context.protectionHouses.map((h: any) =>
+          `  - ID: ${h.id} | 이름: "${h.name}" | 개폐기 ${h.hasOpeners ? '있음' : '없음'} | 유동팬 ${h.hasFans ? '있음' : '없음'} | ${h.active ? `방재 중 (남은 ${h.remainingMinutes}분)` : '대기'}`,
+        ).join('\n')
+      : '  (방재 가능한 하우스 없음)';
+
     const now = new Date();
     const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const currentTime = `${kstTime.getUTCFullYear()}-${String(kstTime.getUTCMonth() + 1).padStart(2, '0')}-${String(kstTime.getUTCDate()).padStart(2, '0')} ${String(kstTime.getUTCHours()).padStart(2, '0')}:${String(kstTime.getUTCMinutes()).padStart(2, '0')} KST`;
@@ -260,7 +266,22 @@ ${sprayInfo}
 농작업 상태 (구역별 작업 마지막 경과일, 오래된 순):
 ${workInfo}
 
+방재 모드 대상 하우스 (개폐기 닫기·유동팬 정지 밀폐 타이머):
+${protectionInfo}
+
 === 실행 규칙 ===
+
+방재 모드 (하우스 밀폐 타이머 — 위 '방재일정'(약품 살포 일정)과 다른 기능):
+- 하우스 이름 + 시간과 함께 방재를 "해줘/돌려/시작/켜/동작시켜" → protection_start
+  예: "하교하우스 방재 1시간 동작시켜줘" → groupId=하교하우스 ID, durationMinutes=60
+- 시간은 분으로 환산 (1시간=60, 30분=30, 1시간 반=90, 2시간=120). 허용 범위 1~720분(12시간), 벗어나면 chat으로 안내
+- 시간을 말하지 않았으면 실행하지 말고 chat으로 "몇 시간 동안 할까요?"라고 질문
+- 하우스는 반드시 '방재 모드 대상 하우스' 목록의 ID만 사용. 특정이 안 되거나 애매하면 chat으로 질문
+- 기본은 개폐기 닫기 + 유동팬 정지 둘 다. "개폐기만" → stopFans:false, "팬만/유동팬만" → closeOpeners:false
+- "방재 연장", "30분 더" → protection_extend (addMinutes 기본 30)
+- "방재 꺼/중지/정지/그만/해제" → protection_stop
+- "방재 중이야?", "방재 얼마 남았어?" → 위 상태로 chat 답변
+- "오늘 방재 있어?", "방재 언제야?"처럼 일정을 묻는 건 방재일정 chat 답변 (방재 모드 아님)
 
 장치 제어:
 - "팬 켜", "개폐기 열어" → control (장치 직접 ON/OFF)
@@ -332,13 +353,22 @@ ${workInfo}
 자동화 룰 생성: {"action":"create_rule","name":"룰 이름","deviceType":"fan|irrigation|opener","startTime":"HH:MM","command":"on|off","daysOfWeek":[0,1,2,3,4,5,6],"duration":30,"speech":"응답"}
 자동화 룰 수정: {"action":"update_rule","ruleId":"UUID","updates":{"startTime":"HH:MM"},"speech":"응답"}
 다중 장치 제어: {"action":"bulk_control","deviceIds":["UUID1","UUID2"],"command":"on|off","speech":"응답"}
+방재 시작: {"action":"protection_start","groupId":"UUID","durationMinutes":60,"closeOpeners":true,"stopFans":true,"speech":"응답"}
+방재 연장: {"action":"protection_extend","groupId":"UUID","addMinutes":30,"speech":"응답"}
+방재 해제: {"action":"protection_stop","groupId":"UUID","speech":"응답"}
 그 외 모든 질문/대화/조언: {"action":"chat","speech":"데이터 기반 답변"}
 
 농부의 명령: "${text}"`;
   }
 
-  private async executeAction(effectiveUserId: string, parsed: any): Promise<VoiceResponse> {
+  private async executeAction(effectiveUserId: string, parsed: any, role?: string): Promise<VoiceResponse> {
     switch (parsed.action) {
+      case 'protection_start':
+        return this.handleProtectionStart(effectiveUserId, parsed, role);
+      case 'protection_extend':
+        return this.handleProtectionExtend(effectiveUserId, parsed, role);
+      case 'protection_stop':
+        return this.handleProtectionStop(effectiveUserId, parsed, role);
       case 'control':
         return this.handleControl(effectiveUserId, parsed.deviceId, parsed.command, parsed.speech);
       case 'automation_toggle':
@@ -355,6 +385,95 @@ ${workInfo}
         return { success: true, speech: parsed.speech || '무엇을 도와드릴까요?' };
       default:
         return { success: true, speech: parsed.speech || '명령을 이해하지 못했어요.' };
+    }
+  }
+
+  // ── 방재 모드 (하우스 밀폐 타이머) ──
+  // 응답 문구는 LLM speech 가 아니라 실제 처리 결과로 만든다(실패를 성공처럼 말하지 않도록).
+
+  private kstHm(iso: string): string {
+    const k = new Date(new Date(iso).getTime() + 9 * 3600000);
+    const h = k.getUTCHours();
+    const m = k.getUTCMinutes();
+    return `${h < 12 ? '오전' : '오후'} ${h % 12 || 12}시${m ? ` ${m}분` : ''}`;
+  }
+
+  private fmtMinutes(min: number): string {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return [h ? `${h}시간` : '', m ? `${m}분` : ''].filter(Boolean).join(' ') || '0분';
+  }
+
+  private protectionError(e: any, fallback: string): string {
+    const msg = e?.response?.message || e?.message;
+    if (e?.status === 404 || /찾을 수 없/.test(msg || '')) return '해당 하우스를 찾을 수 없어요.';
+    return typeof msg === 'string' && /[가-힣]/.test(msg) ? msg : fallback;
+  }
+
+  private async houseName(effectiveUserId: string, groupId: string): Promise<string> {
+    const groups = await this.groupsService.findAllGroups(effectiveUserId).catch(() => [] as any[]);
+    return (groups || []).find((g: any) => g.id === groupId)?.name || '하우스';
+  }
+
+  private async handleProtectionStart(effectiveUserId: string, parsed: any, role?: string): Promise<VoiceResponse> {
+    const action = 'protection_start';
+    if (role === 'farm_user') return { success: false, speech: '방재 모드는 관리자만 실행할 수 있어요.', action };
+    if (!parsed.groupId) return { success: true, speech: parsed.speech || '어느 하우스를 방재할까요?', action };
+    const minutes = Math.round(Number(parsed.durationMinutes));
+    if (!minutes) return { success: true, speech: parsed.speech || '몇 시간 동안 방재할까요?', action };
+    try {
+      const name = await this.houseName(effectiveUserId, parsed.groupId);
+      const r = await this.groupsService.startProtection(parsed.groupId, effectiveUserId, {
+        durationMinutes: minutes,
+        closeOpeners: parsed.closeOpeners !== false,
+        stopFans: parsed.stopFans !== false,
+      });
+      const { openers, fans } = r.applied;
+      if (!openers && !fans) {
+        return { success: false, speech: `${name}에는 방재로 제어할 개폐기나 유동팬이 없어요.`, action };
+      }
+      const parts = [openers ? `개폐기 ${openers}개 닫기` : '', fans ? `유동팬 ${fans}개 정지` : ''].filter(Boolean);
+      return {
+        success: true,
+        speech: `${name} 방재를 ${this.fmtMinutes(minutes)} 동안 시작했어요. ${parts.join(', ')}. ${this.kstHm(r.until)}에 자동으로 해제되고, 그동안 자동제어는 멈춥니다.`,
+        action,
+        data: { groupId: parsed.groupId, until: r.until },
+      };
+    } catch (e: any) {
+      return { success: false, speech: this.protectionError(e, '방재 시작에 실패했어요.'), action };
+    }
+  }
+
+  private async handleProtectionExtend(effectiveUserId: string, parsed: any, role?: string): Promise<VoiceResponse> {
+    const action = 'protection_extend';
+    if (role === 'farm_user') return { success: false, speech: '방재 모드는 관리자만 실행할 수 있어요.', action };
+    if (!parsed.groupId) return { success: true, speech: parsed.speech || '어느 하우스의 방재를 연장할까요?', action };
+    const add = Math.round(Number(parsed.addMinutes)) || 30;
+    try {
+      const name = await this.houseName(effectiveUserId, parsed.groupId);
+      const r = await this.groupsService.extendProtection(parsed.groupId, effectiveUserId, { addMinutes: add });
+      return {
+        success: true,
+        speech: `${name} 방재를 ${this.fmtMinutes(add)} 연장했어요. ${this.kstHm(r.until)}에 해제됩니다.`,
+        action,
+        data: { groupId: parsed.groupId, until: r.until },
+      };
+    } catch (e: any) {
+      return { success: false, speech: this.protectionError(e, '방재 연장에 실패했어요.'), action };
+    }
+  }
+
+  private async handleProtectionStop(effectiveUserId: string, parsed: any, role?: string): Promise<VoiceResponse> {
+    const action = 'protection_stop';
+    if (role === 'farm_user') return { success: false, speech: '방재 모드는 관리자만 실행할 수 있어요.', action };
+    if (!parsed.groupId) return { success: true, speech: parsed.speech || '어느 하우스의 방재를 해제할까요?', action };
+    try {
+      const name = await this.houseName(effectiveUserId, parsed.groupId);
+      const r = await this.groupsService.cancelProtection(parsed.groupId, effectiveUserId);
+      if (!r.cancelled) return { success: true, speech: `${name}은 진행 중인 방재가 없어요.`, action };
+      return { success: true, speech: `${name} 방재를 해제했어요. 자동제어가 다시 동작합니다.`, action };
+    } catch (e: any) {
+      return { success: false, speech: this.protectionError(e, '방재 해제에 실패했어요.'), action };
     }
   }
 
@@ -694,6 +813,18 @@ ${workInfo}
       }))
       .sort((a, b) => b.elapsedDays - a.elapsedDays); // 오래된 작업 먼저
 
+    // 방재 모드 대상 하우스: 개폐기/유동팬이 있는 구역만 + 현재 방재 상태
+    const protectionHouses = (await Promise.all(
+      (groups || []).map(async (g: any) => {
+        const acts = (g.devices || []).filter((d: any) => d.deviceType === 'actuator');
+        const hasOpeners = acts.some((d: any) => d.equipmentType === 'opener_open' || d.equipmentType === 'opener_close');
+        const hasFans = acts.some((d: any) => d.equipmentType === 'fan');
+        if (!hasOpeners && !hasFans) return null;
+        const st: any = await this.groupsService.getProtection(g.id, effectiveUserId).catch(() => ({ active: false }));
+        return { id: g.id, name: g.name, hasOpeners, hasFans, active: !!st.active, remainingMinutes: st.remainingMinutes ?? null };
+      }),
+    )).filter(Boolean);
+
     // 최근 알림 가공
     const recentAlerts = (alertsResult.data || []).slice(0, 10).map((a: any) => ({
       time: new Date(a.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -718,6 +849,7 @@ ${workInfo}
       recentAlerts,
       spraySchedule,
       workBoard,
+      protectionHouses,
       aliases: this.formatAliases(user?.voiceAliases),
     };
   }
