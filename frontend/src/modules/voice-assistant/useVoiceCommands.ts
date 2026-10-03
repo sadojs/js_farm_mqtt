@@ -14,7 +14,8 @@ export function useVoiceCommands() {
   const isProcessing = ref(false)
 
   async function callApi(text: string) {
-    return apiClient.post('/voice/command', { text }, { timeout: 30000 })
+    // 서버 AI 응답이 보통 20~25초, 최대 50초 → 그보다 길게 대기
+    return apiClient.post('/voice/command', { text }, { timeout: 60000 })
   }
 
   async function sendCommand(text: string): Promise<string> {
@@ -37,8 +38,9 @@ export function useVoiceCommands() {
         const res = await callApi(text)
         data = res.data
       } catch (firstError: any) {
-        // 타임아웃/네트워크 에러 시 1회 재시도
-        if (firstError.code === 'ECONNABORTED' || !firstError.response) {
+        // 네트워크 에러(요청이 서버에 안 닿음)만 1회 재시도.
+        // 타임아웃은 서버가 이미 명령을 실행했을 수 있어 재전송하면 중복 실행(예: 방재 연장 2번)된다.
+        if (!firstError.response && firstError.code !== 'ECONNABORTED') {
           try {
             const res = await callApi(text)
             data = res.data

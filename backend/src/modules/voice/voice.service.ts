@@ -56,6 +56,8 @@ export class VoiceService {
       try {
         parsed = await this.askClaude(prompt);
       } catch (firstError) {
+        // 시간 초과(종료 코드 null = 타임아웃으로 kill)는 재시도해도 또 느려 응답만 늦어지므로 바로 실패 처리
+        if (/종료 코드 null/.test(firstError.message)) throw firstError;
         this.logger.warn(`Claude 1차 호출 실패, 재시도: ${firstError.message}`);
         parsed = await this.askClaude(prompt);
       }
@@ -123,8 +125,10 @@ export class VoiceService {
         'claude',
         ['-p', '--model', 'sonnet', '--output-format', 'text'],
         {
-          timeout: 30000,
-          env: { ...process.env, LANG: 'ko_KR.UTF-8' },
+          // CLI 기동만 ~10초 + 컨텍스트 포함 응답이 보통 20~25초라 30초는 경계값 → 여유 있게 50초
+          timeout: 50000,
+          // 확장 사고(thinking)는 명령 파싱에 불필요하고 지연만 늘리므로 끈다
+          env: { ...process.env, LANG: 'ko_KR.UTF-8', MAX_THINKING_TOKENS: '0' },
         },
       );
 
