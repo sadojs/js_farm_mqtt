@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
 const REFRESH_COOKIE = 'rft';
 const COOKIE_OPTIONS = {
@@ -32,6 +33,7 @@ function isAppClient(req: Request): boolean {
   return req.headers['x-client']?.toString().endsWith('-app') ?? false;
 }
 
+@PlatformScope()
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}

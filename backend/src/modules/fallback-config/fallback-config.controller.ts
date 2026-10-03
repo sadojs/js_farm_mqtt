@@ -19,7 +19,9 @@ import { UpdateFallbackConfigDto } from './dto/update-config.dto';
 import { UpsertOpenerScheduleDto } from './dto/upsert-opener-schedule.dto';
 import { MqttService } from '../mqtt/mqtt.service';
 import { HeartbeatService } from './heartbeat.service';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
+@PlatformScope()
 @Controller('fallback-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FallbackConfigController {

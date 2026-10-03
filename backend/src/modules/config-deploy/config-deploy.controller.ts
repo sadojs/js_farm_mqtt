@@ -18,10 +18,12 @@ import { spawn } from 'child_process';
 import { join, resolve as resolvePath } from 'path';
 import { existsSync } from 'fs';
 import type { Response } from 'express';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 import {
   CommonConfig, DeployResult, PreviewResult, RemoteConfigAccepted,
 } from './config-deploy.types';
 
+@PlatformScope()
 @Controller('config-deploy')
 export class ConfigDeployController {
   constructor(
