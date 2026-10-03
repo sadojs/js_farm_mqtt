@@ -1,5 +1,9 @@
 import { ref, onUnmounted } from 'vue'
 import { Capacitor } from '@capacitor/core'
+// 네이티브 음성인식 플러그인. 정적 import 사용(웹에선 호출 안 하면 무해).
+// ⚠️ async 함수가 이 플러그인 프록시를 resolve 값으로 반환하면 Capacitor 프록시의 .then 접근 때문에
+//    "SpeechRecognition.then() is not implemented" 오류가 난다 → 프록시를 await/return 하지 말 것.
+import { SpeechRecognition as NativeSpeech } from '@capacitor-community/speech-recognition'
 
 // Web Speech API 타입 (브라우저 내장)
 declare global {
@@ -24,24 +28,14 @@ export function useVoiceRecognition() {
   let recognition: any = null
 
   // ── 네이티브(Capacitor) 경로 ──
-  let nativeSpeech: any = null
   let nativePartialH: any = null
   let nativeStateH: any = null
   let nativeFinish: ((ok: boolean) => void) | null = null
 
-  async function loadNativeSpeech() {
-    if (!nativeSpeech) {
-      const mod = await import('@capacitor-community/speech-recognition')
-      nativeSpeech = mod.SpeechRecognition
-    }
-    return nativeSpeech
-  }
-
   async function startNative(): Promise<string> {
-    const Speech = await loadNativeSpeech()
-    let perm = await Speech.checkPermissions().catch(() => ({ speechRecognition: 'prompt' }))
+    let perm = await NativeSpeech.checkPermissions().catch(() => ({ speechRecognition: 'prompt' as const }))
     if (perm.speechRecognition !== 'granted') {
-      perm = await Speech.requestPermissions().catch(() => ({ speechRecognition: 'denied' }))
+      perm = await NativeSpeech.requestPermissions().catch(() => ({ speechRecognition: 'denied' as const }))
     }
     if (perm.speechRecognition !== 'granted') {
       throw new Error('마이크 권한이 필요합니다. 설정 > 앱 권한에서 마이크를 허용해주세요.')
@@ -66,15 +60,15 @@ export function useVoiceRecognition() {
       }
       nativeFinish = finish
       ;(async () => {
-        nativePartialH = await Speech.addListener('partialResults', (data: any) => {
+        nativePartialH = await NativeSpeech.addListener('partialResults', (data: any) => {
           const m = data?.matches?.[0]
           if (m) { last = m; interimText.value = m }
         })
-        nativeStateH = await Speech.addListener('listeningState', (data: any) => {
+        nativeStateH = await NativeSpeech.addListener('listeningState', (data: any) => {
           if (data?.status === 'stopped') finish(true)
         })
         try {
-          await Speech.start({ language: 'ko-KR', partialResults: true, popup: false, maxResults: 1 })
+          await NativeSpeech.start({ language: 'ko-KR', partialResults: true, popup: false, maxResults: 1 })
         } catch {
           finish(false)
         }
@@ -84,8 +78,7 @@ export function useVoiceRecognition() {
 
   async function stopNative() {
     try {
-      const Speech = await loadNativeSpeech()
-      await Speech.stop()
+      await NativeSpeech.stop()
     } catch { /* noop */ }
     // listeningState 'stopped' 이벤트가 안 오는 기기 대비 폴백
     setTimeout(() => nativeFinish?.(true), 600)
