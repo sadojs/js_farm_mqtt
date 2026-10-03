@@ -13,19 +13,29 @@ export class NotificationsService {
     private readonly sender: PushSenderService,
   ) {}
 
-  /** 앱에서 발급받은 디바이스 토큰 등록(upsert). 같은 토큰이 다른 사용자에게 있으면 재매핑. */
+  /**
+   * 앱에서 발급받은 디바이스 토큰 등록(upsert). 같은 토큰이 다른 사용자에게 있으면 재매핑.
+   * 앱 기동 시 registration 콜백이 두 번 울려(동시 등록) 중복 키(ux_device_tokens_token)로
+   * 500 이 나던 문제가 있어, 토큰 유니크 기준 원자적 upsert + 레이스 대비 재매핑으로 멱등화.
+   */
   async registerToken(userId: string, token: string, platform?: string) {
     if (!token) return { ok: false, reason: 'no-token' };
     const plat = platform === 'ios' || platform === 'android' ? platform : 'unknown';
-    const existing = await this.tokens.findOne({ where: { token } });
-    if (existing) {
-      existing.userId = userId;
-      existing.platform = plat;
-      await this.tokens.save(existing);
-    } else {
-      await this.tokens.save(this.tokens.create({ userId, token, platform: plat }));
+    try {
+      // token 유니크 제약 기준 원자적 upsert — 동시 요청이 와도 한쪽은 insert, 한쪽은 update 로 수렴
+      await this.tokens.upsert(
+        { userId, token, platform: plat },
+        { conflictPaths: ['token'] },
+      );
+      return { ok: true };
+    } catch (e) {
+      // 혹시 upsert 미지원/경합이 남아 중복 키가 터져도 토큰 매핑만 갱신하고 성공 처리(멱등)
+      if (/duplicate key|unique/i.test((e as Error).message)) {
+        await this.tokens.update({ token }, { userId, platform: plat });
+        return { ok: true, deduped: true };
+      }
+      throw e;
     }
-    return { ok: true };
   }
 
   async removeToken(token: string) {
