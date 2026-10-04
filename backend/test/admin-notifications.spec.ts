@@ -76,6 +76,21 @@ describe('알림 — 플랫폼 관리자용 문구 분리', () => {
     expect(got[0].title).toBe('[하교농장] 🔌 게이트웨이 오프라인');
   });
 
+  it('농장 사용자(하위 계정)도 소속 농장 알림·실시간 장비 상태를 농장용 문구로 받는다', async () => {
+    const member = await connect('u1');
+    const pn = collect(member);
+    const ps = new Promise<any[]>((resolve) => {
+      const got: any[] = [];
+      member.on('device:status', (p) => got.push(p));
+      setTimeout(() => resolve(got), 500);
+    });
+    gw.sendNotification(USERS.f1.id, alert);
+    gw.broadcastDeviceStatus(USERS.f1.id, 'dev-x', true);
+    gw.sendNotification(USERS.f2.id, alert); // 다른 농장 알림은 받지 않음
+    expect(await pn).toEqual([alert]);
+    expect((await ps).map((p) => p.deviceId)).toEqual(['dev-x']);
+  });
+
   it('다른 농장 알림도 관리자에게는 그 농장 이름으로 (farm_name 없으면 계정 이름)', async () => {
     const admin = await connect('admin');
     const pa = collect(admin);

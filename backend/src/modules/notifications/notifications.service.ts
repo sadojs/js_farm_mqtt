@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { DeviceToken } from './entities/device-token.entity';
 import { PushPayload, PushSenderService } from './push-sender.service';
 
@@ -11,6 +11,7 @@ export class NotificationsService {
   constructor(
     @InjectRepository(DeviceToken) private readonly tokens: Repository<DeviceToken>,
     private readonly sender: PushSenderService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -45,6 +46,30 @@ export class NotificationsService {
 
   getTokensForUser(userId: string) {
     return this.tokens.find({ where: { userId } });
+  }
+
+  /**
+   * 농장 전체(농장 관리자 + 활성 농장 사용자)의 모든 기기에 푸시 발송.
+   * 농장 알림(센서 이상·게이트웨이 오프라인 등)은 소속 계정 모두가 받는다.
+   */
+  async sendToFarm(farmOwnerId: string, payload: PushPayload) {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id FROM users WHERE (id::text = $1 OR parent_user_id::text = $1) AND status = 'active'`,
+      [farmOwnerId],
+    );
+    const ids = rows.map((r) => r.id);
+    if (!ids.length) return { sent: 0, total: 0, configured: this.sender.isConfigured(), reason: 'no-users' };
+    const list = await this.tokens.find({ where: { userId: In(ids) } });
+    if (!list.length) {
+      return { sent: 0, total: 0, configured: this.sender.isConfigured(), reason: 'no-tokens' };
+    }
+    const results = await this.sender.send(list, payload);
+    const dead = results.filter((r) => r.invalid).map((r) => r.token);
+    if (dead.length) {
+      await this.tokens.delete({ token: In(dead) });
+      this.logger.log(`무효 토큰 ${dead.length}건 정리`);
+    }
+    return { sent: results.filter((r) => r.ok).length, total: list.length, configured: this.sender.isConfigured(), results };
   }
 
   /**

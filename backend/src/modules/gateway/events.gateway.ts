@@ -66,6 +66,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       (client as any).role = payload.role;
       // 사용자별 전용 room 자동 입장
       client.join(`user:${payload.sub}`);
+      // 농장 사용자는 소속 농장(농장 관리자) room 에도 입장 — 농장 실시간 데이터·알림을 함께 받는다
+      // (데이터 소유자가 농장 관리자 id 라 모든 농장 이벤트가 user:<농장 관리자 id> 로 나간다)
+      if (payload.role === 'farm_user' && payload.parentUserId) {
+        client.join(`user:${payload.parentUserId}`);
+      }
       // 플랫폼 관리자(admin)는 별도 'admins' 룸에 입장 — 모든 사용자 데이터 수신
       if (payload.role === 'admin') {
         client.join('admins');
