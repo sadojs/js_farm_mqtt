@@ -190,7 +190,7 @@ const groupMode = ref<GroupMode>('farm')
 const query = ref('')
 const selectedId = ref<string | null>(null)
 
-const ownerName = (uid: string) => platform.userById(uid)?.name || '알 수 없음'
+const ownerName = (uid: string) => platform.ownerLabel(uid)
 const fo = (g: ConsoleGateway) => failover.byGatewayId.value[g.gatewayId]
 
 const tabs = computed(() => [

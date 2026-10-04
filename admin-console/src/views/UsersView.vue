@@ -68,14 +68,15 @@
           <div class="c-fields">
             <div class="c-field"><span class="c-k">이름</span><span class="c-v">{{ selected.name }}</span></div>
             <div class="c-field"><span class="c-k">역할</span><span class="c-v">{{ roleLabel(selected.role) }}</span></div>
-            <div v-if="selected.role === 'farm_user'" class="c-field" style="grid-column:1 / -1"><span class="c-k">소속 농장</span><span class="c-v">{{ selected.parentUserName || platform.userById(selected.parentUserId)?.name || '미지정' }}</span></div>
-            <div class="c-field" style="grid-column:1 / -1"><span class="c-k">주소 (날씨 기준 위치)</span><span class="c-v">{{ selected.address || '—' }}</span></div>
+            <div v-if="selected.role === 'farm_user'" class="c-field" style="grid-column:1 / -1"><span class="c-k">소속 농장</span><span class="c-v">{{ selected.parentFarmName || farmLabel(platform.userById(selected.parentUserId)) || '미지정' }}</span></div>
+            <div v-if="selected.role === 'farm_admin'" class="c-field" style="grid-column:1 / -1"><span class="c-k">농장 이름</span><span class="c-v">{{ farmLabel(selected) }}</span></div>
+            <div class="c-field" style="grid-column:1 / -1"><span class="c-k">{{ selected.role === 'farm_admin' ? '농장 위치 (날씨 기준)' : '주소' }}</span><span class="c-v">{{ selected.address || '—' }}</span></div>
           </div>
 
           <div class="c-sub-h">기능 권한</div>
           <div style="padding:0 16px 12px">
             <p v-if="selected.role === 'admin'" class="c-note">플랫폼 관리자는 모든 기능에 접근할 수 있습니다.</p>
-            <p v-else-if="selected.role === 'farm_user'" class="c-note">소속 농장({{ selected.parentUserName || '미지정' }}) 관리자의 설정을 상속합니다.</p>
+            <p v-else-if="selected.role === 'farm_user'" class="c-note">소속 농장({{ selected.parentFarmName || selected.parentUserName || '미지정' }}) 관리자의 설정을 상속합니다.</p>
             <template v-else>
               <div class="c-perm">
                 <div><div class="c-t">생육관리</div><div class="c-d">GDD 생육 추적 모듈</div></div>
@@ -140,7 +141,7 @@ import type { User } from '@/types/auth.types'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import CIcon from '@console/components/CIcon.vue'
 import GatewayFormModal from '@console/components/GatewayFormModal.vue'
-import { usePlatformStore, agentOnline, type ConsoleGateway } from '@console/stores/platform.store'
+import { usePlatformStore, farmLabel, agentOnline, type ConsoleGateway } from '@console/stores/platform.store'
 
 type Tab = 'all' | 'admin' | 'farm_admin' | 'farm_user'
 
@@ -172,8 +173,8 @@ function ago(iso: string): string {
   return h < 24 ? `${h}시간 전` : `${Math.floor(h / 24)}일 전`
 }
 function farmNameOf(u: User): string {
-  if (u.role === 'farm_admin') return u.name
-  if (u.role === 'farm_user') return u.parentUserName || platform.userById(u.parentUserId)?.name || ''
+  if (u.role === 'farm_admin') return farmLabel(u)
+  if (u.role === 'farm_user') return u.parentFarmName || farmLabel(platform.userById(u.parentUserId)) || ''
   return ''
 }
 
@@ -285,6 +286,7 @@ async function saveUser(data: any) {
   try {
     if (formUser.value?.id) {
       const payload: any = { name: data.name, address: data.address }
+      if (data.role === 'farm_admin') payload.farmName = data.farmName
       if (data.role) payload.role = data.role
       if (data.status) payload.status = data.status
       if (data.password) payload.password = data.password
@@ -303,6 +305,7 @@ async function saveUser(data: any) {
         name: data.name,
         role: data.role || 'farm_admin',
         address: data.address,
+        farmName: (data.role || 'farm_admin') === 'farm_admin' ? data.farmName : undefined,
         parentUserId: data.parentUserId,
       } as any)
       notif.success('생성 완료', `${data.name} 사용자가 추가되었습니다.`)

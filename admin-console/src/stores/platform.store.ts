@@ -54,6 +54,11 @@ export function gatewayIssue(gw: ConsoleGateway): string | null {
   return null
 }
 
+/** 농장 표시 이름 — farm_name(migration 051) 이 없으면 농장 관리자 계정 이름 */
+export function farmLabel(f: { farmName?: string | null; name: string } | null | undefined): string {
+  return f ? f.farmName || f.name : ''
+}
+
 export const usePlatformStore = defineStore('console-platform', () => {
   const users = ref<User[]>([])
   const farms = ref<FarmAdmin[]>([])
@@ -94,6 +99,8 @@ export const usePlatformStore = defineStore('console-platform', () => {
   const userById = (id: string | null | undefined) => users.value.find((u) => u.id === id) ?? null
   const groupsOfFarm = (farmId: string) => groups.value.filter((z) => z.userId === farmId)
   const gatewaysOfFarm = (farmId: string) => gateways.value.filter((gw) => gw.userId === farmId)
+  /** 소유자 id(농장 관리자 또는 플랫폼 관리자) → 농장 이름(없으면 계정 이름) */
+  const ownerLabel = (id: string | null | undefined) => farmLabel(farmById(id) || userById(id)) || '알 수 없음'
   const membersOfFarm = (farmId: string) => users.value.filter((u) => u.role === 'farm_user' && u.parentUserId === farmId)
 
   const counts = computed(() => ({
@@ -107,6 +114,6 @@ export const usePlatformStore = defineStore('console-platform', () => {
 
   return {
     users, farms, gateways, groups, loaded, loading, error, counts,
-    load, patchGatewayStatus, farmById, userById, groupsOfFarm, gatewaysOfFarm, membersOfFarm,
+    load, patchGatewayStatus, farmById, userById, ownerLabel, groupsOfFarm, gatewaysOfFarm, membersOfFarm,
   }
 })

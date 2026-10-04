@@ -32,8 +32,8 @@
             <thead><tr><th>농장</th><th>관리자 계정</th><th>구역</th><th>게이트웨이</th><th>구성원</th><th>상태</th><th /></tr></thead>
             <tbody>
               <tr v-for="f in farmRows" :key="f.id">
-                <td><b>{{ f.name }}</b></td>
-                <td class="c-mono">@{{ f.username }}</td>
+                <td><b>{{ farmLabel(f) }}</b></td>
+                <td>{{ f.name }} <span class="c-mono c-muted">@{{ f.username }}</span></td>
                 <td class="c-mono">{{ f.zones }}</td>
                 <td>
                   <span v-for="gw in f.gateways" :key="gw.id" class="c-pill" :class="gwOk(gw) ? 'c-p-ok' : 'c-p-warn'" style="margin-right:4px">
@@ -73,7 +73,7 @@
           <tbody>
             <tr v-for="gw in platform.gateways" :key="gw.id">
               <td><b>{{ gw.name }}</b> <span class="c-mono c-muted">{{ gw.gatewayId }}</span></td>
-              <td>{{ platform.farmById(gw.userId)?.name || platform.userById(gw.userId)?.name || '—' }}</td>
+              <td>{{ platform.ownerLabel(gw.userId) }}</td>
               <td>{{ gw.groupName || '—' }}</td>
               <td><span class="c-pill" :class="agentOnline(gw) ? 'c-p-ok' : 'c-p-bad'"><span class="c-led" :class="agentOnline(gw) ? 'c-led-ok' : 'c-led-warn'" />{{ agentOnline(gw) ? '온라인' : '오프라인' }}</span></td>
               <td><span class="c-pill" :class="gw.zigbeeStatus === 'online' ? 'c-p-ok' : 'c-p-off'">{{ gw.zigbeeStatus === 'online' ? '연결' : '미연결' }}</span></td>
@@ -106,7 +106,7 @@ import { computed, onMounted, ref } from 'vue'
 import apiClient from '@/api/client'
 import type { Device } from '@/types/device.types'
 import CIcon from '@console/components/CIcon.vue'
-import { usePlatformStore, agentOnline, tunnelConnected, gatewayOk as gwOk, gatewayIssue } from '@console/stores/platform.store'
+import { usePlatformStore, farmLabel, agentOnline, tunnelConnected, gatewayOk as gwOk, gatewayIssue } from '@console/stores/platform.store'
 import { useFailoverSummary, fmtDateTime } from '@console/composables/useFailoverSummary'
 import { PLATFORM_REQUEST } from '@console/farm/farmContext'
 
@@ -156,7 +156,7 @@ const farmRows = computed(() => platform.farms.map((f) => {
 const attention = computed(() => {
   const out: Array<{ tone: 'bad' | 'warn' | 'off'; icon: string; title: string; desc: string }> = []
   for (const d of sensorsOffline.value) {
-    out.push({ tone: 'bad', icon: 'wifioff', title: `${d.name} 오프라인`, desc: `${platform.farmById(d.userId)?.name || '—'} · 측정기` })
+    out.push({ tone: 'bad', icon: 'wifioff', title: `${d.name} 오프라인`, desc: `${platform.ownerLabel(d.userId)} · 측정기` })
   }
   for (const gw of platform.gateways) {
     const issue = gatewayIssue(gw)
@@ -166,7 +166,7 @@ const attention = computed(() => {
     else if (fo && fo.sync !== 'synced') out.push({ tone: 'warn', icon: 'refresh', title: '페일오버 설정 동기화 중', desc: `${gw.name} · RPi v${fo.appliedVersion ?? '—'} → 서버 v${fo.version}` })
   }
   const notReady = farmRows.value.filter((f) => !f.ready)
-  if (notReady.length) out.push({ tone: 'off', icon: 'info', title: `구역 · 게이트웨이 미할당 농장 ${notReady.length}곳`, desc: notReady.map((f) => f.name).join(', ') })
+  if (notReady.length) out.push({ tone: 'off', icon: 'info', title: `구역 · 게이트웨이 미할당 농장 ${notReady.length}곳`, desc: notReady.map((f) => farmLabel(f)).join(', ') })
   return out
 })
 </script>

@@ -23,8 +23,8 @@
             <thead><tr><th>농장</th><th>관리자 계정</th><th>구역</th><th>게이트웨이</th><th>구성원</th><th>상태</th><th v-if="pickSeg" /></tr></thead>
             <tbody>
               <tr v-for="f in rows" :key="f.id" class="c-click" :class="{ 'c-sel': f.id === selectedId }" tabindex="0" @click="select(f.id)" @keydown.enter="select(f.id)">
-                <td><b>{{ f.name }}</b></td>
-                <td class="c-mono">@{{ f.username }}</td>
+                <td><b>{{ farmLabel(f) }}</b></td>
+                <td>{{ f.name }} <span class="c-mono c-muted">@{{ f.username }}</span></td>
                 <td class="c-mono">{{ f.zones.length }}</td>
                 <td>
                   <span v-for="gw in f.gateways" :key="gw.id" class="c-pill" :class="gwOk(gw) ? 'c-p-ok' : 'c-p-warn'" style="margin-right:4px"><span class="c-led" :class="agentOnline(gw) ? 'c-led-ok' : 'c-led-warn'" />{{ gw.name }}</span>
@@ -44,8 +44,8 @@
         <template v-if="farm">
           <div class="c-detail-h" style="flex-wrap:wrap">
             <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:16px">{{ farm.name }}</b><span class="c-pill" :class="farm.ready ? 'c-p-ok' : 'c-p-warn'">{{ farm.ready ? '운영 중' : '설정 필요' }}</span></div>
-              <div class="c-mono c-muted" style="margin-top:2px">@{{ farm.username }}<template v-if="farmAddress"> · {{ farmAddress }}</template></div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:16px">{{ farmLabel(farm) }}</b><span class="c-pill" :class="farm.ready ? 'c-p-ok' : 'c-p-warn'">{{ farm.ready ? '운영 중' : '설정 필요' }}</span></div>
+              <div class="c-muted" style="margin-top:2px;font-size:12px">관리자 {{ farm.name }} <span class="c-mono">@{{ farm.username }}</span><template v-if="farmAddress"> · {{ farmAddress }}</template></div>
             </div>
             <router-link class="c-btn c-btn-sm" :to="`/users?select=${farm.id}`">계정</router-link>
             <button class="c-btn c-btn-pri" type="button" @click="openFarm(farm.id)"><CIcon name="eye" :size="14" />농장 보기</button>
@@ -128,7 +128,7 @@ import type { HouseGroupWithOwner } from '@/types/group.types'
 import CIcon from '@console/components/CIcon.vue'
 import { FARM_PAGES } from '@console/router'
 import { rememberFarm } from '@console/farm/farmContext'
-import { usePlatformStore, agentOnline, tunnelConnected, gatewayOk as gwOk, type ConsoleGateway } from '@console/stores/platform.store'
+import { usePlatformStore, farmLabel, agentOnline, tunnelConnected, gatewayOk as gwOk, type ConsoleGateway } from '@console/stores/platform.store'
 
 const platform = usePlatformStore()
 const notif = useNotificationStore()
@@ -156,7 +156,7 @@ const farmAddress = computed(() => platform.userById(farm.value?.id)?.address ||
 /** 기존 AdminFarmManagement 와 동일: 미할당 게이트웨이 전체(다른 농장 소유 포함) — 할당 시 소유권이 이 농장으로 이관됨 */
 const unassigned = computed(() => platform.gateways.filter((gw) => !gw.groupId))
 const zoneGateways = (zoneId: string) => platform.gateways.filter((gw) => gw.groupId === zoneId)
-const ownerName = (uid: string) => platform.userById(uid)?.name || '다른 계정'
+const ownerName = (uid: string) => platform.ownerLabel(uid)
 
 function select(id: string) {
   selectedId.value = id
@@ -164,7 +164,7 @@ function select(id: string) {
 }
 function openFarm(id: string) {
   const f = platform.farmById(id)
-  if (f) rememberFarm({ id: f.id, name: f.name, username: f.username })
+  if (f) rememberFarm({ id: f.id, name: farmLabel(f), username: f.username })
   router.push(`/farm/${id}/${pickSeg.value || 'dashboard'}`)
 }
 

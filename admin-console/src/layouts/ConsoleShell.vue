@@ -23,7 +23,7 @@
       <button class="c-farmpick" :class="{ active: !!activeFarm }" type="button" :aria-expanded="pickerOpen" @click="togglePicker">
         <template v-if="pickerFarm">
           <span class="c-led" :class="activeFarm ? 'c-led-ok' : 'c-led-off'" />
-          <b>{{ pickerFarm.name }}</b><span class="c-mono" style="font-size:11px;color:var(--c-side-muted)">@{{ pickerFarm.username }}</span>
+          <b>{{ farmLabel(pickerFarm) }}</b><span class="c-mono" style="font-size:11px;color:var(--c-side-muted)">@{{ pickerFarm.username }}</span>
         </template>
         <template v-else><CIcon name="search" :size="14" />농장을 선택하세요</template>
         <span class="c-chev">▾</span>
@@ -31,7 +31,7 @@
       <div v-if="pickerOpen" class="c-farmlist" role="listbox">
         <input ref="pickerInput" v-model="pickerQuery" placeholder="농장 이름·아이디 필터" aria-label="농장 필터" @keydown.esc="pickerOpen = false" />
         <button v-for="f in pickerResults" :key="f.id" type="button" :class="{ on: f.id === activeFarmId }" @click="enterFarm(f.id)">
-          <span class="c-led c-led-ok" />{{ f.name }}<span class="c-mono" style="margin-left:auto;font-size:11px;color:var(--c-side-muted)">@{{ f.username }}</span>
+          <span class="c-led c-led-ok" />{{ farmLabel(f) }}<span class="c-mono" style="margin-left:auto;font-size:11px;color:var(--c-side-muted)">@{{ f.username }}</span>
         </button>
         <div v-if="!pickerResults.length" class="c-mono" style="padding:8px 10px;font-size:12px;color:var(--c-side-muted)">결과 없음</div>
       </div>
@@ -52,7 +52,7 @@
     <main class="c-main">
       <div v-if="activeFarmId" class="c-ctxbar" role="status">
         <CIcon name="eye" :size="14" />
-        <span><b>{{ activeFarm?.name || '농장' }}</b> 농장을 관리자 권한으로 보는 중 — 여기서 하는 제어는 이 농장에 실제로 적용됩니다</span>
+        <span>농장 보기 <b>{{ farmLabel(activeFarm) || '농장' }}</b> — 관리자 권한으로 보는 중. 여기서 하는 제어는 이 농장에 실제로 적용됩니다</span>
         <span v-if="farmSocketNote" class="c-mono" style="font-size:11px;opacity:.8">{{ farmSocketNote }}</span>
         <span class="c-ctx-act">
           <button type="button" @click="openPickerFromCtx">농장 변경</button>
@@ -147,7 +147,7 @@ import NotificationCenter from '@/components/common/NotificationCenter.vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import apiClient from '@/api/client'
 import CIcon from '@console/components/CIcon.vue'
-import { usePlatformStore } from '@console/stores/platform.store'
+import { usePlatformStore, farmLabel } from '@console/stores/platform.store'
 import { farmState, rememberFarm, PLATFORM_REQUEST } from '@console/farm/farmContext'
 import { useMySettings, useFarmMenuFlags } from '@console/composables/useConsoleFeatures'
 
@@ -187,7 +187,7 @@ watch([activeFarmId, () => platform.loaded], ([id, loaded]) => {
     void router.replace('/farms')
     return
   }
-  rememberFarm({ id: farm.id, name: farm.name, username: farm.username })
+  rememberFarm({ id: farm.id, name: farmLabel(farm), username: farm.username })
 }, { immediate: true })
 
 const menuFlags = useFarmMenuFlags()
@@ -224,7 +224,7 @@ const pickerQuery = ref('')
 const pickerInput = ref<HTMLInputElement | null>(null)
 const pickerResults = computed(() => {
   const q = pickerQuery.value.trim().toLowerCase()
-  return platform.farms.filter((f) => !q || f.name.toLowerCase().includes(q) || f.username.toLowerCase().includes(q))
+  return platform.farms.filter((f) => !q || [farmLabel(f), f.name, f.username].some((s) => s.toLowerCase().includes(q)))
 })
 function togglePicker() {
   pickerOpen.value = !pickerOpen.value
@@ -251,7 +251,7 @@ function exitFarm() {
 const crumbs = computed(() => {
   const title = route.meta.title || ''
   switch (route.meta.section) {
-    case 'farm': return ['농장 보기', activeFarm.value?.name || '농장', title]
+    case 'farm': return ['농장 보기', farmLabel(activeFarm.value) || '농장', title]
     case 'platform': return ['플랫폼 운영', title]
     default: return ['콘솔', title]
   }
@@ -270,8 +270,8 @@ const searchGroups = computed(() => {
   const roleLabel: Record<string, string> = { admin: '플랫폼 관리자', farm_admin: '농장 관리자', farm_user: '농장 사용자' }
   const users = platform.users.filter((u) => u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)).slice(0, 6)
     .map<SearchItem>((u) => ({ key: 'u' + u.id, idx: idx++, icon: 'user', title: u.name, sub: `@${u.username} · ${roleLabel[u.role] || u.role}`, to: `/users?select=${u.id}` }))
-  const farms = platform.farms.filter((f) => f.name.toLowerCase().includes(q) || f.username.toLowerCase().includes(q)).slice(0, 6)
-    .map<SearchItem>((f) => ({ key: 'f' + f.id, idx: idx++, icon: 'home', title: f.name, sub: `@${f.username}`, to: `/farms?select=${f.id}` }))
+  const farms = platform.farms.filter((f) => [farmLabel(f), f.name, f.username].some((s) => s.toLowerCase().includes(q))).slice(0, 6)
+    .map<SearchItem>((f) => ({ key: 'f' + f.id, idx: idx++, icon: 'home', title: farmLabel(f), sub: `${f.name} · @${f.username}`, to: `/farms?select=${f.id}` }))
   const gws = platform.gateways.filter((g) => g.name.toLowerCase().includes(q) || g.gatewayId.toLowerCase().includes(q) || (g.location || '').toLowerCase().includes(q)).slice(0, 6)
     .map<SearchItem>((g) => ({ key: 'g' + g.id, idx: idx++, icon: 'gateway', title: g.name, sub: g.gatewayId, to: `/gateways?select=${g.id}` }))
   return [
