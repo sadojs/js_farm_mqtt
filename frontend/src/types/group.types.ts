@@ -64,11 +64,16 @@ export interface GroupDependenciesResponse {
 export interface HouseGroupWithOwner extends HouseGroup {
   ownerName?: string
   ownerUsername?: string
+  /** 구역을 소유한 농장의 이름 (관리자 전체 조회) */
+  ownerFarmName?: string
 }
 
 export interface FarmAdmin {
   id: string
   username: string
+  /** 농장 관리자(사람) 이름 */
   name: string
+  /** 농장 이름 (migration 051 — 비어 있으면 name 으로 표시) */
+  farmName?: string | null
   status: string
 }

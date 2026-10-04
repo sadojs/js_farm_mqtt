@@ -74,8 +74,8 @@
             >
               <span class="row-avatar" :data-role="admin.role">{{ initialOf(admin.name) }}</span>
               <span class="row-text">
-                <span class="row-name">{{ admin.name }}</span>
-                <span class="row-username">@{{ admin.username }}</span>
+                <span class="row-name">{{ admin.farmName || admin.name }}</span>
+                <span class="row-username">{{ admin.name }} · @{{ admin.username }}</span>
               </span>
               <span v-if="admin.status === 'active'" class="row-dot"></span>
             </button>
@@ -189,9 +189,13 @@
                 <span class="field-label">주소</span>
                 <span class="field-value">{{ selectedUser.address || '—' }}</span>
               </div>
+              <div v-if="selectedUser.role === 'farm_admin'" class="profile-field">
+                <span class="field-label">농장 이름</span>
+                <span class="field-value">{{ selectedUser.farmName || selectedUser.name }}</span>
+              </div>
               <div v-if="selectedUser.parentUserName" class="profile-field">
                 <span class="field-label">소속 농장</span>
-                <span class="field-value">{{ selectedUser.parentUserName }}</span>
+                <span class="field-value">{{ selectedUser.parentFarmName || selectedUser.parentUserName }}</span>
               </div>
             </div>
           </div>
@@ -203,7 +207,7 @@
               플랫폼 관리자는 모든 기능에 접근할 수 있습니다.
             </div>
             <div v-else-if="selectedUser.role === 'farm_user'" class="info-note">
-              소속 농장({{ selectedUser.parentUserName || '미지정' }}) 관리자의 설정을 상속합니다.
+              소속 농장({{ selectedUser.parentFarmName || selectedUser.parentUserName || '미지정' }}) 관리자의 설정을 상속합니다.
             </div>
             <template v-else>
               <div class="feature-card">
@@ -450,6 +454,8 @@ interface User {
   role: 'admin' | 'farm_admin' | 'farm_user'
   parentUserId?: string
   parentUserName?: string
+  parentFarmName?: string | null
+  farmName?: string | null
   address?: string
   gateways?: any[]
   createdAt: string
@@ -642,9 +648,9 @@ const deleteUser = async (user: User) => {
   try {
     await userApi.remove(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
-  } catch (err) {
+  } catch (err: any) {
     console.error('삭제 실패:', err)
-    alert('삭제에 실패했습니다.')
+    alert(err?.response?.data?.message || '삭제에 실패했습니다.')
   }
 }
 
@@ -657,6 +663,7 @@ const saveUser = async (userData: any) => {
   try {
     if (selectedUserForForm.value && selectedUserForForm.value.id) {
       const payload: any = { name: userData.name, address: userData.address }
+      if (userData.role === 'farm_admin') payload.farmName = userData.farmName
       if (userData.role) payload.role = userData.role
       if (userData.status) payload.status = userData.status
       if (userData.password) payload.password = userData.password
@@ -679,8 +686,9 @@ const saveUser = async (userData: any) => {
         name: userData.name,
         role: userData.role || 'farm_admin',
         address: userData.address,
+        farmName: (userData.role || 'farm_admin') === 'farm_admin' ? userData.farmName : undefined,
         parentUserId: userData.parentUserId,
-      })
+      } as any)
 
       await refreshAll()
     }

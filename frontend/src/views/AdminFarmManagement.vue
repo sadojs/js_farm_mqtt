@@ -29,7 +29,7 @@
           :class="{ 'farm-card--active': selectedFarmId === farm.id }"
           @click="selectFarm(farm.id)"
         >
-          <div class="farm-card-name">{{ farm.name }}</div>
+          <div class="farm-card-name">{{ farm.farmName || farm.name }}</div>
           <div class="farm-card-meta">
             <span class="farm-username">@{{ farm.username }}</span>
             <span class="farm-badge">구역 {{ zoneCountOf(farm.id) }}개</span>
@@ -199,7 +199,7 @@ async function submitAddZone() {
       name: newZoneName.value.trim(),
       targetUserId: selectedFarmId.value,
     })
-    allZones.value.push({ ...res.data, ownerName: selectedFarm.value?.name, ownerUsername: selectedFarm.value?.username })
+    allZones.value.push({ ...res.data, ownerName: selectedFarm.value?.name, ownerFarmName: selectedFarm.value?.farmName || selectedFarm.value?.name, ownerUsername: selectedFarm.value?.username })
     showAddZone.value = false
     notif.success('완료', '구역이 추가되었습니다.')
   } catch {

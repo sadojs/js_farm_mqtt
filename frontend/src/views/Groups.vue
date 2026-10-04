@@ -84,7 +84,7 @@
         <!-- 그룹 헤더 -->
         <div class="group-header">
           <div class="group-title">
-            <span v-if="isAdmin && group.ownerName" class="farm-owner-badge">🏠 {{ group.ownerName }}</span>
+            <span v-if="isAdmin && (group.ownerFarmName || group.ownerName)" class="farm-owner-badge">🏠 {{ group.ownerFarmName || group.ownerName }}</span>
             <!-- 구역 이름/설명 변경은 환경설정(⚙) 안으로 이동됨 -->
             <h3>{{ group.name }}</h3>
             <p v-if="group.description" class="group-desc">{{ group.description }}</p>
