@@ -26,6 +26,10 @@ export class User {
   @Column({ nullable: true })
   address: string;
 
+  /** 농장 이름 — 농장 관리자(farm_admin)만 사용. 그 외 역할은 NULL (소속 농장 이름은 부모의 farm_name) */
+  @Column({ name: 'farm_name', type: 'varchar', length: 100, nullable: true })
+  farmName: string | null;
+
   @Column({ name: 'voice_aliases', type: 'jsonb', default: '{}' })
   voiceAliases: Record<string, string>;
 

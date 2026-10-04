@@ -765,9 +765,13 @@ export class AutomationRunnerService {
       [groupId],
     );
     if (weatherRows.length > 0) {
+      // 이 구역을 소유한 농장의 날씨만 사용 (이전: 농장 구분 없이 최신 1건 → 다른 농장 날씨로 동작할 수 있었음)
       const latestWeather = await this.dataSource.query(
         `SELECT temperature, humidity, precipitation, wind_speed
-         FROM weather_data ORDER BY time DESC LIMIT 1`,
+         FROM weather_data
+         WHERE user_id = (SELECT user_id FROM house_groups WHERE id = $1)
+         ORDER BY time DESC LIMIT 1`,
+        [groupId],
       );
       if (latestWeather.length > 0) {
         const wd = latestWeather[0];

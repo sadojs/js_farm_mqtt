@@ -9,6 +9,7 @@ import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { User } from '../users/entities/user.entity';
 import { MqttService } from '../mqtt/mqtt.service';
+import { farmNameOf } from '../users/farm-name.util';
 
 @Injectable()
 export class GroupsService {
@@ -106,6 +107,7 @@ export class GroupsService {
       return filtered.map(g => ({
         ...g,
         ownerName: userMap.get(g.userId)?.name ?? '',
+        ownerFarmName: farmNameOf(userMap.get(g.userId)) ?? '',
         ownerUsername: userMap.get(g.userId)?.username ?? '',
       }));
     }

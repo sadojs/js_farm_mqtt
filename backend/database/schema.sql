@@ -17,6 +17,7 @@ CREATE TABLE users (
   role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'farm_admin', 'farm_user')),
   parent_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   address TEXT,
+  farm_name VARCHAR(100),           -- 농장 이름 (farm_admin 만, migration 051)
   status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
