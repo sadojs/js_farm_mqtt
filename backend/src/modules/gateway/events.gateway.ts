@@ -14,8 +14,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { House } from '../groups/entities/house.entity';
 import { HouseGroup } from '../groups/entities/house-group.entity';
+import { User } from '../users/entities/user.entity';
+import { farmNameOf } from '../users/farm-name.util';
 import { FarmContextService } from '../../common/farm-context/farm-context.service';
 import { FarmContextCode, FarmContextException } from '../../common/farm-context/farm-context.constants';
+
+/**
+ * 플랫폼 관리자 알림 전용 room. 'admins'(데이터 방송용)와 달리 농장 보기(subscribe:farm) 중에도 나가지 않는다.
+ * 농장 알림은 이 room 을 제외하고 농장 room 에 보내고, 관리자에게는 농장 이름을 붙인 별도 문구를 보낸다.
+ */
+const ADMIN_ALERTS_ROOM = 'admin-alerts';
 
 @WebSocketGateway({
   cors: {
@@ -41,6 +49,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private houseRepository: Repository<House>,
     @InjectRepository(HouseGroup)
     private groupRepository: Repository<HouseGroup>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private farmContext: FarmContextService,
   ) {}
 
@@ -59,6 +69,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // 플랫폼 관리자(admin)는 별도 'admins' 룸에 입장 — 모든 사용자 데이터 수신
       if (payload.role === 'admin') {
         client.join('admins');
+        client.join(ADMIN_ALERTS_ROOM);
       }
       this.logger.log(`Client connected: ${payload.sub} (role=${payload.role})`);
     } catch {
@@ -288,13 +299,36 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('gpio:status', { gatewayId, ...data });
   }
 
-  // 일반 알림 — 사용자 room 기반으로 전송 (소켓 순회 제거)
+  /**
+   * 일반 알림 — 받는 사람에 따라 문구를 나눈다.
+   *  - 농장(농장 관리자 room): 원래 문구 그대로. 플랫폼 관리자 소켓은 제외(농장 보기 중이라 같은 room 에 있어도).
+   *  - 플랫폼 관리자(admin-alerts room): 어느 농장의 문제인지 농장 이름·담당 계정을 붙인 문구 + farmId.
+   */
   sendNotification(userId: string, notification: {
     type: string;
     title: string;
     message: string;
   }) {
-    this.server.to(`user:${userId}`).emit('notification:new', notification);
+    this.server.to(`user:${userId}`).except(ADMIN_ALERTS_ROOM).emit('notification:new', notification);
+    void this.sendAdminNotification(userId, notification);
+  }
+
+  private async sendAdminNotification(ownerId: string, n: { type: string; title: string; message: string }) {
+    try {
+      const owner = await this.userRepository.findOne({ where: { id: ownerId } });
+      const farm = owner ? farmNameOf(owner) : null;
+      const who = owner ? (owner.role === 'farm_admin' ? `관리자 ${owner.name} @${owner.username}` : `@${owner.username}`) : '';
+      this.server.to(ADMIN_ALERTS_ROOM).emit('notification:new', {
+        type: n.type,
+        title: farm ? `[${farm}] ${n.title}` : n.title,
+        message: farm ? `${farm} 농장(${who}) — ${n.message}` : n.message,
+        farmId: owner?.role === 'farm_admin' ? owner.id : null,
+        farmName: farm,
+        scope: 'platform',
+      });
+    } catch (e) {
+      this.logger.error(`[Admin Notify] 관리자 알림 전송 실패: ${(e as Error).message}`);
+    }
   }
 
   // 비 감지 우회 상태 브로드캐스트 (구역 단위)

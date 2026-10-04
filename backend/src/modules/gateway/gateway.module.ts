@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventsGateway } from './events.gateway';
 import { House } from '../groups/entities/house.entity';
 import { HouseGroup } from '../groups/entities/house-group.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { HouseGroup } from '../groups/entities/house-group.entity';
         signOptions: { expiresIn: '1h' },
       }),
     }),
-    TypeOrmModule.forFeature([House, HouseGroup]),
+    TypeOrmModule.forFeature([House, HouseGroup, User]),
   ],
   providers: [EventsGateway],
   exports: [EventsGateway],

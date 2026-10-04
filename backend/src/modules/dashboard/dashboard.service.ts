@@ -26,6 +26,7 @@ interface KmaItem {
   obsrValue: string;
 }
 
+import { farmNameOf } from '../users/farm-name.util';
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
@@ -45,18 +46,34 @@ export class DashboardService {
     this.positions = JSON.parse(raw) as PositionEntry[];
   }
 
+  /** 관리자용 안내 문구에 쓰는 농장 정보 */
+  async describeFarm(userId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    return {
+      farmName: farmNameOf(user) ?? '알 수 없는 농장',
+      username: user?.username ?? '',
+      address: user?.address ?? '',
+    };
+  }
+
   async getWeatherForUser(userId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
     if (!user.address) {
-      throw new NotFoundException('사용자 주소가 설정되지 않았습니다.');
+      throw new NotFoundException({
+        code: 'FARM_ADDRESS_MISSING',
+        message: '농장 위치(주소)가 설정되지 않아 날씨를 표시할 수 없습니다. 플랫폼 관리자에게 농장 위치 설정을 요청하세요.',
+      });
     }
 
     const position = this.findBestPosition(user.address);
     if (!position) {
-      throw new NotFoundException(`주소에 대응하는 좌표를 찾지 못했습니다: ${user.address}`);
+      throw new NotFoundException({
+        code: 'FARM_ADDRESS_UNMAPPED',
+        message: `농장 위치(${user.address})로 날씨 지역을 찾지 못했습니다. 플랫폼 관리자에게 농장 위치 확인을 요청하세요.`,
+      });
     }
 
     let serviceKey: string;
