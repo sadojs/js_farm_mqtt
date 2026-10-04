@@ -165,6 +165,8 @@ const attention = computed(() => {
     if (fo?.mode === 'fallback') out.push({ tone: 'bad', icon: 'warn', title: `${gw.name} 폴백 모드 동작 중`, desc: '서버 연결 단절로 게이트웨이 자체 제어 중' })
     else if (fo && fo.sync !== 'synced') out.push({ tone: 'warn', icon: 'refresh', title: '페일오버 설정 동기화 중', desc: `${gw.name} · RPi v${fo.appliedVersion ?? '—'} → 서버 v${fo.version}` })
   }
+  const noAddress = platform.farms.filter((f) => !platform.userById(f.id)?.address)
+  if (noAddress.length) out.push({ tone: 'warn', icon: 'info', title: `농장 위치(주소) 미설정 ${noAddress.length}곳`, desc: `${noAddress.map((f) => farmLabel(f)).join(', ')} — 날씨·날씨 조건 자동 제어가 동작하지 않음. 사용자 화면에서 농장 관리자 계정을 편집해 입력` })
   const notReady = farmRows.value.filter((f) => !f.ready)
   if (notReady.length) out.push({ tone: 'off', icon: 'info', title: `구역 · 게이트웨이 미할당 농장 ${notReady.length}곳`, desc: notReady.map((f) => farmLabel(f)).join(', ') })
   return out

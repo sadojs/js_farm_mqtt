@@ -50,6 +50,11 @@
             <router-link class="c-btn c-btn-sm" :to="`/users?select=${farm.id}`">계정</router-link>
             <button class="c-btn c-btn-pri" type="button" @click="openFarm(farm.id)"><CIcon name="eye" :size="14" />농장 보기</button>
           </div>
+          <div v-if="!farmAddress" class="c-li" style="background:var(--c-warn-bg);color:var(--c-warn-fg);border-top:0;flex-wrap:wrap">
+            <CIcon name="warn" :size="14" />
+            <span style="flex:1;min-width:200px">농장 위치(주소)가 설정되지 않았습니다 — 날씨 표시와 날씨 조건 자동 제어가 동작하지 않습니다.</span>
+            <router-link class="c-btn c-btn-sm" :to="`/users?select=${farm.id}&edit=1`">위치 설정</router-link>
+          </div>
           <div class="c-fields c-3">
             <div class="c-stat"><span class="c-k">구역</span><span class="c-v">{{ farm.zones.length }}</span></div>
             <div class="c-stat"><span class="c-k">게이트웨이</span><span class="c-v">{{ farm.gateways.length }}</span></div>

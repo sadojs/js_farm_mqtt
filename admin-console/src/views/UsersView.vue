@@ -369,6 +369,10 @@ onMounted(async () => {
   if (route.query.new === '1') {
     router.replace({ query: { ...route.query, new: undefined } })
     openNew()
+  } else if (route.query.edit === '1' && selected.value) {
+    // 농장 화면 '위치 설정' 등에서 바로 편집 창으로
+    router.replace({ query: { ...route.query, edit: undefined } })
+    openEdit(selected.value)
   }
 })
 watch(() => route.query.select, (q) => {
