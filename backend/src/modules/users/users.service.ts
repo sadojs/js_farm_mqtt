@@ -158,7 +158,7 @@ export class UsersService {
     }
 
     const [{ count: logCount }] = await this.dataSource.query(
-      'SELECT COUNT(*)::int AS count FROM activity_logs WHERE user_id = $1',
+      'SELECT COUNT(*)::int AS count FROM activity_logs WHERE user_id::text = $1',
       [id],
     );
     if (logCount > 0) {
@@ -187,10 +187,10 @@ export class UsersService {
   private async farmUsage(userId: string) {
     const [row] = await this.dataSource.query(
       `SELECT
-         (SELECT COUNT(*)::int FROM users        WHERE parent_user_id = $1) AS members,
-         (SELECT COUNT(*)::int FROM gateways     WHERE user_id = $1)        AS gateways,
-         (SELECT COUNT(*)::int FROM house_groups WHERE user_id = $1)        AS zones,
-         (SELECT COUNT(*)::int FROM devices      WHERE user_id = $1)        AS devices`,
+         (SELECT COUNT(*)::int FROM users        WHERE parent_user_id::text = $1) AS members,
+         (SELECT COUNT(*)::int FROM gateways     WHERE user_id::text = $1)        AS gateways,
+         (SELECT COUNT(*)::int FROM house_groups WHERE user_id::text = $1)        AS zones,
+         (SELECT COUNT(*)::int FROM devices      WHERE user_id::text = $1)        AS devices`,
       [userId],
     );
     return { ...row, owned: row.gateways + row.zones + row.devices } as {

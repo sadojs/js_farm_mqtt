@@ -769,7 +769,7 @@ export class AutomationRunnerService {
       const latestWeather = await this.dataSource.query(
         `SELECT temperature, humidity, precipitation, wind_speed
          FROM weather_data
-         WHERE user_id = (SELECT user_id FROM house_groups WHERE id = $1)
+         WHERE user_id::text = (SELECT user_id::text FROM house_groups WHERE id::text = $1)
          ORDER BY time DESC LIMIT 1`,
         [groupId],
       );

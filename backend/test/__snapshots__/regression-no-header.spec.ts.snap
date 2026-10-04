@@ -1758,6 +1758,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
 {
   "body": {
     "address": null,
+    "farmName": null,
     "id": "aaaaaaaa-0000-4000-8000-000000000001",
     "mustChangePassword": false,
     "name": "플랫폼관리자",
@@ -2468,6 +2469,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
       "iotEnabled": true,
       "manager": null,
       "name": "F2-1동",
+      "ownerFarmName": "F2-농장주",
       "ownerName": "F2-농장주",
       "ownerUsername": "f2admin",
       "updatedAt": "<datetime>",
@@ -2499,6 +2501,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
       "iotEnabled": true,
       "manager": null,
       "name": "F1-1동",
+      "ownerFarmName": "F1-농장주",
       "ownerName": "F1-농장주",
       "ownerUsername": "f1admin",
       "updatedAt": "<datetime>",
@@ -2630,10 +2633,12 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [],
       "id": "aaaaaaaa-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "플랫폼관리자",
+      "parentFarmName": null,
       "parentUserId": null,
       "parentUserName": null,
       "role": "admin",
@@ -2645,10 +2650,12 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [],
       "id": "aaaaaaaa-0000-4000-8000-000000000002",
       "mustChangePassword": false,
       "name": "플랫폼관리자2",
+      "parentFarmName": null,
       "parentUserId": null,
       "parentUserName": null,
       "role": "admin",
@@ -2660,6 +2667,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [
         {
           "gatewayId": "f1-gw",
@@ -2671,6 +2679,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
       "id": "11111111-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "F1-농장주",
+      "parentFarmName": null,
       "parentUserId": null,
       "parentUserName": null,
       "role": "farm_admin",
@@ -2682,6 +2691,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [
         {
           "gatewayId": "f2-gw",
@@ -2693,6 +2703,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
       "id": "22222222-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "F2-농장주",
+      "parentFarmName": null,
       "parentUserId": null,
       "parentUserName": null,
       "role": "farm_admin",
@@ -2704,10 +2715,12 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [],
       "id": "11111111-0000-4000-8000-000000000002",
       "mustChangePassword": false,
       "name": "F1-일반사용자",
+      "parentFarmName": "F1-농장주",
       "parentUserId": "11111111-0000-4000-8000-000000000001",
       "parentUserName": "F1-농장주",
       "role": "farm_user",
@@ -2719,10 +2732,12 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "gateways": [],
       "id": "33333333-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "F3-비활성",
+      "parentFarmName": null,
       "parentUserId": null,
       "parentUserName": null,
       "role": "farm_admin",
@@ -2742,6 +2757,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "id": "11111111-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "F1-농장주",
@@ -2755,6 +2771,7 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(
     {
       "address": null,
       "createdAt": "<datetime>",
+      "farmName": null,
       "id": "22222222-0000-4000-8000-000000000001",
       "mustChangePassword": false,
       "name": "F2-농장주",
