@@ -14,6 +14,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { House } from '../groups/entities/house.entity';
 import { HouseGroup } from '../groups/entities/house-group.entity';
+import { FarmContextService } from '../../common/farm-context/farm-context.service';
+import { FarmContextCode, FarmContextException } from '../../common/farm-context/farm-context.constants';
 
 @WebSocketGateway({
   cors: {
@@ -39,6 +41,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private houseRepository: Repository<House>,
     @InjectRepository(HouseGroup)
     private groupRepository: Repository<HouseGroup>,
+    private farmContext: FarmContextService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -121,7 +124,54 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { channel: string },
   ) {
+    // 관리자 농장 컨텍스트 퇴장 (옵트인). 'farm' 이외 채널은 기존 동작 그대로.
+    if (data?.channel === 'farm') return this.leaveFarm(client);
     client.leave(data.channel);
+  }
+
+  /**
+   * 관리자 농장 컨텍스트 (옵트인) — admin 소켓이 선택한 농장 이벤트만 받도록 room 을 바꾼다.
+   * 기존 클라이언트는 이 이벤트를 보내지 않으므로 영향 없음.
+   * 성공: admins room 퇴장 + user:<farmId> 입장 → farm:joined. 실패: farm:error (room 변화 없음).
+   * ack 콜백이 있으면 { ok, farmId } / { ok:false, code, message } 로도 응답.
+   */
+  @SubscribeMessage('subscribe:farm')
+  async handleSubscribeFarm(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { farmId?: string },
+  ) {
+    const fail = (e: FarmContextException) => {
+      const payload = e.toPayload();
+      client.emit('farm:error', payload);
+      return { ok: false, ...payload };
+    };
+    if ((client as any).role !== 'admin') {
+      this.logger.warn(`Unauthorized subscribe:farm — userId=${(client as any).userId}`);
+      return fail(new FarmContextException(FarmContextCode.FORBIDDEN));
+    }
+    let farm: { id: string };
+    try {
+      farm = await this.farmContext.resolveFarm(String(data?.farmId ?? '').trim());
+    } catch (e) {
+      if (e instanceof FarmContextException) return fail(e);
+      throw e;
+    }
+    const prev: string | undefined = client.data?.farmId;
+    if (prev && prev !== farm.id) client.leave(`user:${prev}`);
+    client.leave('admins');
+    client.join(`user:${farm.id}`);
+    client.data.farmId = farm.id;
+    client.emit('farm:joined', { farmId: farm.id });
+    return { ok: true, farmId: farm.id };
+  }
+
+  private leaveFarm(client: Socket) {
+    const farmId: string | null = client.data?.farmId ?? null;
+    if (farmId) client.leave(`user:${farmId}`);
+    if (client.data) client.data.farmId = undefined;
+    if ((client as any).role === 'admin') client.join('admins');
+    client.emit('farm:left', { farmId });
+    return { ok: true, farmId };
   }
 
   // 센서 데이터 — 해당 사용자 room + house room + admins 룸으로 전송

@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
 @Controller('gateways')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +29,7 @@ export class GatewayManagerController {
     return this.gatewayService.findAllByUser(this.getEffectiveUserId(user));
   }
 
+  @PlatformScope()
   @Post()
   @Roles('admin', 'farm_admin')
   create(
@@ -39,6 +41,7 @@ export class GatewayManagerController {
     return this.gatewayService.create(ownerId, body);
   }
 
+  @PlatformScope()
   @Put(':id')
   @Roles('admin', 'farm_admin')
   update(
@@ -53,6 +56,7 @@ export class GatewayManagerController {
     return this.gatewayService.update(id, this.getEffectiveUserId(user), body);
   }
 
+  @PlatformScope()
   @Delete(':id')
   @Roles('admin', 'farm_admin')
   remove(@CurrentUser() user: any, @Param('id') id: string) {
@@ -63,6 +67,7 @@ export class GatewayManagerController {
   }
 
   /** 게이트웨이 구역 할당 / 해제 */
+  @PlatformScope()
   @Patch(':id/zone')
   @Roles('admin', 'farm_admin')
   assignZone(

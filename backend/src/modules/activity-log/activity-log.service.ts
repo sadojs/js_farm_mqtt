@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActivityLog } from './entities/activity-log.entity';
+import { farmContextStorage } from '../../common/farm-context/farm-context.storage';
 
 export interface LogParams {
   userId: string;
@@ -26,6 +27,21 @@ export class ActivityLogService {
   /** 로그 기록 (async, non-blocking — 실패해도 본 기능에 영향 없음) */
   async log(params: LogParams) {
     try {
+      // 관리자 농장 컨텍스트(X-Farm-Context)로 실행된 요청이면 실제 수행자를 details 에 병합.
+      // (스키마 변경 없음 — 기존 nullable jsonb 컬럼 사용. 헤더 없는 요청은 store 가 없어 그대로)
+      const ctx = farmContextStorage.getStore();
+      if (ctx) {
+        params = {
+          ...params,
+          details: {
+            ...(params.details && typeof params.details === 'object' ? params.details
+              : params.details != null ? { value: params.details } : {}),
+            farmContext: true,
+            actingAdminId: ctx.actingAdminId,
+            actingAdminUsername: ctx.actingAdminUsername,
+          },
+        };
+      }
       await this.repo.save(this.repo.create(params));
     } catch (err: any) {
       this.logger.warn(`활동 로그 기록 실패: ${err.message}`);
