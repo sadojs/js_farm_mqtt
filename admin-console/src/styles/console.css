@@ -63,6 +63,8 @@ body { margin: 0; background: var(--c-bg); }
 .c-farmlist input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid #2C3442; background: transparent; color: #fff; padding: 8px 10px; font: inherit; font-size: 13px; outline: 0; }
 .c-farmlist button { display: flex; width: 100%; gap: 8px; align-items: center; padding: 8px 10px; border: 0; background: transparent; color: var(--c-side-text); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
 .c-farmlist button:hover, .c-farmlist button.on { background: var(--c-side-hover); color: #fff; }
+/* 사이드바 항목은 줄어들지 않게 — 메뉴가 길면(농장 보기) 사이드바가 스크롤되고 농장 목록이 찌그러지지 않는다 */
+.c-side > * { flex-shrink: 0; }
 .c-side-foot { margin-top: auto; border-top: 1px solid var(--c-side-border); padding: 12px 10px 0; font-size: 12px; color: var(--c-side-muted); display: flex; flex-direction: column; gap: 6px; }
 .c-side-foot .c-row { display: flex; align-items: center; gap: 6px; }
 
