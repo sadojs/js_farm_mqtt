@@ -1,0 +1,35 @@
+# 관리자 콘솔 전용 compose — 기존 docker-compose.yml 과 별개 (기존 서비스는 건드리지 않음)
+#
+# 실행 (저장소 루트에서):
+#   docker network ls                      # 기존 네트워크 이름 확인 (예: smart-farm-mqtt_sfm-network, 운영 맥미니는 js_farm_mqtt_sfm-network)
+#   SFM_NETWORK=<위 이름> docker compose -f admin-console/docker-compose.console.yml up -d --build
+# 중지/제거:
+#   docker compose -f admin-console/docker-compose.console.yml down
+#
+# 환경변수
+#   SFM_NETWORK       기존 compose 네트워크 이름 (기본 smart-farm-mqtt_sfm-network)
+#   BACKEND_UPSTREAM  백엔드 주소 (기본 sfm-backend:3100. 백엔드가 호스트 pm2 면 host.docker.internal:3100)
+#   CONSOLE_PORT      공개 포트 (기본 8082)
+name: sfm-admin-console
+
+services:
+  admin-console:
+    build:
+      context: ..
+      dockerfile: admin-console/Dockerfile
+    image: sfm-admin-console:latest
+    container_name: sfm-admin-console
+    ports:
+      - "${CONSOLE_PORT:-8082}:80"
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-sfm-backend:3100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sfm-network
+    restart: unless-stopped
+
+networks:
+  sfm-network:
+    external: true
+    name: ${SFM_NETWORK:-smart-farm-mqtt_sfm-network}
