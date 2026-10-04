@@ -7,6 +7,7 @@ import { installFarmContext, storeSnapshotPlugin } from './farm/farmContext'
 import '@/style.css'
 // 콘솔 셸·신규 화면 스타일 (c-* / --c-* 접두사로 기존 CSS 와 분리)
 import './styles/console.css'
+import './styles/legacy-theme.css'
 
 async function bootstrap() {
   const app = createApp(App)
