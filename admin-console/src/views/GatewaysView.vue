@@ -75,6 +75,7 @@
             <router-link class="c-btn c-btn-sm" :to="`/gateways/${gw.id}/env`"><CIcon name="settings" :size="13" />환경 설정</router-link>
             <router-link class="c-btn c-btn-sm" to="/config-deploy"><CIcon name="deploy" :size="13" />시스템 설정 배포</router-link>
             <router-link class="c-btn c-btn-sm" to="/emergency-failover"><CIcon name="warn" :size="13" />페일오버 설정</router-link>
+            <button class="c-btn c-btn-sm" type="button" :disabled="!agentOnline(gw)" :title="agentOnline(gw) ? '' : '게이트웨이가 오프라인입니다'" @click="openAgentUpdate(gw)"><CIcon name="refresh" :size="13" />Pi 프로그램 업데이트</button>
           </div>
 
           <div class="c-kv">
@@ -159,6 +160,26 @@
       </div>
     </div>
 
+    <!-- Pi 프로그램(에이전트) 업데이트 — 서버의 최신 raspberry-pi/{agent} 코드를 Pi 가 내려받아 교체·재시작, 실패 시 자동 복원 -->
+    <div v-if="agentTarget" class="c-modal-back" @click.self="agentBusy ? null : (agentTarget = null)">
+      <div class="c-modal" role="dialog" aria-modal="true" aria-label="Pi 프로그램 업데이트">
+        <div class="c-modal-h">Pi 프로그램 업데이트 — {{ agentTarget.name }}</div>
+        <div class="c-modal-b">
+          <p class="c-note">서버에 있는 최신 Pi 프로그램을 게이트웨이가 내려받아 교체하고 재시작합니다. 재시작이 실패하면 이전 버전으로 자동 복원됩니다. 재시작 동안(수 초) 해당 프로그램은 잠시 멈춥니다.</p>
+          <label v-for="a in AGENTS" :key="a.key" class="c-perm" style="cursor:pointer">
+            <input v-model="agentSel" type="checkbox" :value="a.key" :disabled="agentBusy" />
+            <div><div class="c-t">{{ a.label }}</div><div class="c-d">{{ a.desc }}</div></div>
+            <span v-if="agentResult[a.key]" class="c-pill" :class="agentResult[a.key].tone">{{ agentResult[a.key].text }}</span>
+          </label>
+          <p class="c-muted" style="margin:0;font-size:12px">설정 에이전트(config-agent)는 업데이트 중 응답이 끊길 수 있어 여기서 제외합니다.</p>
+        </div>
+        <div class="c-modal-f">
+          <button class="c-btn" type="button" :disabled="agentBusy" @click="agentTarget = null">닫기</button>
+          <button class="c-btn c-btn-pri" type="button" :disabled="agentBusy || !agentSel.length" @click="runAgentUpdate">{{ agentBusy ? '업데이트 중…' : '업데이트' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 웹 터미널 (기존 컴포넌트) -->
     <div v-if="terminalGw" class="c-term-back" @click.self="terminalGw = null">
       <div class="c-term-panel">
@@ -169,9 +190,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { gatewayApi } from '@/api/gateway.api'
+import apiClient from '@/api/client'
+import { useWebSocket } from '@/composables/useWebSocket'
+import { PLATFORM_REQUEST } from '@console/farm/farmContext'
 import { emergencyFailoverApi } from '@/api/emergency-failover.api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useNotificationStore } from '@/stores/notification.store'
@@ -192,6 +216,7 @@ const { confirm } = useConfirm()
 const failover = useFailoverSummary()
 const route = useRoute()
 const router = useRouter()
+const ws = useWebSocket()
 
 const loading = ref(false)
 const filter = ref<Filter>('all')
@@ -363,6 +388,70 @@ async function releaseEmergency(g: ConsoleGateway) {
     actionBusy.value = false
   }
 }
+
+// ── Pi 프로그램(에이전트) 업데이트 ──
+const AGENTS = [
+  { key: 'fallback-engine', label: '폴백 엔진 (fallback-engine)', desc: '서버 단절 시 로컬 제어 · 비상 정지 유지 · 방재 인지' },
+  { key: 'gpio-agent', label: '릴레이 제어 (gpio-agent)', desc: '온보드 릴레이 구동 · 인터록 · 비상 정지 ON 거부' },
+] as const
+const agentTarget = ref<ConsoleGateway | null>(null)
+const agentSel = ref<string[]>([])
+const agentBusy = ref(false)
+const agentResult = ref<Record<string, { text: string; tone: string }>>({})
+const pendingAgentReq = new Map<string, { agent: string; resolve: () => void }>()
+let agentListener: { event: string; fn: (p: any) => void } | null = null
+
+function openAgentUpdate(g: ConsoleGateway) {
+  agentTarget.value = g
+  agentSel.value = ['fallback-engine', 'gpio-agent']
+  agentResult.value = {}
+}
+
+function listenAgentResponses(gatewayId: string) {
+  if (agentListener) ws.off(agentListener.event, agentListener.fn)
+  const fn = (p: any) => {
+    const pending = pendingAgentReq.get(p?.requestId)
+    if (!pending) return
+    const ok = p.status === 'success' || p.status === 'applied_online'
+    agentResult.value = { ...agentResult.value, [pending.agent]: { text: ok ? '완료' : `실패${p.detail ? ' — ' + String(p.detail).slice(0, 60) : ''}`, tone: ok ? 'c-p-ok' : 'c-p-bad' } }
+    pendingAgentReq.delete(p.requestId)
+    pending.resolve()
+  }
+  agentListener = { event: `config:response:${gatewayId}`, fn }
+  ws.on(agentListener.event, fn)
+}
+
+async function runAgentUpdate() {
+  const g = agentTarget.value
+  if (!g) return
+  agentBusy.value = true
+  listenAgentResponses(g.gatewayId)
+  try {
+    for (const agent of agentSel.value) {
+      agentResult.value = { ...agentResult.value, [agent]: { text: '요청 중…', tone: 'c-p-off' } }
+      try {
+        const { data } = await apiClient.post(`/config-deploy/${encodeURIComponent(g.gatewayId)}/agent-update`, { agent }, PLATFORM_REQUEST)
+        agentResult.value = { ...agentResult.value, [agent]: { text: '게이트웨이 적용 중…', tone: 'c-p-warn' } }
+        // 결과 회신 대기(최대 120초) — 다음 프로그램은 앞 프로그램 재시작이 끝난 뒤 진행
+        await new Promise<void>((resolve) => {
+          pendingAgentReq.set(data.requestId, { agent, resolve })
+          setTimeout(() => {
+            if (pendingAgentReq.delete(data.requestId)) {
+              agentResult.value = { ...agentResult.value, [agent]: { text: '응답 없음(확인 필요)', tone: 'c-p-warn' } }
+              resolve()
+            }
+          }, 120_000)
+        })
+      } catch (e: any) {
+        agentResult.value = { ...agentResult.value, [agent]: { text: `요청 실패 — ${e?.response?.data?.message || e?.message || ''}`, tone: 'c-p-bad' } }
+      }
+    }
+  } finally {
+    agentBusy.value = false
+  }
+}
+
+onBeforeUnmount(() => { if (agentListener) ws.off(agentListener.event, agentListener.fn) })
 
 const stopTarget = ref<ConsoleGateway | null>(null)
 const stopTyped = ref('')
