@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FallbackMode, FallbackGatewayStatus, FallbackConfig } from '../../types/emergency-failover.types'
+import type { FallbackMode, FallbackGatewayStatus, FallbackConfig, EmergencyStopState } from '../../types/emergency-failover.types'
 
 const props = defineProps<{
   mode: FallbackMode
   status: FallbackGatewayStatus | null
   config: FallbackConfig
+  emergency?: EmergencyStopState | null
 }>()
 defineEmits<{
   (e: 'resync'): void
   (e: 'emergency-stop'): void
+  (e: 'emergency-release'): void
 }>()
 
 const modeBadgeClass = computed(() => {
@@ -34,7 +36,17 @@ function fmt(d: string | null | undefined) {
 </script>
 
 <template>
-  <section class="status-card">
+  <section class="status-card" :class="{ latched: emergency?.active }">
+    <div v-if="emergency?.active" class="emergency-banner" role="alert">
+      <div>
+        <strong>🛑 비상 정지 중</strong> — 이 게이트웨이의 모든 릴레이가 정지되어 있고, 해제 전까지 자동제어·수동 조작으로 켜지지 않습니다.
+        <div class="emergency-meta">
+          {{ fmt(emergency.stoppedAt) }} · {{ emergency.stoppedByName || '-' }}
+          · {{ emergency.piConfirmed ? '게이트웨이 적용 확인됨' : '게이트웨이 적용 확인 대기 (오프라인이면 연결 즉시 적용)' }}
+        </div>
+      </div>
+      <button class="btn-release" @click="$emit('emergency-release')">정지 해제</button>
+    </div>
     <div class="status-row">
       <div>
         <span class="status-label">현재 모드</span>
@@ -58,13 +70,24 @@ function fmt(d: string | null | undefined) {
       </div>
       <div class="actions">
         <button class="btn-secondary" @click="$emit('resync')">재동기화</button>
-        <button class="btn-danger" @click="$emit('emergency-stop')">비상 정지</button>
+        <button v-if="!emergency?.active" class="btn-danger" @click="$emit('emergency-stop')">비상 정지</button>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
+.status-card.latched { border-color: #c62828; }
+.emergency-banner {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: #ffebee; color: #b71c1c; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+  font-size: calc(14px * var(--content-scale, 1));
+}
+.emergency-meta { font-size: calc(12px * var(--content-scale, 1)); color: #8e2a2a; margin-top: 4px; }
+.btn-release {
+  background: #fff; color: #b71c1c; border: 1px solid #b71c1c; border-radius: 8px; padding: 8px 14px;
+  font-weight: 600; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
+}
 .status-card {
   background: var(--card-bg, #fff); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;

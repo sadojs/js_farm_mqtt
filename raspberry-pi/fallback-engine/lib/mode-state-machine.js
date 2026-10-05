@@ -15,6 +15,11 @@ class ModeStateMachine {
     this.pendingOnlineSince = null;
   }
 
+  /** 폴백 중 서버 하트비트가 돌아와 온라인 전환을 기다리는 중(grace) — 이때부터 제어권은 서버 */
+  serverBack() {
+    return this.mode === 'fallback' && this.pendingOnlineSince !== null;
+  }
+
   tryTransition(intendedMode) {
     const now = Date.now();
 

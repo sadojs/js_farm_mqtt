@@ -121,7 +121,12 @@ class RuleEvaluator {
     });
   }
 
-  evaluate(now) {
+  /**
+   * @param now 평가 시각
+   * @param opts.protectionActive 방재(밀폐) 중이면 환기팬·개폐기 룰을 돌리지 않는다 — 서버가 방재 시작 때
+   *        이미 개폐기 닫기·팬 정지를 했으므로 그대로 유지(서버 단절 중 폴백이 다시 여는 문제 방지)
+   */
+  evaluate(now, opts = {}) {
     const cfg = this.store.config();
     const args = {
       cfg,
@@ -136,6 +141,7 @@ class RuleEvaluator {
     fertilizer.evaluate(args);
     irrigation.evaluate(args);        // 안전망: 최대런타임 초과 구역 OFF
     irrigationSchedule.evaluate(args); // 폴백 관수 스케줄 실행(요일+시각 발화)
+    if (opts.protectionActive) return;
     fan.evaluate(args);
     opener.evaluate(args);
   }
@@ -143,6 +149,34 @@ class RuleEvaluator {
   /** 폴백 이탈(온라인 복귀) 시 — 예약된 폴백 관수 타이머 취소(온라인 스케줄러 인계). */
   onExitFallback() {
     irrigationSchedule.cancelAll(this.state);
+    // 폴백 중 켜진 관수·액비·교반 채널은 서버가 모르는 상태 → 복귀 시 OFF 해서 열린 채 남지 않게 한다.
+    // (서버 단절 중엔 서버가 관수를 시작할 수 없으므로 지금 켜져 있는 관수 계열은 폴백이 켠 것)
+    const chans = new Set([
+      ...this.store.getChannels('irrigation'),
+      ...this.store.getChannels('fertilizer'),
+    ]);
+    for (const sched of this.store.irrigationSchedules ? this.store.irrigationSchedules() : []) {
+      for (const z of sched.zones || []) if (z.channel) chans.add(z.channel);
+      if (sched.mixer?.channel) chans.add(sched.mixer.channel);
+      if (sched.fertilizer?.channel) chans.add(sched.fertilizer.channel);
+    }
+    const off = [];
+    for (const ch of chans) {
+      if (this.state.channels[ch]?.state || (this.state.irrigationOnByFallback || {})[ch]) {
+        if (this.relay.setRelay(ch, false, 'fallback-exit-irrigation-off')) {
+          this.state.channels[ch] = { state: false, onSince: null };
+          off.push(ch);
+        }
+      }
+    }
+    this.state.irrigationOnByFallback = {};
+    if (off.length) {
+      this.queue.enqueue({
+        eventType: 'safety_off',
+        payload: { reason: 'fallback-exit-irrigation-off', channels: off },
+        occurredAt: new Date().toISOString(),
+      });
+    }
   }
 }
 

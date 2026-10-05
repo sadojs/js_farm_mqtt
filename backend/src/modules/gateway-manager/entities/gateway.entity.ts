@@ -69,6 +69,10 @@ export class Gateway {
   @Column({ name: 'bootstrap_token_used_at', nullable: true, type: 'timestamptz' })
   bootstrapTokenUsedAt: Date | null;
 
+  /** 비상 정지 유지 상태 (migration 052) — active 동안 모든 릴레이 ON 차단 */
+  @Column({ name: 'emergency_stop', type: 'jsonb', nullable: true })
+  emergencyStop: Record<string, any> | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -142,9 +142,23 @@ async function resync() {
 }
 
 async function emergencyStop() {
-  if (!confirm('정말 모든 릴레이를 비상 정지하시겠습니까? 폴백 모드에서도 즉시 실행됩니다.')) return
-  await fail.emergencyStop('manual-from-ui', 'admin')
-  alert('비상 정지 명령을 발행했습니다.')
+  if (!confirm('정말 모든 릴레이를 비상 정지하시겠습니까?\n\n해제 버튼을 누르기 전까지 자동제어·수동 조작으로 켜지지 않습니다. 폴백 모드에서도 즉시 실행됩니다.')) return
+  try {
+    await fail.emergencyStop('manual-from-ui', 'admin')
+    alert('비상 정지했습니다. 해제 전까지 이 게이트웨이의 릴레이는 켜지지 않습니다.')
+  } catch (e: any) {
+    alert(e?.response?.data?.message || '비상 정지 요청에 실패했습니다.')
+  }
+}
+
+async function emergencyRelease() {
+  if (!confirm('비상 정지를 해제할까요?\n\n장비는 꺼진 상태 그대로이며, 자동제어가 다음 평가부터 다시 동작합니다.')) return
+  try {
+    await fail.emergencyRelease()
+    alert('비상 정지를 해제했습니다.')
+  } catch (e: any) {
+    alert(e?.response?.data?.message || '해제 요청에 실패했습니다.')
+  }
 }
 
 function fmt(d: string | null) {
@@ -191,8 +205,10 @@ function fmt(d: string | null) {
         :mode="fail.mode.value"
         :status="fail.status.value"
         :config="fail.config.value"
+        :emergency="fail.emergency.value"
         @resync="resync"
         @emergency-stop="emergencyStop"
+        @emergency-release="emergencyRelease"
       />
 
       <!-- M-3: 최소 안전 룰 비활성화 경고 -->

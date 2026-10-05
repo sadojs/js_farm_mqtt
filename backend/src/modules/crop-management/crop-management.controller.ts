@@ -21,6 +21,7 @@ import { GddService } from './gdd.service';
 import { KmaClimateService } from './kma-climate.service';
 import { CreateCropBatchDto } from './dto/create-crop-batch.dto';
 import { UpdateCropBatchDto } from './dto/update-crop-batch.dto';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
 @Controller('crop-management')
 @UseGuards(JwtAuthGuard)
@@ -138,6 +139,7 @@ export class CropManagementController {
   }
 
   /** 기능 설정 변경 (본인 또는 platform 범위) */
+  @PlatformScope()
   @Patch('feature')
   async setFeatureSetting(
     @CurrentUser() user: any,
@@ -161,6 +163,7 @@ export class CropManagementController {
   }
 
   /** 플랫폼 관리자: 특정 사용자의 기능 설정 변경 */
+  @PlatformScope()
   @Patch('feature/users/:targetUserId')
   async setUserFeatureSetting(
     @CurrentUser() user: any,
@@ -179,6 +182,7 @@ export class CropManagementController {
   }
 
   /** 플랫폼 관리자: 전체 사용자 기능 설정 목록 조회 */
+  @PlatformScope()
   @Get('feature/all')
   async getAllFeatureSettings(@CurrentUser() user: any) {
     if (user.role !== 'admin') throw new ForbiddenException('플랫폼 관리자만 조회 가능합니다.');
@@ -228,6 +232,7 @@ export class CropManagementController {
   }
 
   /** 기후 정규값 KMA ASOS API로 즉시 갱신 (admin only) */
+  @PlatformScope()
   @Post('climate-normals/refresh')
   async refreshClimateNormals(@CurrentUser() user: any) {
     if (user.role !== 'admin') throw new ForbiddenException('플랫폼 관리자만 가능합니다.');

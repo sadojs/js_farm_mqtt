@@ -41,6 +41,7 @@ export class GroupsController {
   }
 
   @Post()
+  @Roles('admin', 'farm_admin')
   async createGroup(@CurrentUser() user: any, @Body() body: any) {
     const effectiveUserId = (user.role === 'admin' && body.targetUserId)
       ? body.targetUserId
@@ -59,6 +60,7 @@ export class GroupsController {
   }
 
   @Put(':id')
+  @Roles('admin', 'farm_admin')
   async updateGroup(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     const result = await this.groupsService.updateGroup(id, this.getEffectiveUserId(user), body, user.role);
     if (result) {
@@ -74,6 +76,7 @@ export class GroupsController {
   }
 
   @Delete(':id')
+  @Roles('admin', 'farm_admin')
   removeGroup(@Param('id') id: string, @CurrentUser() user: any) {
     return this.groupsService.removeGroup(id, this.getEffectiveUserId(user), user.role);
   }
@@ -119,6 +122,7 @@ export class GroupsController {
   }
 
   @Post('houses')
+  @Roles('admin', 'farm_admin')
   createHouse(@CurrentUser() user: any, @Body() body: any) {
     const effectiveUserId = (user.role === 'admin' && body.targetUserId)
       ? body.targetUserId
@@ -127,11 +131,13 @@ export class GroupsController {
   }
 
   @Put('houses/:id')
+  @Roles('admin', 'farm_admin')
   updateHouse(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.groupsService.updateHouse(id, this.getEffectiveUserId(user), body, user.role);
   }
 
   @Delete('houses/:id')
+  @Roles('admin', 'farm_admin')
   removeHouse(@Param('id') id: string, @CurrentUser() user: any) {
     return this.groupsService.removeHouse(id, this.getEffectiveUserId(user), user.role);
   }
@@ -178,6 +184,7 @@ export class GroupsController {
   }
 
   @Post(':id/gateway')
+  @Roles('admin', 'farm_admin')
   assignGateway(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -187,6 +194,7 @@ export class GroupsController {
   }
 
   @Post(':id/devices')
+  @Roles('admin', 'farm_admin')
   assignDevices(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -196,6 +204,7 @@ export class GroupsController {
   }
 
   @Delete(':id/devices/:deviceId')
+  @Roles('admin', 'farm_admin')
   removeDeviceFromGroup(
     @Param('id') id: string,
     @Param('deviceId') deviceId: string,

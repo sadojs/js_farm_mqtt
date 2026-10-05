@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, forwardRef } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +10,7 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttService } from '../mqtt/mqtt.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
+import { isGatewayLatched } from '../../common/emergency/emergency-latch';
 
 interface ScheduledAction {
   time: number; // ms offset from start
@@ -16,6 +18,16 @@ interface ScheduledAction {
   switchCode: string;
   value: boolean;
   label: string;
+  /** 구역 액션의 기능 키(zone_1 등) — 수동 타이머가 잡고 있는 구역이면 건너뛰기 위해 */
+  fnKey?: string;
+}
+
+/** 서버 재시작에도 남는 관수 진행 표시 (device_settings.irrigationRun) */
+interface IrrigationRunMarker {
+  ruleId: string;
+  ruleName: string;
+  startedAt: string;
+  estimatedEndAt: string;
 }
 
 interface ActiveIrrigation {
@@ -41,7 +53,7 @@ const ZONE_FUNCTION_KEY: Record<number, string> = {
 };
 
 @Injectable()
-export class IrrigationSchedulerService {
+export class IrrigationSchedulerService implements OnApplicationBootstrap {
   private readonly logger = new Logger(IrrigationSchedulerService.name);
   private activeIrrigations = new Map<string, ActiveIrrigation>();
 
@@ -75,6 +87,13 @@ export class IrrigationSchedulerService {
         await this.startIrrigation(rule, conditions);
       }
     }
+  }
+
+  /** 즉시 1회 관수 (음성·즉시실행) — 룰 조건(시각)은 바꾸지 않는다 */
+  async startNow(rule: AutomationRule) {
+    if (this.activeIrrigations.has(rule.id)) return { started: false, reason: 'already_running' };
+    await this.startIrrigation(rule, rule.conditions as any);
+    return { started: this.activeIrrigations.has(rule.id) };
   }
 
   private shouldStartNow(conditions: any, now: Date): boolean {
@@ -121,34 +140,38 @@ export class IrrigationSchedulerService {
       this.logger.warn(`관수 룰 ${rule.id}: 게이트웨이를 찾을 수 없음`);
       return;
     }
-
-    // 수동 타이머(채널 override) 활성 존이 있으면 스케줄 실행 스킵(충돌 방지). 만료 후 다음 스케줄부터 정상 동작.
-    const chOv = (device.deviceSettings as any)?.channelOverrides;
-    if (chOv && typeof chOv === 'object') {
-      const nowMs = Date.now();
-      const active = Object.values<any>(chOv).some((o) => o?.until && new Date(o.until).getTime() > nowMs);
-      if (active) {
-        this.logger.log(`관수 스케줄 스킵: 수동 타이머 활성 채널 존재 - ${rule.name}`);
-        return;
-      }
+    if (isGatewayLatched(gateway.gatewayId)) {
+      this.logger.warn(`관수 스케줄 스킵: 비상 정지 유지 중 (${gateway.gatewayId}) - ${rule.name}`);
+      return;
     }
+
+    // 수동 타이머(채널 override)가 걸린 구역은 이번 관수에서 제외 (이전: 구역 하나라도 있으면 스케줄 전체 스킵)
+    const heldZones = this.heldChannelKeys(device);
 
     // 장비 채널 매핑 로드
     const mapping = this.devicesService.getEffectiveMapping(device);
 
-    // 원격제어(remote_control) OFF 상태면 스케줄 스킵
-    // MQTT 버전: 현재 switchStates 미구현, 향후 추가 시 활성화
+    // 원격제어(remote_control) OFF 상태면 스케줄 스킵 — 상태는 device_settings.switchStates 에 기록됨
+    // (이전: 존재하지 않는 device.switchStates 를 봐서 항상 통과하던 문제 수정)
     const remoteControlSwitch = mapping['remote_control'];
-    const deviceAny = device as any;
-    if (deviceAny.switchStates && remoteControlSwitch in deviceAny.switchStates) {
-      if (deviceAny.switchStates[remoteControlSwitch] === false) {
-        this.logger.log(`관수 스케줄 스킵: 원격제어(${remoteControlSwitch}) OFF - ${rule.name}`);
-        return;
-      }
+    const savedStates = (device.deviceSettings as any)?.switchStates;
+    if (remoteControlSwitch && savedStates && savedStates[remoteControlSwitch] === false) {
+      this.logger.log(`관수 스케줄 스킵: 원격제어(${remoteControlSwitch}) OFF - ${rule.name}`);
+      return;
     }
 
-    // 타임라인 생성
-    const timeline = this.buildTimeline(conditions, mapping);
+    // 타임라인 생성 — 수동 타이머가 잡고 있는 구역 제외
+    const effectiveConditions = heldZones.size
+      ? { ...conditions, zones: (conditions.zones || []).filter((z: any) => !heldZones.has(ZONE_FUNCTION_KEY[z.zone])) }
+      : conditions;
+    if (heldZones.size) {
+      this.logger.log(`관수: 수동 타이머 구역 제외 (${[...heldZones].join(', ')}) - ${rule.name}`);
+    }
+    const timeline = this.buildTimeline(effectiveConditions, mapping);
+    if (timeline.length === 0) {
+      this.logger.log(`관수 스케줄 스킵: 실행할 구역 없음 - ${rule.name}`);
+      return;
+    }
     this.logger.log(`관수 타임라인 (${timeline.length}개 액션): ${JSON.stringify(timeline.map(a => ({ t: Math.round(a.time / 60000), type: a.type, sw: a.switchCode })))}`);
 
     // 타이머 등록
@@ -168,9 +191,16 @@ export class IrrigationSchedulerService {
       timers,
     };
     this.activeIrrigations.set(rule.id, active);
+    await this.setRunMarker(active.deviceId, {
+      ruleId: rule.id,
+      ruleName: rule.name,
+      startedAt: new Date(active.startedAt).toISOString(),
+      estimatedEndAt: new Date(active.estimatedEndAt).toISOString(),
+    });
 
     // 관수 시작 이벤트
     this.eventsGateway.emitIrrigationStarted({
+      userId: rule.userId,
       ruleId: rule.id,
       ruleName: rule.name,
       deviceId: deviceIds[0],
@@ -206,6 +236,14 @@ export class IrrigationSchedulerService {
     for (const action of timeline) {
       const timer = setTimeout(async () => {
         try {
+          // 관수 도중 사용자가 이 구역에 수동 타이머를 걸었으면 그 구역 명령은 건너뜀(타이머 우선)
+          if (action.fnKey) {
+            const fresh = await this.devicesRepo.findOne({ where: { id: active.deviceId } });
+            if (fresh && this.heldChannelKeys(fresh).has(action.fnKey)) {
+              this.logger.log(`관수 명령 건너뜀(수동 타이머 우선): ${action.label}`);
+              return;
+            }
+          }
           this.logger.log(`관수 실행: ${action.label} (${action.switchCode}=${action.value})`);
           // device.source에 따라 onboard(gpio-agent) / zigbee(z2m) 자동 라우팅
           await this.devicesService.publishDeviceSwitch(active.device, active.gateway, action.switchCode, action.value);
@@ -221,10 +259,12 @@ export class IrrigationSchedulerService {
       try {
         // 관수 종료 이벤트
         this.eventsGateway.emitIrrigationStopped({
+          userId: rule.userId,
           ruleId: rule.id,
           tuyaDeviceId: device.friendlyName,
         });
         this.activeIrrigations.delete(rule.id);
+        await this.clearRunMarker(active.deviceId);
         this.logger.log(`관수 완료: ${rule.name}`);
 
         // 비반복: 이번 주 남은 요일이 없으면 비활성화
@@ -320,6 +360,7 @@ export class IrrigationSchedulerService {
         switchCode,
         value: true,
         label: `${zone.name} ON`,
+        fnKey,
       });
 
       // 2) 교반기 ON (관수 시작과 동시, 관수 종료와 동시에 OFF)
@@ -368,6 +409,7 @@ export class IrrigationSchedulerService {
         switchCode,
         value: false,
         label: `${zone.name} OFF`,
+        fnKey,
       });
 
       // 5) 교반기 OFF (관수 종료와 동시) — 액비 활성 시에만
@@ -404,6 +446,7 @@ export class IrrigationSchedulerService {
         // 1) 예약 타이머 모두 취소
         active.timers.forEach(t => clearTimeout(t));
         this.activeIrrigations.delete(ruleId);
+        await this.clearRunMarker(active.deviceId);
 
         // 2) 현재 ON 상태인 스위치들 OFF 명령 전송
         try {
@@ -442,12 +485,102 @@ export class IrrigationSchedulerService {
           }),
         );
 
-        this.eventsGateway.emitIrrigationStopped({ ruleId, tuyaDeviceId: friendlyName });
+        this.eventsGateway.emitIrrigationStopped({ userId: active.userId, ruleId, tuyaDeviceId: friendlyName });
         this.logger.log(`관수 강제 중단: ruleId=${ruleId}`);
         return true;
       }
     }
     return false;
+  }
+
+  /** 원격제어 OFF(devices.service) → 진행 중인 관수 타임라인 중단 */
+  @OnEvent('irrigation.remote-off')
+  async onRemoteOff(payload: { friendlyName: string }) {
+    if (payload?.friendlyName && (await this.stopByDevice(payload.friendlyName))) {
+      this.logger.log(`원격제어 OFF → 진행 중 관수 중단: ${payload.friendlyName}`);
+    }
+  }
+
+  /**
+   * 서버 재시작 복구: 재시작 전에 진행 중이던 관수(예약 타이머는 메모리라 사라짐)는
+   * 구역·교반기·액비모터를 모두 OFF 해 밸브가 열린 채 남지 않게 한다. 남은 구역은 실행하지 않는다.
+   * MQTT 연결을 기다리기 위해 부팅 20초 후 실행.
+   */
+  onApplicationBootstrap() {
+    setTimeout(() => { void this.recoverInterruptedRuns(); }, 20_000).unref?.();
+  }
+
+  async recoverInterruptedRuns() {
+    let devices: Device[] = [];
+    try {
+      devices = await this.devicesRepo
+        .createQueryBuilder('d')
+        .where(`d.device_settings ? 'irrigationRun'`)
+        .getMany();
+    } catch (err: any) {
+      this.logger.warn(`관수 복구 조회 실패: ${err.message}`);
+      return;
+    }
+    for (const device of devices) {
+      const run = (device.deviceSettings as any)?.irrigationRun as IrrigationRunMarker | undefined;
+      if (!run || [...this.activeIrrigations.values()].some((a) => a.deviceId === device.id)) continue;
+      try {
+        const gateway = device.gatewayId ? await this.gatewayRepo.findOne({ where: { id: device.gatewayId } }) : null;
+        if (gateway) {
+          const mapping = this.devicesService.getEffectiveMapping(device);
+          const offCodes = Object.entries(mapping)
+            .filter(([key]) => key.startsWith('zone_') || key === 'mixer' || key === 'fertilizer_motor')
+            .map(([, code]) => code);
+          for (const code of offCodes) {
+            await this.devicesService.publishDeviceSwitch(device, gateway, code, false).catch(() => undefined);
+          }
+        }
+        await this.clearRunMarker(device.id);
+        await this.logsRepo.save(this.logsRepo.create({
+          ruleId: run.ruleId,
+          userId: device.userId,
+          success: false,
+          conditionsMet: { type: 'irrigation_interrupted', deviceName: device.name, startedAt: run.startedAt },
+          actionsExecuted: { status: 'interrupted', reason: 'server_restart' },
+        }));
+        this.eventsGateway.sendNotification(device.userId, {
+          type: 'warning',
+          title: '💧 관수 중단',
+          message: `${device.name}: 서버 재시작으로 진행 중이던 관수(${run.ruleName})를 안전하게 중단했습니다. 남은 구역은 실행되지 않았습니다.`,
+        });
+        this.logger.warn(`서버 재시작 복구: 진행 중 관수 안전 정지 — ${device.name} (${run.ruleName})`);
+      } catch (err: any) {
+        this.logger.error(`관수 복구 실패: ${device.name} - ${err.message}`);
+      }
+    }
+  }
+
+  /** 수동 타이머(channelOverrides)가 아직 유효한 기능 키 목록 */
+  private heldChannelKeys(device: Device): Set<string> {
+    const held = new Set<string>();
+    const chOv = (device.deviceSettings as any)?.channelOverrides;
+    if (chOv && typeof chOv === 'object') {
+      const nowMs = Date.now();
+      for (const [key, o] of Object.entries<any>(chOv)) {
+        if (o?.until && new Date(o.until).getTime() > nowMs) held.add(key);
+      }
+    }
+    return held;
+  }
+
+  /** device_settings 의 다른 키를 덮어쓰지 않도록 jsonb 부분 갱신 */
+  private async setRunMarker(deviceId: string, marker: IrrigationRunMarker) {
+    await this.devicesRepo.query(
+      `UPDATE devices SET device_settings = jsonb_set(COALESCE(device_settings, '{}'::jsonb), '{irrigationRun}', $2::jsonb) WHERE id::text = $1`,
+      [deviceId, JSON.stringify(marker)],
+    ).catch((e: any) => this.logger.warn(`관수 진행 표시 저장 실패: ${e.message}`));
+  }
+
+  private async clearRunMarker(deviceId: string) {
+    await this.devicesRepo.query(
+      `UPDATE devices SET device_settings = device_settings - 'irrigationRun' WHERE id::text = $1 AND device_settings ? 'irrigationRun'`,
+      [deviceId],
+    ).catch((e: any) => this.logger.warn(`관수 진행 표시 삭제 실패: ${e.message}`));
   }
 
   private async fetchGroupName(groupId: string | null | undefined): Promise<string | null> {

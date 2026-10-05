@@ -500,6 +500,10 @@ ${protectionInfo}
     const value = command === 'on' || command === 'open';
     const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
     try {
+      // 개폐기 수동 조작은 앱 버튼과 동일하게 먼저 이 개폐기의 활성 룰을 정지 — 안 하면 다음 주기에 룰이 반대로 움직임
+      if (isOpener) {
+        await this.automationService.stopActiveRulesForDevice(effectiveUserId, device.id).catch(() => undefined);
+      }
       await this.devicesService.controlDevice(device.id, effectiveUserId, [
         { code: 'switch_1', value },
       ]);
@@ -536,62 +540,11 @@ ${protectionInfo}
       const rule = rules.find((r) => r.id === ruleId);
       if (!rule) return { success: false, speech: '해당 룰을 찾을 수 없습니다.', action: 'automation_run' };
 
-      // 현재 시간 +1분 계산 (KST)
-      const nextMin = new Date(Date.now() + 60 * 1000);
-      const kst = new Date(nextMin.getTime() + 9 * 60 * 60 * 1000);
-      const hh = String(kst.getUTCHours()).padStart(2, '0');
-      const mm = String(kst.getUTCMinutes()).padStart(2, '0');
-      const newStartTime = `${hh}:${mm}`;
-
-      const originalConditions = JSON.parse(JSON.stringify(rule.conditions || {}));
-      const wasEnabled = rule.enabled;
-
-      // 관수(irrigation) 룰: startTime만 변경
-      if (originalConditions.type === 'irrigation') {
-        const newConditions = { ...originalConditions, startTime: newStartTime };
-        await this.automationService.update(rule.id, effectiveUserId, {
-          conditions: newConditions,
-          enabled: true,
-        } as any);
-      } else {
-        // 일반 자동화: 시간 조건을 1회성으로 교체
-        const h = kst.getUTCHours();
-        const m = kst.getUTCMinutes();
-        const origFirstCond = originalConditions?.groups?.[0]?.conditions?.[0] || {};
-        const onceCondition: any = {
-          field: 'hour',
-          operator: 'between',
-          value: [h * 100 + m, h * 100 + m + 2],
-          scheduleType: 'once',
-          daysOfWeek: [],
-        };
-        if (origFirstCond.relay) {
-          onceCondition.relay = origFirstCond.relay;
-          onceCondition.relayOnMinutes = origFirstCond.relayOnMinutes;
-          onceCondition.relayOffMinutes = origFirstCond.relayOffMinutes;
-        }
-        await this.automationService.update(rule.id, effectiveUserId, {
-          conditions: { ...originalConditions, groups: [{ logic: 'AND', conditions: [onceCondition] }] },
-          enabled: true,
-        } as any);
-      }
-
-      this.logger.log(`1회성 즉시 실행 등록: ${rule.name} → ${newStartTime}`);
-
-      // 3분 뒤 원래 조건으로 복원
-      setTimeout(async () => {
-        try {
-          await this.automationService.update(rule.id, effectiveUserId, {
-            conditions: originalConditions,
-            enabled: wasEnabled,
-          } as any);
-          this.logger.log(`조건 복원 완료: ${rule.name}`);
-        } catch (e) {
-          this.logger.error(`조건 복원 실패: ${rule.name} — ${e.message}`);
-        }
-      }, 180 * 1000);
-
-      return { success: true, speech: `${rule.name} 룰을 ${newStartTime}에 실행하도록 등록했습니다. 약 1분 뒤 실행됩니다.`, action: 'automation_run' };
+      // 룰 조건을 바꾸지 않고 즉시 1회 실행 (이전: 조건을 임시 교체 후 3분 뒤 메모리 타이머로 복원 →
+      // 그 사이 서버가 재시작되면 원래 조건이 영구 소실되던 문제)
+      await this.automationService.runRuleNow(rule.id, effectiveUserId);
+      this.logger.log(`음성 즉시 실행: ${rule.name}`);
+      return { success: true, speech: `${rule.name} 룰을 지금 실행했습니다.`, action: 'automation_run' };
     } catch (error) {
       return { success: false, speech: '실행 등록에 실패했습니다.', action: 'automation_run' };
     }

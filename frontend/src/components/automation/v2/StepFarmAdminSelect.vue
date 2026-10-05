@@ -36,8 +36,8 @@
           </svg>
         </span>
         <div class="farm-info">
-          <span class="farm-name">{{ farm.name }}</span>
-          <span class="farm-meta">@{{ farm.username }}</span>
+          <span class="farm-name">{{ farm.farmName || farm.name }}</span>
+          <span class="farm-meta">{{ farm.name }} · @{{ farm.username }}</span>
         </div>
         <!-- 우측 라디오 원 -->
         <span class="radio-mark" :class="{ checked: modelValue === farm.id }" aria-hidden="true">

@@ -5,7 +5,14 @@ export interface User {
   role: 'admin' | 'farm_admin' | 'farm_user'
   parentUserId?: string | null
   parentUserName?: string | null
+  /** 소속 농장 이름 (사용자 목록 API — 농장 사용자의 부모 농장) */
+  parentFarmName?: string | null
   address?: string
+  /**
+   * 농장 이름. 사용자 목록 API: 농장 관리자 본인 값(그 외 null).
+   * 로그인·/auth/me: 내가 속한 농장 이름(농장 관리자=자기 농장, 농장 사용자=소속 농장)
+   */
+  farmName?: string | null
   status: 'active' | 'inactive'
   mustChangePassword?: boolean
   createdAt: string

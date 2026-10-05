@@ -9,11 +9,11 @@
       <div class="modal-body">
         <form @submit.prevent="handleSubmit">
           <div class="form-group">
-            <label>이름 *</label>
+            <label>이름 (사람) *</label>
             <input
               v-model="formData.name"
               type="text"
-              placeholder="사용자 이름"
+              placeholder="계정 사용자 이름 (예: 홍길동)"
               class="form-input"
               required
             />
@@ -54,21 +54,36 @@
             </select>
           </div>
 
-          <div v-if="formData.role === 'farm_user'" class="form-group">
-            <label>소속 농장 (농장 관리자) *</label>
-            <select v-model="formData.parentUserId" class="form-select" required>
-              <option value="">선택하세요</option>
-              <option v-for="admin in farmAdmins" :key="admin.id" :value="admin.id">
-                {{ admin.name }} ({{ admin.username }})
-              </option>
-            </select>
+          <div v-if="formData.role === 'farm_admin'" class="form-group">
+            <label>농장 이름 *</label>
+            <input
+              v-model="formData.farmName"
+              type="text"
+              placeholder="예: 하교농장"
+              class="form-input"
+              maxlength="100"
+              required
+            />
             <p class="help-text">
-              농장 사용자는 선택한 농장 관리자의 장치/측정기/구역 데이터를 공유합니다
+              농장 목록·구역·알림 등에 표시되는 이름입니다. 위의 '이름'(사람)과 따로 관리됩니다
             </p>
           </div>
 
-          <div class="form-group">
-            <label>주소</label>
+          <div v-if="formData.role === 'farm_user'" class="form-group">
+            <label>소속 농장 *</label>
+            <select v-model="formData.parentUserId" class="form-select" required>
+              <option value="">선택하세요</option>
+              <option v-for="admin in farmAdmins" :key="admin.id" :value="admin.id">
+                {{ admin.farmName || admin.name }} — 관리자 {{ admin.name }} ({{ admin.username }})
+              </option>
+            </select>
+            <p class="help-text">
+              농장 사용자는 소속 농장의 장치/측정기/구역 데이터를 함께 사용합니다
+            </p>
+          </div>
+
+          <div v-if="formData.role !== 'farm_user'" class="form-group">
+            <label>{{ formData.role === 'farm_admin' ? '농장 위치 (주소)' : '주소' }}</label>
             <div class="address-grid">
               <select v-model="selectedLevel1" class="form-select">
                 <option value="">시/도 선택</option>
@@ -99,6 +114,7 @@
             </div>
             <p class="help-text">
               오입력 방지를 위해 시/도, 시/군/구를 선택하세요. 상세 주소는 선택 입력입니다.
+              <template v-if="formData.role === 'farm_admin'"> 날씨 정보는 이 위치 기준입니다.</template>
             </p>
           </div>
 
@@ -128,6 +144,8 @@ interface UserFormData {
   role: 'admin' | 'farm_admin' | 'farm_user'
   parentUserId?: string
   address?: string
+  /** 농장 이름 (농장 관리자만) */
+  farmName?: string | null
   password?: string
   [key: string]: any
 }
@@ -157,7 +175,7 @@ const formData = ref<UserFormData>({
   password: ''
 })
 
-const farmAdmins = ref<{ id: string; name: string; username: string }[]>([])
+const farmAdmins = ref<{ id: string; name: string; username: string; farmName?: string | null }[]>([])
 
 watch(() => props.show, async (show) => {
   if (show) {
@@ -217,6 +235,8 @@ watch(
     if (newUser) {
       formData.value = {
         ...newUser,
+        // 기존 농장 관리자: 저장된 농장 이름(없으면 계정 이름)으로 시작
+        farmName: newUser.farmName || (newUser.role === 'farm_admin' ? newUser.name : ''),
         password: '',
       }
     } else {
@@ -225,6 +245,7 @@ watch(
         username: '',
         role: 'farm_admin',
         address: '',
+        farmName: '',
         password: ''
       }
     }
@@ -281,6 +302,10 @@ function syncAddress() {
 const handleSubmit = () => {
   if (selectedLevel1.value && !selectedLevel2.value) {
     alert('시/군/구를 선택해 주세요.')
+    return
+  }
+  if (formData.value.role === 'farm_admin' && !formData.value.farmName?.trim()) {
+    alert('농장 이름을 입력해 주세요.')
     return
   }
   syncAddress()

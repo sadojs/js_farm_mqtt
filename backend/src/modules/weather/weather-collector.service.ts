@@ -23,7 +23,8 @@ export class WeatherCollectorService {
     const users = await this.userRepo.find({
       where: { status: 'active' },
     });
-    const usersWithAddress = users.filter((u) => u.address);
+    // 날씨는 농장 단위 — 농장 사용자는 소속 농장(부모)의 날씨를 쓰므로 수집하지 않는다
+    const usersWithAddress = users.filter((u) => u.address && u.role !== 'farm_user');
 
     const now = new Date();
     now.setMinutes(0, 0, 0);

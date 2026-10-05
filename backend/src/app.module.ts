@@ -36,6 +36,7 @@ import { WorkLogModule } from './modules/work-log/work-log.module';
 import { ZoneNotesModule } from './modules/zone-notes/zone-notes.module';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { RetentionService } from './common/retention.service';
+import { FarmContextModule } from './common/farm-context/farm-context.module';
 
 @Module({
   imports: [
@@ -54,6 +55,8 @@ import { RetentionService } from './common/retention.service';
         logging: config.get('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error'],
       }),
     }),
+    // 관리자 농장 컨텍스트(X-Farm-Context, 옵트인). 헤더 없는 요청은 영향 없음.
+    FarmContextModule,
     AuthModule,
     UsersModule,
     DevicesModule,

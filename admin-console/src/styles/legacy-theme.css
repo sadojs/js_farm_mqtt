@@ -1,0 +1,105 @@
+/*
+ * 기존 화면 임베드(LegacyHost)용 테마 — frontend/src/App.vue 전역 <style> 의 라이트 테마 값을 그대로 옮김.
+ * 기존 앱은 이 변수를 #app 에 정의하지만 콘솔은 #app-root 에 마운트하므로 여기서 다시 제공한다.
+ * (기존 파일은 수정하지 않음. 값이 바뀌면 이 파일도 맞춰야 한다.)
+ * 모달이 body 로 텔레포트되는 경우가 있어 변수는 :root 에 둔다 — 콘솔 자체 변수는 --c-* 라 충돌 없음.
+ */
+:root {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f5f5;
+  --bg-active: #e8f5e9;
+  --bg-input: #ffffff;
+  --bg-badge: #f0f0f0;
+  --bg-sensor: #f8f0ff;
+  --bg-actuator: #f0faf0;
+  --bg-condition: #f1f8e9;
+  --bg-action: #e8f5e9;
+  --bg-info-banner: #e3f2fd;
+  --text-primary: #333333;
+  --text-secondary: #555555;
+  --text-muted: #999999;
+  --text-link: #666666;
+  --text-info-banner: #1565c0;
+  --border-color: #d0d0d0;
+  --border-light: #e8e8e8;
+  --border-card: #d0d0d0;
+  --border-input: #e0e0e0;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --accent: #2e7d32;
+  --accent-hover: #1b5e20;
+  --accent-bg: #e8f5e9;
+  --accent-text: #2e7d32;
+  --danger: #e53935;
+  --danger-hover: #c62828;
+  --danger-bg: #ffebee;
+  --warning: #ff9800;
+  --warning-hover: #f57c00;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --warning-border: #fde68a;
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --danger-badge-bg: #fee2e2;
+  --danger-badge-text: #991b1b;
+  --diff-old: #dc2626;
+  --diff-new: #16a34a;
+  --sensor-accent: #7b1fa2;
+  --sensor-bg: #ede7f6;
+  --sensor-value-bg: #f8f0ff;
+  --automation-bg: #fff3e0;
+  --automation-text: #e65100;
+  --chart-primary: #4caf50;
+  --chart-bg: rgba(76, 175, 80, 0.2);
+  --toggle-off: #cccccc;
+  --toggle-on: #4caf50;
+  --overlay: rgba(0, 0, 0, 0.5);
+  /* 글자 크기 (기존 기본 = 보통) */
+  --content-scale: 1;
+  --font-size-display: 38px;
+  --font-size-title: 26px;
+  --font-size-subtitle: 22px;
+  --font-size-body: 18px;
+  --font-size-label: 16px;
+  --font-size-caption: 14px;
+  --font-size-tiny: 13px;
+}
+
+/* 기존 전역 리셋 — 임베드 영역·기존 모달 안에서만, 명시도 0 으로 (기존 컴포넌트 스타일이 항상 우선) */
+:where(.legacy-scope, .modal-overlay) *,
+:where(.legacy-scope, .modal-overlay) *::before,
+:where(.legacy-scope, .modal-overlay) *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 임베드 래퍼는 기존 .main-content 클래스를 함께 달아 본문 글꼴 규칙(기존 App.vue)을 그대로 받는다.
+   레이아웃 관련(고정 높이·사이드바 여백·전체 높이)만 콘솔 셸에 맞게 되돌린다. */
+.legacy-scope.main-content {
+  font-size: var(--font-size-body);
+  line-height: 1.55;
+  color: var(--text-primary);
+  background: transparent;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  padding: 8px 8px 24px;
+}
+/* 명시도는 기존과 동일하게 유지 (:where 로 .legacy-scope 를 0 처리) — 컴포넌트 scoped 스타일이 이길 곳은 그대로 이기도록 */
+:where(.legacy-scope).main-content p, :where(.legacy-scope).main-content li, :where(.legacy-scope).main-content td,
+:where(.legacy-scope).main-content th, :where(.legacy-scope).main-content label, :where(.legacy-scope).main-content input,
+:where(.legacy-scope).main-content select, :where(.legacy-scope).main-content textarea, :where(.legacy-scope).main-content button {
+  font-size: var(--font-size-body);
+}
+:where(.legacy-scope).main-content small, :where(.legacy-scope).main-content .help-text, :where(.legacy-scope).main-content .rule-summary,
+:where(.legacy-scope).main-content .page-description, :where(.legacy-scope).main-content .target-label, :where(.legacy-scope).main-content .priority-badge {
+  font-size: var(--font-size-label) !important;
+}
+:where(.legacy-scope).main-content .page-header h2, :where(.legacy-scope).main-content .rule-name,
+:where(.legacy-scope).main-content .modal-title, :where(.legacy-scope).main-content .step-title {
+  font-size: var(--font-size-subtitle) !important;
+}

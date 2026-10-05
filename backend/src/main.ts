@@ -4,8 +4,11 @@ import * as helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { acquireInstanceLock } from './common/instance-lock';
 
 async function bootstrap() {
+  // 자동제어·스케줄러 중복 실행 방지 — 다른 인스턴스가 돌고 있으면 기다렸다가, 끝내 안 되면 기동 중단
+  await acquireInstanceLock();
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 

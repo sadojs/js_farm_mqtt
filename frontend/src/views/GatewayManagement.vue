@@ -353,7 +353,7 @@
         <div class="form-group">
           <label>소유 농장</label>
           <select v-model="form.userId">
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.username }})</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.farmName || u.name }} ({{ u.username }})</option>
           </select>
         </div>
         <div class="form-group">
@@ -432,7 +432,7 @@ const showAddModal = ref(false)
 const editTarget = ref<GatewayWithTunnel | null>(null)
 const saving = ref(false)
 const zoneAssigning = ref<string | null>(null)
-const users = ref<{ id: string; name: string; username: string }[]>([])
+const users = ref<{ id: string; name: string; username: string; farmName?: string | null }[]>([])
 const houses = ref<{ id: string; name: string }[]>([])
 const groups = ref<HouseGroupWithOwner[]>([])
 
@@ -475,7 +475,7 @@ onBeforeUnmount(() => {
 
 function farmNameOf(userId: string): string {
   const u = users.value.find(u => u.id === userId)
-  return u ? u.name : '알 수 없음'
+  return u ? (u.farmName || u.name) : '알 수 없음'
 }
 
 function farmUsernameOf(userId: string): string {

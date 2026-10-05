@@ -1,12 +1,15 @@
 'use strict';
 
 const mqtt   = require('mqtt');
+const fs     = require('fs');
 const { spawn, execSync } = require('child_process');
 
 const GATEWAY_ID  = process.env.GATEWAY_ID   || 'lgw-dev';
 const MQTT_SERVER = process.env.MQTT_SERVER   || 'mqtt://localhost:1883';
 const MQTT_USER   = process.env.MQTT_USERNAME || '';
 const MQTT_PASS   = process.env.MQTT_PASSWORD || '';
+// 비상 정지 유지(래치) 파일 — fallback-engine 이 기록. 존재하면 ON 명령 거부(OFF 는 허용).
+const EMERGENCY_LATCH_PATH = process.env.EMERGENCY_LATCH_PATH || '/var/lib/smartfarm/fallback/emergency.json';
 // 릴레이 모듈이 active-low인 경우 true (연결 시 자동 ON되는 모듈)
 const ACTIVE_LOW  = process.env.GPIO_ACTIVE_LOW === 'true';
 // gpiochip 번호 (RPi 5는 gpiochip4, RPi 3B/4는 gpiochip0)
@@ -173,6 +176,13 @@ async function processRelayCommand(msg) {
 
   if (!BCM_VALID.has(pin)) {
     console.warn(`[GPIO] 유효하지 않은 핀: BCM ${pin}`);
+    return;
+  }
+
+  // 비상 정지 유지 중이면 ON 거부 (서버도 차단하지만 Pi 에서 한 번 더 — 마지막 방어선)
+  if (state === true && fs.existsSync(EMERGENCY_LATCH_PATH)) {
+    console.warn(`[GPIO] 🛑 비상 정지 유지 중 — BCM ${pin} (${slot}) ON 거부`);
+    publishStatus({ requestId, slot, pin, state: false, rejected: 'emergency-latched' });
     return;
   }
 

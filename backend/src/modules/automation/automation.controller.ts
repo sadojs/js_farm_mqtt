@@ -30,6 +30,7 @@ export class AutomationController {
   }
 
   @Post('rules')
+  @Roles('admin', 'farm_admin')
   async create(@CurrentUser() user: any, @Body() dto: CreateRuleDto) {
     // admin이 룰을 만들 때 user_id 결정 우선순위:
     //   1) targetUserId 명시 → 그 사용자
@@ -65,6 +66,7 @@ export class AutomationController {
   }
 
   @Put('rules/:id')
+  @Roles('admin', 'farm_admin')
   async update(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: UpdateRuleDto) {
     const result = await this.automationService.update(id, this.getEffectiveUserId(user), dto);
     this.activityLog.log({
@@ -77,6 +79,7 @@ export class AutomationController {
   }
 
   @Patch('rules/:id/toggle')
+  @Roles('admin', 'farm_admin')
   async toggle(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -95,11 +98,13 @@ export class AutomationController {
   }
 
   @Post('rules/:id/run')
+  @Roles('admin', 'farm_admin')
   runNow(@Param('id') id: string, @CurrentUser() user: any) {
     return this.automationService.runRuleNow(id, this.getEffectiveUserId(user));
   }
 
   @Delete('rules/:id')
+  @Roles('admin', 'farm_admin')
   async remove(@Param('id') id: string, @CurrentUser() user: any) {
     const result = await this.automationService.remove(id, this.getEffectiveUserId(user));
     this.activityLog.log({
@@ -116,6 +121,7 @@ export class AutomationController {
   }
 
   @Post('rules/bulk-disable')
+  @Roles('admin', 'farm_admin')
   bulkDisableByDevice(@CurrentUser() user: any, @Body() dto: { deviceId: string }) {
     return this.automationService.bulkDisableByDevice(this.getEffectiveUserId(user), dto.deviceId);
   }

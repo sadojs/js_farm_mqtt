@@ -37,6 +37,14 @@ export function onFallbackModeChanged(fn: FallbackModeHandler) {
   return () => fallbackModeHandlers.delete(fn)
 }
 
+// 비상 정지 유지 상태 변경
+type EmergencyStateHandler = (data: { gatewayId: string; active: boolean; piConfirmed: boolean; [k: string]: unknown }) => void
+const emergencyStateHandlers = new Set<EmergencyStateHandler>()
+export function onEmergencyState(fn: EmergencyStateHandler) {
+  emergencyStateHandlers.add(fn)
+  return () => emergencyStateHandlers.delete(fn)
+}
+
 type FallbackEventHandler = (data: {
   gatewayId: string
   eventType: string
@@ -239,6 +247,9 @@ export function useWebSocket() {
     })
     socket.on('fallback:event', (data: Parameters<FallbackEventHandler>[0]) => {
       fallbackEventHandlers.forEach(fn => fn(data))
+    })
+    socket.on('emergency:state', (data: Parameters<EmergencyStateHandler>[0]) => {
+      emergencyStateHandlers.forEach(fn => fn(data))
     })
 
     // 고온 무대기 강제열림 상태 (구역 단위)

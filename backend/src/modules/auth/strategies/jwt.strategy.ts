@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { getCachedUserActive, setCachedUserActive } from '../../../common/auth/user-status-cache';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -12,7 +14,7 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService, private readonly dataSource: DataSource) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -21,6 +23,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // 비활성화·삭제된 계정은 아직 만료 전인 access token 으로도 사용 불가 (최대 30초 캐시)
+    let active = getCachedUserActive(payload.sub);
+    if (active === undefined) {
+      const [row] = await this.dataSource.query('SELECT status FROM users WHERE id::text = $1', [payload.sub]);
+      active = row?.status === 'active';
+      setCachedUserActive(payload.sub, active);
+    }
+    if (!active) throw new UnauthorizedException('비활성화되었거나 삭제된 계정입니다.');
     return { id: payload.sub, username: payload.username, role: payload.role, parentUserId: payload.parentUserId || null };
   }
 }

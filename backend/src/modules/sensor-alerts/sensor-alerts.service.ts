@@ -61,9 +61,9 @@ export class SensorAlertsService {
     } catch (e) {
       this.logger.error(`[Alert Deliver] 웹소켓 전송 실패: ${(e as Error).message}`);
     }
-    // 모바일 푸시 — 자격증명 미설정 시 안전하게 no-op
+    // 모바일 푸시 — 농장 관리자 + 소속 농장 사용자 전원. 자격증명 미설정 시 안전하게 no-op
     try {
-      await this.notifications.sendToUser(a.userId, {
+      await this.notifications.sendToFarm(a.userId, {
         title,
         body: message,
         data: { type: sensorType, severity },

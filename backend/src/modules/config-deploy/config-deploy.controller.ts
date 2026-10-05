@@ -18,10 +18,13 @@ import { spawn } from 'child_process';
 import { join, resolve as resolvePath } from 'path';
 import { existsSync } from 'fs';
 import type { Response } from 'express';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
+import { GatewayOwnershipGuard } from '../../common/guards/gateway-ownership.guard';
 import {
   CommonConfig, DeployResult, PreviewResult, RemoteConfigAccepted,
 } from './config-deploy.types';
 
+@PlatformScope()
 @Controller('config-deploy')
 export class ConfigDeployController {
   constructor(
@@ -78,7 +81,7 @@ export class ConfigDeployController {
 
   @Post(':gatewayId/wifi')
   @HttpCode(HttpStatus.ACCEPTED)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, GatewayOwnershipGuard)
   @Roles('admin', 'farm_admin')
   requestWifi(
     @Param('gatewayId') gatewayId: string,
@@ -93,7 +96,7 @@ export class ConfigDeployController {
 
   @Post(':gatewayId/hostname')
   @HttpCode(HttpStatus.ACCEPTED)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, GatewayOwnershipGuard)
   @Roles('admin', 'farm_admin')
   requestHostname(
     @Param('gatewayId') gatewayId: string,

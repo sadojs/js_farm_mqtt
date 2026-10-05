@@ -18,14 +18,20 @@ import { FallbackConfigService } from './fallback-config.service';
 import { UpdateFallbackConfigDto } from './dto/update-config.dto';
 import { UpsertOpenerScheduleDto } from './dto/upsert-opener-schedule.dto';
 import { MqttService } from '../mqtt/mqtt.service';
+import { EmergencyStopService } from './emergency-stop.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HeartbeatService } from './heartbeat.service';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
+import { GatewayOwnershipGuard } from '../../common/guards/gateway-ownership.guard';
 
+@PlatformScope()
 @Controller('fallback-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, GatewayOwnershipGuard)
 export class FallbackConfigController {
   constructor(
     private readonly service: FallbackConfigService,
     private readonly mqtt: MqttService,
+    private readonly emergency: EmergencyStopService,
     private readonly heartbeat: HeartbeatService,
   ) {}
 
@@ -47,7 +53,9 @@ export class FallbackConfigController {
   @Get(':gatewayId')
   @Roles('admin', 'farm_admin')
   async getFull(@Param('gatewayId') gatewayId: string) {
-    return this.service.getFullConfig(gatewayId);
+    const full = await this.service.getFullConfig(gatewayId);
+    const emergency = await this.emergency.status(gatewayId).catch(() => null);
+    return { ...full, emergency };
   }
 
   @Patch(':gatewayId')
@@ -106,18 +114,32 @@ export class FallbackConfigController {
     return { ok: true };
   }
 
-  /** 비상 정지 (폴백 모드에서도 통과) */
+  /**
+   * 비상 정지 — 정지 유지(래치). 해제 전까지 서버·Pi 모두 이 게이트웨이 릴레이 ON 차단.
+   * 실행자는 로그인 사용자로 기록(본문 by 는 무시 — 이전엔 'admin' 고정).
+   */
   @Post(':gatewayId/emergency-stop')
   @Roles('admin', 'farm_admin')
   async emergencyStop(
     @Param('gatewayId') gatewayId: string,
-    @Body() body: { reason: string; by: string },
+    @Body() body: { reason?: string },
+    @CurrentUser() user: any,
   ) {
-    await this.mqtt.publishEmergencyStop(
-      gatewayId,
-      body.reason ?? 'manual',
-      body.by ?? 'unknown',
-    );
-    return { ok: true };
+    const res = await this.emergency.stop(gatewayId, { id: user.id, username: user.username }, body?.reason || 'manual');
+    return { ok: true, ...res };
+  }
+
+  /** 비상 정지 해제 — 장비는 꺼진 상태 그대로, 자동제어·수동 조작이 다시 가능해진다 */
+  @Post(':gatewayId/emergency-release')
+  @Roles('admin', 'farm_admin')
+  async emergencyRelease(@Param('gatewayId') gatewayId: string, @CurrentUser() user: any) {
+    const res = await this.emergency.release(gatewayId, { id: user.id, username: user.username });
+    return { ok: true, ...res };
+  }
+
+  @Get(':gatewayId/emergency')
+  @Roles('admin', 'farm_admin', 'farm_user')
+  async emergencyStatus(@Param('gatewayId') gatewayId: string) {
+    return this.emergency.status(gatewayId);
   }
 }

@@ -15,6 +15,7 @@ import { WorkerPayrollService } from './worker-payroll.service';
 import { SaveWorkerDto } from './dto/worker.dto';
 import { UpsertAdvanceDto } from './dto/advance.dto';
 import { SetDayDto } from './dto/day-override.dto';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
 @Controller('worker-payroll')
 @UseGuards(JwtAuthGuard)
@@ -41,6 +42,7 @@ export class WorkerPayrollController {
   }
 
   /** 일꾼 본인 프로필 (farm_user 진입점) */
+  @PlatformScope()
   @Get('me')
   getMe(@CurrentUser() user: any) {
     return this.service.getMyWorker(user.id);

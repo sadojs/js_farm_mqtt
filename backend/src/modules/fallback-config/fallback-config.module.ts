@@ -10,6 +10,8 @@ import { FallbackConfigController } from './fallback-config.controller';
 import { HeartbeatService } from './heartbeat.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { GatewayModule } from '../gateway/gateway.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { EmergencyStopService } from './emergency-stop.service';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Device } from '../devices/entities/device.entity';
@@ -28,9 +30,10 @@ import { Device } from '../devices/entities/device.entity';
     ]),
     forwardRef(() => MqttModule),
     GatewayModule,
+    ActivityLogModule,
   ],
   controllers: [FallbackConfigController],
-  providers: [FallbackConfigService, HeartbeatService],
+  providers: [FallbackConfigService, HeartbeatService, EmergencyStopService],
   exports: [FallbackConfigService],
 })
 export class FallbackConfigModule {}

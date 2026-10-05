@@ -4,7 +4,9 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { NotificationsService } from './notifications.service';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
+@PlatformScope()
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {

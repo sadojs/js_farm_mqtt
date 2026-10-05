@@ -16,6 +16,9 @@ class CommandGate {
 
   shouldExecute(cmd) {
     if (this.fsm.mode === 'online') return true;
+    // 서버 하트비트가 돌아와 온라인 전환 대기(grace) 중 — 제어권은 이미 서버에 넘어감(폴백은 새 명령을 멈춤).
+    // 이전: grace 동안 서버 GPIO 명령은 막히고 Zigbee 명령은 통과 + 폴백도 계속 제어 → 같은 장치 이중 제어.
+    if (this.fsm.serverBack && this.fsm.serverBack()) return true;
 
     // fallback 모드
     if (cmd && cmd.bypass === true) {

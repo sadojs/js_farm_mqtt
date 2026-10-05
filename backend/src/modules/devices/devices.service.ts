@@ -14,6 +14,7 @@ import { IrrigationSchedulerService } from '../automation/irrigation-scheduler.s
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { AVAILABLE_SWITCH_CODES, AVAILABLE_SWITCH_CODES_12CH, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
+import { isGatewayLatched, isOnValue } from '../../common/emergency/emergency-latch';
 
 const DEVICE_DEPENDENCY_SQL = `
   SELECT id, name, enabled FROM automation_rules
@@ -388,8 +389,12 @@ export class DevicesService {
       return { ok: true };
     }
     // 장치 타이머 해제 → override 클리어(자동제어가 다음 tick에 재구동). 개폐기 쌍도 함께.
+    // ON 으로 잡아 둔 팬 타이머를 해제하면 먼저 OFF (만료와 동일 — 룰이 없으면 계속 켜져 있던 문제)
+    if (settings.overrideValue === true) {
+      await this.controlDevice(device.id, userId, [{ code: 'switch_1', value: false }], 'admin', 'automation').catch(() => undefined);
+    }
     for (const did of [device.id, device.pairedDeviceId].filter(Boolean) as string[]) {
-      const d = did === device.id ? device : await this.devicesRepo.findOne({ where: { id: did } });
+      const d = await this.devicesRepo.findOne({ where: { id: did } });
       if (!d) continue;
       const s: any = d.deviceSettings || {};
       s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue; delete s.overrideReason;
@@ -411,29 +416,41 @@ export class DevicesService {
     for (const d of devices) {
       const s: any = d.deviceSettings;
       if (!s) continue;
-      let changed = false;
-      if (s.overrideUntil && new Date(s.overrideUntil).getTime() <= now) {
-        s.userOverride = false; delete s.overrideUntil; delete s.overrideDirection; delete s.overrideValue;
-        changed = true;
-        this.eventEmitter.emit('device.manual.released', { deviceId: d.id });
-        this.logger.log(`[timer-expire] ${d.name} 타이머 만료 → 자동제어 복귀`);
+      const deviceExpired = !!(s.overrideUntil && new Date(s.overrideUntil).getTime() <= now);
+      const expiredChannels = s.channelOverrides && typeof s.channelOverrides === 'object'
+        ? Object.entries<any>(s.channelOverrides).filter(([, ov]) => ov?.until && new Date(ov.until).getTime() <= now).map(([k]) => k)
+        : [];
+      if (!deviceExpired && expiredChannels.length === 0) continue;
+
+      // 1) 장비 명령 먼저 — ON 으로 잡아 둔 팬 타이머는 만료 시 OFF (이전: 플래그만 풀고 OFF 미발행 →
+      //    해당 팬을 다루는 룰이 없으면 무기한 가동). OFF 후 자동제어가 다음 평가에서 필요하면 다시 켠다.
+      if (deviceExpired && s.overrideValue === true) {
+        await this.controlDevice(d.id, d.userId, [{ code: 'switch_1', value: false }], 'admin', 'automation').catch(() => undefined);
       }
-      if (s.channelOverrides && typeof s.channelOverrides === 'object') {
-        const mapping = this.getEffectiveMapping(d);
-        for (const [key, ov] of Object.entries<any>(s.channelOverrides)) {
-          if (ov?.until && new Date(ov.until).getTime() <= now) {
-            const sc = mapping[key];
-            if (sc) await this.controlDevice(d.id, d.userId, [{ code: sc, value: false }], 'admin', 'automation').catch(() => undefined);
-            delete s.channelOverrides[key];
-            changed = true;
-            this.logger.log(`[timer-expire] ${d.name}/${key} 채널 타이머 만료 → OFF·자동제어 복귀`);
-          }
+      const mapping = expiredChannels.length ? this.getEffectiveMapping(d) : {};
+      for (const key of expiredChannels) {
+        const sc = mapping[key];
+        if (sc) await this.controlDevice(d.id, d.userId, [{ code: sc, value: false }], 'admin', 'automation').catch(() => undefined);
+      }
+
+      // 2) controlDevice 가 기록한 switchState 를 덮어쓰지 않도록 최신 상태를 다시 읽어 override 만 정리
+      const fresh = await this.devicesRepo.findOne({ where: { id: d.id } }).catch(() => null);
+      if (!fresh) continue;
+      const fs: any = fresh.deviceSettings || {};
+      if (deviceExpired && fs.overrideUntil && new Date(fs.overrideUntil).getTime() <= now) {
+        fs.userOverride = false; delete fs.overrideUntil; delete fs.overrideDirection; delete fs.overrideValue; delete fs.overrideReason;
+        this.logger.log(`[timer-expire] ${d.name} 타이머 만료 → ${s.overrideValue === true ? 'OFF 후 ' : ''}자동제어 복귀`);
+      }
+      for (const key of expiredChannels) {
+        const ov = fs.channelOverrides?.[key];
+        if (ov?.until && new Date(ov.until).getTime() <= now) {
+          delete fs.channelOverrides[key];
+          this.logger.log(`[timer-expire] ${d.name}/${key} 채널 타이머 만료 → OFF·자동제어 복귀`);
         }
       }
-      if (changed) {
-        d.deviceSettings = s;
-        await this.devicesRepo.save(d).catch(() => undefined);
-      }
+      fresh.deviceSettings = fs;
+      await this.devicesRepo.save(fresh).catch(() => undefined);
+      if (deviceExpired) this.eventEmitter.emit('device.manual.released', { deviceId: d.id });
     }
   }
 
@@ -822,6 +839,11 @@ export class DevicesService {
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     if (!device.friendlyName) throw new BadRequestException('장비의 friendly_name이 설정되지 않았습니다.');
 
+    // ── 비상 정지 유지 중: ON 계열 명령 거부(OFF 는 허용) — 수동·자동·타이머·방재·음성 공통 입구 ──
+    if (isGatewayLatched(device.gatewayId) && commands.some((c) => isOnValue(c.value))) {
+      throw new ConflictException('비상 정지 중인 게이트웨이의 장비입니다. 페일오버 화면에서 비상 정지를 해제한 뒤 다시 시도하세요.');
+    }
+
     // ── 수동 pin/release 정책 ──
     // 사용자 명령(callerSource undefined)일 때만 적용 — 자동제어/rain-override는 영향 없음.
     // 정책:
@@ -847,7 +869,8 @@ export class DevicesService {
         // 단일 ON/OFF 명령만 처리 (관수의 다중 switch는 ruleIntendedState 적용 안 함)
         if (intent != null && (isOnCmd || isOffCmd)) {
           const newValue = isOnCmd;
-          if (settings.userOverride && newValue === intent) {
+          const timerActive = !!(settings.overrideUntil && new Date(settings.overrideUntil).getTime() > Date.now());
+          if (settings.userOverride && newValue === intent && !timerActive) {
             settings.userOverride = false;
             device.deviceSettings = settings;
             await this.devicesRepo.save(device).catch(() => undefined);
@@ -980,6 +1003,8 @@ export class DevicesService {
               this.normalizeForZ2m(offPayload, device.zigbeeModel));
             this.logger.log(`원격제어 OFF: 전체 스위치 OFF — ${device.name}`);
           }
+          // 원격제어 OFF → 진행 중인 관수 타임라인 실제 중단 (이전: 로그만 남기고 이후 구역 ON 이 계속 발행됨)
+          this.eventEmitter.emit('irrigation.remote-off', { friendlyName: device.friendlyName });
           // 원격제어 OFF → 현재 진행 중인 관수 timeline만 중단 (룰 자체는 enabled 유지)
           // (정책 변경 2026-05-28: 의도치 않은 토글로 룰이 비활성화되는 사고 방지.
           //  사용자가 의식적으로 룰을 끄고 싶으면 자동제어 페이지에서 직접 toggle하도록 분리.)

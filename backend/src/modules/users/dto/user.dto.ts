@@ -26,6 +26,12 @@ export class CreateUserDto {
   @IsString()
   address?: string;
 
+  /** 농장 이름 (농장 관리자만 저장됨) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  farmName?: string;
+
   /** 임시 비밀번호 발급 — 첫 로그인 시 비밀번호 변경 강제 */
   @IsOptional()
   @IsBoolean()
@@ -48,6 +54,12 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  /** 농장 이름 (농장 관리자만 저장됨) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  farmName?: string;
 
   @IsOptional()
   @IsIn(['active', 'inactive'])

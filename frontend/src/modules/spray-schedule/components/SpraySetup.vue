@@ -133,7 +133,8 @@ const emit = defineEmits<{ (e: 'changed'): void }>()
 const authStore = useAuthStore()
 const notify = useNotificationStore()
 
-const farmLabel = `${authStore.user?.name ?? '우리'} 농장`
+// 내가 속한 농장 이름 (농장 사용자는 소속 농장) — 이전엔 로그인한 사람 이름으로 "OOO 농장" 이 표시됐음
+const farmLabel = authStore.user?.farmName || '우리 농장'
 
 let keySeq = 0
 const nextKey = () => `k${keySeq++}`

@@ -19,6 +19,7 @@ class RelayBridge {
     this.client = client;
     this.gatewayId = gatewayId;
     this.store = store;
+    this.latched = false;
   }
 
   /** 브로커 연결 여부 — 룰 평가기가 발행 가능 시점을 사전 판단(개폐기 지연 펄스 등). */
@@ -31,6 +32,11 @@ class RelayBridge {
    * false 면 호출부는 in-memory 상태를 커밋하지 말 것 → 다음 eval tick에서 자연 재시도.
    */
   setRelay(channel, state, reason, durationMs) {
+    // 비상 정지 유지 중엔 ON 금지 (OFF 는 허용) — index.js 가 latched 를 설정
+    if (state && this.latched) {
+      console.warn(`[RELAY-BRIDGE] 비상 정지 유지 중 — ${channel} ON 차단`);
+      return false;
+    }
     if (!this.client?.connected) {
       console.warn(`[RELAY-BRIDGE] MQTT 미연결 — ${channel}=${state ? 'ON' : 'OFF'} drop`);
       return false;

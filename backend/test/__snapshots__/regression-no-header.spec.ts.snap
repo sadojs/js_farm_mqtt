@@ -1,0 +1,2920 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/activity-logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "action": "group.update",
+        "createdAt": "<datetime>",
+        "details": null,
+        "groupId": "11111111-0000-4000-8000-000000000010",
+        "groupName": "F1-1동",
+        "id": "11111111-0000-4000-8000-000000000070",
+        "targetId": "11111111-0000-4000-8000-000000000010",
+        "targetName": "F1-1동",
+        "targetType": "group",
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "userName": "F1-농장주",
+      },
+    ],
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/automation/bulk-stopped-rules 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/automation/irrigation/status 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/automation/logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "actionsExecuted": null,
+        "conditionsMet": null,
+        "errorMessage": null,
+        "executedAt": "<datetime>",
+        "id": "11111111-0000-4000-8000-000000000051",
+        "ruleId": "11111111-0000-4000-8000-000000000050",
+        "ruleName": "F1-환기룰",
+        "success": true,
+        "userId": "11111111-0000-4000-8000-000000000001",
+      },
+    ],
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/automation/logs/stats 1`] = `
+{
+  "body": {
+    "mostActiveRule": "F1-환기룰",
+    "successRate": 100,
+    "todayCount": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/automation/rules 1`] = `
+{
+  "body": [
+    {
+      "actions": {
+        "action": "on",
+        "targetDeviceId": "11111111-0000-4000-8000-000000000041",
+        "targetDeviceIds": [
+          "11111111-0000-4000-8000-000000000041",
+        ],
+      },
+      "conditions": {
+        "groups": [
+          {
+            "conditions": [
+              {
+                "field": "time",
+                "operator": "between",
+                "type": "time",
+                "value": {
+                  "end": "07:00",
+                  "start": "06:00",
+                },
+              },
+            ],
+            "logic": "AND",
+          },
+        ],
+        "logic": "AND",
+      },
+      "createdAt": "<datetime>",
+      "description": null,
+      "disabledAt": null,
+      "disabledReason": null,
+      "displayOrder": 0,
+      "enabled": true,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000050",
+      "name": "F1-환기룰",
+      "priority": 0,
+      "ruleType": "time",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/crop-management/batches 1`] = `
+{
+  "body": [
+    {
+      "baseTemp": "10.0",
+      "borrowedGroupId": null,
+      "createdAt": "<datetime>",
+      "cropType": "tomato",
+      "greenhouseOffset": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000110",
+      "isActive": true,
+      "notes": "F1-배치",
+      "offsetCalibratedAt": null,
+      "offsetSource": null,
+      "seedlingType": "plug",
+      "sowingDate": "2026-01-01",
+      "targetGdd": null,
+      "tempSource": "auto",
+      "transplantDate": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/crop-management/dashboard 1`] = `
+{
+  "body": [
+    {
+      "batchId": "11111111-0000-4000-8000-000000000110",
+      "cropType": "tomato",
+      "gdd": {
+        "backfilledDays": 0,
+        "currentGdd": 9,
+        "dailyAvg": 9,
+        "offsetInfo": {
+          "strategy": "default",
+          "value": 8,
+        },
+        "progressPct": 1,
+        "sourceBadge": {
+          "color": "orange",
+          "emoji": "🟠",
+          "label": "기상청 + 보정값",
+        },
+        "sourceQuality": "weather_with_offset",
+        "stage": {
+          "emoji": "🌱",
+          "key": "germination",
+          "label": "발아기",
+        },
+        "targetGdd": 1200,
+        "totalDays": 1,
+      },
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "groupName": "F1-1동",
+      "nextMilestone": null,
+      "sowingDate": "2026-01-01",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/dashboard/widgets 1`] = `
+{
+  "body": {
+    "currentStage": null,
+    "history": null,
+    "inside": null,
+    "trend6h": null,
+    "uvStats14d": null,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/devices 1`] = `
+{
+  "body": [
+    {
+      "category": "sensor",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "sensor",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": null,
+      "friendlyName": "F1-온습도",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000040",
+      "lastSeen": null,
+      "name": "F1-온습도",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "fan",
+      "friendlyName": "F1-유동팬",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000041",
+      "lastSeen": null,
+      "name": "F1-유동팬",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_open",
+      "friendlyName": "F1-개폐기열림",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000042",
+      "lastSeen": null,
+      "name": "F1-개폐기열림",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000043",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_close",
+      "friendlyName": "F1-개폐기닫힘",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000043",
+      "lastSeen": null,
+      "name": "F1-개폐기닫힘",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000042",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/env-config/roles 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/features 1`] = `
+{
+  "body": {
+    "spray_schedule": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "work_log": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "worker_payroll": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/gateways 1`] = `
+{
+  "body": [
+    {
+      "agentStatus": "offline",
+      "bootstrapTokenUsedAt": null,
+      "createdAt": "<datetime>",
+      "emergencyStop": null,
+      "gatewayId": "f1-gw",
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "groupName": "F1-1동",
+      "hostname": null,
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "id": "11111111-0000-4000-8000-000000000030",
+      "lastConfigAppliedAt": null,
+      "lastSeen": null,
+      "location": null,
+      "machineId": null,
+      "name": "F1-게이트웨이",
+      "rpiIp": null,
+      "serverIp": null,
+      "status": "offline",
+      "tunnelLastSeen": null,
+      "tunnelPort": null,
+      "tunnelPublicKey": null,
+      "tunnelStatus": "disconnected",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "wifiSsid": null,
+      "zigbeeStatus": "offline",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/groups 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "description": null,
+      "devices": [],
+      "displayOrder": 0,
+      "enableAutomation": false,
+      "enableGroupControl": true,
+      "houses": [
+        {
+          "area": null,
+          "createdAt": "<datetime>",
+          "description": null,
+          "groupId": "11111111-0000-4000-8000-000000000010",
+          "id": "11111111-0000-4000-8000-000000000020",
+          "iotEnabled": true,
+          "location": null,
+          "name": "F1-하우스",
+          "status": "active",
+          "updatedAt": "<datetime>",
+          "userId": "11111111-0000-4000-8000-000000000001",
+        },
+      ],
+      "id": "11111111-0000-4000-8000-000000000010",
+      "iotEnabled": true,
+      "manager": null,
+      "name": "F1-1동",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/groups/houses 1`] = `
+{
+  "body": [
+    {
+      "area": null,
+      "createdAt": "<datetime>",
+      "description": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000020",
+      "iotEnabled": true,
+      "location": null,
+      "name": "F1-하우스",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/groups/houses/iot-related-counts 1`] = `
+{
+  "body": {
+    "perHouse": [],
+    "totals": {
+      "device": 0,
+      "gateway": 0,
+      "rule": 0,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/reports/actuator-stats?startDate=2026-01-14&endDate=2026-01-16 1`] = `
+{
+  "body": [
+    {
+      "time": "<datetime>",
+      "total_actions": "1",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/reports/hourly?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [
+    {
+      "avg_value": "21.00",
+      "count": "1",
+      "max_value": "21.00",
+      "min_value": "21.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+    {
+      "avg_value": "22.00",
+      "count": "1",
+      "max_value": "22.00",
+      "min_value": "22.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+    {
+      "avg_value": "23.00",
+      "count": "1",
+      "max_value": "23.00",
+      "min_value": "23.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/reports/statistics?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [
+    {
+      "avg_value": "22.00",
+      "count": "3",
+      "max_value": "23.00",
+      "min_value": "21.00",
+      "sensor_type": "temperature",
+      "unit": "°C",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/sensor-alerts 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "alertType": "out_of_range",
+        "createdAt": "<datetime>",
+        "deviceId": "11111111-0000-4000-8000-000000000040",
+        "deviceName": "F1-온습도",
+        "id": "11111111-0000-4000-8000-000000000060",
+        "message": "F1-고온 경고",
+        "resolved": false,
+        "resolvedAt": null,
+        "sensorType": "temperature",
+        "severity": "warning",
+        "snoozedUntil": null,
+        "threshold": null,
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "value": null,
+      },
+    ],
+    "limit": 100,
+    "offset": 0,
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/sensor-alerts/sensors 1`] = `
+{
+  "body": [
+    {
+      "deviceId": "11111111-0000-4000-8000-000000000040",
+      "deviceName": "F1-온습도",
+      "lastSeen": "<datetime>",
+      "latestValue": 23,
+      "sensorType": "temperature",
+      "standby": false,
+      "unit": "°C",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/sensor-data/latest 1`] = `
+{
+  "body": [
+    {
+      "device_id": "11111111-0000-4000-8000-000000000040",
+      "sensor_type": "temperature",
+      "status": "normal",
+      "time": "<datetime>",
+      "unit": "°C",
+      "value": "23.0000",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/sensor-data?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": {
+    "data": [],
+    "statistics": {
+      "avg": null,
+      "count": "0",
+      "max": null,
+      "min": null,
+      "stddev": null,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/spray-schedule/events?from=2026-01-01&to=2026-02-28 1`] = `
+{
+  "body": [
+    {
+      "bee": false,
+      "color": null,
+      "createdAt": "<datetime>",
+      "date": "2026-01-20",
+      "id": "11111111-0000-4000-8000-000000000081",
+      "isManual": false,
+      "kind": "spray",
+      "note": null,
+      "pest": "F1-진딧물",
+      "pinned": false,
+      "product": null,
+      "productId": null,
+      "programId": null,
+      "round": 1,
+      "timeOfDay": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "zoneColor": "#43a047",
+      "zoneId": "11111111-0000-4000-8000-000000000080",
+      "zoneName": "F1-방재구역",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/spray-schedule/zones 1`] = `
+{
+  "body": [
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "cropType": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000080",
+      "isActive": true,
+      "name": "F1-방재구역",
+      "programs": [],
+      "sortOrder": 0,
+      "transplantDate": "2026-01-01",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/work-log/board 1`] = `
+{
+  "body": [
+    {
+      "lastDoneAt": "<datetime>",
+      "taskTypeId": "11111111-0000-4000-8000-000000000100",
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/work-log/logs 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "doneAt": "<datetime>",
+      "id": "11111111-0000-4000-8000-000000000101",
+      "note": "F1-작업메모",
+      "qty": null,
+      "taskTypeId": "11111111-0000-4000-8000-000000000100",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "workerId": null,
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/work-log/task-types 1`] = `
+{
+  "body": [
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "displayOrder": 0,
+      "emoji": "🍃",
+      "hidden": false,
+      "iconKey": null,
+      "id": "11111111-0000-4000-8000-000000000100",
+      "isStandard": false,
+      "label": "F1-순지르기",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "displayOrder": 1,
+      "emoji": "🍃",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "하엽 제거",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#00897b",
+      "createdAt": "<datetime>",
+      "displayOrder": 2,
+      "emoji": "✂️",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "순지르기",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#3949ab",
+      "createdAt": "<datetime>",
+      "displayOrder": 3,
+      "emoji": "🪢",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "유인(줄걸이)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#e53935",
+      "createdAt": "<datetime>",
+      "displayOrder": 4,
+      "emoji": "🍅",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수확(피킹)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fb8c00",
+      "createdAt": "<datetime>",
+      "displayOrder": 5,
+      "emoji": "✋",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "적과",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fbc02d",
+      "createdAt": "<datetime>",
+      "displayOrder": 6,
+      "emoji": "🐝",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수정(벌)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/worker-payroll/workers 1`] = `
+{
+  "body": [
+    {
+      "accountUserId": null,
+      "createdAt": "<datetime>",
+      "dailyHours": 8,
+      "deductions": [],
+      "endDate": null,
+      "fixedMonthlySalary": 0,
+      "hourlyWage": 0,
+      "id": "11111111-0000-4000-8000-000000000090",
+      "isActive": true,
+      "name": "F1-일꾼",
+      "phone": null,
+      "salaryType": "hourly",
+      "settlementCycleType": "calendar_month",
+      "startDate": "2026-01-01",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "username": null,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET /api/zone-notes 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "createdByName": "F1-농장주",
+      "createdByUser": "11111111-0000-4000-8000-000000000001",
+      "id": "11111111-0000-4000-8000-000000000120",
+      "pinned": false,
+      "tag": "etc",
+      "text": "F1-메모",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/activity-logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "action": "group.update",
+        "createdAt": "<datetime>",
+        "details": null,
+        "groupId": "11111111-0000-4000-8000-000000000010",
+        "groupName": "F1-1동",
+        "id": "11111111-0000-4000-8000-000000000070",
+        "targetId": "11111111-0000-4000-8000-000000000010",
+        "targetName": "F1-1동",
+        "targetType": "group",
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "userName": "F1-농장주",
+      },
+    ],
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/automation/bulk-stopped-rules 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/automation/irrigation/status 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/automation/logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "actionsExecuted": null,
+        "conditionsMet": null,
+        "errorMessage": null,
+        "executedAt": "<datetime>",
+        "id": "11111111-0000-4000-8000-000000000051",
+        "ruleId": "11111111-0000-4000-8000-000000000050",
+        "ruleName": "F1-환기룰",
+        "success": true,
+        "userId": "11111111-0000-4000-8000-000000000001",
+      },
+    ],
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/automation/logs/stats 1`] = `
+{
+  "body": {
+    "mostActiveRule": "F1-환기룰",
+    "successRate": 100,
+    "todayCount": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/automation/rules 1`] = `
+{
+  "body": [
+    {
+      "actions": {
+        "action": "on",
+        "targetDeviceId": "11111111-0000-4000-8000-000000000041",
+        "targetDeviceIds": [
+          "11111111-0000-4000-8000-000000000041",
+        ],
+      },
+      "conditions": {
+        "groups": [
+          {
+            "conditions": [
+              {
+                "field": "time",
+                "operator": "between",
+                "type": "time",
+                "value": {
+                  "end": "07:00",
+                  "start": "06:00",
+                },
+              },
+            ],
+            "logic": "AND",
+          },
+        ],
+        "logic": "AND",
+      },
+      "createdAt": "<datetime>",
+      "description": null,
+      "disabledAt": null,
+      "disabledReason": null,
+      "displayOrder": 0,
+      "enabled": true,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000050",
+      "name": "F1-환기룰",
+      "priority": 0,
+      "ruleType": "time",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/crop-management/batches 1`] = `
+{
+  "body": [
+    {
+      "baseTemp": "10.0",
+      "borrowedGroupId": null,
+      "createdAt": "<datetime>",
+      "cropType": "tomato",
+      "greenhouseOffset": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000110",
+      "isActive": true,
+      "notes": "F1-배치",
+      "offsetCalibratedAt": null,
+      "offsetSource": null,
+      "seedlingType": "plug",
+      "sowingDate": "2026-01-01",
+      "targetGdd": null,
+      "tempSource": "auto",
+      "transplantDate": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/crop-management/dashboard 1`] = `
+{
+  "body": [
+    {
+      "batchId": "11111111-0000-4000-8000-000000000110",
+      "cropType": "tomato",
+      "gdd": {
+        "backfilledDays": 0,
+        "currentGdd": 9,
+        "dailyAvg": 9,
+        "offsetInfo": {
+          "strategy": "default",
+          "value": 8,
+        },
+        "progressPct": 1,
+        "sourceBadge": {
+          "color": "orange",
+          "emoji": "🟠",
+          "label": "기상청 + 보정값",
+        },
+        "sourceQuality": "weather_with_offset",
+        "stage": {
+          "emoji": "🌱",
+          "key": "germination",
+          "label": "발아기",
+        },
+        "targetGdd": 1200,
+        "totalDays": 1,
+      },
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "groupName": "F1-1동",
+      "nextMilestone": null,
+      "sowingDate": "2026-01-01",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/dashboard/widgets 1`] = `
+{
+  "body": {
+    "currentStage": null,
+    "history": null,
+    "inside": null,
+    "trend6h": null,
+    "uvStats14d": null,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/devices 1`] = `
+{
+  "body": [
+    {
+      "category": "sensor",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "sensor",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": null,
+      "friendlyName": "F1-온습도",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000040",
+      "lastSeen": null,
+      "name": "F1-온습도",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "fan",
+      "friendlyName": "F1-유동팬",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000041",
+      "lastSeen": null,
+      "name": "F1-유동팬",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_open",
+      "friendlyName": "F1-개폐기열림",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000042",
+      "lastSeen": null,
+      "name": "F1-개폐기열림",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000043",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_close",
+      "friendlyName": "F1-개폐기닫힘",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000043",
+      "lastSeen": null,
+      "name": "F1-개폐기닫힘",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000042",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/env-config/roles 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/features 1`] = `
+{
+  "body": {
+    "spray_schedule": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "work_log": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "worker_payroll": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/gateways 1`] = `
+{
+  "body": [
+    {
+      "agentStatus": "offline",
+      "bootstrapTokenUsedAt": null,
+      "createdAt": "<datetime>",
+      "emergencyStop": null,
+      "gatewayId": "f1-gw",
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "groupName": "F1-1동",
+      "hostname": null,
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "id": "11111111-0000-4000-8000-000000000030",
+      "lastConfigAppliedAt": null,
+      "lastSeen": null,
+      "location": null,
+      "machineId": null,
+      "name": "F1-게이트웨이",
+      "rpiIp": null,
+      "serverIp": null,
+      "status": "offline",
+      "tunnelLastSeen": null,
+      "tunnelPort": null,
+      "tunnelPublicKey": null,
+      "tunnelStatus": "disconnected",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "wifiSsid": null,
+      "zigbeeStatus": "offline",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/groups 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "description": null,
+      "devices": [],
+      "displayOrder": 0,
+      "enableAutomation": false,
+      "enableGroupControl": true,
+      "houses": [
+        {
+          "area": null,
+          "createdAt": "<datetime>",
+          "description": null,
+          "groupId": "11111111-0000-4000-8000-000000000010",
+          "id": "11111111-0000-4000-8000-000000000020",
+          "iotEnabled": true,
+          "location": null,
+          "name": "F1-하우스",
+          "status": "active",
+          "updatedAt": "<datetime>",
+          "userId": "11111111-0000-4000-8000-000000000001",
+        },
+      ],
+      "id": "11111111-0000-4000-8000-000000000010",
+      "iotEnabled": true,
+      "manager": null,
+      "name": "F1-1동",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/groups/houses 1`] = `
+{
+  "body": [
+    {
+      "area": null,
+      "createdAt": "<datetime>",
+      "description": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000020",
+      "iotEnabled": true,
+      "location": null,
+      "name": "F1-하우스",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/groups/houses/iot-related-counts 1`] = `
+{
+  "body": {
+    "perHouse": [],
+    "totals": {
+      "device": 0,
+      "gateway": 0,
+      "rule": 0,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/reports/actuator-stats?startDate=2026-01-14&endDate=2026-01-16 1`] = `
+{
+  "body": [
+    {
+      "time": "<datetime>",
+      "total_actions": "1",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/reports/hourly?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [
+    {
+      "avg_value": "21.00",
+      "count": "1",
+      "max_value": "21.00",
+      "min_value": "21.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+    {
+      "avg_value": "22.00",
+      "count": "1",
+      "max_value": "22.00",
+      "min_value": "22.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+    {
+      "avg_value": "23.00",
+      "count": "1",
+      "max_value": "23.00",
+      "min_value": "23.00",
+      "sensor_type": "temperature",
+      "time": "<datetime>",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/reports/statistics?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [
+    {
+      "avg_value": "22.00",
+      "count": "3",
+      "max_value": "23.00",
+      "min_value": "21.00",
+      "sensor_type": "temperature",
+      "unit": "°C",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/sensor-alerts 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "alertType": "out_of_range",
+        "createdAt": "<datetime>",
+        "deviceId": "11111111-0000-4000-8000-000000000040",
+        "deviceName": "F1-온습도",
+        "id": "11111111-0000-4000-8000-000000000060",
+        "message": "F1-고온 경고",
+        "resolved": false,
+        "resolvedAt": null,
+        "sensorType": "temperature",
+        "severity": "warning",
+        "snoozedUntil": null,
+        "threshold": null,
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "value": null,
+      },
+    ],
+    "limit": 100,
+    "offset": 0,
+    "total": 1,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/sensor-alerts/sensors 1`] = `
+{
+  "body": [
+    {
+      "deviceId": "11111111-0000-4000-8000-000000000040",
+      "deviceName": "F1-온습도",
+      "lastSeen": "<datetime>",
+      "latestValue": 23,
+      "sensorType": "temperature",
+      "standby": false,
+      "unit": "°C",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/sensor-data/latest 1`] = `
+{
+  "body": [
+    {
+      "device_id": "11111111-0000-4000-8000-000000000040",
+      "sensor_type": "temperature",
+      "status": "normal",
+      "time": "<datetime>",
+      "unit": "°C",
+      "value": "23.0000",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/sensor-data?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": {
+    "data": [],
+    "statistics": {
+      "avg": null,
+      "count": "0",
+      "max": null,
+      "min": null,
+      "stddev": null,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/spray-schedule/events?from=2026-01-01&to=2026-02-28 1`] = `
+{
+  "body": [
+    {
+      "bee": false,
+      "color": null,
+      "createdAt": "<datetime>",
+      "date": "2026-01-20",
+      "id": "11111111-0000-4000-8000-000000000081",
+      "isManual": false,
+      "kind": "spray",
+      "note": null,
+      "pest": "F1-진딧물",
+      "pinned": false,
+      "product": null,
+      "productId": null,
+      "programId": null,
+      "round": 1,
+      "timeOfDay": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "zoneColor": "#43a047",
+      "zoneId": "11111111-0000-4000-8000-000000000080",
+      "zoneName": "F1-방재구역",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/spray-schedule/zones 1`] = `
+{
+  "body": [
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "cropType": null,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000080",
+      "isActive": true,
+      "name": "F1-방재구역",
+      "programs": [],
+      "sortOrder": 0,
+      "transplantDate": "2026-01-01",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/work-log/board 1`] = `
+{
+  "body": [
+    {
+      "lastDoneAt": "<datetime>",
+      "taskTypeId": "11111111-0000-4000-8000-000000000100",
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/work-log/logs 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "doneAt": "<datetime>",
+      "id": "11111111-0000-4000-8000-000000000101",
+      "note": "F1-작업메모",
+      "qty": null,
+      "taskTypeId": "11111111-0000-4000-8000-000000000100",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "workerId": null,
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/work-log/task-types 1`] = `
+{
+  "body": [
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "displayOrder": 0,
+      "emoji": "🍃",
+      "hidden": false,
+      "iconKey": null,
+      "id": "11111111-0000-4000-8000-000000000100",
+      "isStandard": false,
+      "label": "F1-순지르기",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "displayOrder": 1,
+      "emoji": "🍃",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "하엽 제거",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#00897b",
+      "createdAt": "<datetime>",
+      "displayOrder": 2,
+      "emoji": "✂️",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "순지르기",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#3949ab",
+      "createdAt": "<datetime>",
+      "displayOrder": 3,
+      "emoji": "🪢",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "유인(줄걸이)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#e53935",
+      "createdAt": "<datetime>",
+      "displayOrder": 4,
+      "emoji": "🍅",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수확(피킹)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fb8c00",
+      "createdAt": "<datetime>",
+      "displayOrder": 5,
+      "emoji": "✋",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "적과",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fbc02d",
+      "createdAt": "<datetime>",
+      "displayOrder": 6,
+      "emoji": "🐝",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수정(벌)",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/worker-payroll/workers 1`] = `
+{
+  "body": {
+    "message": "농장 관리자만 가능합니다.",
+    "path": "/api/worker-payroll/workers",
+    "statusCode": 403,
+    "timestamp": "<datetime>",
+  },
+  "status": 403,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/zone-notes 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "createdByName": "F1-농장주",
+      "createdByUser": "11111111-0000-4000-8000-000000000001",
+      "id": "11111111-0000-4000-8000-000000000120",
+      "pinned": false,
+      "tag": "etc",
+      "text": "F1-메모",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "zoneId": "11111111-0000-4000-8000-000000000010",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/activity-logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "action": "group.update",
+        "createdAt": "<datetime>",
+        "details": null,
+        "groupId": "11111111-0000-4000-8000-000000000010",
+        "groupName": "F1-1동",
+        "id": "11111111-0000-4000-8000-000000000070",
+        "targetId": "11111111-0000-4000-8000-000000000010",
+        "targetName": "F1-1동",
+        "targetType": "group",
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "userName": "F1-농장주",
+      },
+      {
+        "action": "group.update",
+        "createdAt": "<datetime>",
+        "details": null,
+        "groupId": "22222222-0000-4000-8000-000000000010",
+        "groupName": "F2-1동",
+        "id": "22222222-0000-4000-8000-000000000070",
+        "targetId": "22222222-0000-4000-8000-000000000010",
+        "targetName": "F2-1동",
+        "targetType": "group",
+        "userId": "22222222-0000-4000-8000-000000000001",
+        "userName": "F2-농장주",
+      },
+    ],
+    "total": 2,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/auth/me 1`] = `
+{
+  "body": {
+    "address": null,
+    "farmName": null,
+    "id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "mustChangePassword": false,
+    "name": "플랫폼관리자",
+    "parentUserId": null,
+    "role": "admin",
+    "username": "platform-admin",
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/automation/bulk-stopped-rules 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/automation/irrigation/status 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/automation/logs 1`] = `
+{
+  "body": {
+    "data": [
+      {
+        "actionsExecuted": null,
+        "conditionsMet": null,
+        "errorMessage": null,
+        "executedAt": "<datetime>",
+        "id": "11111111-0000-4000-8000-000000000051",
+        "ruleId": "11111111-0000-4000-8000-000000000050",
+        "ruleName": "F1-환기룰",
+        "success": true,
+        "userId": "11111111-0000-4000-8000-000000000001",
+      },
+      {
+        "actionsExecuted": null,
+        "conditionsMet": null,
+        "errorMessage": null,
+        "executedAt": "<datetime>",
+        "id": "22222222-0000-4000-8000-000000000051",
+        "ruleId": "22222222-0000-4000-8000-000000000050",
+        "ruleName": "F2-환기룰",
+        "success": true,
+        "userId": "22222222-0000-4000-8000-000000000001",
+      },
+    ],
+    "total": 2,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/automation/logs/stats 1`] = `
+{
+  "body": {
+    "mostActiveRule": "F2-환기룰",
+    "successRate": 100,
+    "todayCount": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/automation/rules 1`] = `
+{
+  "body": [
+    {
+      "actions": {
+        "action": "on",
+        "targetDeviceId": "11111111-0000-4000-8000-000000000041",
+        "targetDeviceIds": [
+          "11111111-0000-4000-8000-000000000041",
+        ],
+      },
+      "conditions": {
+        "groups": [
+          {
+            "conditions": [
+              {
+                "field": "time",
+                "operator": "between",
+                "type": "time",
+                "value": {
+                  "end": "07:00",
+                  "start": "06:00",
+                },
+              },
+            ],
+            "logic": "AND",
+          },
+        ],
+        "logic": "AND",
+      },
+      "createdAt": "<datetime>",
+      "description": null,
+      "disabledAt": null,
+      "disabledReason": null,
+      "displayOrder": 0,
+      "enabled": true,
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "id": "11111111-0000-4000-8000-000000000050",
+      "name": "F1-환기룰",
+      "priority": 0,
+      "ruleType": "time",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+    {
+      "actions": {
+        "action": "on",
+        "targetDeviceId": "22222222-0000-4000-8000-000000000041",
+        "targetDeviceIds": [
+          "22222222-0000-4000-8000-000000000041",
+        ],
+      },
+      "conditions": {
+        "groups": [
+          {
+            "conditions": [
+              {
+                "field": "time",
+                "operator": "between",
+                "type": "time",
+                "value": {
+                  "end": "07:00",
+                  "start": "06:00",
+                },
+              },
+            ],
+            "logic": "AND",
+          },
+        ],
+        "logic": "AND",
+      },
+      "createdAt": "<datetime>",
+      "description": null,
+      "disabledAt": null,
+      "disabledReason": null,
+      "displayOrder": 0,
+      "enabled": true,
+      "groupId": "22222222-0000-4000-8000-000000000010",
+      "id": "22222222-0000-4000-8000-000000000050",
+      "name": "F2-환기룰",
+      "priority": 0,
+      "ruleType": "time",
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/config-deploy/template 1`] = `
+{
+  "body": {
+    "advanced": {
+      "channel": 11,
+      "last_seen": "ISO_8601",
+      "legacy_api": false,
+      "legacy_availability_payload": false,
+      "log_level": "info",
+      "log_output": [
+        "console",
+      ],
+    },
+    "availability": {
+      "active": {
+        "timeout": 10,
+      },
+      "passive": {
+        "timeout": 1500,
+      },
+    },
+    "frontend": {
+      "host": "0.0.0.0",
+      "port": 8080,
+    },
+    "homeassistant": false,
+    "ota": {
+      "disable_automatic_update_check": true,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/crop-management/batches 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/crop-management/dashboard 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/crop-management/feature/all 1`] = `
+{
+  "body": {
+    "platform": true,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/dashboard/widgets 1`] = `
+{
+  "body": {
+    "currentStage": null,
+    "history": null,
+    "inside": null,
+    "trend6h": null,
+    "uvStats14d": null,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/devices 1`] = `
+{
+  "body": [
+    {
+      "category": "sensor",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "sensor",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": null,
+      "friendlyName": "F1-온습도",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000040",
+      "lastSeen": null,
+      "name": "F1-온습도",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "fan",
+      "friendlyName": "F1-유동팬",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000041",
+      "lastSeen": null,
+      "name": "F1-유동팬",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_open",
+      "friendlyName": "F1-개폐기열림",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000042",
+      "lastSeen": null,
+      "name": "F1-개폐기열림",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000043",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_close",
+      "friendlyName": "F1-개폐기닫힘",
+      "gatewayId": "f1-gw",
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "11111111-0000-4000-8000-000000000043",
+      "lastSeen": null,
+      "name": "F1-개폐기닫힘",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F1-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "11111111-0000-4000-8000-000000000042",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "sensor",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "sensor",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": null,
+      "friendlyName": "F2-온습도",
+      "gatewayId": "f2-gw",
+      "houseId": "22222222-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "22222222-0000-4000-8000-000000000040",
+      "lastSeen": null,
+      "name": "F2-온습도",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "fan",
+      "friendlyName": "F2-유동팬",
+      "gatewayId": "f2-gw",
+      "houseId": "22222222-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "22222222-0000-4000-8000-000000000041",
+      "lastSeen": null,
+      "name": "F2-유동팬",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": null,
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": null,
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_open",
+      "friendlyName": "F2-개폐기열림",
+      "gatewayId": "f2-gw",
+      "houseId": "22222222-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "22222222-0000-4000-8000-000000000042",
+      "lastSeen": null,
+      "name": "F2-개폐기열림",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F2-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "22222222-0000-4000-8000-000000000043",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+    {
+      "category": "actuator",
+      "channelCode": null,
+      "channelMapping": null,
+      "channelOverrides": {},
+      "createdAt": "<datetime>",
+      "deviceSettings": null,
+      "deviceType": "actuator",
+      "disabledChannels": [],
+      "displayOrder": 0,
+      "enabled": true,
+      "equipmentType": "opener_close",
+      "friendlyName": "F2-개폐기닫힘",
+      "gatewayId": "f2-gw",
+      "houseId": "22222222-0000-4000-8000-000000000020",
+      "icon": null,
+      "id": "22222222-0000-4000-8000-000000000043",
+      "lastSeen": null,
+      "name": "F2-개폐기닫힘",
+      "onboardDeviceId": null,
+      "online": false,
+      "openerGroupName": "F2-개폐기",
+      "overrideDirection": null,
+      "overrideUntil": null,
+      "overrideValue": null,
+      "pairedDeviceId": "22222222-0000-4000-8000-000000000042",
+      "parentDeviceId": null,
+      "rainOverrideDisabled": false,
+      "relayActivePhase": null,
+      "ruleIntendedState": null,
+      "source": "zigbee",
+      "switchState": null,
+      "switchStates": null,
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+      "userOverride": false,
+      "zigbeeIeee": null,
+      "zigbeeModel": null,
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/env-config/roles 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/fallback-config/heartbeat/status 1`] = `
+{
+  "body": {
+    "disabledGateways": [],
+    "globalDisabled": true,
+    "intervalMs": 10000,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/features 1`] = `
+{
+  "body": {
+    "spray_schedule": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "work_log": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "worker_payroll": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/features/users/aaaaaaaa-0000-4000-8000-000000000001 1`] = `
+{
+  "body": {
+    "spray_schedule": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "work_log": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+    "worker_payroll": {
+      "enabled": true,
+      "lockedByAdmin": false,
+      "platformEnabled": true,
+      "userEnabled": true,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/gateways 1`] = `
+{
+  "body": [
+    {
+      "agentStatus": "offline",
+      "bootstrapTokenUsedAt": null,
+      "createdAt": "<datetime>",
+      "emergencyStop": null,
+      "gatewayId": "f1-gw",
+      "groupId": "11111111-0000-4000-8000-000000000010",
+      "groupName": "F1-1동",
+      "hostname": null,
+      "houseId": "11111111-0000-4000-8000-000000000020",
+      "id": "11111111-0000-4000-8000-000000000030",
+      "lastConfigAppliedAt": null,
+      "lastSeen": null,
+      "location": null,
+      "machineId": null,
+      "name": "F1-게이트웨이",
+      "rpiIp": null,
+      "serverIp": null,
+      "status": "offline",
+      "tunnelLastSeen": null,
+      "tunnelPort": null,
+      "tunnelPublicKey": null,
+      "tunnelStatus": "disconnected",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+      "wifiSsid": null,
+      "zigbeeStatus": "offline",
+    },
+    {
+      "agentStatus": "offline",
+      "bootstrapTokenUsedAt": null,
+      "createdAt": "<datetime>",
+      "emergencyStop": null,
+      "gatewayId": "f2-gw",
+      "groupId": "22222222-0000-4000-8000-000000000010",
+      "groupName": "F2-1동",
+      "hostname": null,
+      "houseId": "22222222-0000-4000-8000-000000000020",
+      "id": "22222222-0000-4000-8000-000000000030",
+      "lastConfigAppliedAt": null,
+      "lastSeen": null,
+      "location": null,
+      "machineId": null,
+      "name": "F2-게이트웨이",
+      "rpiIp": null,
+      "serverIp": null,
+      "status": "offline",
+      "tunnelLastSeen": null,
+      "tunnelPort": null,
+      "tunnelPublicKey": null,
+      "tunnelStatus": "disconnected",
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+      "wifiSsid": null,
+      "zigbeeStatus": "offline",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/groups 1`] = `
+{
+  "body": [
+    {
+      "createdAt": "<datetime>",
+      "description": null,
+      "devices": [],
+      "displayOrder": 0,
+      "enableAutomation": false,
+      "enableGroupControl": true,
+      "houses": [
+        {
+          "area": null,
+          "createdAt": "<datetime>",
+          "description": null,
+          "groupId": "22222222-0000-4000-8000-000000000010",
+          "id": "22222222-0000-4000-8000-000000000020",
+          "iotEnabled": true,
+          "location": null,
+          "name": "F2-하우스",
+          "status": "active",
+          "updatedAt": "<datetime>",
+          "userId": "22222222-0000-4000-8000-000000000001",
+        },
+      ],
+      "id": "22222222-0000-4000-8000-000000000010",
+      "iotEnabled": true,
+      "manager": null,
+      "name": "F2-1동",
+      "ownerFarmName": "F2-농장주",
+      "ownerName": "F2-농장주",
+      "ownerUsername": "f2admin",
+      "updatedAt": "<datetime>",
+      "userId": "22222222-0000-4000-8000-000000000001",
+    },
+    {
+      "createdAt": "<datetime>",
+      "description": null,
+      "devices": [],
+      "displayOrder": 0,
+      "enableAutomation": false,
+      "enableGroupControl": true,
+      "houses": [
+        {
+          "area": null,
+          "createdAt": "<datetime>",
+          "description": null,
+          "groupId": "11111111-0000-4000-8000-000000000010",
+          "id": "11111111-0000-4000-8000-000000000020",
+          "iotEnabled": true,
+          "location": null,
+          "name": "F1-하우스",
+          "status": "active",
+          "updatedAt": "<datetime>",
+          "userId": "11111111-0000-4000-8000-000000000001",
+        },
+      ],
+      "id": "11111111-0000-4000-8000-000000000010",
+      "iotEnabled": true,
+      "manager": null,
+      "name": "F1-1동",
+      "ownerFarmName": "F1-농장주",
+      "ownerName": "F1-농장주",
+      "ownerUsername": "f1admin",
+      "updatedAt": "<datetime>",
+      "userId": "11111111-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/groups/houses 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/groups/houses/iot-related-counts 1`] = `
+{
+  "body": {
+    "perHouse": [],
+    "totals": {
+      "device": 0,
+      "gateway": 0,
+      "rule": 0,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/reports/actuator-stats?startDate=2026-01-14&endDate=2026-01-16 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/reports/hourly?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/reports/statistics?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/sensor-alerts 1`] = `
+{
+  "body": {
+    "data": [],
+    "limit": 100,
+    "offset": 0,
+    "total": 0,
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/sensor-alerts/sensors 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/sensor-data/latest 1`] = `
+{
+  "body": [
+    {
+      "device_id": "11111111-0000-4000-8000-000000000040",
+      "sensor_type": "temperature",
+      "status": "normal",
+      "time": "<datetime>",
+      "unit": "°C",
+      "value": "23.0000",
+    },
+    {
+      "device_id": "22222222-0000-4000-8000-000000000040",
+      "sensor_type": "temperature",
+      "status": "normal",
+      "time": "<datetime>",
+      "unit": "°C",
+      "value": "24.0000",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/sensor-data?startDate=2026-01-14&endDate=2026-01-16&sensorType=temperature 1`] = `
+{
+  "body": {
+    "data": [],
+    "statistics": {
+      "avg": null,
+      "count": "0",
+      "max": null,
+      "min": null,
+      "stddev": null,
+    },
+  },
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/spray-schedule/events?from=2026-01-01&to=2026-02-28 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/spray-schedule/zones 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/users 1`] = `
+{
+  "body": [
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [],
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "플랫폼관리자",
+      "parentFarmName": null,
+      "parentUserId": null,
+      "parentUserName": null,
+      "role": "admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "platform-admin",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [],
+      "id": "aaaaaaaa-0000-4000-8000-000000000002",
+      "mustChangePassword": false,
+      "name": "플랫폼관리자2",
+      "parentFarmName": null,
+      "parentUserId": null,
+      "parentUserName": null,
+      "role": "admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "platform-admin2",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [
+        {
+          "gatewayId": "f1-gw",
+          "id": "11111111-0000-4000-8000-000000000030",
+          "name": "F1-게이트웨이",
+          "status": "offline",
+        },
+      ],
+      "id": "11111111-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "F1-농장주",
+      "parentFarmName": null,
+      "parentUserId": null,
+      "parentUserName": null,
+      "role": "farm_admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "f1admin",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [
+        {
+          "gatewayId": "f2-gw",
+          "id": "22222222-0000-4000-8000-000000000030",
+          "name": "F2-게이트웨이",
+          "status": "offline",
+        },
+      ],
+      "id": "22222222-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "F2-농장주",
+      "parentFarmName": null,
+      "parentUserId": null,
+      "parentUserName": null,
+      "role": "farm_admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "f2admin",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [],
+      "id": "11111111-0000-4000-8000-000000000002",
+      "mustChangePassword": false,
+      "name": "F1-일반사용자",
+      "parentFarmName": "F1-농장주",
+      "parentUserId": "11111111-0000-4000-8000-000000000001",
+      "parentUserName": "F1-농장주",
+      "role": "farm_user",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "f1user",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "gateways": [],
+      "id": "33333333-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "F3-비활성",
+      "parentFarmName": null,
+      "parentUserId": null,
+      "parentUserName": null,
+      "role": "farm_admin",
+      "status": "inactive",
+      "updatedAt": "<datetime>",
+      "username": "f3inactive",
+      "voiceAliases": {},
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/users/farm-admins 1`] = `
+{
+  "body": [
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "id": "11111111-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "F1-농장주",
+      "parentUserId": null,
+      "role": "farm_admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "f1admin",
+      "voiceAliases": {},
+    },
+    {
+      "address": null,
+      "createdAt": "<datetime>",
+      "farmName": null,
+      "id": "22222222-0000-4000-8000-000000000001",
+      "mustChangePassword": false,
+      "name": "F2-농장주",
+      "parentUserId": null,
+      "role": "farm_admin",
+      "status": "active",
+      "updatedAt": "<datetime>",
+      "username": "f2admin",
+      "voiceAliases": {},
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/work-log/board 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/work-log/logs 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/work-log/task-types 1`] = `
+{
+  "body": [
+    {
+      "color": "#43a047",
+      "createdAt": "<datetime>",
+      "displayOrder": 1,
+      "emoji": "🍃",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "하엽 제거",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#00897b",
+      "createdAt": "<datetime>",
+      "displayOrder": 2,
+      "emoji": "✂️",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "순지르기",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#3949ab",
+      "createdAt": "<datetime>",
+      "displayOrder": 3,
+      "emoji": "🪢",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "유인(줄걸이)",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#e53935",
+      "createdAt": "<datetime>",
+      "displayOrder": 4,
+      "emoji": "🍅",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수확(피킹)",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fb8c00",
+      "createdAt": "<datetime>",
+      "displayOrder": 5,
+      "emoji": "✋",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "적과",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+    {
+      "color": "#fbc02d",
+      "createdAt": "<datetime>",
+      "displayOrder": 6,
+      "emoji": "🐝",
+      "hidden": false,
+      "iconKey": null,
+      "id": "<uuid>",
+      "isStandard": true,
+      "label": "수정(벌)",
+      "updatedAt": "<datetime>",
+      "userId": "aaaaaaaa-0000-4000-8000-000000000001",
+    },
+  ],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/worker-payroll/workers 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;
+
+exports[`헤더 없는 요청 회귀 (변경 전과 동일) 플랫폼 관리자(전체 합산) GET /api/zone-notes 1`] = `
+{
+  "body": [],
+  "status": 200,
+}
+`;

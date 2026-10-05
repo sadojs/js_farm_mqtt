@@ -1,6 +1,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { emergencyFailoverApi } from '../api/emergency-failover.api'
-import { onFallbackModeChanged, onFallbackEvent } from './useWebSocket'
+import { onFallbackModeChanged, onFallbackEvent, onEmergencyState } from './useWebSocket'
 import type {
   FallbackFullConfig,
   UpdateConfigDto,
@@ -123,9 +123,24 @@ export function useEmergencyFailover() {
     await emergencyFailoverApi.resync(gatewayId.value)
   }
 
+  /** 비상 정지 유지 상태 */
+  const emergency = computed(() => full.value?.emergency ?? null)
+
+  async function refreshEmergency() {
+    if (!gatewayId.value || !full.value) return
+    full.value.emergency = await emergencyFailoverApi.getEmergency(gatewayId.value)
+  }
+
   async function emergencyStop(reason: string, by: string) {
     if (!gatewayId.value) return
     await emergencyFailoverApi.emergencyStop(gatewayId.value, reason, by)
+    await refreshEmergency()
+  }
+
+  async function emergencyRelease() {
+    if (!gatewayId.value) return
+    await emergencyFailoverApi.emergencyRelease(gatewayId.value)
+    await refreshEmergency()
   }
 
   // 실시간 WebSocket 구독
@@ -167,9 +182,17 @@ export function useEmergencyFailover() {
     })
   })
 
+  // 비상 정지 상태(정지/해제/Pi 확인) 실시간 반영
+  const cleanupEmergency = onEmergencyState((data) => {
+    if (data.gatewayId !== gatewayId.value || !full.value) return
+    const { gatewayId: _g, ...state } = data as any
+    full.value.emergency = state
+  })
+
   onUnmounted(() => {
     cleanupMode?.()
     cleanupEvent?.()
+    cleanupEmergency()
   })
 
   return {
@@ -192,5 +215,8 @@ export function useEmergencyFailover() {
     loadEvents,
     resync,
     emergencyStop,
+    emergency,
+    emergencyRelease,
+    refreshEmergency,
   }
 }

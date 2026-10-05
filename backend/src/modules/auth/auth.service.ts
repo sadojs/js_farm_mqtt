@@ -55,15 +55,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        parentUserId: user.parentUserId || null,
-        address: user.address,
-        mustChangePassword: user.mustChangePassword,
-      },
+      user: await this.toUserInfo(user),
     };
   }
 
@@ -88,11 +80,17 @@ export class AuthService {
     // 기존 토큰 삭제 (rotation)
     await this.refreshTokenRepo.delete(validRecord.id);
 
+    // 역할·소속 농장·상태는 토큰이 아니라 현재 DB 기준으로 다시 싣는다
+    // (관리자가 역할/소속을 바꾸거나 비활성화하면 다음 갱신부터 반영 — 재로그인 불필요)
+    const user = await this.usersRepo.findOne({ where: { id: payload.sub } });
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('비활성화되었거나 삭제된 계정입니다.');
+    }
     const newPayload: JwtPayload = {
-      sub: payload.sub,
-      username: payload.username,
-      role: payload.role,
-      parentUserId: payload.parentUserId || null,
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      parentUserId: user.parentUserId || null,
     };
 
     const accessToken = this.jwtService.sign(newPayload, { expiresIn: ACCESS_TOKEN_TTL });
@@ -126,6 +124,18 @@ export class AuthService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
 
+    return this.toUserInfo(user);
+  }
+
+  /** 로그인·/auth/me 공통 사용자 정보. farmName = 내가 속한 농장 이름(농장 관리자는 자기 농장, 농장 사용자는 소속 농장) */
+  private async toUserInfo(user: User) {
+    let farmName: string | null = null;
+    if (user.role === 'farm_admin') {
+      farmName = user.farmName || user.name;
+    } else if (user.role === 'farm_user' && user.parentUserId) {
+      const parent = await this.usersRepo.findOne({ where: { id: user.parentUserId } });
+      farmName = parent ? parent.farmName || parent.name : null;
+    }
     return {
       id: user.id,
       username: user.username,
@@ -133,6 +143,7 @@ export class AuthService {
       role: user.role,
       parentUserId: user.parentUserId || null,
       address: user.address,
+      farmName,
       mustChangePassword: user.mustChangePassword,
     };
   }

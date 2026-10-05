@@ -10,6 +10,7 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FeatureFlagsService } from './feature-flags.service';
+import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
 @Controller('features')
 @UseGuards(JwtAuthGuard)
@@ -30,6 +31,7 @@ export class FeatureFlagsController {
   }
 
   /** 본인(농장) 또는 플랫폼 범위 토글 — farm_admin: personal, admin: platform 가능 */
+  @PlatformScope()
   @Patch(':feature')
   async setMine(
     @CurrentUser() user: any,
@@ -45,6 +47,7 @@ export class FeatureFlagsController {
   }
 
   /** 플랫폼 관리자: 특정 사용자(농장)의 기능 상태 조회 */
+  @PlatformScope()
   @Get('users/:targetUserId')
   async getForUser(@CurrentUser() user: any, @Param('targetUserId') targetUserId: string) {
     if (user.role !== 'admin') throw new ForbiddenException('플랫폼 관리자만 조회 가능합니다.');
@@ -52,6 +55,7 @@ export class FeatureFlagsController {
   }
 
   /** 플랫폼 관리자: 특정 사용자(농장)의 기능 토글 */
+  @PlatformScope()
   @Patch(':feature/users/:targetUserId')
   async setForUser(
     @CurrentUser() user: any,
