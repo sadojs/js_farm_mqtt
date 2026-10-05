@@ -61,6 +61,13 @@ BACKEND_UPSTREAM=host.docker.internal:3100 \
 | `CONSOLE_PORT` | `8082` | 공개 포트 |
 | 빌드 인자 `VITE_SERVER_HOST`/`VITE_SERVER_USER` | `urifarm.com` / `jeongseok` | 게이트웨이 Pi 설치 명령에 들어가는 값(기존 frontend/Dockerfile 과 동일) |
 
+**운영(HTTPS) — 실제 사용 명령** (기존 앱과 같은 인증서 `certs/` 사용, `https://urifarm.com:8082`):
+```bash
+cd /Users/jeongseok/Projects/js_farm_mqtt
+SFM_NETWORK=js_farm_mqtt_sfm-network BACKEND_UPSTREAM=host.docker.internal:3100 \
+  docker compose -f admin-console/docker-compose.console.yml -f admin-console/docker-compose.console.tls.yml up -d --build
+```
+
 > ⚠️ **HTTPS 필수**: 운영 백엔드(`NODE_ENV=production`)는 refresh 쿠키를 `Secure` 로 내려보냅니다.
 > `http://…:8082` 로 열면 브라우저가 쿠키를 저장하지 않아 **로그인은 되지만 새로고침·10분 갱신 시 로그아웃**됩니다.
 > 기존 앱처럼 TLS 를 앞단에 두거나(같은 인증서로 리버스 프록시) 콘솔 nginx 에 TLS 를 추가한 뒤 쓰세요.

@@ -1,0 +1,17 @@
+# 운영(HTTPS) 오버라이드 — 기본 compose 위에 겹쳐 쓴다.
+#   SFM_NETWORK=js_farm_mqtt_sfm-network BACKEND_UPSTREAM=host.docker.internal:3100 \
+#     docker compose -f admin-console/docker-compose.console.yml -f admin-console/docker-compose.console.tls.yml up -d --build
+# 기존 앱(sfm-frontend)과 같은 인증서(저장소 루트 certs/)를 읽기 전용으로 마운트하고 443 으로 서비스한다.
+# Secure refresh 쿠키 때문에 운영 콘솔은 반드시 HTTPS 여야 한다(http 면 새로고침 시 로그아웃).
+services:
+  admin-console:
+    ports: !override
+      - "${CONSOLE_PORT:-8082}:443"
+    volumes:
+      - ../certs:/etc/nginx/certs:ro
+      - ./nginx.tls.conf:/etc/nginx/templates/default.conf.template:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://127.0.0.1:443/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
