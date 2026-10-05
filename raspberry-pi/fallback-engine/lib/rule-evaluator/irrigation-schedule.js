@@ -43,8 +43,10 @@ function runTimeline(sched, store, relay, queue, state) {
 
     // 1) 구역 ON (+ 교반기 ON)
     at(base, () => {
-      relay.setRelay(zone.channel, true, `fallback-irrigation-zone-${zone.channel}`);
-      if (mixerActive) relay.setRelay(mixerCh, true, 'fallback-irrigation-mixer');
+      // 폴백이 켠 채널 기록 — 온라인 복귀 시 OFF 대상(gpio 상태 회신이 없는 Zigbee 채널 포함)
+      state.irrigationOnByFallback = state.irrigationOnByFallback || {};
+      if (relay.setRelay(zone.channel, true, `fallback-irrigation-zone-${zone.channel}`)) state.irrigationOnByFallback[zone.channel] = true;
+      if (mixerActive && relay.setRelay(mixerCh, true, 'fallback-irrigation-mixer')) state.irrigationOnByFallback[mixerCh] = true;
     });
 
     // 2) 액비모터 ON/OFF (온라인과 동일 offset)
@@ -52,7 +54,10 @@ function runTimeline(sched, store, relay, queue, state) {
       const fertStart = zoneMs - fert.durationMin * 60000 - (fert.preStopWaitMin || 0) * 60000;
       const fertEnd = zoneMs - (fert.preStopWaitMin || 0) * 60000;
       if (fertStart >= 0 && fertEnd > fertStart) {
-        at(base + fertStart, () => relay.setRelay(fert.channel, true, 'fallback-irrigation-fertilizer'));
+        at(base + fertStart, () => {
+          state.irrigationOnByFallback = state.irrigationOnByFallback || {};
+          if (relay.setRelay(fert.channel, true, 'fallback-irrigation-fertilizer')) state.irrigationOnByFallback[fert.channel] = true;
+        });
         at(base + fertEnd, () => relay.setRelay(fert.channel, false, 'fallback-irrigation-fertilizer-off'));
       }
     }

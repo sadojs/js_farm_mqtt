@@ -14,6 +14,7 @@
  * - event-queue        : 폴백 이벤트 SQLite 큐 → 복구 시 일괄 전송
  */
 
+const fs = require('fs');
 const mqtt = require('mqtt');
 const RuleStore = require('./lib/rule-store');
 const HeartbeatWatchdog = require('./lib/heartbeat-watchdog');
@@ -34,6 +35,10 @@ const DATA_DIR = process.env.FALLBACK_DATA_DIR || '/var/lib/smartfarm/fallback';
 const RULES_PATH = process.env.FALLBACK_RULES_PATH || `${DATA_DIR}/rules.json`;
 const DB_PATH = process.env.FALLBACK_DB_PATH || `${DATA_DIR}/fallback.db`;
 const EVAL_INTERVAL_MS = parseInt(process.env.FALLBACK_EVAL_INTERVAL_MS || '30000', 10);
+// 비상 정지 유지(래치) 파일 — 존재하면 해제 전까지 모든 릴레이 ON 금지(재부팅 후에도 유지). gpio-agent 도 같은 파일을 본다.
+const EMERGENCY_LATCH_PATH = process.env.EMERGENCY_LATCH_PATH || `${DATA_DIR}/emergency.json`;
+// 방재(밀폐) 종료 시각 — 서버 단절 중에도 방재 중이면 환기팬·개폐기 폴백 룰을 멈춘다.
+const PROTECTION_PATH = process.env.PROTECTION_PATH || `${DATA_DIR}/protection.json`;
 
 if (!GATEWAY_ID || !MQTT_SERVER) {
   console.error('[FALLBACK] GATEWAY_ID와 MQTT_SERVER 환경변수가 필요합니다.');
@@ -47,7 +52,10 @@ const T_MODE = `farm/${GATEWAY_ID}/fallback/mode`;
 const T_EVENTS = `farm/${GATEWAY_ID}/fallback/events`;
 const T_ACK = `farm/${GATEWAY_ID}/fallback/ack`;
 const T_GPIO_RELAY = `farm/${GATEWAY_ID}/gpio/relay`;
-const T_EMERGENCY_STOP = `farm/${GATEWAY_ID}/gpio/emergency-stop`;
+const T_EMERGENCY_STOP = `farm/${GATEWAY_ID}/gpio/emergency-stop`;       // 구형 1회 정지(호환)
+const T_EMERGENCY = `farm/${GATEWAY_ID}/gpio/emergency`;                  // 정지 유지 상태(retained, {active})
+const T_EMERGENCY_STATE = `farm/${GATEWAY_ID}/gpio/emergency/state`;      // Pi → 서버 적용 확인
+const T_PROTECTION = `farm/${GATEWAY_ID}/fallback/protection`;            // 방재 종료 시각(retained, {until})
 const T_GPIO_STATUS = `farm/${GATEWAY_ID}/gpio/status`;
 // 센서 데이터 (온도/빗물): z2m 토픽 패턴 farm/{gw}/z2m/{device}
 const T_Z2M_PREFIX = `farm/${GATEWAY_ID}/z2m/`;
@@ -65,6 +73,17 @@ const rain = new RainOverride();
 
 let client;
 let evalTimer = null;
+
+// ── 비상 정지 래치 / 방재 상태 (파일 영속) ─────────────────────
+function readJson(path) {
+  try { return JSON.parse(fs.readFileSync(path, 'utf-8')); } catch { return null; }
+}
+function writeJson(path, obj) {
+  try { fs.writeFileSync(path, JSON.stringify(obj)); } catch (e) { console.error(`[FALLBACK] ${path} 저장 실패: ${e.message}`); }
+}
+let emergencyLatched = !!readJson(EMERGENCY_LATCH_PATH)?.active;
+let protectionUntilMs = (() => { const u = readJson(PROTECTION_PATH)?.until; const t = u ? Date.parse(u) : NaN; return Number.isFinite(t) ? t : 0; })();
+if (emergencyLatched) console.warn('[FALLBACK] 부팅: 비상 정지 유지 중 — 해제 전까지 릴레이 ON 금지');
 let relayBridge;
 let evaluator;
 let rainGpio;
@@ -82,6 +101,7 @@ function connect() {
   });
 
   relayBridge = new RelayBridge({ client, gatewayId: GATEWAY_ID, store });
+  relayBridge.latched = emergencyLatched;
   evaluator = new RuleEvaluator({
     store, queue, rain, relayBridge, gatewayId: GATEWAY_ID,
   });
@@ -90,7 +110,7 @@ function connect() {
   client.on('connect', () => {
     console.log('[FALLBACK] MQTT 연결 성공');
     const topics = [
-      T_HEARTBEAT, T_RULES_SYNC, T_GPIO_RELAY, T_EMERGENCY_STOP, T_GPIO_STATUS,
+      T_HEARTBEAT, T_RULES_SYNC, T_GPIO_RELAY, T_EMERGENCY_STOP, T_EMERGENCY, T_PROTECTION, T_GPIO_STATUS,
       `${T_Z2M_PREFIX}+`,
     ];
     topics.forEach((t) => client.subscribe(t, { qos: 1 }, (err) => {
@@ -100,6 +120,8 @@ function connect() {
 
     // 초기 모드 publish
     publishMode();
+    // 현재 비상 정지 유지 상태 회신 (서버가 Pi 실제 상태를 알 수 있게)
+    publishEmergencyState();
 
     // 우적센서 GPIO 감시 시작 (rainInput.enabled 에 따라)
     rainGpio.applyConfig(store.config().rainInput);
@@ -150,9 +172,31 @@ function handleMessage(topic, payload) {
       return;
     }
     // online 모드 — 평가기에 관수 ON timestamp 등록
-    if (cmd?.channel && typeof cmd.state === 'boolean') {
-      evaluator.recordChannelState(cmd.channel, cmd.state);
+    // 서버/gpio-agent 는 'slot' 필드를 쓴다(구형 'channel' 호환). 이전엔 channel 만 봐서 상태가 비어
+    // 폴백 관수 최대가동 안전망이 동작하지 않았다.
+    const ch = cmd?.slot ?? cmd?.channel;
+    if (ch && typeof cmd.state === 'boolean') {
+      evaluator.recordChannelState(ch, cmd.state);
     }
+    return;
+  }
+
+  // 4-a) 비상 정지 유지 상태 (retained) — 재접속·재부팅 후에도 서버 상태를 다시 받는다
+  if (topic === T_EMERGENCY) {
+    let msg;
+    try { msg = JSON.parse(payload.toString('utf-8')); } catch { return; }
+    setEmergencyLatch(!!msg?.active, msg);
+    return;
+  }
+
+  // 4-b) 방재 종료 시각 (retained)
+  if (topic === T_PROTECTION) {
+    let msg;
+    try { msg = JSON.parse(payload.toString('utf-8')); } catch { return; }
+    const t = msg?.until ? Date.parse(msg.until) : NaN;
+    protectionUntilMs = Number.isFinite(t) ? t : 0;
+    writeJson(PROTECTION_PATH, { until: protectionUntilMs ? new Date(protectionUntilMs).toISOString() : null });
+    console.log(`[FALLBACK] 방재 상태: ${protectionUntilMs > Date.now() ? `~${new Date(protectionUntilMs).toISOString()}` : '없음'}`);
     return;
   }
 
@@ -168,8 +212,9 @@ function handleMessage(topic, payload) {
     let s;
     try { s = JSON.parse(payload.toString('utf-8')); }
     catch { return; }
-    if (s?.channel && typeof s.state === 'boolean') {
-      evaluator.recordChannelState(s.channel, s.state);
+    const ch = s?.slot ?? s?.channel;
+    if (ch && typeof s.state === 'boolean') {
+      evaluator.recordChannelState(ch, s.state);
     }
     return;
   }
@@ -191,6 +236,40 @@ function handleMessage(topic, payload) {
     }
     return;
   }
+}
+
+/**
+ * 비상 정지 유지 적용/해제.
+ *  적용: 래치 파일 기록 → RelayBridge ON 차단 → 모든 릴레이 OFF → 폴백 룰 평가 중지
+ *  해제: 래치 파일 삭제 → ON 허용 (장비는 꺼진 상태 그대로, 다시 켜는 건 서버 자동제어/사용자)
+ */
+function setEmergencyLatch(active, meta) {
+  const changed = active !== emergencyLatched;
+  emergencyLatched = active;
+  if (relayBridge) relayBridge.latched = active;
+  if (active) {
+    writeJson(EMERGENCY_LATCH_PATH, { active: true, by: meta?.by || null, reason: meta?.reason || null, at: meta?.ts || new Date().toISOString() });
+    // 이미 래치 중이어도(재접속 시 retained 재수신) OFF 는 한 번 더 보내 안전하게
+    evaluator.emergencyStopAll();
+    if (changed) console.warn(`[FALLBACK] 비상 정지 유지 적용 (by ${meta?.by || '?'})`);
+  } else {
+    try { fs.unlinkSync(EMERGENCY_LATCH_PATH); } catch {}
+    if (changed) console.warn(`[FALLBACK] 비상 정지 해제 (by ${meta?.by || '?'})`);
+  }
+  if (changed) {
+    queue.enqueue({
+      eventType: active ? 'emergency_latched' : 'emergency_released',
+      payload: { by: meta?.by || null, reason: meta?.reason || null },
+      occurredAt: new Date().toISOString(),
+    });
+    flushQueue();
+  }
+  publishEmergencyState();
+}
+
+function publishEmergencyState() {
+  if (!client?.connected) return;
+  client.publish(T_EMERGENCY_STATE, JSON.stringify({ active: emergencyLatched, ts: new Date().toISOString() }), { qos: 1, retain: true });
 }
 
 function publishMode() {
@@ -249,7 +328,7 @@ function startEvaluationLoop() {
         publishMode();
         if (fsm.mode === 'online') {
           flushQueue();
-          evaluator.onExitFallback(); // 폴백 관수 예약 타이머 취소 → 온라인 스케줄러 인계
+          evaluator.onExitFallback(); // 폴백 관수 예약 취소 + 폴백이 켠 관수 채널 OFF → 온라인 스케줄러 인계
           evaluator.applyRainOverride(false); // 폴백이 걸어둔 빗물 강제닫힘 해제 → 서버 인계
         }
 
@@ -269,9 +348,9 @@ function startEvaluationLoop() {
         else if (rainState === 'inactive') evaluator.applyRainOverride(false);
       }
 
-      // 3) 폴백 모드면 룰 평가
-      if (fsm.mode === 'fallback') {
-        evaluator.evaluate(new Date());
+      // 3) 폴백 모드면 룰 평가 — 비상 정지 유지 중엔 평가하지 않음(모든 릴레이 정지 유지)
+      if (fsm.mode === 'fallback' && !emergencyLatched) {
+        evaluator.evaluate(new Date(), { protectionActive: protectionUntilMs > Date.now() });
       }
     } catch (err) {
       console.error(`[FALLBACK] 평가 루프 오류: ${err.message}`);

@@ -35,6 +35,13 @@
 #   /root/.ssh/tunnel_key                      | first-boot-init 이 새로 발급
 #   /etc/hostname                              | lgw-default 로 초기화
 #   bash history                               | 보안 (운영 비밀번호 등 잔존 방지)
+#   Zigbee 네트워크(network_key/pan_id/ext_pan_id, | 모든 Pi 가 같은 Zigbee 네트워크 ID·키를 갖지 않게 →
+#     database.db, coordinator_backup.json, state.json) | 첫 기동 시 z2m 이 새로 생성 (2026-10-05 추가)
+#   fallback 데이터(rules.json, fallback.db*,  | 마스터의 룰·이벤트·비상정지 유지·방재 상태가
+#     emergency.json, protection.json)         | 새 Pi 로 넘어가지 않게 (2026-10-05 추가)
+#   mosquitto 영속 DB (/var/lib/mosquitto/*.db) | 마스터 ID 로 된 보관(retained) 메시지 제거
+#   이 스크립트의 백업 폴더                    | 지운 키(SSH·터널)를 다시 담고 있어 이미지에 남으면 안 됨 —
+#                                              | 기본으로 마지막에 삭제 (--keep-backup 으로 유지 가능)
 #
 # 신규 Pi 에서의 흐름 (sanitize 적용 후):
 #   1. SD 굽기 → 신규 Pi 부팅
@@ -50,6 +57,13 @@
 # ============================================================
 
 set -euo pipefail
+
+KEEP_BACKUP=false
+for arg in "$@"; do
+  case "$arg" in
+    --keep-backup) KEEP_BACKUP=true ;;
+  esac
+done
 
 if [[ "$EUID" -ne 0 ]]; then
   echo "이 스크립트는 root 권한이 필요합니다. sudo 로 실행하세요." >&2
@@ -134,6 +148,56 @@ echo "  hostname=lgw-default, first-boot 마커 제거, bash history 정리"
 # ───── 8. NetworkManager Wi-Fi: 본부 Wi-Fi 보존, 다른 자격증명만 정리 ─────
 # (현장 SSID/PW 변경은 운영자가 단계 7 에서 백엔드 UI 로 진행)
 echo ""
+# ───── 8-a. Zigbee 네트워크 정보 초기화 ─────
+echo ""
+echo "[8-a] Zigbee 네트워크 정보 초기화 (네트워크 키·PAN ID·페어링 목록)..."
+Z2M_DATA="/opt/zigbee2mqtt/data"
+if [[ -d "$Z2M_DATA" ]]; then
+  mkdir -p "$BAK/z2m"
+  cp -a "$Z2M_DATA/configuration.yaml" "$BAK/z2m/" 2>/dev/null || true
+  rm -f "$Z2M_DATA/database.db" "$Z2M_DATA/database.db.backup" "$Z2M_DATA/coordinator_backup.json" "$Z2M_DATA/state.json"
+  rm -rf "$Z2M_DATA/log"
+  if [[ -f "$Z2M_DATA/configuration.yaml" ]]; then
+    # network_key / pan_id / ext_pan_id 를 GENERATE 로 (인라인 [..] 과 블록 리스트 '- n' 형식 모두 처리)
+    python3 - "$Z2M_DATA/configuration.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+lines = open(path).read().split('\n')
+out, skip_indent = [], None
+for ln in lines:
+    if skip_indent is not None:
+        stripped = ln.lstrip()
+        indent = len(ln) - len(stripped)
+        if stripped.startswith('- ') and indent > skip_indent:
+            continue          # 블록 리스트 항목 제거
+        skip_indent = None
+    m = re.match(r'^(\s*)(network_key|pan_id|ext_pan_id):(.*)$', ln)
+    if m:
+        out.append(f"{m.group(1)}{m.group(2)}: GENERATE")
+        skip_indent = len(m.group(1))
+        continue
+    out.append(ln)
+open(path, 'w').write('\n'.join(out))
+PY
+    echo "  network_key / pan_id / ext_pan_id → GENERATE, 페어링 DB·백업·상태 파일 삭제"
+  fi
+else
+  echo "  $Z2M_DATA 없음 — 건너뜀"
+fi
+
+# ───── 8-b. 폴백 엔진 데이터 + mosquitto 보관 메시지 ─────
+echo ""
+echo "[8-b] 폴백 엔진 데이터(룰·이벤트·비상정지 유지·방재) + mosquitto 보관 메시지 제거..."
+FB_DIR="/var/lib/smartfarm/fallback"
+if [[ -d "$FB_DIR" ]]; then
+  rm -f "$FB_DIR/rules.json" "$FB_DIR/fallback.db" "$FB_DIR/fallback.db-shm" "$FB_DIR/fallback.db-wal" \
+        "$FB_DIR/emergency.json" "$FB_DIR/protection.json"
+  if id pi >/dev/null 2>&1; then chown -R pi:pi "$FB_DIR"; fi
+  echo "  $FB_DIR 정리 (emergency.json 이 남으면 새 Pi 가 '비상 정지 중'으로 켜짐)"
+fi
+rm -f /var/lib/mosquitto/mosquitto.db 2>/dev/null || true
+echo "  /var/lib/mosquitto/mosquitto.db 제거"
+
 echo "[9/9] Wi-Fi 프로파일: 본부 Wi-Fi(wifi-hq) + 유선(eth0-static) 보존..."
 if [[ -d /etc/NetworkManager/system-connections ]]; then
   mkdir -p "$BAK/NetworkManager"
@@ -149,7 +213,16 @@ echo "════════════════════════�
 echo "  ✅ Sanitize 완료 — 이제 골든 이미지 추출 단계로"
 echo "═══════════════════════════════════════════════════"
 echo ""
-echo "백업: $BAK"
+# ───── 백업 폴더 처리 — 지운 SSH 호스트 키·터널 키가 들어 있으므로 이미지에 남기지 않는다 ─────
+if [[ "$KEEP_BACKUP" = true ]]; then
+  echo "⚠️  백업 유지: $BAK"
+  echo "    이 폴더에는 마스터의 SSH 호스트 키·터널 키가 있습니다. 이미지 추출 전에 반드시 삭제하세요:"
+  echo "    sudo rm -rf /root/sanitize-backup-*"
+else
+  rm -rf "$BAK"
+  rm -rf /root/sanitize-backup-* 2>/dev/null || true
+  echo "백업 폴더 삭제됨 (키가 이미지에 남지 않도록). 보존하려면 --keep-backup"
+fi
 echo ""
 echo "다음 단계:"
 echo "  1. sync && fstrim -av"

@@ -153,6 +153,8 @@ if [ -d /var/lib/smartfarm/fallback ]; then
   rm -f /var/lib/smartfarm/fallback/fallback.db
   rm -f /var/lib/smartfarm/fallback/fallback.db-shm
   rm -f /var/lib/smartfarm/fallback/fallback.db-wal
+  # 비상 정지 유지·방재 상태 — 남으면 새 Pi 가 '비상 정지 중'으로 켜짐 (2026-10-05)
+  rm -f /var/lib/smartfarm/fallback/emergency.json /var/lib/smartfarm/fallback/protection.json
   # 디렉터리 소유권 보정 (pi 유저로 새로 파일 생성 가능하도록)
   if id pi >/dev/null 2>&1; then
     chown -R pi:pi /var/lib/smartfarm/fallback
