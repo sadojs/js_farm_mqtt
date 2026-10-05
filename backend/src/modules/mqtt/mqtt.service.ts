@@ -5,6 +5,7 @@ import { MqttSensorHandler } from './mqtt-sensor.handler';
 import { MqttDeviceHandler } from './mqtt-device.handler';
 import { MqttBridgeHandler } from './mqtt-bridge.handler';
 import { ZigbeeDevice } from './mqtt.types';
+import { EmergencyLatchedError, isGatewayLatched, isOnValue } from '../../common/emergency/emergency-latch';
 /** 폴백 채널 매핑 엔트리 — 온보드 GPIO(pin) 또는 Zigbee(friendlyName/z2mKey) */
 type ChannelEntry = {
   channel: string;
@@ -87,6 +88,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       'farm/+/fallback/mode',           // RPi fallback-engine — 현재 모드 (online/fallback)
       'farm/+/fallback/events',         // RPi fallback-engine — 폴백 이벤트 배치
       'farm/+/fallback/ack',            // RPi fallback-engine — 룰 동기화 ACK
+      'farm/+/gpio/emergency/state',    // RPi fallback-engine — 비상 정지 유지 상태 확인(ACK)
     ];
 
     for (const topic of topics) {
@@ -127,6 +129,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
 
     // RPi fallback-engine: farm/{gw}/fallback/{mode|events|ack}
+    // 비상 정지 유지 상태 확인(ACK): farm/{gw}/gpio/emergency/state
+    if (namespace === 'gpio' && parts[3] === 'emergency' && parts[4] === 'state') {
+      try { this.emergencyStateHandler?.(gatewayId, payload); } catch (e) {
+        this.logger.error(`비상 정지 상태 처리 실패: ${(e as Error).message}`);
+      }
+      return;
+    }
+
     if (namespace === 'fallback') {
       const sub = parts[3];
       try {
@@ -174,6 +184,10 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   /** 장비 제어 (MQTT publish) */
   async controlDevice(gatewayId: string, friendlyName: string, command: object): Promise<void> {
+    // 비상 정지 유지 중엔 ON 계열 명령 차단 (OFF 는 허용) — 수동·자동·스케줄·방재 전 경로의 최종 관문
+    if (isGatewayLatched(gatewayId) && Object.values(command || {}).some(isOnValue)) {
+      throw new EmergencyLatchedError(gatewayId);
+    }
     const topic = `farm/${gatewayId}/z2m/${friendlyName}/set`;
     return new Promise((resolve, reject) => {
       this.client.publish(topic, JSON.stringify(command), { qos: 1 }, (err) => {
@@ -194,6 +208,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     /** 개폐기 인터록 파트너 핀(BCM). state=ON 시 gpio-agent가 이 핀을 먼저 강제 OFF → 동시 ON 방지. */
     interlockPin?: number;
   }): Promise<void> {
+    if (isGatewayLatched(gatewayId) && cmd.state) {
+      throw new EmergencyLatchedError(gatewayId);
+    }
     const topic = `farm/${gatewayId}/gpio/relay`;
     const payload = JSON.stringify({ ...cmd, requestId: Date.now() });
     return new Promise((resolve, reject) => {
@@ -365,6 +382,36 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         },
       );
     });
+  }
+
+  private emergencyStateHandler: ((gatewayId: string, payload: Buffer) => void) | null = null;
+  setEmergencyStateHandler(handler: (gatewayId: string, payload: Buffer) => void) {
+    this.emergencyStateHandler = handler;
+  }
+
+  /**
+   * 비상 정지 유지 상태 발행 (retained) — Pi 는 재접속·재부팅 후에도 이 값을 받아 유지/해제한다.
+   * active=true 면 Pi 가 모든 릴레이 OFF + 해제 전까지 ON 차단.
+   */
+  async publishEmergencyState(gatewayId: string, state: { active: boolean; by: string; reason?: string; ts: string }): Promise<void> {
+    const topic = `farm/${gatewayId}/gpio/emergency`;
+    return new Promise((resolve, reject) => {
+      this.client.publish(topic, JSON.stringify(state), { qos: 1, retain: true }, (err) => {
+        if (err) {
+          this.logger.error(`비상 정지 상태 발행 실패: ${topic} - ${err.message}`);
+          reject(err);
+        } else {
+          this.logger.warn(`비상 정지 상태 발행: ${topic} active=${state.active} (by ${state.by})`);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /** 방재(밀폐) 종료 시각 발행 (retained) — 서버 단절 중 Pi 폴백이 방재 중엔 환기팬·개폐기를 움직이지 않게 */
+  publishProtection(gatewayId: string, untilIso: string | null) {
+    if (!this.client?.connected) return;
+    this.client.publish(`farm/${gatewayId}/fallback/protection`, JSON.stringify({ until: untilIso }), { qos: 1, retain: true });
   }
 
   /** 서버 → RPi 비상 정지 명령. 폴백 모드에서도 통과되어야 함. */

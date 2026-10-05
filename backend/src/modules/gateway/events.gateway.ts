@@ -387,6 +387,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     void this.ownerOfGroup(payload.groupId).then((owner) => this.emitToFarm(owner, 'high-temp:override', payload));
   }
 
+  /** 비상 정지 유지 상태 변경 — 해당 농장 + 관리자 */
+  broadcastEmergencyState(ownerId: string, payload: Record<string, unknown>) {
+    this.emitToFarm(ownerId, 'emergency:state', payload);
+  }
+
   // rpi-emergency-failover: 폴백 모드 전환 브로드캐스트
   broadcastFallbackModeChanged(payload: {
     gatewayId: string;

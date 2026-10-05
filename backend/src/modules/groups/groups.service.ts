@@ -492,6 +492,7 @@ export class GroupsService {
     }
     const until = new Date(Date.now() + minutes * 60000).toISOString();
     this.logger.log(`[protection] group=${groupId} 방재 시작 ${minutes}분 — 개폐기 ${appliedOpeners} / 팬 ${appliedFans}`);
+    await this.publishProtectionToPi(groupId, userId, role, until);
     return { ok: true, until, applied: { openers: appliedOpeners, fans: appliedFans } };
   }
 
@@ -530,6 +531,7 @@ export class GroupsService {
     }
     if (!extended) throw new BadRequestException('진행 중인 방재가 없습니다.');
     this.logger.log(`[protection] group=${groupId} 방재 ${add}분 연장 — ${extended}개 장치`);
+    await this.publishProtectionToPi(groupId, userId, role, new Date(newUntil).toISOString());
     return { ok: true, until: new Date(newUntil).toISOString(), extended };
   }
 
@@ -548,7 +550,25 @@ export class GroupsService {
       } catch (e: any) { this.logger.warn(`[protection] 정지 실패 ${d.name}: ${e.message}`); }
     }
     this.logger.log(`[protection] group=${groupId} 방재 정지 — ${cancelled}개 해제`);
+    await this.publishProtectionToPi(groupId, userId, role, null);
     return { ok: true, cancelled };
+  }
+
+  /**
+   * 방재 종료 시각을 이 구역 장비가 붙은 게이트웨이(Pi)에 retained 로 알린다.
+   * 서버가 끊겨 Pi 가 폴백으로 동작할 때 방재 중이면 환기팬·개폐기를 움직이지 않게 하기 위함.
+   * (만료는 Pi 가 시각으로 판단 — 별도 해제 발행 불필요)
+   */
+  private async publishProtectionToPi(groupId: string, userId: string, role: string | undefined, untilIso: string | null) {
+    try {
+      const { openers, fans } = await this.loadGroupActuators(groupId, userId, role);
+      const gwPks = [...new Set([...openers, ...fans].map((d) => d.gatewayId).filter(Boolean))] as string[];
+      if (!gwPks.length || !this.mqttService) return;
+      const gws = await this.gatewayRepo.find({ where: { id: In(gwPks) } });
+      for (const gw of gws) this.mqttService.publishProtection(gw.gatewayId, untilIso);
+    } catch (e: any) {
+      this.logger.warn(`[protection] Pi 방재 상태 발행 실패: ${e.message}`);
+    }
   }
 
   async assignDevices(groupId: string, userId: string, deviceIds: string[]) {

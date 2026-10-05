@@ -14,6 +14,7 @@ import { IrrigationSchedulerService } from '../automation/irrigation-scheduler.s
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { AVAILABLE_SWITCH_CODES, AVAILABLE_SWITCH_CODES_12CH, detectChannelCount, getDefaultMappingByCount } from './channel-mapping.constants';
+import { isGatewayLatched, isOnValue } from '../../common/emergency/emergency-latch';
 
 const DEVICE_DEPENDENCY_SQL = `
   SELECT id, name, enabled FROM automation_rules
@@ -837,6 +838,11 @@ export class DevicesService {
     const device = await this.devicesRepo.findOne({ where: role === 'admin' ? { id } : { id, userId } });
     if (!device) throw new NotFoundException('장비를 찾을 수 없습니다.');
     if (!device.friendlyName) throw new BadRequestException('장비의 friendly_name이 설정되지 않았습니다.');
+
+    // ── 비상 정지 유지 중: ON 계열 명령 거부(OFF 는 허용) — 수동·자동·타이머·방재·음성 공통 입구 ──
+    if (isGatewayLatched(device.gatewayId) && commands.some((c) => isOnValue(c.value))) {
+      throw new ConflictException('비상 정지 중인 게이트웨이의 장비입니다. 페일오버 화면에서 비상 정지를 해제한 뒤 다시 시도하세요.');
+    }
 
     // ── 수동 pin/release 정책 ──
     // 사용자 명령(callerSource undefined)일 때만 적용 — 자동제어/rain-override는 영향 없음.

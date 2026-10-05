@@ -10,6 +10,7 @@ import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
 import { RainOverrideService } from '../rain-override/rain-override.service';
 import { HighTempOverrideService } from './high-temp-override.service';
+import { isGatewayLatched } from '../../common/emergency/emergency-latch';
 
 type LogicOp = 'AND' | 'OR';
 
@@ -841,6 +842,11 @@ export class AutomationRunnerService {
     const results: any[] = [];
     for (const device of candidateDevices) {
       // 수동/타이머 우회 활성 device 는 룰 실행 대상에서 제외(relay 경로와 동일). 만료 시 자동 복귀.
+      if (isGatewayLatched(device.gatewayId)) {
+        this.logger.log(`[emergency] ${device.name} 비상 정지 유지 중 — 룰 실행 skip (rule=${rule.name})`);
+        results.push({ deviceId: device.id, deviceName: device.name, success: true, skipped: true });
+        continue;
+      }
       if (isManuallyHeld(device.deviceSettings)) {
         this.logger.log(`[manual-override] ${device.name} 수동/타이머 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
         results.push({ deviceId: device.id, deviceName: device.name, success: true, skipped: true });
@@ -1170,7 +1176,7 @@ export class AutomationRunnerService {
     const remainingIds: string[] = [];
     for (const id of new Set(targetIds)) {
       const dev = await this.devicesRepo.findOne({ where: { id } });
-      if (dev && isManuallyHeld(dev.deviceSettings)) {
+      if (dev && (isManuallyHeld(dev.deviceSettings) || isGatewayLatched(dev.gatewayId))) {
         skippedIds.push(id);
         this.logger.log(`[manual-override] ${dev.name} 수동 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
       } else {

@@ -10,6 +10,7 @@ import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttService } from '../mqtt/mqtt.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
+import { isGatewayLatched } from '../../common/emergency/emergency-latch';
 
 interface ScheduledAction {
   time: number; // ms offset from start
@@ -137,6 +138,10 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
     const gateway = await this.gatewayRepo.findOne({ where: { id: device.gatewayId } });
     if (!gateway) {
       this.logger.warn(`관수 룰 ${rule.id}: 게이트웨이를 찾을 수 없음`);
+      return;
+    }
+    if (isGatewayLatched(gateway.gatewayId)) {
+      this.logger.warn(`관수 스케줄 스킵: 비상 정지 유지 중 (${gateway.gatewayId}) - ${rule.name}`);
       return;
     }
 
