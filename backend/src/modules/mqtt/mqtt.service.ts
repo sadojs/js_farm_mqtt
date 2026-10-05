@@ -232,7 +232,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   /** 페어링 모드 ON/OFF */
   async permitJoin(gatewayId: string, enable: boolean, duration = 120): Promise<void> {
     const topic = `farm/${gatewayId}/z2m/bridge/request/permit_join`;
-    this.client.publish(topic, JSON.stringify({ value: enable, time: duration }));
+    // 발행 실패를 호출자에게 알린다 (이전: 콜백 없이 발행 후 항상 성공 응답)
+    if (!this.client?.connected) throw new Error('MQTT 브로커에 연결되어 있지 않습니다.');
+    await new Promise<void>((resolve, reject) => {
+      this.client.publish(topic, JSON.stringify({ value: enable, time: duration }), { qos: 1 }, (err) =>
+        err ? reject(err) : resolve());
+    });
     this.logger.log(`페어링 모드 ${enable ? 'ON' : 'OFF'}: ${gatewayId} (${duration}초)`);
   }
 

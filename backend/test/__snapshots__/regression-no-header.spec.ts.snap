@@ -876,8 +876,22 @@ exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 관리자 GET
 exports[`헤더 없는 요청 회귀 (변경 전과 동일) 농장 사용자 GET /api/activity-logs 1`] = `
 {
   "body": {
-    "data": [],
-    "total": 0,
+    "data": [
+      {
+        "action": "group.update",
+        "createdAt": "<datetime>",
+        "details": null,
+        "groupId": "11111111-0000-4000-8000-000000000010",
+        "groupName": "F1-1동",
+        "id": "11111111-0000-4000-8000-000000000070",
+        "targetId": "11111111-0000-4000-8000-000000000010",
+        "targetName": "F1-1동",
+        "targetType": "group",
+        "userId": "11111111-0000-4000-8000-000000000001",
+        "userName": "F1-농장주",
+      },
+    ],
+    "total": 1,
   },
   "status": 200,
 }

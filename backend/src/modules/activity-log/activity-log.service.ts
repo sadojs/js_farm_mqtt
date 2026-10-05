@@ -68,7 +68,11 @@ export class ActivityLogService {
 
     // RBAC: admin은 전체, 일반은 자기 userId만
     if (!params.isAdmin) {
-      qb.andWhere('a.user_id = :userId', { userId: params.userId });
+      // 이전: 실행한 계정 본인 것만 → 농장 관리자가 소속 사용자(작업자)의 조작을 볼 수 없었음
+      qb.andWhere(
+        `a.user_id::text IN (SELECT u.id::text FROM users u WHERE u.id::text = :userId OR u.parent_user_id::text = :userId)`,
+        { userId: params.userId },
+      );
     }
     if (params.groupId) {
       qb.andWhere('a.group_id = :groupId', { groupId: params.groupId });

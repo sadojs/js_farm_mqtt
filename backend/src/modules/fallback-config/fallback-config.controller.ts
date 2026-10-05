@@ -20,10 +20,11 @@ import { UpsertOpenerScheduleDto } from './dto/upsert-opener-schedule.dto';
 import { MqttService } from '../mqtt/mqtt.service';
 import { HeartbeatService } from './heartbeat.service';
 import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
+import { GatewayOwnershipGuard } from '../../common/guards/gateway-ownership.guard';
 
 @PlatformScope()
 @Controller('fallback-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, GatewayOwnershipGuard)
 export class FallbackConfigController {
   constructor(
     private readonly service: FallbackConfigService,

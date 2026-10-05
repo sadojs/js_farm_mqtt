@@ -195,6 +195,7 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
 
     // 관수 시작 이벤트
     this.eventsGateway.emitIrrigationStarted({
+      userId: rule.userId,
       ruleId: rule.id,
       ruleName: rule.name,
       deviceId: deviceIds[0],
@@ -253,6 +254,7 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
       try {
         // 관수 종료 이벤트
         this.eventsGateway.emitIrrigationStopped({
+          userId: rule.userId,
           ruleId: rule.id,
           tuyaDeviceId: device.friendlyName,
         });
@@ -478,7 +480,7 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
           }),
         );
 
-        this.eventsGateway.emitIrrigationStopped({ ruleId, tuyaDeviceId: friendlyName });
+        this.eventsGateway.emitIrrigationStopped({ userId: active.userId, ruleId, tuyaDeviceId: friendlyName });
         this.logger.log(`관수 강제 중단: ruleId=${ruleId}`);
         return true;
       }

@@ -16,6 +16,8 @@ export class RetentionService {
       { table: 'activity_logs', column: 'created_at', interval: '3 months' },
       { table: 'sensor_alerts', column: 'created_at', interval: '3 months', extraWhere: 'AND resolved = true' },
       { table: 'notifications', column: 'created_at', interval: '2 months' },
+      // 폴백 이벤트(게이트웨이 단절·복구·안전 정지 기록) — 이전엔 정책이 없어 무한 증가
+      { table: 'fallback_events', column: 'occurred_at', interval: '6 months' },
     ];
 
     for (const p of policies) {

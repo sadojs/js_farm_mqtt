@@ -25,6 +25,7 @@ export class DevicesController {
   }
 
   @Post('register')
+  @Roles('admin', 'farm_admin')
   async register(
     @CurrentUser() user: any,
     @Body() body: { devices: any[]; houseId?: string },
@@ -58,6 +59,7 @@ export class DevicesController {
   }
 
   @Put(':id')
+  @Roles('admin', 'farm_admin')
   update(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -121,6 +123,7 @@ export class DevicesController {
   }
 
   @Patch(':id/name')
+  @Roles('admin', 'farm_admin')
   async renameDevice(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -137,6 +140,7 @@ export class DevicesController {
   }
 
   @Patch(':id/channel-mapping')
+  @Roles('admin', 'farm_admin')
   updateChannelMapping(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -155,6 +159,7 @@ export class DevicesController {
    * body: { key: 'zone_3', enabled: false }
    */
   @Patch(':id/channel-enabled')
+  @Roles('admin', 'farm_admin')
   updateChannelEnabled(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -174,6 +179,7 @@ export class DevicesController {
    * body: { channelCode: 'switch_5' } — 다른 child가 쓰는 코드면 409
    */
   @Patch(':id/channel-code')
+  @Roles('admin', 'farm_admin')
   updateChannelCode(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -192,6 +198,7 @@ export class DevicesController {
    * body: { disabled: true|false }
    */
   @Patch(':id/rain-override-disabled')
+  @Roles('admin', 'farm_admin')
   updateRainOverrideDisabled(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -229,6 +236,7 @@ export class DevicesController {
    * 트랜잭션 + activity_logs + z2m unpair(best-effort) + WebSocket broadcast.
    */
   @Post(':id/replace')
+  @Roles('admin', 'farm_admin')
   @HttpCode(HttpStatus.OK)
   async replaceDevice(
     @Param('id') id: string,
@@ -253,12 +261,14 @@ export class DevicesController {
   }
 
   @Delete(':id/opener-pair')
+  @Roles('admin', 'farm_admin')
   @HttpCode(HttpStatus.OK)
   removeOpenerPair(@Param('id') id: string, @CurrentUser() user: any) {
     return this.devicesService.removeOpenerPair(id, this.getEffectiveUserId(user));
   }
 
   @Delete(':id')
+  @Roles('admin', 'farm_admin')
   async remove(@Param('id') id: string, @CurrentUser() user: any) {
     const result = await this.devicesService.remove(id, this.getEffectiveUserId(user), user.role);
     this.activityLog.log({

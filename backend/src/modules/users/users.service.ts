@@ -6,6 +6,8 @@ import { User } from './entities/user.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { GatewayManagerService } from '../gateway-manager/gateway-manager.service';
 import { farmNameOf } from './farm-name.util';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { invalidateUserStatus } from '../../common/auth/user-status-cache';
 
 type Role = 'admin' | 'farm_admin' | 'farm_user';
 
@@ -15,6 +17,7 @@ export class UsersService {
     @InjectRepository(User) private usersRepo: Repository<User>,
     private gatewayService: GatewayManagerService,
     private dataSource: DataSource,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async findAll() {
@@ -132,11 +135,23 @@ export class UsersService {
     } else {
       user.farmName = null;
     }
+    const deactivating = dto.status === 'inactive' && user.status !== 'inactive';
     if (dto.status) user.status = dto.status;
     if (dto.password) user.passwordHash = await bcrypt.hash(dto.password, 10);
 
     const saved = await this.usersRepo.save(user);
+    invalidateUserStatus(user.id);
+    if (deactivating) await this.revokeSessions(user.id);
     return this.sanitize(saved);
+  }
+
+  /**
+   * 비활성화·삭제 즉시 반영: refresh 토큰 폐기 + 실시간/터미널 접속 종료.
+   * (이전: 로그인·토큰 갱신 때만 상태를 봐서 비활성화 후에도 열린 접속과 최대 15분짜리 토큰이 계속 유효)
+   */
+  private async revokeSessions(userId: string) {
+    await this.dataSource.query('DELETE FROM refresh_tokens WHERE user_id::text = $1', [userId]).catch(() => undefined);
+    this.eventEmitter.emit('user.sessions.revoked', { userId });
   }
 
   /**
@@ -167,7 +182,9 @@ export class UsersService {
       );
     }
 
+    await this.revokeSessions(user.id);
     await this.usersRepo.remove(user);
+    invalidateUserStatus(user.id);
     return { message: '삭제되었습니다.' };
   }
 

@@ -18,7 +18,8 @@ export class ActivityLogController {
     @Query('limit') limit?: string,
   ) {
     return this.service.findAll({
-      userId: user.sub || user.id,
+      // 농장 단위 — 농장 사용자는 소속 농장, 농장 관리자는 자기 농장 (본인 + 소속 사용자들의 조작을 함께 본다)
+      userId: user.role === 'farm_user' && user.parentUserId ? user.parentUserId : (user.sub || user.id),
       isAdmin: user.role === 'admin',
       groupId,
       action,

@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { House } from '../groups/entities/house.entity';
@@ -64,6 +65,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = this.jwtService.verify(token);
       (client as any).userId = payload.sub;
       (client as any).role = payload.role;
+      (client as any).parentUserId = payload.parentUserId ?? null;
       // 사용자별 전용 room 자동 입장
       client.join(`user:${payload.sub}`);
       // 농장 사용자는 소속 농장(농장 관리자) room 에도 입장 — 농장 실시간 데이터·알림을 함께 받는다
@@ -269,16 +271,45 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     tuyaDeviceId: string;
     startedAt: number;
     estimatedEndAt: number;
+    userId?: string;
   }) {
-    this.server.emit('irrigation:started', data);
+    const { userId, ...payload } = data;
+    this.emitToFarm(userId ?? null, 'irrigation:started', payload);
   }
 
   // 관수 종료 알림
   emitIrrigationStopped(data: {
     ruleId: string;
     tuyaDeviceId: string;
+    userId?: string;
   }) {
-    this.server.emit('irrigation:stopped', data);
+    const { userId, ...payload } = data;
+    this.emitToFarm(userId ?? null, 'irrigation:stopped', payload);
+  }
+
+  /**
+   * 농장 데이터 이벤트 — 그 농장 room(농장 관리자·소속 사용자·농장 보기 중인 관리자) + 플랫폼 관리자.
+   * (이전: 전체 방송 — 다른 농장 접속자에게도 룰 이름·장치 ID·이벤트가 전달됨)
+   * 소유자를 알 수 없으면 관리자에게만 보낸다.
+   */
+  private emitToFarm(ownerId: string | null, event: string, payload: unknown) {
+    if (ownerId) this.server.to(`user:${ownerId}`).to('admins').emit(event, payload);
+    else this.server.to('admins').emit(event, payload);
+  }
+
+  private async ownerOfGateway(gatewayRef: string): Promise<string | null> {
+    try {
+      const [row] = await this.userRepository.manager.query(
+        'SELECT user_id::text AS user_id FROM gateways WHERE gateway_id = $1 OR id::text = $1 LIMIT 1', [gatewayRef]);
+      return row?.user_id ?? null;
+    } catch { return null; }
+  }
+
+  private async ownerOfGroup(groupId: string): Promise<string | null> {
+    try {
+      const g = await this.groupRepository.findOne({ where: { id: groupId } });
+      return (g as any)?.userId ?? null;
+    } catch { return null; }
   }
 
   // 게이트웨이 상태 변경 알림
@@ -301,7 +332,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // GPIO 핀 상태 브로드캐스트 (admin 핀 테스트 실시간 피드백)
   broadcastGpioStatus(gatewayId: string, data: { slot: string; pin: number; state: boolean; auto?: boolean }) {
-    this.server.emit('gpio:status', { gatewayId, ...data });
+    void this.ownerOfGateway(gatewayId).then((owner) => this.emitToFarm(owner, 'gpio:status', { gatewayId, ...data }));
+  }
+
+  /** 계정 비활성화·삭제 → 그 계정의 실시간 접속 종료 (농장 관리자면 소속 농장 사용자 접속도) */
+  @OnEvent('user.sessions.revoked')
+  disconnectUser(payload: { userId: string }) {
+    for (const sock of this.server.sockets.sockets.values()) {
+      const c = sock as any;
+      if (c.role === 'admin') continue;
+      if (c.userId === payload.userId || c.parentUserId === payload.userId) sock.disconnect(true);
+    }
   }
 
   /**
@@ -338,12 +379,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 비 감지 우회 상태 브로드캐스트 (구역 단위)
   broadcastRainOverride(payload: { groupId: string; rainDetected: boolean; userOverride: boolean }) {
-    this.server.emit('rain:override', payload);
+    void this.ownerOfGroup(payload.groupId).then((owner) => this.emitToFarm(owner, 'rain:override', payload));
   }
 
   // 고온 무대기 강제열림 상태 브로드캐스트 (구역 단위)
   broadcastHighTempOverride(payload: { groupId: string; active: boolean; temperature?: number | null; threshold?: number | null }) {
-    this.server.emit('high-temp:override', payload);
+    void this.ownerOfGroup(payload.groupId).then((owner) => this.emitToFarm(owner, 'high-temp:override', payload));
   }
 
   // rpi-emergency-failover: 폴백 모드 전환 브로드캐스트
@@ -352,7 +393,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     mode: 'online' | 'fallback' | 'unknown';
     modeChangedAt: string;
   }) {
-    this.server.emit('fallback:mode-changed', payload);
+    void this.ownerOfGateway(payload.gatewayId).then((owner) => this.emitToFarm(owner, 'fallback:mode-changed', payload));
   }
 
   // rpi-emergency-failover: 폴백 이벤트 발생 시 실시간 알림
@@ -362,6 +403,6 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     payload: Record<string, unknown>;
     occurredAt: string;
   }) {
-    this.server.emit('fallback:event', payload);
+    void this.ownerOfGateway(payload.gatewayId).then((owner) => this.emitToFarm(owner, 'fallback:event', payload));
   }
 }
