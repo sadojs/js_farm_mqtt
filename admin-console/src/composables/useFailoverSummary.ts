@@ -14,6 +14,8 @@ export interface FailoverSummary {
   sync: 'synced' | 'syncing' | 'never'
   lastHeartbeat: string | null
   heartbeatTimeoutSeconds: number | null
+  /** 비상 정지 유지 상태 (없으면 null — 구버전 백엔드) */
+  emergency: { active: boolean; stoppedAt: string | null; stoppedByName: string | null; piConfirmed: boolean } | null
 }
 
 export function useFailoverSummary() {
@@ -26,7 +28,7 @@ export function useFailoverSummary() {
     const next: Record<string, FailoverSummary> = {}
     results.forEach((r, i) => {
       if (r.status !== 'fulfilled') return
-      const { config, status } = r.value.data || ({} as FallbackFullConfig)
+      const { config, status, emergency } = r.value.data || ({} as FallbackFullConfig)
       const version = config?.version ?? null
       const applied = config?.lastAppliedVersion ?? null
       next[gatewayIds[i]] = {
@@ -36,6 +38,9 @@ export function useFailoverSummary() {
         sync: applied == null ? 'never' : applied === version ? 'synced' : 'syncing',
         lastHeartbeat: status?.lastHeartbeatSeenAt ?? null,
         heartbeatTimeoutSeconds: config?.heartbeatTimeoutSeconds ?? null,
+        emergency: emergency
+          ? { active: !!emergency.active, stoppedAt: emergency.stoppedAt, stoppedByName: emergency.stoppedByName, piConfirmed: !!emergency.piConfirmed }
+          : null,
       }
     })
     byGatewayId.value = next

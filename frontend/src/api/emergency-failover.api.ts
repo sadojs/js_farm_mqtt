@@ -6,8 +6,7 @@ import type {
   UpdateConfigDto,
   UpsertScheduleDto,
   OpenerSchedule,
-  FallbackConfig,
-} from '../types/emergency-failover.types'
+  FallbackConfig, EmergencyStopState } from '../types/emergency-failover.types'
 
 const base = (gatewayId: string) => `/fallback-config/${gatewayId}`
 
@@ -70,15 +69,27 @@ export const emergencyFailoverApi = {
     return data
   },
 
+  /** 비상 정지 — 정지 유지(래치). 실행자는 서버가 로그인 사용자로 기록(by 는 하위 호환용) */
   async emergencyStop(
     gatewayId: string,
     reason: string,
     by: string,
-  ): Promise<{ ok: boolean }> {
+  ): Promise<{ ok: boolean } & Partial<EmergencyStopState>> {
     const { data } = await apiClient.post(
       `${base(gatewayId)}/emergency-stop`,
       { reason, by },
     )
+    return data
+  },
+
+  /** 비상 정지 해제 — 장비는 꺼진 상태 그대로, 자동제어·수동 조작이 다시 가능 */
+  async emergencyRelease(gatewayId: string): Promise<{ ok: boolean } & Partial<EmergencyStopState>> {
+    const { data } = await apiClient.post(`${base(gatewayId)}/emergency-release`)
+    return data
+  },
+
+  async getEmergency(gatewayId: string): Promise<EmergencyStopState> {
+    const { data } = await apiClient.get(`${base(gatewayId)}/emergency`)
     return data
   },
 }

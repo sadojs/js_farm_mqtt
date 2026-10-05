@@ -49,10 +49,24 @@ export interface FallbackGatewayStatus {
   updatedAt: string
 }
 
+/** 비상 정지 유지(래치) 상태 — active 동안 이 게이트웨이의 모든 릴레이 ON 차단, '정지 해제'로만 풀림 */
+export interface EmergencyStopState {
+  active: boolean
+  stoppedAt: string | null
+  stoppedByName: string | null
+  reason: string | null
+  releasedAt: string | null
+  releasedByName: string | null
+  /** Pi 가 현재 상태를 회신했고 서버 상태와 일치 */
+  piConfirmed: boolean
+  piConfirmedAt: string | null
+}
+
 export interface FallbackFullConfig {
   config: FallbackConfig
   schedule: OpenerSchedule[]
   status: FallbackGatewayStatus | null
+  emergency?: EmergencyStopState | null
 }
 
 export interface FallbackEvent {

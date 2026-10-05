@@ -40,6 +40,7 @@
                   <td><span class="c-pill" :class="gw.zigbeeStatus === 'online' ? 'c-p-ok' : 'c-p-off'">{{ gw.zigbeeStatus === 'online' ? '연결' : '미연결' }}</span></td>
                   <td class="c-mono">{{ tunnelConnected(gw) && gw.tunnelPort ? ':' + gw.tunnelPort : '끊김' }}</td>
                   <td>
+                    <span v-if="fo(gw)?.emergency?.active" class="c-pill c-p-bad" style="margin-right:4px">🛑 비상 정지</span>
                     <span v-if="fo(gw)" class="c-pill" :class="fo(gw)!.mode === 'fallback' ? 'c-p-bad' : fo(gw)!.sync === 'synced' ? 'c-p-ok' : 'c-p-warn'">
                       {{ fo(gw)!.mode.toUpperCase() }} v{{ fo(gw)!.version }}{{ fo(gw)!.sync === 'synced' ? '' : fo(gw)!.sync === 'syncing' ? ' · 동기화 중' : ' · 미동기화' }}
                     </span>
@@ -116,12 +117,20 @@
 
           <div class="c-sub-h">페일오버 원격 조치</div>
           <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">
+            <div v-if="fo(gw)?.emergency?.active" class="c-danger-box" role="alert">
+              <div class="c-t">
+                <b>🛑 비상 정지 중</b> — {{ fmtDateTime(fo(gw)!.emergency!.stoppedAt) }} · {{ fo(gw)!.emergency!.stoppedByName || '-' }}<br />
+                해제 전까지 자동제어·수동 조작으로 릴레이가 켜지지 않습니다.
+                {{ fo(gw)!.emergency!.piConfirmed ? '게이트웨이 적용 확인됨.' : '게이트웨이 적용 확인 대기(오프라인이면 연결 즉시 적용).' }}
+              </div>
+              <button class="c-btn c-btn-sm" type="button" :disabled="actionBusy" @click="releaseEmergency(gw)">정지 해제</button>
+            </div>
             <div class="c-li" style="border:1px solid var(--c-border-soft);border-radius:6px">
               <div style="flex:1;min-width:180px;font-size:12px" class="c-muted">게이트웨이에 최신 페일오버 설정을 다시 보냅니다.</div>
               <button class="c-btn c-btn-sm" type="button" :disabled="actionBusy" @click="resync(gw)">재동기화</button>
             </div>
-            <div class="c-danger-box">
-              <div class="c-t"><b>비상 정지</b> — 이 게이트웨이의 모든 릴레이를 즉시 끕니다. 폴백 모드에서도 실행됩니다.</div>
+            <div v-if="!fo(gw)?.emergency?.active" class="c-danger-box">
+              <div class="c-t"><b>비상 정지</b> — 이 게이트웨이의 모든 릴레이를 즉시 끄고, '정지 해제' 전까지 다시 켜지지 않게 유지합니다. 폴백 모드에서도 실행됩니다.</div>
               <button class="c-btn c-btn-sm c-btn-danger" type="button" :disabled="actionBusy" @click="startEmergencyStop(gw)">비상 정지…</button>
             </div>
           </div>
@@ -137,7 +146,7 @@
       <div class="c-modal" role="alertdialog" aria-modal="true" aria-label="비상 정지 최종 확인">
         <div class="c-modal-h" style="color:var(--c-bad-fg)">비상 정지 — 최종 확인</div>
         <div class="c-modal-b">
-          <p style="margin:0">“{{ stopTarget.name }}” 게이트웨이의 <b>모든 릴레이가 즉시 꺼집니다</b>. 관수 · 환기 · 개폐기 동작이 멈춥니다.</p>
+          <p style="margin:0">“{{ stopTarget.name }}” 게이트웨이의 <b>모든 릴레이가 즉시 꺼지고</b>, '정지 해제' 전까지 자동제어·수동 조작으로 다시 켜지지 않습니다. 관수 · 환기 · 개폐기 동작이 멈춥니다.</p>
           <div class="c-form-row">
             <label for="estop-confirm">계속하려면 게이트웨이 ID <b class="c-mono">{{ stopTarget.gatewayId }}</b> 를 그대로 입력하세요</label>
             <input id="estop-confirm" v-model="stopTyped" class="c-input" autocomplete="off" spellcheck="false" />
@@ -340,6 +349,21 @@ async function resync(g: ConsoleGateway) {
   }
 }
 
+async function releaseEmergency(g: ConsoleGateway) {
+  const ok = await confirm({ title: '비상 정지 해제', message: `"${g.name}" 게이트웨이의 비상 정지를 해제할까요? 장비는 꺼진 상태 그대로이며, 자동제어가 다음 평가부터 다시 동작합니다.`, confirmText: '해제', variant: 'warning' })
+  if (!ok) return
+  actionBusy.value = true
+  try {
+    await emergencyFailoverApi.emergencyRelease(g.gatewayId)
+    notif.success('비상 정지 해제', `${g.name}: 비상 정지를 해제했습니다.`)
+    await failover.load(platform.gateways.map((x) => x.gatewayId))
+  } catch (e: any) {
+    notif.error('오류', e?.response?.data?.message || '해제에 실패했습니다.')
+  } finally {
+    actionBusy.value = false
+  }
+}
+
 const stopTarget = ref<ConsoleGateway | null>(null)
 const stopTyped = ref('')
 async function startEmergencyStop(g: ConsoleGateway) {
@@ -354,8 +378,9 @@ async function executeEmergencyStop() {
   actionBusy.value = true
   try {
     await emergencyFailoverApi.emergencyStop(g.gatewayId, 'manual-from-console', auth.user?.username || 'admin')
-    notif.success('비상 정지', '비상 정지 명령을 발행했습니다.')
+    notif.success('비상 정지', '비상 정지했습니다. 해제 전까지 이 게이트웨이의 릴레이는 켜지지 않습니다.')
     stopTarget.value = null
+    await failover.load(platform.gateways.map((x) => x.gatewayId))
   } catch (e: any) {
     notif.error('오류', e?.response?.data?.message || '비상 정지 명령 발행에 실패했습니다.')
   } finally {

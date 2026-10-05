@@ -162,6 +162,7 @@ const attention = computed(() => {
     const issue = gatewayIssue(gw)
     if (issue) out.push({ tone: agentOnline(gw) ? 'warn' : 'bad', icon: 'gateway', title: `${gw.name} 점검 필요`, desc: issue })
     const fo = failover.byGatewayId.value[gw.gatewayId]
+    if (fo?.emergency?.active) out.push({ tone: 'bad', icon: 'warn', title: `${gw.name} 비상 정지 중`, desc: `${platform.ownerLabel(gw.userId)} · ${fo.emergency.stoppedByName || '-'} · 해제 전까지 모든 릴레이 정지` })
     if (fo?.mode === 'fallback') out.push({ tone: 'bad', icon: 'warn', title: `${gw.name} 폴백 모드 동작 중`, desc: '서버 연결 단절로 게이트웨이 자체 제어 중' })
     else if (fo && fo.sync !== 'synced') out.push({ tone: 'warn', icon: 'refresh', title: '페일오버 설정 동기화 중', desc: `${gw.name} · RPi v${fo.appliedVersion ?? '—'} → 서버 v${fo.version}` })
   }
