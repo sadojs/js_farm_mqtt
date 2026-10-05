@@ -406,11 +406,9 @@ export class GroupsService {
           results.push({ deviceId: device.id, name: device.name, success: false, error: '게이트웨이 없음' });
           continue;
         }
-        const command: Record<string, any> = {};
-        for (const cmd of commands) {
-          command[cmd.code] = cmd.value;
-        }
-        await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, command);
+        // 개별 장치 제어와 같은 경로 — 개폐기 인터록(반대편 OFF→1초→ON)·상태 기록·비상 정지 차단 적용
+        // (이전: MQTT 직접 발행이라 그룹에 개폐기가 있으면 열림·닫힘이 동시에 ON 될 수 있었음)
+        await this.devicesService.controlDevice(device.id, userId, commands, undefined);
         results.push({ deviceId: device.id, name: device.name, success: true });
       } catch (err: any) {
         results.push({ deviceId: device.id, name: device.name, success: false, error: err.message });

@@ -237,6 +237,10 @@ export class AutomationService {
   async runRuleNow(id: string, userId: string | null) {
     const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
+    // 관수 룰은 타임라인(구역 순차) 실행이라 스케줄러로, 그 외는 조건 무시 1회 실행
+    if ((rule.conditions as any)?.type === 'irrigation') {
+      return this.irrigationScheduler.startNow(rule);
+    }
     return this.runnerService.forceExecuteRule(rule);
   }
 

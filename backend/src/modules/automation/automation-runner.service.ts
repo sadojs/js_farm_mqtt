@@ -13,6 +13,13 @@ import { HighTempOverrideService } from './high-temp-override.service';
 
 type LogicOp = 'AND' | 'OR';
 
+/** 수동 우회 또는 아직 유효한 타이머·방재가 걸린 장비 — 룰이 건드리지 않는다 */
+export function isManuallyHeld(settings: any): boolean {
+  if (!settings) return false;
+  if (settings.userOverride) return true;
+  return !!(settings.overrideUntil && new Date(settings.overrideUntil).getTime() > Date.now());
+}
+
 @Injectable()
 export class AutomationRunnerService {
   private readonly logger = new Logger(AutomationRunnerService.name);
@@ -133,9 +140,15 @@ export class AutomationRunnerService {
       if (!dev) continue;
       const settings: any = dev.deviceSettings || {};
       let changed = false;
-      if (settings.userOverride) { settings.userOverride = false; changed = true; }
+      // 타이머·방재(overrideUntil 미래)는 룰 수정/토글로 풀지 않는다 — 만료 시 정상 복귀
+      // (이전: 룰을 고치거나 켜면 방재 중에도 즉시 보호가 풀려 개폐기가 열리던 문제)
+      const timerActive = !!(settings.overrideUntil && new Date(settings.overrideUntil).getTime() > Date.now());
+      if (settings.userOverride && !timerActive) { settings.userOverride = false; changed = true; }
       if (settings.ruleIntendedState != null) { settings.ruleIntendedState = null; changed = true; }
-      // 룰 disable 시: sticky 정리 + switchState=false → UI 즉시 반영
+      // 룰 disable 시: 이 룰이 켜 둔 장비는 실제 OFF 발행 후 sticky 정리 + switchState=false → UI 즉시 반영
+      if (!rule.enabled && !timerActive) {
+        await this.turnOffIfRuleOwned(dev, rule, settings);
+      }
       if (!rule.enabled && (settings.relayActivePhase || settings.switchState)) {
         settings.relayActivePhase = null;
         settings.relayActiveRuleId = null;
@@ -344,7 +357,14 @@ export class AutomationRunnerService {
         actionResults.push(executed);
       }
 
-      if (conditionResult.onceConditionHits.length > 0) {
+      // 대상 장비가 전부 수동/타이머/방재로 건너뛰어졌으면 '한 번 실행' 조건을 소진하지 않고,
+      // 다음 평가에서 다시 시도한다(이전: 실행 안 됐는데 소진·비활성화되던 문제).
+      const allSkipped = actionResults.length > 0 && actionResults.every((r: any) =>
+        Array.isArray(r?.devices) && r.devices.length > 0 && r.devices.every((d: any) => d.skipped));
+      if (allSkipped) {
+        this.lastState.delete(rule.id);
+        this.logger.log(`[once-defer] ${rule.name}: 대상 장비 모두 수동/타이머 우선 — 실행·소진 보류`);
+      } else if (conditionResult.onceConditionHits.length > 0) {
         await this.markOnceConditionsExecuted(rule, conditionResult.onceConditionHits, evaluatedAt);
       }
 
@@ -821,7 +841,7 @@ export class AutomationRunnerService {
     const results: any[] = [];
     for (const device of candidateDevices) {
       // 수동/타이머 우회 활성 device 는 룰 실행 대상에서 제외(relay 경로와 동일). 만료 시 자동 복귀.
-      if ((device.deviceSettings as any)?.userOverride) {
+      if (isManuallyHeld(device.deviceSettings)) {
         this.logger.log(`[manual-override] ${device.name} 수동/타이머 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
         results.push({ deviceId: device.id, deviceName: device.name, success: true, skipped: true });
         continue;
@@ -1067,6 +1087,21 @@ export class AutomationRunnerService {
    * 룰이 inactive 전환 시 — 대상 device의 relayActivePhase 해제 + switchState=false.
    * 펄스 사이클 sticky 상태를 정리하여 UI 토글이 OFF로 돌아가도록.
    */
+  /**
+   * 룰이 켜 둔(relayActiveRuleId = 이 룰, switchState=true) 장비에 OFF 를 실제로 발행.
+   * 사용자가 수동으로 잡고 있는(userOverride) 장비·관수 장비는 건드리지 않는다.
+   */
+  private async turnOffIfRuleOwned(device: Device, rule: AutomationRule, settings: any) {
+    if (!settings?.switchState || settings.relayActiveRuleId !== rule.id || settings.userOverride) return;
+    if (device.equipmentType === 'irrigation') return;
+    try {
+      await this.devicesService.controlDevice(device.id, rule.userId, [{ code: 'switch_1', value: false }], undefined, 'automation');
+      this.logger.log(`[rule-end] ${rule.name} 종료/비활성 → ${device.name} OFF`);
+    } catch (err: any) {
+      this.logger.warn(`[rule-end] ${device.name} OFF 실패: ${err?.message ?? err}`);
+    }
+  }
+
   private async clearRelayActivePhase(rule: AutomationRule): Promise<void> {
     const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
     const ids: string[] = [];
@@ -1091,6 +1126,8 @@ export class AutomationRunnerService {
         }
         if (settings.relayActivePhase || settings.switchState
           || settings.ruleIntendedState != null || settings.userOverride) {
+          // 이 룰이 켜 둔 장비면 실제로 OFF 발행 (이전: DB 표시만 '꺼짐'으로 바꾸고 장비는 켜진 채 남음)
+          await this.turnOffIfRuleOwned(t, rule, settings);
           settings.relayActivePhase = null;
           settings.relayActiveRuleId = null;
           settings.relayActiveUntil = null;
@@ -1133,7 +1170,7 @@ export class AutomationRunnerService {
     const remainingIds: string[] = [];
     for (const id of new Set(targetIds)) {
       const dev = await this.devicesRepo.findOne({ where: { id } });
-      if (dev && (dev.deviceSettings as any)?.userOverride) {
+      if (dev && isManuallyHeld(dev.deviceSettings)) {
         skippedIds.push(id);
         this.logger.log(`[manual-override] ${dev.name} 수동 우회 활성 — 룰 실행 skip (rule=${rule.name})`);
       } else {
