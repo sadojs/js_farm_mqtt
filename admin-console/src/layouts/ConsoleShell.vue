@@ -165,11 +165,17 @@ watch(() => route.fullPath, () => { navOpen.value = false; paletteOpen.value = f
 
 // ── 플랫폼 데이터 + 실시간 게이트웨이 상태 ──
 function onGatewayStatus(p: { gatewayId: string; agentStatus: string }) { platform.patchGatewayStatus(p.gatewayId, p.agentStatus) }
+// 게이트웨이 상태(마지막 신호·터널)는 실시간 이벤트 외에 1분마다 다시 받아 화면이 오래된 값으로 '오프라인' 판정되지 않게 한다
+let platformRefresh: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   void platform.load()
   ws.on('gateway:status', onGatewayStatus)
+  platformRefresh = setInterval(() => { if (document.visibilityState === 'visible') void platform.load(true) }, 60_000)
 })
-onBeforeUnmount(() => ws.off('gateway:status', onGatewayStatus))
+onBeforeUnmount(() => {
+  ws.off('gateway:status', onGatewayStatus)
+  if (platformRefresh) clearInterval(platformRefresh)
+})
 
 // ── 농장 보기 ──
 const activeFarmId = computed(() => farmState.activeFarmId)

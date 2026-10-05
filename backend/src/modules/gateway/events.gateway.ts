@@ -314,7 +314,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 게이트웨이 상태 변경 알림
   broadcastGatewayStatus(userId: string, gatewayId: string, status: string, agentStatus: string) {
-    this.server.to(`user:${userId}`).emit('gateway:status', { gatewayId, status, agentStatus });
+    // 농장 + 플랫폼 관리자 (이전: 농장 room 만 → 관리자 화면은 마지막 신호 시각이 갱신되지 않아 5분 뒤 '오프라인'으로 보임)
+    this.emitToFarm(userId, 'gateway:status', { gatewayId, status, agentStatus });
   }
 
   // 게이트웨이 재등장 알림 (offline → online 전환 시)
