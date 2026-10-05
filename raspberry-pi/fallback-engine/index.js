@@ -73,6 +73,7 @@ const rain = new RainOverride();
 
 let client;
 let evalTimer = null;
+let handedOver = false; // 서버 복귀(grace) 시 제어권 인계를 이미 했는지
 
 // ── 비상 정지 래치 / 방재 상태 (파일 영속) ─────────────────────
 function readJson(path) {
@@ -327,6 +328,7 @@ function startEvaluationLoop() {
         });
         publishMode();
         if (fsm.mode === 'online') {
+          handedOver = false;
           flushQueue();
           evaluator.onExitFallback(); // 폴백 관수 예약 취소 + 폴백이 켠 관수 채널 OFF → 온라인 스케줄러 인계
           evaluator.applyRainOverride(false); // 폴백이 걸어둔 빗물 강제닫힘 해제 → 서버 인계
@@ -343,13 +345,22 @@ function startEvaluationLoop() {
       //    online 중엔 서버 rain-override가 담당하며 사용자 '비감지자동제어' 토글을 존중하므로,
       //    fallback 은 개입하지 않는다(index.js 상단 원칙: 정상 통신 중엔 idle).
       const rainState = rain.state();
-      if (fsm.mode === 'fallback') {
+      if (fsm.mode === 'fallback' && !fsm.serverBack()) {
         if (rainState === 'active') evaluator.applyRainOverride(true);
         else if (rainState === 'inactive') evaluator.applyRainOverride(false);
       }
 
-      // 3) 폴백 모드면 룰 평가 — 비상 정지 유지 중엔 평가하지 않음(모든 릴레이 정지 유지)
-      if (fsm.mode === 'fallback' && !emergencyLatched) {
+      // 2-b) 서버 복귀(grace) 시작 순간 — 제어권 인계: 폴백 관수 예약 취소 + 폴백이 켠 관수 OFF (1회)
+      const serverBack = fsm.serverBack();
+      if (serverBack && !handedOver) {
+        console.log('[FALLBACK] 서버 하트비트 복귀 — 제어권 서버로 인계 (온라인 표시는 grace 후)');
+        evaluator.onExitFallback();
+        handedOver = true;
+      }
+      if (!serverBack && fsm.mode === 'fallback') handedOver = false;
+
+      // 3) 폴백 모드면 룰 평가 — 비상 정지 유지 중·서버 복귀 대기 중엔 평가하지 않음
+      if (fsm.mode === 'fallback' && !serverBack && !emergencyLatched) {
         evaluator.evaluate(new Date(), { protectionActive: protectionUntilMs > Date.now() });
       }
     } catch (err) {

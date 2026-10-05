@@ -97,3 +97,21 @@ test('방재 중에는 팬·개폐기 룰을 평가하지 않는다', () => {
     opener.evaluate = orig.opener;
   }
 });
+
+test('서버 복귀(grace) 중에는 서버 GPIO 명령을 통과시킨다 — 이중 제어 방지', () => {
+  const ModeStateMachine = require('../lib/mode-state-machine');
+  const CommandGate = require('../lib/command-gate');
+  const watchdog = { graceSecondsFn: () => 30 };
+  const fsm = new ModeStateMachine({ watchdog });
+  const gate = new CommandGate({ fsm, queue: fakeQueue(), gatewayId: 'gw' });
+  fsm.tryTransition('fallback');
+  assert.strictEqual(fsm.serverBack(), false);
+  assert.strictEqual(gate.shouldExecute({ state: true }), false); // 폴백: 서버 명령 차단
+  fsm.tryTransition('online');                                    // 하트비트 복귀 → grace 시작
+  assert.strictEqual(fsm.mode, 'fallback');
+  assert.strictEqual(fsm.serverBack(), true);
+  assert.strictEqual(gate.shouldExecute({ state: true }), true);  // 제어권 서버
+  fsm.tryTransition('fallback');                                  // 다시 끊김
+  assert.strictEqual(fsm.serverBack(), false);
+  assert.strictEqual(gate.shouldExecute({ state: true }), false);
+});
