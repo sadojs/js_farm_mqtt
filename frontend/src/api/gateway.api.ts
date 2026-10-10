@@ -8,7 +8,8 @@ export const gatewayApi = {
   create: (data: { gatewayId: string; name: string; location?: string; rpiIp?: string; userId?: string }) =>
     apiClient.post<Gateway>('/gateways', data),
 
-  update: (id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null }) =>
+  /** groupId: 연결 구역(구역당 게이트웨이 1대). houseId 는 구형 호환 */
+  update: (id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null; groupId?: string | null }) =>
     apiClient.put<Gateway>(`/gateways/${id}`, data),
 
   remove: (id: string) =>

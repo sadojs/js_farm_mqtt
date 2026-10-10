@@ -75,17 +75,16 @@ export class EnvConfigService {
     // (구역관리 페이지와 동일한 로직)
     // 비활성화(enabled=false)된 센서는 역할 매핑 후보에서 제외 (구역관리·환경설정 일관성)
     const sensorDevices: Device[] = group.devices.filter(d => d.deviceType === 'sensor' && (d as any).enabled !== false);
-    const houseIds = (group.houses || []).map(h => h.id);
-    if (houseIds.length > 0) {
-      // 동일 그룹 내 모든 게이트웨이의 sensor 장치 추가
+    {
+      // 구역에 연결된 게이트웨이의 sensor 장치 추가 (게이트웨이 → 구역 직접, migration 053)
       // (devices.gateway_id 는 varchar, gateways.id 는 uuid → cast 필요)
       const extra = await this.dataSource.query(`
         SELECT DISTINCT d.* FROM devices d
         JOIN gateways g ON g.id::text = d.gateway_id
-        WHERE g.house_id = ANY($1::uuid[])
+        WHERE g.group_id = $1::uuid
           AND d.device_type = 'sensor'
           AND d.enabled IS NOT FALSE
-      `, [houseIds]);
+      `, [group.id]);
       const existingIds = new Set(sensorDevices.map(d => d.id));
       for (const d of extra) {
         if (!existingIds.has(d.id)) {
@@ -328,11 +327,9 @@ export class EnvConfigService {
     groupId: string,
   ): Promise<Gateway[]> {
     const where: any = userId ? { id: groupId, userId } : { id: groupId };
-    const group = await this.groupRepo.findOne({ where, relations: ['houses'] });
+    const group = await this.groupRepo.findOne({ where });
     if (!group) throw new NotFoundException('구역을 찾을 수 없습니다');
-    const houseIds = (group.houses || []).map((h) => h.id);
-    if (!houseIds.length) return [];
-    return this.gatewayRepo.find({ where: { houseId: In(houseIds) } });
+    return this.gatewayRepo.find({ where: { groupId: group.id } });
   }
 
   async getZoneDeviceSettings(userId: string | null, groupId: string) {

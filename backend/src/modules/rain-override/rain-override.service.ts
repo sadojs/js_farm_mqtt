@@ -145,10 +145,9 @@ export class RainOverrideService {
              COALESCE(fc.opener_operation_seconds, 30) AS on_sec,
              COALESCE(fc.opener_standby_seconds, 60)   AS off_sec
       FROM devices d
-      JOIN houses hs ON hs.id::text = d.house_id
-      LEFT JOIN gateways g          ON g.id::text = d.gateway_id
+      JOIN gateways g               ON g.id::text = d.gateway_id
       LEFT JOIN fallback_configs fc ON fc.gateway_id = g.gateway_id
-      WHERE hs.group_id = CAST($1 AS uuid)
+      WHERE g.group_id = CAST($1 AS uuid)
         AND d.device_type = 'actuator'
         AND d.equipment_type = 'opener_close'
     `, [groupId]);

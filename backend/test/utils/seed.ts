@@ -81,9 +81,9 @@ export async function seed(ds: DataSource) {
       [houseId, owner, groupId, `${P}하우스`, T0],
     );
     await ds.query(
-      `insert into gateways (id, user_id, gateway_id, name, house_id, status, agent_status, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,'offline','offline',$6,$6)`,
-      [gwId, owner, `f${f}-gw`, `${P}게이트웨이`, houseId, T0],
+      `insert into gateways (id, user_id, gateway_id, name, house_id, group_id, status, agent_status, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,'offline','offline',$7,$7)`,
+      [gwId, owner, `f${f}-gw`, `${P}게이트웨이`, houseId, groupId, T0],
     );
     const dev = (did: string, name: string, deviceType: string, equipmentType: string | null, paired: string | null) =>
       ds.query(

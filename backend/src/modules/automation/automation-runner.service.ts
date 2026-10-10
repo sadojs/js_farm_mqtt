@@ -675,9 +675,10 @@ export class AutomationRunnerService {
     //         houses.id=uuid, houses.group_id=uuid, group_devices.group_id=uuid, group_devices.device_id=uuid
     if (groupId) {
       params.push(groupId);
+      // 구역 장치 = group_devices 직접 매핑 ∪ 구역에 연결된 게이트웨이의 장치 (migration 053)
       groupFilter = `AND (
         d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = $2::uuid)
-        OR h.group_id = $2::uuid
+        OR g.group_id = $2::uuid
       )`;
     }
 
@@ -694,7 +695,7 @@ export class AutomationRunnerService {
         sd.value
       FROM sensor_data sd
       JOIN devices d ON d.id = sd.device_id
-      LEFT JOIN houses h ON h.id::text = d.house_id
+      LEFT JOIN gateways g ON g.id::text = d.gateway_id
       WHERE sd.user_id = $1::uuid
       ${groupFilter}
       ${houseFilter}
@@ -875,14 +876,19 @@ export class AutomationRunnerService {
     const targetHouseId = this.getRuleHouseId(rule);
     // 스키마 혼재: devices.user_id/house_id는 varchar, houses.group_id는 uuid
     // 따라서 group_id 비교만 uuid CAST 필요
+    // 구역의 장치 = 구역에 연결된 게이트웨이의 장치 ∪ group_devices 직접 매핑 (migration 053)
+    // (이전: devices.house_id 경로만 — house_id 가 비거나 어긋난 장치는 룰 대상에서 빠짐)
     const qb = this.devicesRepo
       .createQueryBuilder('d')
-      .leftJoin('houses', 'h', 'h.id::text = d.house_id')
+      .leftJoin('gateways', 'g', 'g.id::text = d.gateway_id')
       .where('d.user_id = :userId', { userId: rule.userId })
       .andWhere('d.device_type = :deviceType', { deviceType: 'actuator' });
 
     if (rule.groupId) {
-      qb.andWhere('h.group_id = CAST(:groupId AS uuid)', { groupId: rule.groupId });
+      qb.andWhere(
+        '(g.group_id = CAST(:groupId AS uuid) OR d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = CAST(:groupId AS uuid)))',
+        { groupId: rule.groupId },
+      );
     }
     if (targetHouseId) {
       qb.andWhere('d.house_id = :houseId', { houseId: targetHouseId });

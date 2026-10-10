@@ -77,7 +77,7 @@
                   {{ gw.name }}
                   <button class="c-link-btn" type="button" :aria-label="`${gw.name} 할당 해제`" style="color:inherit" @click="detach(gw)"><CIcon name="x" :size="11" /></button>
                 </span>
-                <select v-if="unassigned.length" class="c-select" :aria-label="`${z.name} 에 게이트웨이 할당`" :disabled="busy" @change="assign(z.id, ($event.target as HTMLSelectElement))">
+                <select v-if="unassigned.length && !zoneGateways(z.id).length" class="c-select" :aria-label="`${z.name} 에 게이트웨이 할당`" :disabled="busy" @change="assign(z.id, ($event.target as HTMLSelectElement))">
                   <option value="">+ 게이트웨이 할당</option>
                   <option v-for="gw in unassigned" :key="gw.id" :value="gw.id">{{ gw.name }} ({{ gw.gatewayId }}){{ gw.userId !== farm.id ? ' · ' + ownerName(gw.userId) : '' }}</option>
                 </select>

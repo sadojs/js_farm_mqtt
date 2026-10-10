@@ -715,8 +715,8 @@ async function resolveZone() {
   try {
     const [gwRes, grpRes] = await Promise.all([gatewayApi.getAll(), groupApi.getGroups()])
     const gw = gwRes.data.find((g: any) => g.id === gatewayId)
-    if (!gw?.houseId) { zoneGroupId.value = null; zoneGroupName.value = ''; return }
-    const grp = grpRes.data.find(g => (g.houses || []).some(h => h.id === gw.houseId))
+    if (!gw?.groupId) { zoneGroupId.value = null; zoneGroupName.value = ''; return }
+    const grp = grpRes.data.find(g => g.id === gw.groupId)
     zoneGroupId.value = grp?.id ?? null
     zoneGroupName.value = grp?.name ?? ''
   } catch {

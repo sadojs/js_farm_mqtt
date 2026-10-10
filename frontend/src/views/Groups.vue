@@ -973,8 +973,8 @@ async function loadGateways() {
 }
 
 function getGroupGateways(group: HouseGroup): Gateway[] {
-  const houseIds = new Set(group.houses.map(h => h.id))
-  return gateways.value.filter(gw => gw.houseId && houseIds.has(gw.houseId))
+  // 게이트웨이가 구역을 직접 가리킨다(구역당 1대)
+  return gateways.value.filter(gw => gw.groupId === group.id)
 }
 
 // 게이트웨이 추가 모달

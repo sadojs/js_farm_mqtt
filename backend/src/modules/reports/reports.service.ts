@@ -30,7 +30,7 @@ export class ReportsService {
       values.push(params.endDate);
     }
     if (params.groupId) {
-      // 그룹 소속 장치 = group_devices 직접 매핑 ∪ gateway→house→group 경로 매핑.
+      // 그룹 소속 장치 = group_devices 직접 매핑 ∪ 게이트웨이→구역 경로 매핑(migration 053).
       // env-config.service 의 getSources() 와 동일한 매핑 로직.
       // (group_devices 가 비어있어도 gateway 경로로 추적되도록 UNION)
       conditions.push(`sd.device_id IN (
@@ -38,8 +38,7 @@ export class ReportsService {
         UNION
         SELECT d.id FROM devices d
         JOIN gateways g ON g.id::text = d.gateway_id
-        JOIN houses h ON h.id = g.house_id
-        WHERE h.group_id = $${paramIndex}::uuid
+        WHERE g.group_id = $${paramIndex}::uuid
       )`);
       values.push(params.groupId);
       paramIndex++;

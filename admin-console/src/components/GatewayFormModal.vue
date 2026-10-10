@@ -28,10 +28,11 @@
         </div>
         <div v-if="gateway" class="c-form-row">
           <label for="gwf-house">연결 구역</label>
-          <select id="gwf-house" v-model="form.houseId" class="c-input">
+          <select id="gwf-house" v-model="form.groupId" class="c-input">
             <option value="">미지정</option>
-            <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
+            <option v-for="g in ownerGroups" :key="g.id" :value="g.id">{{ g.name }}{{ occupiedBy(g.id) ? ` — ${occupiedBy(g.id)} 연결됨` : '' }}</option>
           </select>
+          <span class="c-muted" style="font-size:12px">한 구역에는 게이트웨이 1대만 연결할 수 있습니다.</span>
         </div>
       </div>
       <div class="c-modal-f">
@@ -49,7 +50,6 @@
  */
 import { computed, ref, watch } from 'vue'
 import { gatewayApi } from '@/api/gateway.api'
-import { groupApi } from '@/api/group.api'
 import { useNotificationStore } from '@/stores/notification.store'
 import CIcon from '@console/components/CIcon.vue'
 import { usePlatformStore, type ConsoleGateway } from '@console/stores/platform.store'
@@ -60,25 +60,21 @@ const emit = defineEmits<{ close: []; saved: [] }>()
 const platform = usePlatformStore()
 const notif = useNotificationStore()
 const saving = ref(false)
-const houses = ref<Array<{ id: string; name: string }>>([])
-const form = ref({ gatewayId: '', name: '', location: '', rpiIp: '', userId: '', houseId: '' })
+const form = ref({ gatewayId: '', name: '', location: '', rpiIp: '', userId: '', groupId: '' })
+/** 연결 구역 선택지 — 소유 농장의 구역 */
+const ownerGroups = computed(() => platform.groupsOfFarm(form.value.userId))
+/** 그 구역에 이미 연결된 다른 게이트웨이 이름 */
+const occupiedBy = (groupId: string) => platform.gateways.find((g) => g.groupId === groupId && g.id !== props.gateway?.id)?.name ?? ''
 
 const title = computed(() => (props.gateway ? '게이트웨이 편집' : '게이트웨이 등록'))
 const owners = computed(() => platform.users.filter((u) => u.role !== 'farm_user'))
 
-watch(() => props.show, async (open) => {
+watch(() => props.show, (open) => {
   if (!open) return
   const gw = props.gateway
   form.value = gw
-    ? { gatewayId: gw.gatewayId, name: gw.name, location: gw.location || '', rpiIp: gw.rpiIp || '', userId: gw.userId, houseId: gw.houseId || '' }
-    : { gatewayId: '', name: '', location: '', rpiIp: '', userId: props.defaultUserId || '', houseId: '' }
-  if (gw) {
-    try {
-      houses.value = ((await groupApi.getHouses()).data as Array<{ id: string; name: string }>) || []
-    } catch {
-      houses.value = []
-    }
-  }
+    ? { gatewayId: gw.gatewayId, name: gw.name, location: gw.location || '', rpiIp: gw.rpiIp || '', userId: gw.userId, groupId: gw.groupId || '' }
+    : { gatewayId: '', name: '', location: '', rpiIp: '', userId: props.defaultUserId || '', groupId: '' }
 }, { immediate: true })
 
 async function save() {
@@ -89,7 +85,7 @@ async function save() {
   saving.value = true
   try {
     if (props.gateway) {
-      await gatewayApi.update(props.gateway.id, { name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId, houseId: form.value.houseId || null })
+      await gatewayApi.update(props.gateway.id, { name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId, groupId: form.value.groupId || null })
       notif.success('수정 완료', '게이트웨이 정보가 수정되었습니다.')
     } else {
       await gatewayApi.create({ gatewayId: form.value.gatewayId, name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId })

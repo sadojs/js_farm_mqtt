@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, LessThan, Repository } from 'typeorm';
+import { DataSource, LessThan, Repository, In } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Gateway } from './entities/gateway.entity';
 import { House } from '../groups/entities/house.entity';
@@ -117,23 +117,16 @@ export class GatewayManagerService {
     }
   }
 
-  /** gateway 목록에 구역 정보 병합 */
+  /** gateway 목록에 구역 정보 병합 — 게이트웨이가 구역을 직접 가리킨다(migration 053) */
   private async attachGroupInfo(gateways: Gateway[]): Promise<any[]> {
     if (gateways.length === 0) return gateways;
-    const houseIds = gateways.map(g => g.houseId).filter(Boolean) as string[];
-    if (houseIds.length === 0) return gateways.map(g => ({ ...g, groupId: null, groupName: null }));
-
-    const houses = await this.houseRepo
-      .createQueryBuilder('h')
-      .leftJoinAndSelect('h.group', 'hg')
-      .where('h.id IN (:...houseIds)', { houseIds })
-      .getMany();
-
-    const houseToGroup = new Map(houses.map(h => [h.id, { groupId: h.group?.id ?? null, groupName: h.group?.name ?? null }]));
+    const groupIds = [...new Set(gateways.map(g => g.groupId).filter(Boolean))] as string[];
+    const groups = groupIds.length ? await this.groupRepo.find({ where: { id: In(groupIds) } }) : [];
+    const nameOf = new Map(groups.map(g => [g.id, g.name]));
     return gateways.map(g => ({
       ...g,
-      groupId: g.houseId ? (houseToGroup.get(g.houseId)?.groupId ?? null) : null,
-      groupName: g.houseId ? (houseToGroup.get(g.houseId)?.groupName ?? null) : null,
+      groupId: g.groupId ?? null,
+      groupName: g.groupId ? (nameOf.get(g.groupId) ?? null) : null,
     }));
   }
 
@@ -247,6 +240,11 @@ export class GatewayManagerService {
   }
 
   /** 게이트웨이를 구역(HouseGroup)에 할당 / 해제 */
+  /**
+   * 게이트웨이를 구역에 연결/해제. 구역당 게이트웨이 1대.
+   * 장치의 구역은 게이트웨이의 구역을 따르므로 장치 쪽 구역 정보는 따로 갱신할 필요가 없다.
+   * (houses/house_id 는 되돌리기 대비로 함께 기록 — 2단계에서 제거)
+   */
   async assignZone(id: string, userId: string, role: string, groupId: string | null): Promise<any> {
     const gw = role === 'admin'
       ? await this.gatewayRepo.findOne({ where: { id } })
@@ -254,22 +252,17 @@ export class GatewayManagerService {
     if (!gw) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
 
     if (groupId === null) {
-      // 할당 해제: houseId만 null로 (house 레코드는 보존)
+      gw.groupId = null;
       gw.houseId = null;
       await this.gatewayRepo.save(gw);
       return { ...gw, groupId: null, groupName: null };
     }
 
-    // 이미 다른 구역에 할당된 경우 체크
-    if (gw.houseId) {
-      const currentHouse = await this.houseRepo.findOne({ where: { id: gw.houseId } });
-      if (currentHouse?.groupId && currentHouse.groupId !== groupId) {
-        // 현재 구역의 소유자 확인 - 다른 사용자(농장)에 할당된 경우
-        const currentGroup = await this.groupRepo.findOne({ where: { id: currentHouse.groupId } });
-        if (currentGroup && currentGroup.userId !== gw.userId) {
-          throw new ConflictException('이 게이트웨이는 이미 다른 농장의 구역에 할당되어 있습니다. 해당 농장에서 먼저 제거해주세요.');
-        }
-        // 같은 소유자의 다른 구역이면 재할당 허용
+    // 다른 농장의 구역에 연결돼 있으면 먼저 그 농장에서 해제해야 한다
+    if (gw.groupId && gw.groupId !== groupId) {
+      const currentGroup = await this.groupRepo.findOne({ where: { id: gw.groupId } });
+      if (currentGroup && currentGroup.userId !== gw.userId) {
+        throw new ConflictException('이 게이트웨이는 이미 다른 농장의 구역에 할당되어 있습니다. 해당 농장에서 먼저 제거해주세요.');
       }
     }
 
@@ -279,50 +272,69 @@ export class GatewayManagerService {
     });
     if (!group) throw new NotFoundException('구역을 찾을 수 없습니다.');
 
-    // 구역의 house 가져오거나 생성
-    let house = group.houses[0];
+    // 구역당 게이트웨이 1대
+    const occupied = await this.gatewayRepo.findOne({ where: { groupId: group.id } });
+    if (occupied && occupied.id !== gw.id) {
+      throw new ConflictException(`"${group.name}" 구역에는 이미 게이트웨이 "${occupied.name}"이(가) 연결되어 있습니다. 한 구역에는 게이트웨이 1대만 연결할 수 있습니다.`);
+    }
+
+    // 되돌리기 대비: 기존 house 연결도 유지(구역 이름의 house 를 가져오거나 생성)
+    let house = group.houses?.[0];
     if (!house) {
       house = await this.houseRepo.save(
         this.houseRepo.create({ userId: group.userId, name: group.name, groupId: group.id }),
       );
     }
 
+    gw.groupId = group.id;
     gw.houseId = house.id;
-    // 게이트웨이 소유자도 그룹 소유자(농장)로 함께 이관 — 자동제어룰 wizard 등에서
-    // user_id 필터로 인해 디바이스가 안 보이는 문제 방지.
-    // (이전: admin 으로 등록 후 다른 농장에 할당하면 devices.user_id 가 admin 으로 남아
-    //  대상 농장이 로그인해도 자신의 device 로 인식 못 함.)
+    // 게이트웨이 소유자도 구역 소유자(농장)로 함께 이관 — user_id 필터로 장치가 안 보이는 문제 방지
     const previousOwnerId = gw.userId;
     gw.userId = group.userId;
     await this.gatewayRepo.save(gw);
 
-    // onboard device들의 house_id + user_id 동기화 — 새 zone(house) 매핑 + 새 농장으로 이관
-    // (devices.gateway_id / house_id 가 varchar이므로 명시적 cast)
+    // 이 게이트웨이의 장치 전부(온보드 + Zigbee)를 새 농장으로 이관 (이전: 온보드만 → Zigbee 장치가 예전 농장/구역에 남음)
     await this.gatewayRepo.manager.query(
-      `UPDATE devices SET house_id = $1::text, user_id = $2 WHERE gateway_id = $3::text AND source = 'onboard'`,
+      `UPDATE devices SET house_id = $1::text, user_id = $2 WHERE gateway_id = $3::text`,
       [house.id, group.userId, gw.id],
     ).catch((e) => {
-      this.logger.warn(`onboard device sync 실패 (gateway=${gw.gatewayId}): ${e.message}`);
+      this.logger.warn(`device sync 실패 (gateway=${gw.gatewayId}): ${e.message}`);
     });
     if (previousOwnerId !== group.userId) {
-      this.logger.log(
-        `게이트웨이 소유자 이관 ${gw.gatewayId}: ${previousOwnerId} → ${group.userId} (그룹 ${group.id})`,
-      );
+      this.logger.log(`게이트웨이 소유자 이관 ${gw.gatewayId}: ${previousOwnerId} → ${group.userId} (구역 ${group.id})`);
     }
 
     return { ...gw, groupId: group.id, groupName: group.name };
   }
 
+  /** 수정 요청의 구역 지정(groupId 또는 구형 houseId)을 구역 연결로 변환 */
+  private async applyZoneFromUpdate(id: string, userId: string, role: string, data: { groupId?: string | null; houseId?: string | null }) {
+    let target: string | null | undefined;
+    if ('groupId' in data) target = data.groupId ?? null;
+    else if ('houseId' in data) {
+      if (!data.houseId) target = null;
+      else {
+        const h = await this.houseRepo.findOne({ where: { id: data.houseId } });
+        target = h?.groupId ?? null;
+      }
+    }
+    if (target === undefined) return;
+    const gw = await this.gatewayRepo.findOne({ where: { id } });
+    if ((gw?.groupId ?? null) === target) return;
+    await this.assignZone(id, userId, role, target);
+  }
+
   /** admin: 소유자 변경 포함 업데이트 */
-  async updateByAdmin(id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null }) {
+  async updateByAdmin(id: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null; groupId?: string | null }) {
     const gw = await this.gatewayRepo.findOne({ where: { id } });
     if (!gw) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
     if (data.name !== undefined) gw.name = data.name;
     if (data.location !== undefined) gw.location = data.location;
     if (data.rpiIp !== undefined) gw.rpiIp = data.rpiIp;
     if (data.userId !== undefined) gw.userId = data.userId;
-    if ('houseId' in data) gw.houseId = data.houseId ?? null;
-    return this.gatewayRepo.save(gw);
+    await this.gatewayRepo.save(gw);
+    await this.applyZoneFromUpdate(id, gw.userId, 'admin', data);
+    return this.gatewayRepo.findOne({ where: { id } });
   }
 
   async findOne(id: string, userId: string) {
@@ -348,14 +360,15 @@ export class GatewayManagerService {
     return this.gatewayRepo.save(gateway);
   }
 
-  async update(id: string, userId: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null }) {
+  async update(id: string, userId: string, data: { name?: string; location?: string; rpiIp?: string; userId?: string; houseId?: string | null; groupId?: string | null }) {
     const gw = await this.findOne(id, userId);
     if (data.name !== undefined) gw.name = data.name;
     if (data.location !== undefined) gw.location = data.location;
     if (data.rpiIp !== undefined) gw.rpiIp = data.rpiIp;
     if (data.userId !== undefined) gw.userId = data.userId;
-    if ('houseId' in data) gw.houseId = data.houseId ?? null;
-    return this.gatewayRepo.save(gw);
+    await this.gatewayRepo.save(gw);
+    await this.applyZoneFromUpdate(id, userId, 'farm_admin', data);
+    return this.gatewayRepo.findOne({ where: { id } });
   }
 
   /** 특정 사용자의 게이트웨이 목록 */

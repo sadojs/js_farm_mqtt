@@ -69,6 +69,10 @@ export class Gateway {
   @Column({ name: 'bootstrap_token_used_at', nullable: true, type: 'timestamptz' })
   bootstrapTokenUsedAt: Date | null;
 
+  /** 연결된 구역 (migration 053) — 장치의 구역은 이 값을 따른다. 구역당 게이트웨이 1대 */
+  @Column({ name: 'group_id', type: 'uuid', nullable: true })
+  groupId: string | null;
+
   /** 비상 정지 유지 상태 (migration 052) — active 동안 모든 릴레이 ON 차단 */
   @Column({ name: 'emergency_stop', type: 'jsonb', nullable: true })
   emergencyStop: Record<string, any> | null;

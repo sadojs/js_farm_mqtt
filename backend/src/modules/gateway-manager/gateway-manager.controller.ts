@@ -47,7 +47,7 @@ export class GatewayManagerController {
   update(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() body: { name?: string; location?: string; userId?: string; houseId?: string | null },
+    @Body() body: { name?: string; location?: string; userId?: string; houseId?: string | null; groupId?: string | null },
   ) {
     // admin은 모든 게이트웨이 수정 가능 (소유자 변경 포함)
     if (user.role === 'admin') {

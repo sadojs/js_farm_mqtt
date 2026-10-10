@@ -192,9 +192,9 @@ export class DevicesService {
 
   private async getDeviceGroupId(deviceId: string): Promise<string | null> {
     const rows = await this.dataSource.query(`
-      SELECT h.group_id::text AS group_id
+      SELECT g.group_id::text AS group_id
       FROM devices d
-      JOIN houses h ON h.id::text = d.house_id
+      JOIN gateways g ON g.id::text = d.gateway_id
       WHERE d.id = $1
       LIMIT 1
     `, [deviceId]);

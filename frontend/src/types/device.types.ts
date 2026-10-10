@@ -205,6 +205,9 @@ export interface Gateway {
   location?: string
   rpiIp?: string
   houseId?: string | null
+  /** 연결된 구역 (게이트웨이 → 구역 직접, 구역당 1대) */
+  groupId?: string | null
+  groupName?: string | null
   status: string
   agentStatus?: string
   lastSeen?: string

@@ -64,24 +64,21 @@ export class GroupsService {
       }
     }
 
-    // Also include devices from gateways assigned to houses in these groups
-    const houseIds = groups.flatMap(g => g.houses.map(h => h.id));
-    if (houseIds.length > 0) {
-      const gateways = await this.gatewayRepo.find({ where: { houseId: In(houseIds) } });
+    // 구역에 연결된 게이트웨이의 장치를 구역 장치로 포함 (게이트웨이 → 구역 직접, migration 053)
+    const groupIds = groups.map(g => g.id);
+    if (groupIds.length > 0) {
+      const gateways = await this.gatewayRepo.find({ where: { groupId: In(groupIds) } });
       if (gateways.length > 0) {
         const gatewayIds = gateways.map(gw => gw.id);
         const gwDevices = await this.devicesRepo.find({
           where: isAdmin ? { gatewayId: In(gatewayIds) } : { gatewayId: In(gatewayIds), userId },
         });
 
-        const gwToHouseMap = new Map(gateways.map(gw => [gw.id, gw.houseId!]));
-        const houseToGroupMap = new Map(groups.flatMap(g => g.houses.map(h => [h.id, g.id])));
+        const gwToGroupMap = new Map(gateways.map(gw => [gw.id, gw.groupId!]));
         const devicesByGroup = new Map<string, Device[]>();
 
         for (const device of gwDevices) {
-          const houseId = gwToHouseMap.get(device.gatewayId);
-          if (!houseId) continue;
-          const groupId = houseToGroupMap.get(houseId);
+          const groupId = gwToGroupMap.get(device.gatewayId);
           if (!groupId) continue;
           if (!devicesByGroup.has(groupId)) devicesByGroup.set(groupId, []);
           devicesByGroup.get(groupId)!.push(device);
@@ -123,7 +120,13 @@ export class GroupsService {
     if (!gateway) throw new NotFoundException('게이트웨이를 찾을 수 없습니다.');
     if (gateway.userId !== userId) throw new ForbiddenException('권한이 없습니다.');
 
-    // Get or create a house for this group
+    // 구역당 게이트웨이 1대 (migration 053)
+    const occupied = await this.gatewayRepo.findOne({ where: { groupId: group.id } });
+    if (occupied && occupied.id !== gatewayId) {
+      throw new ConflictException(`"${group.name}" 구역에는 이미 게이트웨이 "${occupied.name}"이(가) 연결되어 있습니다. 한 구역에는 게이트웨이 1대만 연결할 수 있습니다.`);
+    }
+
+    // Get or create a house for this group (되돌리기 대비 — 2단계에서 제거)
     let house = group.houses[0];
     if (!house) {
       house = await this.housesRepo.save(
@@ -131,8 +134,8 @@ export class GroupsService {
       );
     }
 
-    // Assign gateway to house
-    await this.gatewayRepo.update({ id: gatewayId }, { houseId: house.id });
+    // Assign gateway to zone (+ house)
+    await this.gatewayRepo.update({ id: gatewayId }, { houseId: house.id, groupId: group.id });
 
     // Auto-propagate houseId to all existing devices of this gateway
     await this.devicesRepo.update({ gatewayId, userId }, { houseId: house.id });
@@ -226,16 +229,14 @@ export class GroupsService {
     const scoped = isAdmin ? groups : groups.filter((g) => g.userId === userId);
     if (!scoped.length) return empty;
 
-    const houseIds = scoped.flatMap((g) => (g.houses ?? []).map((h) => h.id));
-    const gws = houseIds.length
-      ? await this.gatewayRepo.find({ where: { houseId: In(houseIds) } })
+    const scopedIds = scoped.map((g) => g.id);
+    const gws = scopedIds.length
+      ? await this.gatewayRepo.find({ where: { groupId: In(scopedIds) } })
       : [];
-    const houseToGroup = new Map<string, string>();
-    for (const g of scoped) for (const h of g.houses ?? []) houseToGroup.set(h.id, g.id);
     const gwCntByGroup = new Map<string, number>();
     const gwIdsByGroup = new Map<string, string[]>();
     for (const gw of gws) {
-      const gId = houseToGroup.get(gw.houseId!);
+      const gId = gw.groupId;
       if (!gId) continue;
       gwCntByGroup.set(gId, (gwCntByGroup.get(gId) ?? 0) + 1);
       const arr = gwIdsByGroup.get(gId) ?? [];
@@ -250,11 +251,10 @@ export class GroupsService {
           select: ['id', 'gatewayId'],
         })
       : [];
-    const gwToHouse = new Map(gws.map((g) => [g.id, g.houseId!]));
+    const gwToGroup = new Map(gws.map((g) => [g.id, g.groupId!]));
     const deviceCntByGroup = new Map<string, number>();
     for (const d of devices) {
-      const hId = gwToHouse.get(d.gatewayId);
-      const gId = hId ? houseToGroup.get(hId) : undefined;
+      const gId = gwToGroup.get(d.gatewayId);
       if (!gId) continue;
       deviceCntByGroup.set(gId, (deviceCntByGroup.get(gId) ?? 0) + 1);
     }
@@ -430,9 +430,8 @@ export class GroupsService {
     const group = await this.groupsRepo.findOne({ where, relations: ['houses', 'devices'] });
     if (!group) throw new NotFoundException('그룹을 찾을 수 없습니다.');
     const devices: Device[] = [...(group.devices || [])];
-    const houseIds = (group.houses || []).map((h) => h.id);
-    if (houseIds.length > 0) {
-      const gateways = await this.gatewayRepo.find({ where: { houseId: In(houseIds) } });
+    {
+      const gateways = await this.gatewayRepo.find({ where: { groupId: group.id } });
       const gwIds = gateways.map((g) => g.id);
       if (gwIds.length > 0) {
         const gwDevices = await this.devicesRepo.find({

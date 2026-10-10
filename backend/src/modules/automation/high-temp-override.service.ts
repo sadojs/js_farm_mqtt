@@ -85,11 +85,9 @@ export class HighTempOverrideService {
     if (cached && cached.exp > now) return cached.cfg;
     const rows = await this.dataSource.query(`
       SELECT fc.high_temp_override_enabled AS enabled, fc.high_temp_open_threshold AS threshold
-      FROM devices d
-      JOIN houses hs ON hs.id::text = d.house_id
-      JOIN gateways g ON g.id::text = d.gateway_id
+      FROM gateways g
       JOIN fallback_configs fc ON fc.gateway_id = g.gateway_id
-      WHERE hs.group_id = CAST($1 AS uuid)
+      WHERE g.group_id = CAST($1 AS uuid)
       LIMIT 1
     `, [groupId]);
     const cfg = rows[0]
@@ -118,10 +116,10 @@ export class HighTempOverrideService {
     const rows = await this.dataSource.query(`
       SELECT sd.value FROM sensor_data sd
       JOIN devices d ON d.id = sd.device_id
-      LEFT JOIN houses h ON h.id::text = d.house_id
+      LEFT JOIN gateways g ON g.id::text = d.gateway_id
       WHERE sd.sensor_type = 'temperature'
         AND (d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = CAST($1 AS uuid))
-             OR h.group_id = CAST($1 AS uuid))
+             OR g.group_id = CAST($1 AS uuid))
       ORDER BY sd.time DESC LIMIT 1
     `, [groupId]);
     return rows[0]?.value != null ? Number(rows[0].value) : null;

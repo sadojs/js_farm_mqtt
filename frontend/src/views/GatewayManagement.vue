@@ -358,10 +358,11 @@
         </div>
         <div class="form-group">
           <label>연결 구역</label>
-          <select v-model="form.houseId">
+          <select v-model="form.groupId">
             <option value="">미지정</option>
-            <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
+            <option v-for="g in ownerGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
           </select>
+          <p class="help-text" style="margin-top:4px;font-size:calc(12px * var(--content-scale, 1));color:var(--text-muted)">한 구역에는 게이트웨이 1대만 연결할 수 있습니다.</p>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeModal">취소</button>
@@ -433,10 +434,11 @@ const editTarget = ref<GatewayWithTunnel | null>(null)
 const saving = ref(false)
 const zoneAssigning = ref<string | null>(null)
 const users = ref<{ id: string; name: string; username: string; farmName?: string | null }[]>([])
-const houses = ref<{ id: string; name: string }[]>([])
 const groups = ref<HouseGroupWithOwner[]>([])
 
-const form = ref({ gatewayId: '', name: '', location: '', rpiIp: '', userId: '', houseId: '' })
+const form = ref({ gatewayId: '', name: '', location: '', rpiIp: '', userId: '', groupId: '' })
+/** 연결 구역 선택지 — 소유 농장의 구역 */
+const ownerGroups = computed(() => groups.value.filter(g => g.userId === form.value.userId))
 
 const SERVER_HOST = import.meta.env.VITE_SERVER_HOST || (window.location.hostname === 'localhost' ? '172.30.1.42' : window.location.hostname)
 // 리버스 SSH 터널의 서버측 계정. dev 기본값(ohjeongseok)은 소스에 유지, 프로덕션은 빌드타임 VITE_SERVER_USER 주입.
@@ -453,15 +455,13 @@ function handleGatewayStatus(data: { gatewayId: string; agentStatus: string }) {
 onMounted(async () => {
   loading.value = true
   try {
-    const [gwRes, userRes, houseRes, groupRes] = await Promise.all([
+    const [gwRes, userRes, groupRes] = await Promise.all([
       gatewayApi.getAll(),
       userApi.getAll().catch(() => ({ data: [] })),
-      groupApi.getHouses().catch(() => ({ data: [] })),
       groupApi.adminGetAllGroups().catch(() => ({ data: [] })),
     ])
     gateways.value = gwRes.data as unknown as GatewayWithTunnel[]
     users.value = (userRes.data as any[]).filter(u => u.role !== 'farm_user')
-    houses.value = houseRes.data as any[]
     groups.value = groupRes.data as any[]
   } finally {
     loading.value = false
@@ -511,14 +511,14 @@ function toggleSetup(id: string) {
 
 function editGateway(gw: GatewayWithTunnel) {
   editTarget.value = gw
-  form.value = { gatewayId: gw.gatewayId, name: gw.name, location: gw.location || '', rpiIp: gw.rpiIp || '', userId: gw.userId, houseId: gw.houseId || '' }
+  form.value = { gatewayId: gw.gatewayId, name: gw.name, location: gw.location || '', rpiIp: gw.rpiIp || '', userId: gw.userId, groupId: gw.groupId || '' }
   showAddModal.value = true
 }
 
 function closeModal() {
   showAddModal.value = false
   editTarget.value = null
-  form.value = { gatewayId: '', name: '', location: '', rpiIp: '', userId: '', houseId: '' }
+  form.value = { gatewayId: '', name: '', location: '', rpiIp: '', userId: '', groupId: '' }
 }
 
 async function saveGateway() {
@@ -529,7 +529,7 @@ async function saveGateway() {
   saving.value = true
   try {
     if (editTarget.value) {
-      await gatewayApi.update(editTarget.value.id, { name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId, houseId: form.value.houseId || null })
+      await gatewayApi.update(editTarget.value.id, { name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId, groupId: form.value.groupId || null })
       notif.success('수정 완료', '게이트웨이 정보가 수정되었습니다.')
     } else {
       await gatewayApi.create({ gatewayId: form.value.gatewayId, name: form.value.name, location: form.value.location, rpiIp: form.value.rpiIp, userId: form.value.userId })
@@ -538,8 +538,9 @@ async function saveGateway() {
     const { data } = await gatewayApi.getAll()
     gateways.value = data as unknown as GatewayWithTunnel[]
     closeModal()
-  } catch {
-    notif.error('오류', '저장 중 오류가 발생했습니다.')
+  } catch (e: any) {
+    // 구역당 게이트웨이 1대 등 서버가 알려주는 사유 표시
+    notif.error('오류', e?.response?.data?.message || '저장 중 오류가 발생했습니다.')
   } finally {
     saving.value = false
   }
