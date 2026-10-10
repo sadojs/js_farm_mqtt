@@ -193,6 +193,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { sensorAlertsApi, type SensorAlert, type SensorEntry, type AlertDetail } from '../api/sensor-alerts.api'
 import { useNotificationStore } from '../stores/notification.store'
+import { useConfirm } from '../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
 
 const notificationStore = useNotificationStore()
 const route = useRoute()
@@ -414,6 +416,8 @@ async function handleResolve(id: string) {
 }
 
 async function handleRemove(id: string) {
+  const ok = await confirmDialog({ title: '알림 이력 삭제', message: '이 알림 이력을 삭제할까요? 삭제하면 되돌릴 수 없습니다.', confirmText: '삭제', variant: 'danger' })
+  if (!ok) return
   try {
     await sensorAlertsApi.removeAlert(id)
     alerts.value = alerts.value.filter(a => a.id !== id)

@@ -127,6 +127,8 @@ import {
 } from '../types/spray-schedule.types'
 import type { SprayZone } from '../types/spray-schedule.types'
 import { computeDefaultStart, todayStr } from '../utils/spray-schedule.utils'
+import { useConfirm } from '../../../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
 
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
@@ -241,7 +243,13 @@ function addProgram(zone: ZoneDraft) {
   })
 }
 
-function removeProgram(zone: ZoneDraft, index: number) {
+async function removeProgram(zone: ZoneDraft, index: number) {
+  const p = zone.programs[index]
+  // 이미 저장된 프로그램은 '저장' 시 서버에서도 삭제(관련 일정 포함)되므로 확인
+  if (p?.id) {
+    const ok = await confirmDialog({ title: '방재 프로그램 삭제', message: `"${p.pest || '이름 없음'}" 프로그램을 삭제할까요? 저장하면 이 프로그램의 약제와 일정이 함께 삭제됩니다.`, confirmText: '삭제', variant: 'danger' })
+    if (!ok) return
+  }
   zone.programs.splice(index, 1)
 }
 
@@ -263,7 +271,12 @@ function addProduct(zone: ZoneDraft, program: ProgramDraft) {
   })
 }
 
-function removeProduct(program: ProgramDraft, index: number) {
+async function removeProduct(program: ProgramDraft, index: number) {
+  const pr = program.products[index]
+  if (pr?.id) {
+    const ok = await confirmDialog({ title: '약제 삭제', message: `"${pr.name || '이름 없음'}" 약제를 삭제할까요? 저장하면 이 약제의 일정이 함께 삭제됩니다.`, confirmText: '삭제', variant: 'danger' })
+    if (!ok) return
+  }
   program.products.splice(index, 1)
 }
 

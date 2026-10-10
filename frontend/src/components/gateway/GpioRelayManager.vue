@@ -253,6 +253,8 @@ import { gatewayEnvApi, type OnboardDevice } from '@/api/gateway-env.api'
 import { gpioApi } from '@/api/gpio.api'
 import { useNotificationStore } from '@/stores/notification.store'
 import { USABLE_BCM_PINS, RESERVED_BCM_PINS } from '@/utils/gpio-pins'
+import { useConfirm } from '@/composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
 
 // ─── 타입 ────────────────────────────────────────────────────────
 type DeviceType = 'fan' | 'irrigation' | 'vent'
@@ -547,6 +549,10 @@ async function bulkEnable(targets: OnboardDevice[], enable: boolean) {
 }
 
 async function clearPins(targets: OnboardDevice[]) {
+  const assigned = targets.filter(d => d.gpioPin !== null)
+  if (!assigned.length) return
+  const ok = await confirmDialog({ title: '핀 초기화', message: `채널 ${assigned.length}개의 GPIO 핀 배정을 모두 해제할까요? 해제된 채널은 다시 배정하기 전까지 동작하지 않습니다.`, confirmText: '초기화', variant: 'danger' })
+  if (!ok) return
   await Promise.allSettled(targets.filter(d => d.gpioPin !== null).map(async dev => {
     try {
       await gatewayEnvApi.updateOnboard(props.gatewayId, dev.id, { gpioPin: null })

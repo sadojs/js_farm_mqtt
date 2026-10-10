@@ -46,7 +46,7 @@
           </div>
         </div>
       </div>
-      <button @click="resetLayout()" class="btn-reset">기본값으로 초기화</button>
+      <button @click="confirmResetLayout" class="btn-reset">기본값으로 초기화</button>
     </div>
 
     <!-- Hero row: 날씨 + 요약 카드 side-by-side (둘 다 visible일 때) -->
@@ -114,6 +114,12 @@ import IrrigationHistoryWidget from '../components/dashboard/IrrigationHistoryWi
 import GddDashboardWidget from '../modules/crop-management/GddDashboardWidget.vue'
 import { useDashboardLayout } from '../composables/useDashboardLayout'
 import { useCropFeature } from '../modules/crop-management/composables/useCropFeature'
+import { useConfirm } from '../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
+async function confirmResetLayout() {
+  const ok = await confirmDialog({ title: '화면 구성 초기화', message: '위젯 배치와 표시 설정을 기본값으로 되돌릴까요?', confirmText: '초기화', variant: 'warning' })
+  if (ok) resetLayout()
+}
 
 const { feature: cropFeature } = useCropFeature()
 

@@ -186,6 +186,8 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { Worker, Advance } from '../types/worker-payroll.types'
+import { useConfirm } from '../../../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
 
 const props = defineProps<{ workerId: string | null }>()
 const emit = defineEmits<{ (e: 'saved', worker: Worker): void; (e: 'delete'): void }>()
@@ -406,6 +408,8 @@ async function addAdvance() {
 
 async function removeAdvance(id: string) {
   if (!props.workerId) return
+  const ok = await confirmDialog({ title: '가불 내역 삭제', message: '이 가불 내역을 삭제할까요? 정산 금액에 반영되며 되돌릴 수 없습니다.', confirmText: '삭제', variant: 'danger' })
+  if (!ok) return
   try {
     await workerPayrollApi.removeAdvance(id)
     advances.value = await workerPayrollApi.listAdvances(props.workerId)

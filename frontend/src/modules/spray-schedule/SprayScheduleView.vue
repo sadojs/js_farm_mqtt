@@ -110,6 +110,8 @@ import MoveEventModal from './components/MoveEventModal.vue'
 import ShiftEventModal from './components/ShiftEventModal.vue'
 import ManualEventModal from './components/ManualEventModal.vue'
 import DaySprayEventsModal from './components/DaySprayEventsModal.vue'
+import { useConfirm } from '../../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
 
 const authStore = useAuthStore()
 const notify = useNotificationStore()
@@ -281,6 +283,8 @@ async function applyShift(payload: { newDate: string; mode: MoveMode }) {
 
 async function deleteSelected() {
   if (!selected.value) return
+  const ok = await confirmDialog({ title: '방재 일정 삭제', message: '이 방재 일정을 삭제할까요? 삭제하면 되돌릴 수 없습니다.', confirmText: '삭제', variant: 'danger' })
+  if (!ok) return
   try {
     await sprayScheduleApi.deleteEvent(selected.value.id)
     notify.info('방재일정', '일정을 삭제했습니다.')

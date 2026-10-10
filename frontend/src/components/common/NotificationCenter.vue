@@ -71,7 +71,7 @@
 
         <!-- 전체 삭제 -->
         <div v-if="notificationStore.centerItems.length > 0" class="panel-footer">
-          <button class="btn-clear-all" @click="notificationStore.clearCenter()">
+          <button class="btn-clear-all" @click="clearAll">
             전체 삭제
           </button>
         </div>
@@ -83,6 +83,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '../../stores/notification.store'
+import { useConfirm } from '../../composables/useConfirm'
+const { confirm: confirmDialog } = useConfirm()
+async function clearAll() {
+  const ok = await confirmDialog({ title: '알림 전체 삭제', message: '알림 목록을 모두 지울까요?', confirmText: '전체 삭제', variant: 'warning' })
+  if (ok) notificationStore.clearCenter()
+}
 
 const { placement } = withDefaults(defineProps<{ placement?: 'bottom' | 'right' }>(), { placement: 'bottom' })
 const notificationStore = useNotificationStore()
