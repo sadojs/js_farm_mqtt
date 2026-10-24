@@ -16,6 +16,7 @@ import * as dotenv from 'dotenv';
 const LOCK_KEY = 'smartfarm-mqtt-backend';
 const WAIT_MS = 90_000;
 const RETRY_MS = 3_000;
+const CONNECT_WAIT_MS = 300_000;
 let held: Client | null = null;
 
 export async function acquireInstanceLock(): Promise<void> {
@@ -31,8 +32,7 @@ export async function acquireInstanceLock(): Promise<void> {
     logger.warn('DATABASE_URL 없음 — 단일 실행 잠금 생략');
     return;
   }
-  const client = new Client({ connectionString: url });
-  await client.connect();
+  const client = await connectWithRetry(url, logger);
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
     const { rows } = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS ok', [LOCK_KEY]);
@@ -49,6 +49,26 @@ export async function acquireInstanceLock(): Promise<void> {
     }
     logger.warn('다른 백엔드 인스턴스가 잠금을 보유 중 — 종료를 기다립니다...');
     await new Promise((r) => setTimeout(r, RETRY_MS));
+  }
+}
+
+/**
+ * 부팅 직후엔 DB(colima 컨테이너)가 백엔드보다 늦게 뜬다. 바로 실패하면 pm2 재시작 한도를
+ * 순식간에 소진해 errored 로 멈추므로(2026-10-18 재부팅 후 6.5일 다운) 여기서 기다린다.
+ */
+async function connectWithRetry(url: string, logger: Logger): Promise<Client> {
+  const deadline = Date.now() + CONNECT_WAIT_MS;
+  for (;;) {
+    const client = new Client({ connectionString: url });
+    try {
+      await client.connect();
+      return client;
+    } catch (e) {
+      await client.end().catch(() => undefined);
+      if (Date.now() > deadline) throw e;
+      logger.warn(`DB 연결 대기 중 (${(e as Error).message}) — ${RETRY_MS / 1000}초 후 재시도`);
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
   }
 }
 
