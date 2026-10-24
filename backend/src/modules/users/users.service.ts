@@ -21,7 +21,8 @@ export class UsersService {
   ) {}
 
   async findAll() {
-    const users = await this.usersRepo.find({ order: { createdAt: 'DESC' } });
+    // 같은 생성 시각이면 아이디 순 — 목록 순서가 매번 같도록
+    const users = await this.usersRepo.find({ order: { createdAt: 'DESC', username: 'ASC' } });
     const byId = new Map(users.map(u => [u.id, u]));
     const userIds = users.map(u => u.id);
     const allGateways = await this.gatewayService.findAllByUserIds(userIds);

@@ -26,6 +26,10 @@ export class User {
   @Column({ nullable: true })
   address: string;
 
+  /** 농작업 기본 작업 종류를 만든 시각 (migration 054) — 한 번만 만들고, 이후 삭제해도 되살리지 않는다 */
+  @Column({ name: 'work_types_seeded_at', type: 'timestamptz', nullable: true, select: false })
+  workTypesSeededAt: Date | null;
+
   /** 농장 이름 — 농장 관리자(farm_admin)만 사용. 그 외 역할은 NULL (소속 농장 이름은 부모의 farm_name) */
   @Column({ name: 'farm_name', type: 'varchar', length: 100, nullable: true })
   farmName: string | null;

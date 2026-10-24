@@ -18,8 +18,11 @@ export const workLogApi = {
     apiClient.put<WorkTaskType>(`/work-log/task-types/${id}`, dto),
   toggleHidden: (id: string, hidden: boolean) =>
     apiClient.patch<WorkTaskType>(`/work-log/task-types/${id}/hidden`, { hidden }),
-  deleteTaskType: (id: string) =>
-    apiClient.delete<{ ok: true; hidden?: boolean }>(`/work-log/task-types/${id}`),
+  /** 기록이 있는 작업은 409(TASK_TYPE_IN_USE, count) → withLogs=true 로 기록과 함께 삭제 */
+  deleteTaskType: (id: string, withLogs = false) =>
+    apiClient.delete<{ ok: true; deletedLogs: number }>(`/work-log/task-types/${id}`, withLogs ? { params: { withLogs: 'true' } } : undefined),
+  /** 농작업 초기화 — 기록 전부 삭제(작업 종류 유지) */
+  resetLogs: () => apiClient.delete<{ ok: true; deleted: number }>('/work-log/logs'),
   listLogs: (params?: { zoneId?: string; taskTypeId?: string; from?: string; to?: string; limit?: number }) =>
     apiClient.get<WorkLog[]>('/work-log/logs', { params }),
   listByMonth: (month: string) =>

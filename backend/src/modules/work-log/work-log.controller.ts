@@ -64,9 +64,14 @@ export class WorkLogController {
     return this.svc.toggleHidden(user, id, dto.hidden);
   }
 
+  /** 기록이 있는 작업은 ?withLogs=true 로 기록과 함께 삭제 */
   @Delete('task-types/:id')
-  deleteTaskType(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
-    return this.svc.deleteTaskType(user, id);
+  deleteTaskType(
+    @CurrentUser() user: any,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query('withLogs') withLogs?: string,
+  ) {
+    return this.svc.deleteTaskType(user, id, withLogs === 'true');
   }
 
   // ── logs ──
@@ -93,6 +98,12 @@ export class WorkLogController {
     @Body() dto: UpdateWorkLogDto,
   ) {
     return this.svc.updateLog(user, id, dto);
+  }
+
+  /** 농작업 초기화 — 기록 전부 삭제(작업 종류 유지). 'logs/:id' 보다 먼저 선언 */
+  @Delete('logs')
+  resetLogs(@CurrentUser() user: any) {
+    return this.svc.resetLogs(user);
   }
 
   @Delete('logs/:id')

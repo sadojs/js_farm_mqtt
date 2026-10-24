@@ -35,25 +35,29 @@ export class WorkLogService {
   ) {}
 
   // ───── seeding ─────
+  /**
+   * 기본 작업 종류는 농장마다 최초 1회만 만든다(users.work_types_seeded_at 표시, migration 054).
+   * 이전: 화면을 열 때마다 없는 기본 작업을 다시 만들어 삭제해도 되살아났다.
+   */
   private async ensureStandardSeed(userId: string): Promise<void> {
-    const existing = await this.taskTypeRepo.count({ where: { userId, isStandard: true } });
-    if (existing >= STANDARD_WORK_TASK_TYPES.length) return;
-    const have = new Set(
-      (await this.taskTypeRepo.find({ where: { userId, isStandard: true } })).map((t) => t.label),
+    const [row] = await this.userRepo.query(
+      'SELECT work_types_seeded_at FROM users WHERE id::text = $1', [userId],
     );
-    const missing = STANDARD_WORK_TASK_TYPES.filter((s) => !have.has(s.label));
-    if (missing.length === 0) return;
-    const rows = missing.map((s) =>
-      this.taskTypeRepo.create({
-        userId,
-        label: s.label,
-        emoji: s.emoji,
-        color: s.color,
-        isStandard: true,
-        displayOrder: s.order,
-      }),
-    );
-    await this.taskTypeRepo.save(rows);
+    if (!row || row.work_types_seeded_at) return;
+    const existing = await this.taskTypeRepo.count({ where: { userId } });
+    if (existing === 0) {
+      await this.taskTypeRepo.save(STANDARD_WORK_TASK_TYPES.map((s) =>
+        this.taskTypeRepo.create({
+          userId,
+          label: s.label,
+          emoji: s.emoji,
+          color: s.color,
+          isStandard: true,
+          displayOrder: s.order,
+        }),
+      ));
+    }
+    await this.userRepo.query('UPDATE users SET work_types_seeded_at = now() WHERE id::text = $1', [userId]);
   }
 
   // ───── task types ─────
@@ -125,31 +129,45 @@ export class WorkLogService {
     return this.taskTypeRepo.save(row);
   }
 
+  /**
+   * 작업 종류 삭제 — 기본 작업(하엽 제거 등)도 삭제 가능.
+   * 이 작업으로 남긴 기록이 있으면 withLogs=true 일 때만 기록과 함께 삭제(아니면 409 + 건수 → 화면이 경고 후 재요청).
+   */
   async deleteTaskType(
     user: { id: string; role: string; parentUserId?: string | null },
     id: string,
-  ): Promise<{ ok: true; hidden?: boolean }> {
+    withLogs = false,
+  ): Promise<{ ok: true; deletedLogs: number }> {
     if (user.role === 'farm_user') {
       throw new ForbiddenException('작업 종류 삭제는 농장 관리자만 가능합니다');
     }
     const uid = effectiveUserId(user);
     const row = await this.taskTypeRepo.findOne({ where: { id, userId: uid } });
     if (!row) throw new NotFoundException('작업 종류를 찾을 수 없습니다');
-    if (row.isStandard) {
-      // 표준은 삭제 대신 숨김
-      row.hidden = true;
-      await this.taskTypeRepo.save(row);
-      return { ok: true, hidden: true };
-    }
-    // 사용 중인 기록이 있으면 삭제 막음
     const usedCount = await this.logRepo.count({ where: { taskTypeId: id, userId: uid } });
-    if (usedCount > 0) {
-      throw new BadRequestException(
-        `이 작업 종류로 ${usedCount}건의 기록이 있어 삭제할 수 없습니다. 숨김 처리만 가능합니다`,
-      );
+    if (usedCount > 0 && !withLogs) {
+      throw new ConflictException({
+        code: 'TASK_TYPE_IN_USE',
+        count: usedCount,
+        message: `"${row.label}" 작업으로 남긴 기록이 ${usedCount}건 있습니다. 삭제하면 이 기록도 함께 삭제됩니다.`,
+      });
     }
-    await this.taskTypeRepo.remove(row);
-    return { ok: true };
+    // 기록 → 작업 순서로 한 트랜잭션에서 (work_logs.task_type_id 는 RESTRICT)
+    await this.logRepo.manager.transaction(async (m) => {
+      if (usedCount > 0) await m.delete(WorkLog, { taskTypeId: id, userId: uid });
+      await m.delete(WorkTaskType, { id, userId: uid });
+    });
+    return { ok: true, deletedLogs: usedCount };
+  }
+
+  /** 농작업 초기화 — 이 농장의 농작업 기록 전부 삭제(작업 종류는 유지). 농장 관리자만 */
+  async resetLogs(user: { id: string; role: string; parentUserId?: string | null }): Promise<{ ok: true; deleted: number }> {
+    if (user.role === 'farm_user') {
+      throw new ForbiddenException('농작업 초기화는 농장 관리자만 가능합니다');
+    }
+    const uid = effectiveUserId(user);
+    const res = await this.logRepo.delete({ userId: uid });
+    return { ok: true, deleted: res.affected ?? 0 };
   }
 
   // ───── logs ─────

@@ -11,6 +11,7 @@
           <button :class="['tab-btn', { active: tab === 'calendar' }]" @click="tab = 'calendar'">작업 달력</button>
           <button :class="['tab-btn', { active: tab === 'types' }]" @click="tab = 'types'">작업 종류</button>
         </div>
+        <button v-if="isAdmin" class="btn-reset" title="농작업 기록을 모두 삭제합니다 (작업 종류는 유지)" @click="onResetLogs">초기화</button>
         <button class="btn-primary" @click="openQuickLog()">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           빠른 기록
@@ -106,6 +107,11 @@ import QuickLogModal from './components/QuickLogModal.vue'
 import AddTaskTypeModal from './components/AddTaskTypeModal.vue'
 import EditLogModal from './components/EditLogModal.vue'
 import DayLogsModal from './components/DayLogsModal.vue'
+import { useConfirm } from '@/composables/useConfirm'
+import { useNotificationStore } from '@/stores/notification.store'
+
+const { confirm: confirmDialog } = useConfirm()
+const notif = useNotificationStore()
 import { todayYmd, ymd } from './utils/work-log.utils'
 
 const groupStore = useGroupStore()
@@ -273,13 +279,41 @@ async function onToggleHidden(t: WorkTaskType) {
 }
 
 async function onDeleteType(t: WorkTaskType) {
-  if (!confirm(`"${t.label}" 작업 종류를 삭제하시겠습니까? 표준 작업은 숨김 처리됩니다.`)) return
+  const ok = await confirmDialog({ title: '작업 종류 삭제', message: `"${t.label}" 작업 종류를 삭제할까요? 삭제한 작업은 다시 생기지 않습니다.`, confirmText: '삭제', variant: 'danger' })
+  if (!ok) return
   try {
     await workLogApi.deleteTaskType(t.id)
-    const tt = await workLogApi.listTaskTypes()
-    taskTypes.value = tt.data
   } catch (err: any) {
-    alert(err.response?.data?.message || '삭제 실패')
+    const data = err.response?.data
+    if (err.response?.status === 409 && data?.code === 'TASK_TYPE_IN_USE') {
+      // 이 작업으로 남긴 기록이 있음 — 한 번 더 확인 후 기록과 함께 삭제
+      const again = await confirmDialog({ title: '기록도 함께 삭제', message: `${data.message}\n정말 삭제할까요? 되돌릴 수 없습니다.`, confirmText: `기록 ${data.count}건과 함께 삭제`, variant: 'danger' })
+      if (!again) return
+      try {
+        await workLogApi.deleteTaskType(t.id, true)
+      } catch (e2: any) {
+        notif.error('삭제 실패', e2.response?.data?.message || '작업 종류 삭제에 실패했습니다.')
+        return
+      }
+    } else {
+      notif.error('삭제 실패', data?.message || '작업 종류 삭제에 실패했습니다.')
+      return
+    }
+  }
+  notif.success('삭제', `"${t.label}" 작업 종류를 삭제했습니다.`)
+  await loadAll()
+}
+
+/** 농작업 초기화 — 기록 전부 삭제(작업 종류는 유지) */
+async function onResetLogs() {
+  const ok = await confirmDialog({ title: '농작업 초기화', message: '이 농장의 농작업 기록을 모두 삭제할까요?\n작업 종류는 그대로 남고, 삭제한 기록은 되돌릴 수 없습니다.', confirmText: '모두 삭제', variant: 'danger' })
+  if (!ok) return
+  try {
+    const { data } = await workLogApi.resetLogs()
+    notif.success('초기화', `농작업 기록 ${data.deleted}건을 삭제했습니다.`)
+    await loadAll()
+  } catch (err: any) {
+    notif.error('초기화 실패', err.response?.data?.message || '초기화에 실패했습니다.')
   }
 }
 
@@ -292,6 +326,12 @@ onMounted(loadAll)
   display: flex; align-items: flex-start; justify-content: space-between;
   margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
 }
+.btn-reset {
+  background: var(--bg-card); color: var(--danger, #e53935); border: 1px solid var(--danger, #e53935);
+  border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer;
+  font-size: calc(14px * var(--content-scale, 1));
+}
+.btn-reset:hover { background: var(--danger-bg, #ffebee); }
 .page-header h2 { font-size: calc(28px * var(--content-scale, 1)); font-weight: 700; color: var(--text-primary); margin: 0; }
 .page-description { color: var(--text-secondary); font-size: calc(14px * var(--content-scale, 1)); margin: 4px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
