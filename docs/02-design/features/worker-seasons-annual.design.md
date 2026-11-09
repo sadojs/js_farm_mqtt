@@ -310,3 +310,14 @@ npm run build                               # vue-tsc 포함 빌드 검증
 
 ## 변경 기록
 - 2026-11-09: 초안 작성 (Cowork).
+- 2026-11-09: 구현 완료 (브랜치 `feat/worker-seasons`, Phase 1~5). 설계와 달라진 점:
+  - **removeAdvance**: 시즌 밖 날짜여도 400 으로 막지 않음 — 시즌 도입 전에 잘못 입력된 가불을 정리할 수 있도록. 마감 시즌의 가불만 409.
+  - **기간 겹침 오류 코드** `SEASON_OVERLAP`(400), 종료일<시작일 `INVALID_RANGE`(400) 추가.
+  - **미러 자동 보정**: 시즌 저장 시뿐 아니라 조회 시 기본 시즌과 미러가 어긋나면(날짜 경과로 기본 시즌이 바뀐 경우) 바로잡음.
+  - **목록 응답** 시즌 brief 에 `unsettledCount`(정산일 지난 미확정 수) 포함 — 목록 배지용. 회귀 스냅샷은 오늘 날짜 의존값이라 정규화(`<today-dependent>`).
+  - **getSettlement(확정분)**: snapshot 의 `nextPeriodStart/prevPeriodStart` 대신 현재 시즌 기준 값으로 덮어씀(시즌 마지막 기간에서 다음 이동 차단).
+  - **listSeasons 요약**: 확정분은 snapshot, 미확정분은 현재 계산값으로 합산하고 `confirmedGrossPay/confirmedNetPay/unsettledCount/periodCount` 를 함께 반환.
+  - **연간 결산 unsettled**: 삭제(is_active=false)된 일꾼은 제외(확정분 합계에는 포함). 요청됨(requested) 건의 예상 금액은 박제된 netPay.
+  - **기타 고용비용**: `date` 가 있으면 귀속 연도 = date 의 연도(보낸 year 무시). 다른 농장 일꾼 지정 403.
+  - 시즌 생성·마감·해제는 activity-log(`payroll.season.create|close|reopen`, targetType `payroll_season`)에 기록, 활동 로그 화면 라벨 추가.
+  - `xlsx` 의존성 없이 CSV(UTF-8 BOM)로 내려받기.

@@ -65,7 +65,8 @@ backend/src/
 │   ├── config-deploy/ # 원격 Zigbee2MQTT 설정 배포
 │   ├── health/      # 헬스체크
 │   ├── integrations/ # 외부 API 연동
-│   └── notifications/ # 알림 프레임워크
+│   ├── notifications/ # 알림 프레임워크
+│   └── worker-payroll/ # 일꾼관리(근무 달력·가불·월 정산·시즌·연간 결산)
 └── main.ts          # Bootstrap (port 3100)
 ```
 
@@ -138,6 +139,15 @@ frontend/src/
 - 계약서: `admin-console/docs/FARM_SCOPE_DESIGN.md`. 테스트: `cd backend && npm test` (일회용 `*_test` DB 자동 생성·삭제, MQTT mock — 실제 DB·브로커 미접속).
 - 롤백: 이 기능 커밋들을 `git revert` 하면 끝(DB 스키마 변경 없음, 헤더를 안 보내는 기존 클라이언트는 영향 없음).
 
+### 일꾼관리 시즌 모델 (`worker-payroll`, migration 055·056)
+
+- **일꾼 = 사람(계정·연락처), 시즌 = 한 번의 고용**(`payroll_worker_seasons`: 기간·임금·정산주기·기본시간). 공제(`payroll_deductions.season_id`)도 시즌별. 가불·일자조정·정산은 **날짜로** 시즌에 귀속(컬럼 없음).
+- **미러 규칙(D2)**: `payroll_workers` 의 근무조건 컬럼은 삭제하지 않고 **기본 시즌 값의 미러** — 구버전 앱·`/worker-payroll/me` 호환. 시즌 저장 시 `syncMirror`, 조회 시 어긋나면 자동 보정.
+- **기본 시즌(D8)**: `seasonId` 없으면 오늘을 포함하는 시즌 → 없으면 시작일이 가장 최근인 시즌. 응답 필드는 추가만(기존 의미 변경 금지).
+- 계산 로직은 그대로 두고 `effectiveWorker(worker, season)` 로 실행. 시즌 0개인 일꾼은 조회 시 지연 백필(`ensureSeasons`).
+- **마감(D6)**: 모든 정산기간 확정 + 종료일 있어야 `POST seasons/:id/close`. 마감 시즌 날짜의 달력·가불·정산·근무조건 수정은 409 `SEASON_CLOSED`. 시즌 밖 날짜는 400 `DATE_OUTSIDE_SEASON`. 재고용 `POST workers/:id/seasons`(진행 중 시즌 있으면 400 `PREVIOUS_SEASON_OPEN`, 겹치면 400 `SEASON_OVERLAP`).
+- **연간 결산** `GET /worker-payroll/annual?year=`: 확정 정산 snapshot 만 합산(연·월 귀속 = `period_end`), 미확정은 `unsettled` 로 따로, 기타 고용비용(`payroll_extra_costs`) 은 `totalCost` 에 합산.
+
 ## Sensor Types
 
 temperature, humidity, co2, illuminance_lux, soil_moisture, soil_temperature,
@@ -179,3 +189,4 @@ docker compose build backend frontend
 - 라우터: `frontend/src/router/index.ts`
 - API 클라이언트: `frontend/src/api/client.ts`
 - 공유 타입: `shared/types/`, `shared/utils/`
+- 일꾼 시즌·연간 결산 설계: `docs/02-design/features/worker-seasons-annual.design.md`
