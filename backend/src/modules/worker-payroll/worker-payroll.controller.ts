@@ -18,6 +18,7 @@ import { SaveWorkerDto } from './dto/worker.dto';
 import { UpsertAdvanceDto } from './dto/advance.dto';
 import { SetDayDto } from './dto/day-override.dto';
 import { CreateSeasonDto, UpdateSeasonDto } from './dto/season.dto';
+import { SaveExtraCostDto } from './dto/extra-cost.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { PlatformScope } from '../../common/farm-context/platform-scope.decorator';
 
@@ -237,5 +238,34 @@ export class WorkerPayrollController {
     const y = this.yearOf(year);
     if (!y) throw new BadRequestException('year(4자리 연도)가 필요합니다.');
     return this.service.getAnnual(this.ownerId(user), y);
+  }
+
+  // ──── 기타 고용비용 (관리자) ────
+
+  @Get('extra-costs')
+  listExtraCosts(@CurrentUser() user: any, @Query('year') year?: string) {
+    this.assertManager(user);
+    const y = this.yearOf(year);
+    if (!y) throw new BadRequestException('year(4자리 연도)가 필요합니다.');
+    return this.service.listExtraCosts(this.ownerId(user), y);
+  }
+
+  @Post('extra-costs')
+  createExtraCost(@CurrentUser() user: any, @Body() dto: SaveExtraCostDto) {
+    this.assertManager(user);
+    return this.service.saveExtraCost(this.ownerId(user), dto);
+  }
+
+  @Put('extra-costs/:costId')
+  updateExtraCost(@CurrentUser() user: any, @Param('costId') costId: string, @Body() dto: SaveExtraCostDto) {
+    this.assertManager(user);
+    return this.service.saveExtraCost(this.ownerId(user), dto, costId);
+  }
+
+  @Delete('extra-costs/:costId')
+  async removeExtraCost(@CurrentUser() user: any, @Param('costId') costId: string) {
+    this.assertManager(user);
+    await this.service.removeExtraCost(this.ownerId(user), costId);
+    return { ok: true };
   }
 }

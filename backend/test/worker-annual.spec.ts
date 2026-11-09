@@ -138,4 +138,38 @@ describe('연간 결산', () => {
       .set('Authorization', as('admin')).set('X-Farm-Context', USERS.f1.id);
     expect(ctx.body.totals.grossPay).toBe(5880000);
   });
+
+  it('기타 고용비용: CRUD · 날짜 연도 귀속 · 결산 totalCost 반영 · 권한', async () => {
+    const flight = await http().post('/api/worker-payroll/extra-costs').set('Authorization', as('f1'))
+      .send({ year: 2025, workerId: X, label: '항공권', amount: 800000 });
+    expect(flight.status).toBe(201);
+    // date 가 있으면 귀속 연도는 date 의 연도 (year 2024 로 보내도 2025)
+    const visa = await http().post('/api/worker-payroll/extra-costs').set('Authorization', as('f1'))
+      .send({ year: 2024, date: '2025-02-01', label: '비자·수수료', amount: 200000, note: '2명' });
+    expect(visa.body.year).toBe(2025);
+
+    const list = await http().get('/api/worker-payroll/extra-costs?year=2025').set('Authorization', as('f1'));
+    expect(list.body.map((r: any) => [r.label, r.workerName])).toEqual([['비자·수수료', null], ['항공권', 'F1-엑스']]);
+
+    const annual = await http().get('/api/worker-payroll/annual?year=2025').set('Authorization', as('f1'));
+    expect(annual.body.totals.extraCostTotal).toBe(1000000);
+    expect(annual.body.totals.totalCost).toBe(5880000 + 1000000);
+
+    const upd = await http().put(`/api/worker-payroll/extra-costs/${flight.body.id}`).set('Authorization', as('f1'))
+      .send({ year: 2025, workerId: X, label: '항공권(왕복)', amount: 900000 });
+    expect(upd.body.amount).toBe(900000);
+
+    // 권한: 다른 농장·농장 사용자 불가, 다른 농장 일꾼 지정 불가
+    expect((await http().put(`/api/worker-payroll/extra-costs/${flight.body.id}`).set('Authorization', as('f2'))
+      .send({ year: 2025, label: 'x', amount: 1 })).status).toBe(403);
+    expect((await http().delete(`/api/worker-payroll/extra-costs/${flight.body.id}`).set('Authorization', as('f2'))).status).toBe(403);
+    expect((await http().get('/api/worker-payroll/extra-costs?year=2025').set('Authorization', as('u1'))).status).toBe(403);
+    expect((await http().post('/api/worker-payroll/extra-costs').set('Authorization', as('f2'))
+      .send({ year: 2025, workerId: X, label: 'x', amount: 1 })).status).toBe(403);
+    expect((await http().get('/api/worker-payroll/extra-costs?year=2025').set('Authorization', as('f2'))).body).toEqual([]);
+
+    expect((await http().delete(`/api/worker-payroll/extra-costs/${visa.body.id}`).set('Authorization', as('f1'))).status).toBe(200);
+    const after = await http().get('/api/worker-payroll/annual?year=2025').set('Authorization', as('f1'));
+    expect(after.body.totals.extraCostTotal).toBe(900000);
+  });
 });

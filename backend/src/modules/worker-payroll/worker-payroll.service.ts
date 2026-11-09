@@ -13,8 +13,10 @@ import { WorkerAdvance } from './entities/worker-advance.entity';
 import { WorkerDayOverride } from './entities/worker-day-override.entity';
 import { WorkerSettlement } from './entities/worker-settlement.entity';
 import { WorkerSeason } from './entities/worker-season.entity';
+import { WorkerExtraCost } from './entities/worker-extra-cost.entity';
 import { SaveWorkerDto, DeductionInputDto } from './dto/worker.dto';
 import { CreateSeasonDto, UpdateSeasonDto } from './dto/season.dto';
+import { SaveExtraCostDto } from './dto/extra-cost.dto';
 import { UpsertAdvanceDto } from './dto/advance.dto';
 import { SetDayDto } from './dto/day-override.dto';
 import { UsersService } from '../users/users.service';
@@ -132,6 +134,8 @@ export class WorkerPayrollService {
     private readonly settlementRepo: Repository<WorkerSettlement>,
     @InjectRepository(WorkerSeason)
     private readonly seasonRepo: Repository<WorkerSeason>,
+    @InjectRepository(WorkerExtraCost)
+    private readonly extraCostRepo: Repository<WorkerExtraCost>,
     private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
   ) {}
@@ -1560,8 +1564,54 @@ export class WorkerPayrollService {
     };
   }
 
-  /** 기타 고용비용 합계 (Phase 4 전에는 0) */
-  private async extraCostTotal(_ownerId: string, _year: number): Promise<number> {
-    return 0;
+  // ──── 기타 고용비용 (항공권·비자 등) ────
+
+  private async extraCostTotal(ownerId: string, year: number): Promise<number> {
+    const [row] = await this.dataSource.query(
+      'SELECT COALESCE(SUM(amount), 0)::int AS total FROM payroll_extra_costs WHERE user_id = $1 AND year = $2',
+      [ownerId, year],
+    );
+    return num(row?.total);
+  }
+
+  async listExtraCosts(ownerId: string, year: number) {
+    const rows = await this.extraCostRepo.find({
+      where: { userId: ownerId, year },
+      order: { date: 'ASC', createdAt: 'ASC' },
+    });
+    const workers = await this.workerRepo.find({ where: { userId: ownerId } });
+    const nameMap = Object.fromEntries(workers.map((w) => [w.id, w.name]));
+    return rows.map((r) => ({ ...r, workerName: r.workerId ? nameMap[r.workerId] ?? '—' : null }));
+  }
+
+  async saveExtraCost(ownerId: string, dto: SaveExtraCostDto, id?: string) {
+    if (dto.workerId) await this.findOwnedWorker(ownerId, dto.workerId);
+    const date = dto.date ? dto.date.slice(0, 10) : null;
+    const values = {
+      year: date ? parseDate(date).getUTCFullYear() : dto.year,
+      date,
+      workerId: dto.workerId || null,
+      label: dto.label.trim(),
+      amount: dto.amount,
+      note: dto.note?.trim() || null,
+    };
+    if (!id) {
+      return this.extraCostRepo.save(this.extraCostRepo.create({ userId: ownerId, ...values }));
+    }
+    const row = await this.findOwnedExtraCost(ownerId, id);
+    Object.assign(row, values);
+    return this.extraCostRepo.save(row);
+  }
+
+  async removeExtraCost(ownerId: string, id: string) {
+    const row = await this.findOwnedExtraCost(ownerId, id);
+    await this.extraCostRepo.delete({ id: row.id });
+  }
+
+  private async findOwnedExtraCost(ownerId: string, id: string) {
+    const row = await this.extraCostRepo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('비용 항목을 찾을 수 없습니다.');
+    if (row.userId !== ownerId) throw new ForbiddenException();
+    return row;
   }
 }

@@ -259,3 +259,24 @@ export interface SettlementHistoryItem {
   snapshot: SettlementResponse
   seasonYear?: number
 }
+
+/** 기타 고용비용 (항공권·비자 등) — 연간 결산 총 고용비용에 합산 */
+export interface ExtraCost {
+  id: string
+  year: number
+  date: string | null
+  workerId: string | null
+  workerName?: string | null
+  label: string
+  amount: number
+  note: string | null
+}
+
+export interface SaveExtraCostPayload {
+  year: number
+  date?: string | null
+  workerId?: string | null
+  label: string
+  amount: number
+  note?: string | null
+}

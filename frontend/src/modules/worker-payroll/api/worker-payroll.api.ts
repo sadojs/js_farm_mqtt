@@ -12,6 +12,8 @@ import type {
   CreateSeasonPayload,
   UpdateSeasonPayload,
   AnnualReport,
+  ExtraCost,
+  SaveExtraCostPayload,
 } from '../types/worker-payroll.types'
 
 export const workerPayrollApi = {
@@ -114,5 +116,19 @@ export const workerPayrollApi = {
   // ── 연간 결산 ──
   getAnnual(year: number): Promise<AnnualReport> {
     return apiClient.get('/worker-payroll/annual', { params: { year } }).then((r) => r.data)
+  },
+
+  // ── 기타 고용비용 ──
+  listExtraCosts(year: number): Promise<ExtraCost[]> {
+    return apiClient.get('/worker-payroll/extra-costs', { params: { year } }).then((r) => r.data)
+  },
+  createExtraCost(payload: SaveExtraCostPayload): Promise<ExtraCost> {
+    return apiClient.post('/worker-payroll/extra-costs', payload).then((r) => r.data)
+  },
+  updateExtraCost(id: string, payload: SaveExtraCostPayload): Promise<ExtraCost> {
+    return apiClient.put(`/worker-payroll/extra-costs/${id}`, payload).then((r) => r.data)
+  },
+  removeExtraCost(id: string): Promise<void> {
+    return apiClient.delete(`/worker-payroll/extra-costs/${id}`).then(() => undefined)
   },
 }

@@ -35,7 +35,7 @@ export const USERS = {
 /** 테스트가 쓰거나 서비스가 지연 생성하는 테이블까지 포함해 매 파일 시작 시 비운다. */
 const TABLES = [
   'zone_notes', 'gdd_batches', 'work_logs', 'work_task_types', 'payroll_advances', 'payroll_day_overrides',
-  'payroll_deductions', 'payroll_settlements', 'payroll_worker_seasons', 'payroll_workers', 'spray_events', 'spray_products',
+  'payroll_deductions', 'payroll_settlements', 'payroll_worker_seasons', 'payroll_extra_costs', 'payroll_workers', 'spray_events', 'spray_products',
   'spray_programs', 'spray_zones', 'activity_logs', 'sensor_data', 'weather_data', 'sensor_standby',
   'sensor_alerts', 'automation_logs', 'automation_rules', 'env_mappings', 'group_devices', 'devices',
   'gateway_onboard_devices', 'gateways', 'houses', 'house_groups', 'feature_settings', 'device_tokens',

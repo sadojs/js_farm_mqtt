@@ -112,7 +112,7 @@
         </div>
 
         <div class="side">
-          <slot name="side" :report="report" :reload="load" />
+          <ExtraCostsCard :year="year" @changed="load" />
           <div class="card">
             <h4 class="card-title">공제 항목별 회수액</h4>
             <ul v-if="report.deductionsByLabel.length" class="label-list">
@@ -145,6 +145,7 @@ import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { AnnualReport } from '../types/worker-payroll.types'
 import { md, won } from '../utils/payroll-utils'
+import ExtraCostsCard from './ExtraCostsCard.vue'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 
@@ -242,7 +243,7 @@ function downloadCsv() {
     ['가불', r.totals.advanceTotal],
     ['실수령', r.totals.netPay],
     ['실제 지급(실수령+가불)', r.totals.cashOut],
-    ['기타 고용비용', r.totals.extraCostTotal],
+    ['기타 고용비용(항공권·비자 등)', r.totals.extraCostTotal],
     ['인원', r.totals.headcount],
     ['근무일수', r.totals.workDays],
     ['근무시간', r.totals.totalHours],
