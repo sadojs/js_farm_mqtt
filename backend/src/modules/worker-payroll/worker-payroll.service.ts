@@ -1382,14 +1382,17 @@ export class WorkerPayrollService {
     return this.seasonBrief(season);
   }
 
-  /** 정산 이력 (관리자) — 농장 전체 + 일꾼명 */
-  async listSettlements(ownerId: string) {
-    const rows = await this.settlementRepo.find({
-      where: { userId: ownerId },
-      order: { settleDate: 'DESC' },
-    });
+  /** 정산 이력 (관리자) — 농장 전체 + 일꾼명. year 가 오면 period_end 연도로 필터 */
+  async listSettlements(ownerId: string, year?: number) {
+    const qb = this.settlementRepo
+      .createQueryBuilder('s')
+      .where('s.user_id = :ownerId', { ownerId })
+      .orderBy('s.settle_date', 'DESC');
+    if (year) qb.andWhere('EXTRACT(YEAR FROM s.period_end) = :year', { year });
+    const rows = await qb.getMany();
     const workers = await this.workerRepo.find({ where: { userId: ownerId } });
     const nameMap = Object.fromEntries(workers.map((w) => [w.id, w.name]));
+    const seasonsOf = await this.ownerSeasons(ownerId);
     return rows.map((r) => ({
       id: r.id,
       workerId: r.workerId,
@@ -1402,6 +1405,163 @@ export class WorkerPayrollService {
       requestedAt: r.requestedAt,
       confirmedAt: r.confirmedAt,
       snapshot: r.snapshot,
+      seasonYear: this.seasonOfSettlement(r, seasonsOf.get(r.workerId) ?? [])?.seasonYear
+        ?? parseDate(r.periodStart).getUTCFullYear(),
     }));
+  }
+
+  /** 농장의 일꾼별 시즌 (삭제된 일꾼 포함) */
+  private async ownerSeasons(ownerId: string): Promise<Map<string, WorkerSeason[]>> {
+    const rows = await this.seasonRepo.find({ where: { userId: ownerId }, order: { startDate: 'ASC' } });
+    const map = new Map<string, WorkerSeason[]>();
+    for (const r of rows) map.set(r.workerId, [...(map.get(r.workerId) ?? []), r]);
+    return map;
+  }
+
+  /** 정산이 속한 시즌: snapshot 에 박제된 seasonId → 없으면(시즌 도입 전 정산) 기간 시작일로 판단 */
+  private seasonOfSettlement(row: WorkerSettlement, seasons: WorkerSeason[]): WorkerSeason | null {
+    const sid = (row.snapshot as any)?.seasonId;
+    return (sid && seasons.find((x) => x.id === sid)) || this.seasonForDate(seasons, row.periodStart) || null;
+  }
+
+  // ──── 연간 결산 ────
+
+  /**
+   * 연간 인건비 결산 (D9): 확정(confirmed) 정산 snapshot 만 합산. 연도·월 귀속 = period_end.
+   * 미확정분은 unsettled 로 따로(예상 실수령, 변동공제 0). 삭제된 일꾼의 정산도 포함.
+   */
+  async getAnnual(ownerId: string, year: number) {
+    const workers = await this.workerRepo.find({ where: { userId: ownerId } });
+    const seasonMap = await this.loadSeasonsMany(workers);
+    const nameMap = Object.fromEntries(workers.map((w) => [w.id, w.name]));
+
+    const rows = await this.settlementRepo
+      .createQueryBuilder('s')
+      .where('s.user_id = :ownerId', { ownerId })
+      .andWhere('EXTRACT(YEAR FROM s.period_end) IN (:...years)', { years: [year, year - 1] })
+      .orderBy('s.period_end', 'ASC')
+      .getMany();
+    const yearOf = (r: WorkerSettlement) => parseDate(r.periodEnd).getUTCFullYear();
+    const confirmed = rows.filter((r) => r.status === 'confirmed' && yearOf(r) === year);
+    const prevConfirmed = rows.filter((r) => r.status === 'confirmed' && yearOf(r) === year - 1);
+
+    const totals = {
+      grossPay: 0, deductionTotal: 0, advanceTotal: 0, netPay: 0, cashOut: 0,
+      workDays: 0, totalHours: 0, headcount: 0, extraCostTotal: 0, totalCost: 0,
+    };
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1, grossPay: 0, deductionTotal: 0, advanceTotal: 0, netPay: 0,
+    }));
+    const byWorker = new Map<string, any>();
+    const byLabel = new Map<string, number>();
+
+    for (const r of confirmed) {
+      const snap: any = r.snapshot ?? {};
+      const gross = num(snap.grossPay);
+      const ded = num(snap.deductionTotal);
+      const adv = advanceOf(snap);
+      const net = num(snap.netPay ?? r.netPay);
+      totals.grossPay += gross;
+      totals.deductionTotal += ded;
+      totals.advanceTotal += adv;
+      totals.netPay += net;
+      totals.workDays += num(snap.workDays);
+      totals.totalHours += num(snap.totalHours);
+      const m = monthly[parseDate(r.periodEnd).getUTCMonth()];
+      m.grossPay += gross;
+      m.deductionTotal += ded;
+      m.advanceTotal += adv;
+      m.netPay += net;
+
+      const season = this.seasonOfSettlement(r, seasonMap.get(r.workerId) ?? []);
+      const key = `${r.workerId}|${season?.id ?? ''}`;
+      const acc = byWorker.get(key) ?? {
+        workerId: r.workerId,
+        workerName: nameMap[r.workerId] ?? '—',
+        seasonId: season?.id ?? null,
+        seasonYear: season?.seasonYear ?? parseDate(r.periodStart).getUTCFullYear(),
+        seasonStart: season ? season.startDate.slice(0, 10) : null,
+        seasonEnd: season?.endDate ? season.endDate.slice(0, 10) : null,
+        workDays: 0, totalHours: 0, grossPay: 0, deductionTotal: 0, advanceTotal: 0, netPay: 0, share: 0,
+      };
+      acc.workDays += num(snap.workDays);
+      acc.totalHours += num(snap.totalHours);
+      acc.grossPay += gross;
+      acc.deductionTotal += ded;
+      acc.advanceTotal += adv;
+      acc.netPay += net;
+      byWorker.set(key, acc);
+
+      for (const d of Array.isArray(snap.deductions) ? snap.deductions : []) {
+        if (!d?.label) continue;
+        byLabel.set(d.label, (byLabel.get(d.label) ?? 0) + num(d.amount));
+      }
+    }
+    totals.cashOut = totals.netPay + totals.advanceTotal;
+    totals.headcount = new Set(confirmed.map((r) => r.workerId)).size;
+    totals.extraCostTotal = await this.extraCostTotal(ownerId, year);
+    totals.totalCost = totals.grossPay + totals.extraCostTotal;
+    const workerRows = [...byWorker.values()]
+      .map((w) => ({ ...w, share: totals.grossPay > 0 ? w.grossPay / totals.grossPay : 0 }))
+      .sort((a, b) => b.grossPay - a.grossPay);
+
+    // 미확정: 그 해에 끝나는 정산기간 중 확정 아닌 것 (진행 중 일꾼만, 오늘 이후 시작 기간 제외)
+    const rowMap = new Map(rows.map((r) => [`${r.workerId}|${r.periodStart.slice(0, 10)}`, r]));
+    const today = todayStr();
+    const items: any[] = [];
+    for (const w of workers.filter((x) => x.isActive)) {
+      for (const season of seasonMap.get(w.id) ?? []) {
+        const sStart = season.startDate.slice(0, 10);
+        const sEnd = season.endDate ? season.endDate.slice(0, 10) : OPEN_END;
+        if (sStart > `${year}-12-31` || sEnd < `${year}-01-01`) continue;
+        const eff = this.effectiveWorker(w, season);
+        for (const meta of this.seasonPeriods(eff, today)) {
+          if (parseDate(meta.periodEnd).getUTCFullYear() !== year) continue;
+          const row = rowMap.get(`${w.id}|${meta.periodStart}`);
+          if (row?.status === 'confirmed') continue;
+          const estimatedNetPay = row
+            ? row.netPay
+            : (await this.computeReceipt(eff, meta, season)).netPay;
+          items.push({
+            workerId: w.id,
+            workerName: w.name,
+            seasonId: season.id,
+            periodStart: meta.periodStart,
+            periodEnd: meta.periodEnd,
+            settleDate: meta.settleDate,
+            status: row?.status === 'requested' ? 'requested' : meta.settleDate <= today ? 'pending' : 'open',
+            estimatedNetPay,
+          });
+        }
+      }
+    }
+
+    return {
+      year,
+      totals,
+      monthly,
+      byWorker: workerRows,
+      deductionsByLabel: [...byLabel.entries()]
+        .map(([label, amount]) => ({ label, amount }))
+        .sort((a, b) => b.amount - a.amount),
+      unsettled: {
+        count: items.length,
+        estimatedNetPay: items.reduce((sum, i) => sum + i.estimatedNetPay, 0),
+        items,
+      },
+      previousYear: prevConfirmed.length
+        ? {
+            year: year - 1,
+            grossPay: prevConfirmed.reduce((sum, r) => sum + num((r.snapshot as any)?.grossPay), 0),
+            netPay: prevConfirmed.reduce((sum, r) => sum + num((r.snapshot as any)?.netPay ?? r.netPay), 0),
+            headcount: new Set(prevConfirmed.map((r) => r.workerId)).size,
+          }
+        : null,
+    };
+  }
+
+  /** 기타 고용비용 합계 (Phase 4 전에는 0) */
+  private async extraCostTotal(_ownerId: string, _year: number): Promise<number> {
+    return 0;
   }
 }

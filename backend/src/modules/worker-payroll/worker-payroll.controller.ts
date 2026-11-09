@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -223,8 +224,18 @@ export class WorkerPayrollController {
   // ──── 정산 이력 (관리자) ────
 
   @Get('settlements')
-  listSettlements(@CurrentUser() user: any) {
+  listSettlements(@CurrentUser() user: any, @Query('year') year?: string) {
     this.assertManager(user);
-    return this.service.listSettlements(this.ownerId(user));
+    return this.service.listSettlements(this.ownerId(user), this.yearOf(year));
+  }
+
+  // ──── 연간 결산 (관리자) ────
+
+  @Get('annual')
+  getAnnual(@CurrentUser() user: any, @Query('year') year?: string) {
+    this.assertManager(user);
+    const y = this.yearOf(year);
+    if (!y) throw new BadRequestException('year(4자리 연도)가 필요합니다.');
+    return this.service.getAnnual(this.ownerId(user), y);
   }
 }
