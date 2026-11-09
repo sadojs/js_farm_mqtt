@@ -20,8 +20,10 @@
     <div class="period-nav">
       <button class="nav-btn" :disabled="!data.prevPeriodStart" @click="go(data.prevPeriodStart)">‹</button>
       <span class="period-label">{{ shortMD(data.periodStart) }} ~ {{ shortMD(data.periodEnd) }}</span>
-      <button class="nav-btn" @click="go(data.nextPeriodStart)">›</button>
+      <button class="nav-btn" :disabled="!data.nextPeriodStart" @click="go(data.nextPeriodStart)">›</button>
     </div>
+
+    <p v-if="locked" class="lock-note">🔒 {{ data.season?.seasonYear }} {{ t(lang, 'seasonLocked') }}</p>
 
     <!-- 범례 -->
     <div class="legend">
@@ -39,7 +41,7 @@
         v-for="cell in cells"
         :key="cell.date"
         class="cell"
-        :class="{ blank: !cell.day, 'next-month': cell.nextMonth, terminated: cell.terminated, tappable: cell.day && !cell.beforeStart && !cell.terminated && (isMobile || !editable) }"
+        :class="{ blank: !cell.day, 'next-month': cell.nextMonth, terminated: cell.terminated, tappable: cell.day && !cell.beforeStart && !cell.terminated && (isMobile || !editMode) }"
         @click="onCellClick(cell)"
       >
         <template v-if="cell.day">
@@ -56,11 +58,11 @@
           <template v-else>
             <div v-if="cell.status === 'off'" class="holiday-cell">
               <span class="holiday-label">{{ t(lang, 'holiday') }}</span>
-              <button v-if="editable && !isMobile" class="work-btn" @click.stop="setWork(cell)">{{ t(lang, 'work') }}</button>
+              <button v-if="editMode && !isMobile" class="work-btn" @click.stop="setWork(cell)">{{ t(lang, 'work') }}</button>
             </div>
             <template v-else>
               <span class="hours-chip">{{ fmtH(cell.hours) }}h</span>
-              <div v-if="editable && !isMobile" class="day-actions">
+              <div v-if="editMode && !isMobile" class="day-actions">
                 <button @click.stop="adjustHours(cell, -0.5)">−</button>
                 <button @click.stop="adjustHours(cell, 0.5)">+</button>
                 <button class="holiday-btn" @click.stop="setOff(cell)">{{ t(lang, 'holiday') }}</button>
@@ -82,7 +84,7 @@
       :hours="modalCell.hours"
       :advance="modalCell.advance"
       :daily-hours="data.worker.dailyHours"
-      :editable="!!editable"
+      :editable="editMode"
       :lang="lang"
       @save="onModalSave"
       @close="modalCell = null"
@@ -103,6 +105,8 @@ const props = defineProps<{
   lang: PayrollLang
   editable?: boolean
   hideKpi?: boolean
+  /** 보여줄 시즌 (없으면 서버 기본 시즌) */
+  seasonId?: string
 }>()
 const emit = defineEmits<{ (e: 'period-change', periodStart: string): void }>()
 
@@ -111,6 +115,9 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const data = ref<CalendarResponse | null>(null)
 const period = ref<string | undefined>(undefined)
 const modalCell = ref<any | null>(null)
+// 마감된 시즌은 편집 불가
+const locked = computed(() => !!data.value?.season?.closed)
+const editMode = computed(() => !!props.editable && !locked.value)
 
 // 모바일 여부 (반응형)
 const isMobile = ref(false)
@@ -151,7 +158,7 @@ const cells = computed(() => {
 })
 
 async function reload() {
-  data.value = await workerPayrollApi.getCalendar(props.workerId, period.value)
+  data.value = await workerPayrollApi.getCalendar(props.workerId, period.value, props.seasonId)
   emit('period-change', data.value.periodStart)
 }
 
@@ -162,12 +169,12 @@ function go(p: string | null) {
 }
 
 async function setDay(date: string, status: DayStatus, hours?: number) {
-  if (!props.editable) return
+  if (!editMode.value) return
   try {
     await workerPayrollApi.setDay(props.workerId, { date, status, hours })
     await reload()
-  } catch {
-    notify.error('일꾼 관리', '근무 설정에 실패했습니다.')
+  } catch (e: any) {
+    notify.error('일꾼 관리', e?.response?.data?.message ?? '근무 설정에 실패했습니다.')
   }
 }
 
@@ -186,7 +193,7 @@ function setWork(cell: CalendarDay) {
 function onCellClick(cell: any) {
   if (!cell.day || cell.beforeStart || cell.terminated) return
   // 데스크탑 + 편집가능 = 인라인 컨트롤 사용 (모달 안 띄움)
-  if (props.editable && !isMobile.value) return
+  if (editMode.value && !isMobile.value) return
   modalCell.value = cell
 }
 
@@ -197,7 +204,7 @@ function onModalSave(payload: { status: DayStatus; hours?: number }) {
   modalCell.value = null
 }
 
-watch(() => props.workerId, () => { period.value = undefined; reload() })
+watch(() => [props.workerId, props.seasonId], () => { period.value = undefined; reload() })
 onMounted(() => {
   mq = window.matchMedia('(max-width: 768px)')
   syncMq()
@@ -248,6 +255,15 @@ defineExpose({ reload })
 .nav-btn:disabled { opacity: 0.4; cursor: default; }
 .period-label { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.lock-note {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
 .lg { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-caption); color: var(--text-secondary); }
 .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .sw.work { background: var(--success-text); }

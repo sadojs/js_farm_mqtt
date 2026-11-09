@@ -7,12 +7,19 @@ import type {
   SettlementResponse,
   SettlementHistoryItem,
   DayStatus,
+  WorkerSeason,
+  SeasonBrief,
+  CreateSeasonPayload,
+  UpdateSeasonPayload,
+  AnnualReport,
+  ExtraCost,
+  SaveExtraCostPayload,
 } from '../types/worker-payroll.types'
 
 export const workerPayrollApi = {
   // ── 일꾼 ──
-  listWorkers(): Promise<Worker[]> {
-    return apiClient.get('/worker-payroll/workers').then((r) => r.data)
+  listWorkers(year?: number): Promise<Worker[]> {
+    return apiClient.get('/worker-payroll/workers', { params: { year } }).then((r) => r.data)
   },
   /** 일꾼 본인 프로필 (farm_user) — 없으면 null */
   getMe(): Promise<Worker | null> {
@@ -55,35 +62,73 @@ export const workerPayrollApi = {
   },
 
   // ── 달력 / 정산 ──
-  getCalendar(workerId: string, periodStart?: string): Promise<CalendarResponse> {
+  getCalendar(workerId: string, periodStart?: string, seasonId?: string): Promise<CalendarResponse> {
     return apiClient
-      .get(`/worker-payroll/workers/${workerId}/calendar`, { params: { periodStart } })
+      .get(`/worker-payroll/workers/${workerId}/calendar`, { params: { periodStart, seasonId } })
       .then((r) => r.data)
   },
-  getSettlement(workerId: string, periodStart?: string): Promise<SettlementResponse> {
+  getSettlement(workerId: string, periodStart?: string, seasonId?: string): Promise<SettlementResponse> {
     return apiClient
-      .get(`/worker-payroll/workers/${workerId}/settlement`, { params: { periodStart } })
+      .get(`/worker-payroll/workers/${workerId}/settlement`, { params: { periodStart, seasonId } })
       .then((r) => r.data)
   },
   requestSettlement(
     workerId: string,
     periodStart?: string,
     variableAmounts?: Record<string, number>,
+    seasonId?: string,
   ): Promise<unknown> {
     return apiClient
-      .post(`/worker-payroll/workers/${workerId}/settlement/request`, { periodStart, variableAmounts })
+      .post(`/worker-payroll/workers/${workerId}/settlement/request`, { periodStart, variableAmounts, seasonId })
       .then((r) => r.data)
   },
   approveSettlement(
     workerId: string,
     periodStart?: string,
     variableAmounts?: Record<string, number>,
+    seasonId?: string,
   ): Promise<unknown> {
     return apiClient
-      .post(`/worker-payroll/workers/${workerId}/settlement/approve`, { periodStart, variableAmounts })
+      .post(`/worker-payroll/workers/${workerId}/settlement/approve`, { periodStart, variableAmounts, seasonId })
       .then((r) => r.data)
   },
-  listSettlements(): Promise<SettlementHistoryItem[]> {
-    return apiClient.get('/worker-payroll/settlements').then((r) => r.data)
+  listSettlements(year?: number): Promise<SettlementHistoryItem[]> {
+    return apiClient.get('/worker-payroll/settlements', { params: { year } }).then((r) => r.data)
+  },
+
+  // ── 시즌 (재고용 · 조건 수정 · 마감) ──
+  listSeasons(workerId: string): Promise<WorkerSeason[]> {
+    return apiClient.get(`/worker-payroll/workers/${workerId}/seasons`).then((r) => r.data)
+  },
+  createSeason(workerId: string, payload: CreateSeasonPayload): Promise<SeasonBrief & { accountReactivated?: boolean }> {
+    return apiClient.post(`/worker-payroll/workers/${workerId}/seasons`, payload).then((r) => r.data)
+  },
+  updateSeason(seasonId: string, payload: UpdateSeasonPayload): Promise<SeasonBrief> {
+    return apiClient.put(`/worker-payroll/seasons/${seasonId}`, payload).then((r) => r.data)
+  },
+  closeSeason(seasonId: string): Promise<SeasonBrief> {
+    return apiClient.post(`/worker-payroll/seasons/${seasonId}/close`).then((r) => r.data)
+  },
+  reopenSeason(seasonId: string): Promise<SeasonBrief> {
+    return apiClient.post(`/worker-payroll/seasons/${seasonId}/reopen`).then((r) => r.data)
+  },
+
+  // ── 연간 결산 ──
+  getAnnual(year: number): Promise<AnnualReport> {
+    return apiClient.get('/worker-payroll/annual', { params: { year } }).then((r) => r.data)
+  },
+
+  // ── 기타 고용비용 ──
+  listExtraCosts(year: number): Promise<ExtraCost[]> {
+    return apiClient.get('/worker-payroll/extra-costs', { params: { year } }).then((r) => r.data)
+  },
+  createExtraCost(payload: SaveExtraCostPayload): Promise<ExtraCost> {
+    return apiClient.post('/worker-payroll/extra-costs', payload).then((r) => r.data)
+  },
+  updateExtraCost(id: string, payload: SaveExtraCostPayload): Promise<ExtraCost> {
+    return apiClient.put(`/worker-payroll/extra-costs/${id}`, payload).then((r) => r.data)
+  },
+  removeExtraCost(id: string): Promise<void> {
+    return apiClient.delete(`/worker-payroll/extra-costs/${id}`).then(() => undefined)
   },
 }

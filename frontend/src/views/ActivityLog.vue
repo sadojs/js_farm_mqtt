@@ -191,6 +191,9 @@ const ACTION_MAP: Record<string, { label: string; cls: string }> = {
   'group.create': { label: '생성', cls: 'create' },
   'group.update': { label: '수정', cls: 'update' },
   'env.update': { label: '설정변경', cls: 'update' },
+  'payroll.season.create': { label: '재고용', cls: 'create' },
+  'payroll.season.close': { label: '시즌 마감', cls: 'disable' },
+  'payroll.season.reopen': { label: '마감 해제', cls: 'enable' },
 }
 
 function getActionLabel(action: string) { return ACTION_MAP[action]?.label || action }
@@ -207,6 +210,10 @@ function getActionDesc(log: ActivityLogEntry): string {
   const target = log.targetName ? `"${log.targetName}"` : ''
   const typeMap: Record<string, string> = { device: '장치', rule: '설정', group: '구역', env_config: '환경설정', sensor: '측정기' }
   const typeName = typeMap[log.targetType] || log.targetType
+  if (log.targetType === 'payroll_season') {
+    const what: Record<string, string> = { 'payroll.season.create': '시작(재고용)', 'payroll.season.close': '마감', 'payroll.season.reopen': '마감 해제' }
+    return `일꾼 ${log.targetName || '시즌'} ${what[log.action] || log.action}`
+  }
   if (log.action.endsWith('.control')) return `${target} ${typeName} 제어`
   if (log.action.endsWith('.register')) return `${target} ${typeName} 등록`
   if (log.action.endsWith('.delete')) return `${target} ${typeName} 삭제`

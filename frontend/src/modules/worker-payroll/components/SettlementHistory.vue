@@ -1,7 +1,7 @@
 <template>
   <div class="history">
     <header class="hist-head">
-      <h3>정산 이력</h3>
+      <h3>{{ year ? `${year}년 ` : '' }}정산 이력</h3>
       <p class="sub">확정된 정산은 당시 시급·공제·가불이 그대로 보존됩니다 (이후 설정 변경 무관)</p>
     </header>
 
@@ -24,6 +24,7 @@
           <tr>
             <th>정산일</th>
             <th>일꾼</th>
+            <th>시즌</th>
             <th>기간</th>
             <th class="num">근무</th>
             <th class="num">지급액</th>
@@ -37,6 +38,7 @@
           <tr v-for="it in items" :key="it.id">
             <td class="strong">{{ it.settleDate }}</td>
             <td>{{ it.workerName }}</td>
+            <td class="muted">{{ it.seasonYear ?? '—' }}</td>
             <td class="muted">{{ it.periodStart }} ~ {{ it.periodEnd }}</td>
             <td class="num">{{ it.snapshot.workDays }}일 · {{ fmtH(it.snapshot.totalHours) }}h</td>
             <td class="num">{{ it.snapshot.grossPay.toLocaleString() }}</td>
@@ -50,7 +52,7 @@
         </tbody>
       </table>
     </div>
-    <p v-else class="empty">아직 정산 이력이 없습니다.</p>
+    <p v-else class="empty">{{ year ? `${year}년 ` : '아직 ' }}정산 이력이 없습니다.</p>
 
     <VariableDeductionModal
       v-if="varModal"
@@ -63,11 +65,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { SettlementHistoryItem, VariableDeductionDef } from '../types/worker-payroll.types'
 import VariableDeductionModal from './VariableDeductionModal.vue'
+import { advOf } from '../utils/payroll-utils'
+
+/** 연도(정산기간 종료일 기준) 필터 — 없으면 전체 */
+const props = defineProps<{ year?: number }>()
 
 const notify = useNotificationStore()
 const items = ref<SettlementHistoryItem[]>([])
@@ -75,14 +81,6 @@ const busyId = ref<string | null>(null)
 const varModal = ref<{ req: SettlementHistoryItem; items: VariableDeductionDef[]; month: number } | null>(null)
 
 const pending = computed(() => items.value.filter((i) => i.status === 'requested'))
-
-/** 스냅샷의 가불 합계. 구버전 스냅샷에 advanceTotal이 없으면 지급액−공제−실수령으로 역산(표시용, 데이터 변경 없음) */
-function advOf(it: SettlementHistoryItem): number {
-  const s = it.snapshot
-  const v = (s as any).advanceTotal
-  if (typeof v === 'number') return v
-  return Math.max(0, (s.grossPay ?? 0) - (s.deductionTotal ?? 0) - (it.netPay ?? 0))
-}
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
@@ -98,7 +96,7 @@ function fmtDateTime(iso: string | null): string {
 }
 
 async function load() {
-  items.value = await workerPayrollApi.listSettlements()
+  items.value = await workerPayrollApi.listSettlements(props.year)
 }
 
 async function approve(req: SettlementHistoryItem) {
@@ -133,6 +131,7 @@ function onVarSubmit(amounts: Record<string, number>) {
   if (varModal.value) doApprove(varModal.value.req, amounts)
 }
 
+watch(() => props.year, load)
 onMounted(load)
 defineExpose({ reload: load })
 </script>

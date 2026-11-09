@@ -11,8 +11,10 @@
     <div v-if="showNav" class="period-nav">
       <button class="nav-btn" :disabled="!data.prevPeriodStart" @click="go(data.prevPeriodStart)">‹</button>
       <span class="period-label">{{ shortMD(data.periodStart) }} ~ {{ shortMD(data.periodEnd) }}</span>
-      <button class="nav-btn" @click="go(data.nextPeriodStart)">›</button>
+      <button class="nav-btn" :disabled="!data.nextPeriodStart" @click="go(data.nextPeriodStart)">›</button>
     </div>
+
+    <p v-if="data.season?.closed" class="lock-note">🔒 {{ data.season.seasonYear }} {{ t(lang, 'seasonLocked') }}</p>
 
     <!-- 영수증 (확정 요청 전 전체 내역 표시) -->
     <div class="receipt">
@@ -118,6 +120,16 @@
         @click="approve"
       >{{ busy ? '…' : t(lang, 'approve') }}</button>
     </div>
+
+    <!-- 시즌 합계 (관리자) -->
+    <div v-if="seasonTotals" class="season-total">
+      <span class="st-label">{{ seasonTotals.seasonYear }} 시즌 합계 <small>({{ seasonTotals.periodCount }}개월 · 미확정 포함)</small></span>
+      <span class="st-vals">
+        <span>근무 {{ seasonTotals.workDays }}일 · {{ fmtH(seasonTotals.totalHours) }}h</span>
+        <span>지급액 <b>{{ seasonTotals.grossPay.toLocaleString() }}원</b></span>
+        <span>실수령 <b>{{ seasonTotals.netPay.toLocaleString() }}원</b></span>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -140,6 +152,10 @@ const props = defineProps<{
   lang: PayrollLang
   showNav?: boolean
   initialPeriod?: string
+  /** 보여줄 시즌 (없으면 서버 기본 시즌) */
+  seasonId?: string
+  /** 정산 탭 하단 시즌 합계 행 */
+  seasonTotals?: { seasonYear: number; periodCount: number; workDays: number; totalHours: number; grossPay: number; netPay: number } | null
 }>()
 const emit = defineEmits<{ (e: 'changed'): void; (e: 'period-change', p: string): void }>()
 const notify = useNotificationStore()
@@ -187,7 +203,7 @@ const netPreview = computed(() => {
 })
 
 async function reload() {
-  data.value = await workerPayrollApi.getSettlement(props.workerId, period.value)
+  data.value = await workerPayrollApi.getSettlement(props.workerId, period.value, props.seasonId)
   emit('period-change', data.value.periodStart)
   // 변동 입력값 초기화 (편집 가능 시 0으로)
   for (const k of Object.keys(variableInputs)) delete variableInputs[k]
@@ -203,7 +219,7 @@ function go(p: string | null) {
 async function request() {
   busy.value = true
   try {
-    await workerPayrollApi.requestSettlement(props.workerId, data.value?.periodStart)
+    await workerPayrollApi.requestSettlement(props.workerId, data.value?.periodStart, undefined, props.seasonId)
     notify.success('일꾼 관리', '정산 확정을 요청했습니다.')
     await reload()
     emit('changed')
@@ -218,7 +234,7 @@ async function approve() {
   busy.value = true
   const variableAmounts = editableVariable.value ? { ...variableInputs } : undefined
   try {
-    await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart, variableAmounts)
+    await workerPayrollApi.approveSettlement(props.workerId, data.value?.periodStart, variableAmounts, props.seasonId)
     notify.success('일꾼 관리', '정산을 승인했습니다.')
     await reload()
     emit('changed')
@@ -229,7 +245,7 @@ async function approve() {
   }
 }
 
-watch(() => props.workerId, () => { period.value = props.initialPeriod; reload() })
+watch(() => [props.workerId, props.seasonId], () => { period.value = props.initialPeriod; reload() })
 watch(() => props.initialPeriod, (p) => { if (p !== period.value) { period.value = p; reload() } })
 onMounted(reload)
 defineExpose({ reload })
@@ -345,6 +361,30 @@ function formatProrationReason(json: string | null | undefined, lng: PayrollLang
   padding: 10px 14px;
   font-size: var(--font-size-caption);
 }
+.lock-note {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+.season-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.st-label { font-weight: 800; color: var(--text-primary); }
+.st-label small { font-weight: 500; color: var(--text-muted); }
+.st-vals { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: var(--font-size-label); font-variant-numeric: tabular-nums; }
+.st-vals b { color: var(--text-primary); }
 .settle-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
 .status-chip { font-weight: 700; font-size: var(--font-size-label); }
 .status-chip.done { color: var(--success-text); }

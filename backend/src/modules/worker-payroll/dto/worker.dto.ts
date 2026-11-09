@@ -51,6 +51,11 @@ export class SaveWorkerDto {
   @IsString()
   id?: string;
 
+  /** 수정 시 근무조건·공제를 저장할 시즌. 없으면 기본 시즌(구버전 클라이언트 호환) */
+  @IsOptional()
+  @IsString()
+  seasonId?: string;
+
   @IsString()
   name: string;
 
