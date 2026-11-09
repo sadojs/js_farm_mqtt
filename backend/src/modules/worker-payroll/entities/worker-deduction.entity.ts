@@ -18,6 +18,10 @@ export class WorkerDeduction {
   @Column({ name: 'worker_id', type: 'uuid' })
   workerId: string;
 
+  /** 소속 시즌 — 시즌별 공제. NULL 은 시즌 도입 전 행(조회 시 지연 백필로 연결됨) */
+  @Column({ name: 'season_id', type: 'uuid', nullable: true })
+  seasonId: string | null;
+
   @Column({ name: 'label', type: 'varchar', length: 60 })
   label: string;
 

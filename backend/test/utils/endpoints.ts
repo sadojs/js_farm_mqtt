@@ -51,12 +51,15 @@ export const PLATFORM_ENDPOINTS: string[] = [
 const FIXED_UUID = /^(1{8}|2{8}|3{8}|a{8})-0000-4000-8000-\d{12}$/;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const ISO = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?/g;
+/** 오늘 날짜에 따라 달라지는 값 (일꾼 시즌의 '정산일 지난 미확정 건수') */
+const TODAY_DEPENDENT = /"unsettledCount":\d+/g;
 
 /** 스냅샷용 정규화: 시각·지연 생성 UUID 만 치환(고정 픽스처 UUID 는 유지해 교차 오염이 보이도록). */
 export function normalize(body: unknown): unknown {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
   const out = (text ?? 'null')
     .replace(ISO, '<datetime>')
+    .replace(TODAY_DEPENDENT, '"unsettledCount":"<today-dependent>"')
     .replace(UUID, (u) => (FIXED_UUID.test(u) ? u : '<uuid>'));
   try { return JSON.parse(out); } catch { return out; }
 }
