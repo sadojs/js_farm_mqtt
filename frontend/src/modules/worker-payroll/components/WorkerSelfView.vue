@@ -33,6 +33,18 @@
         </div>
       </header>
 
+      <!-- 시즌 선택 (지난 시즌 열람, 읽기 전용) -->
+      <div v-if="seasons.length > 1" class="season-chips" role="tablist">
+        <button
+          v-for="s in seasons"
+          :key="s.id"
+          role="tab"
+          :aria-selected="s.id === seasonId"
+          :class="['s-chip', { active: s.id === seasonId }]"
+          @click="selectSeason(s.id)"
+        >{{ s.seasonYear }} {{ t(lang, 'season') }} · {{ shortMD(s.startDate) }}~{{ s.endDate ? shortMD(s.endDate) : '' }}</button>
+      </div>
+
       <!-- 실수령 히어로 -->
       <div v-if="settlement" class="hero">
         <span class="hero-label">
@@ -51,6 +63,7 @@
       <WorkerCalendar
         :key="worker.id"
         :worker-id="worker.id"
+        :season-id="seasonId"
         :lang="lang"
         :editable="false"
         hide-kpi
@@ -63,6 +76,7 @@
         :lang="lang"
         :show-nav="false"
         :initial-period="period"
+        :season-id="seasonId"
         @changed="loadSettlement"
       />
     </template>
@@ -70,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { workerPayrollApi } from '../api/worker-payroll.api'
 import type { Worker, SettlementResponse } from '../types/worker-payroll.types'
 import { LANG_OPTIONS, type PayrollLang, t, formatMoney, shortMD } from '../i18n/payroll-i18n'
@@ -82,6 +96,15 @@ const settlement = ref<SettlementResponse | null>(null)
 const loaded = ref(false)
 const period = ref<string | undefined>(undefined)
 const lang = ref<PayrollLang>('ko')
+const seasonId = ref<string | undefined>(undefined)
+const seasons = computed(() => worker.value?.seasons ?? [])
+
+function selectSeason(id: string) {
+  if (id === seasonId.value) return
+  seasonId.value = id
+  period.value = undefined
+  loadSettlement()
+}
 
 function fmtH(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
@@ -89,7 +112,7 @@ function fmtH(n: number): string {
 
 async function loadSettlement() {
   if (!worker.value) return
-  settlement.value = await workerPayrollApi.getSettlement(worker.value.id, period.value)
+  settlement.value = await workerPayrollApi.getSettlement(worker.value.id, period.value, seasonId.value)
 }
 
 function onPeriodChange(ps: string) {
@@ -101,6 +124,7 @@ function onPeriodChange(ps: string) {
 
 onMounted(async () => {
   worker.value = await workerPayrollApi.getMe()
+  seasonId.value = worker.value?.currentSeason?.id
   loaded.value = true
   if (worker.value) await loadSettlement()
 })
@@ -130,6 +154,12 @@ onMounted(async () => {
   font-weight: 600; color: var(--text-secondary); font-size: var(--font-size-caption);
 }
 .lang-btn.active { background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-card); }
+.season-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.s-chip {
+  border: 1px solid var(--border-input); background: var(--bg-card); color: var(--text-secondary);
+  border-radius: 20px; padding: 7px 14px; cursor: pointer; font-weight: 600; font-size: var(--font-size-caption);
+}
+.s-chip.active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
 .hero {
   background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
   border-radius: 16px;

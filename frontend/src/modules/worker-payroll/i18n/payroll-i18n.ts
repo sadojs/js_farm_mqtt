@@ -53,6 +53,8 @@ type LabelKey =
   | 'clear'
   | 'advanceTotal'
   | 'fixedSalary'
+  | 'season'
+  | 'seasonLocked'
 
 export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
   ko: {
@@ -97,6 +99,8 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     clear: '지우기',
     advanceTotal: '가불 합계',
     fixedSalary: '고정 월급',
+    season: '시즌',
+    seasonLocked: '마감된 시즌 · 기록 잠금',
   },
   tl: {
     workDays: 'Araw ng trabaho',
@@ -140,6 +144,8 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     clear: 'Burahin',
     advanceTotal: 'Kabuuang paunang bayad',
     fixedSalary: 'Fixed na buwanang sahod',
+    season: 'Season',
+    seasonLocked: 'Sarado na ang season · naka-lock ang talaan',
   },
   th: {
     workDays: 'วันทำงาน',
@@ -183,6 +189,8 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     clear: 'ล้าง',
     advanceTotal: 'รวมเบิกล่วงหน้า',
     fixedSalary: 'เงินเดือนคงที่',
+    season: 'ฤดูกาล',
+    seasonLocked: 'ปิดฤดูกาลแล้ว · ล็อกบันทึก',
   },
   lo: {
     workDays: 'ມື້ເຮັດວຽກ',
@@ -226,6 +234,8 @@ export const LABELS: Record<PayrollLang, Record<LabelKey, string>> = {
     clear: 'ລ້າງ',
     advanceTotal: 'ລວມເບີກລ່ວງໜ້າ',
     fixedSalary: 'ເງິນເດືອນຄົງທີ່',
+    season: 'ລະດູການ',
+    seasonLocked: 'ປິດລະດູການແລ້ວ · ລັອກບັນທຶກ',
   },
 }
 

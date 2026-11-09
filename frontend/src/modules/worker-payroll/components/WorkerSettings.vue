@@ -29,20 +29,24 @@
       </p>
     </div>
 
+    <p v-if="readonly" class="lock-note">🔒 {{ season?.seasonYear }} 시즌은 마감되어 근무조건·공제를 바꿀 수 없습니다. 바꾸려면 시즌 헤더에서 '마감 해제'를 누르세요.</p>
+
+    <fieldset class="season-fields" :disabled="readonly">
     <!-- ② 근무조건 -->
     <div class="card">
-      <h3 class="card-title">② 근무조건</h3>
+      <h3 class="card-title">② <template v-if="season">{{ season.seasonYear }} 시즌 </template>근무조건</h3>
+      <p v-if="season" class="hint">이 시즌에만 적용됩니다. 지난 시즌의 정산·기록은 바뀌지 않습니다.</p>
       <div class="grid2">
         <label v-if="workerId" class="field">
           <span>이름</span>
           <input v-model="form.name" class="inp" placeholder="일꾼 이름" />
         </label>
         <label class="field">
-          <span>근무시작일</span>
+          <span>{{ season ? '시작일 (입국일)' : '근무시작일' }}</span>
           <input v-model="form.startDate" type="date" class="inp" />
         </label>
         <label class="field">
-          <span>퇴사일</span>
+          <span>{{ season ? '종료일 (귀국일)' : '퇴사일' }}</span>
           <div class="end-date-row">
             <input
               v-model="form.endDate"
@@ -52,7 +56,7 @@
             />
             <button v-if="form.endDate" type="button" class="btn-ghost-sm" @click="form.endDate = ''" title="퇴사일 지우기">✕</button>
           </div>
-          <span class="hint inline">비워두면 재직 중</span>
+          <span class="hint inline">비워두면 근무 중</span>
         </label>
         <label class="field">
           <span>기본 근무시간 (시간/일)</span>
@@ -139,6 +143,7 @@
         <button class="btn-add" @click="form.variableDeductions.push({ label: '' })">+ 변동 항목 추가</button>
       </div>
     </div>
+    </fieldset>
 
     <!-- ④ 가불 내역 -->
     <div class="card">
@@ -176,7 +181,7 @@
 
     <div class="actions">
       <button v-if="workerId" class="btn-danger" @click="$emit('delete')">일꾼 삭제</button>
-      <button class="btn-save" :disabled="saving" @click="save">{{ saving ? '저장 중…' : '저장' }}</button>
+      <button class="btn-save" :disabled="saving || readonly" @click="save">{{ saving ? '저장 중…' : '저장' }}</button>
     </div>
   </div>
 </template>
@@ -185,11 +190,16 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '../../../stores/notification.store'
 import { workerPayrollApi } from '../api/worker-payroll.api'
-import type { Worker, Advance } from '../types/worker-payroll.types'
+import type { Worker, Advance, WorkerSeason } from '../types/worker-payroll.types'
 import { useConfirm } from '../../../composables/useConfirm'
 const { confirm: confirmDialog } = useConfirm()
 
-const props = defineProps<{ workerId: string | null }>()
+const props = defineProps<{
+  workerId: string | null
+  /** 편집할 시즌 (없으면 서버 기본 시즌) — 근무조건·공제는 시즌 단위 */
+  season?: WorkerSeason | null
+}>()
+const readonly = computed(() => !!props.season?.closed)
 const emit = defineEmits<{ (e: 'saved', worker: Worker): void; (e: 'delete'): void }>()
 
 const notify = useNotificationStore()
@@ -286,16 +296,18 @@ async function load() {
     return
   }
   const w = await workerPayrollApi.getWorker(props.workerId)
+  // 선택한 시즌이 있으면 그 시즌의 조건·공제, 없으면 기본 시즌(= 일꾼 응답의 미러 값)
+  const src = props.season ?? w
   form.name = w.name
   form.phone = w.phone ?? ''
-  form.startDate = w.startDate.slice(0, 10)
-  form.endDate = w.endDate ? w.endDate.slice(0, 10) : ''
-  form.salaryType = w.salaryType ?? 'hourly'
-  form.hourlyWage = w.hourlyWage
-  form.fixedMonthlySalary = w.fixedMonthlySalary ?? 0
-  form.settlementCycleType = w.settlementCycleType ?? 'calendar_month'
-  form.dailyHours = Number(w.dailyHours)
-  const deds = w.deductions ?? []
+  form.startDate = src.startDate.slice(0, 10)
+  form.endDate = src.endDate ? src.endDate.slice(0, 10) : ''
+  form.salaryType = src.salaryType ?? 'hourly'
+  form.hourlyWage = src.hourlyWage
+  form.fixedMonthlySalary = src.fixedMonthlySalary ?? 0
+  form.settlementCycleType = src.settlementCycleType ?? 'calendar_month'
+  form.dailyHours = Number(src.dailyHours)
+  const deds = (props.season ? props.season.deductions : w.deductions) ?? []
   form.fixedDeductions = deds
     .filter((d) => (d.kind ?? 'fixed') !== 'variable')
     .map((d) => ({ id: d.id, label: d.label, amount: d.amount, prorate: d.prorate !== false }))
@@ -307,7 +319,7 @@ async function load() {
   defaultExpandLatest()
 }
 
-watch(() => props.workerId, load)
+watch(() => [props.workerId, props.season?.id], load)
 onMounted(load)
 
 async function save() {
@@ -338,6 +350,7 @@ async function save() {
   try {
     const saved = await workerPayrollApi.saveWorker({
       id: props.workerId ?? undefined,
+      seasonId: props.workerId ? props.season?.id : undefined,
       name: form.name.trim(),
       username: isNew ? form.username.trim() : undefined,
       password: isNew ? form.password : undefined,
@@ -421,6 +434,17 @@ async function removeAdvance(id: string) {
 
 <style scoped>
 .worker-settings { display: flex; flex-direction: column; gap: 16px; }
+.season-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.season-fields:disabled { opacity: 0.7; }
+.lock-note {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);

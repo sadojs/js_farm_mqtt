@@ -36,11 +36,121 @@ export interface Worker {
   accountUserId?: string | null
   username?: string | null
   deductions: Deduction[]
+  /** 시즌(고용 기간) — 구버전 서버 응답에는 없을 수 있음 */
+  seasons?: SeasonBrief[]
+  currentSeason?: SeasonBrief
+  lastSeasonYear?: number
+  inYear?: boolean
+}
+
+/** 시즌 = 한 번의 고용 기간 (근무조건·공제를 가짐) */
+export interface SeasonBrief {
+  id: string
+  seasonYear: number
+  startDate: string
+  endDate: string | null
+  salaryType: SalaryType
+  hourlyWage: number
+  fixedMonthlySalary: number
+  dailyHours: number
+  settlementCycleType: SettlementCycleType
+  note: string | null
+  closed: boolean
+  closedAt: string | null
+  /** 정산일이 지났는데 확정되지 않은 기간 수 (목록 응답에만) */
+  unsettledCount?: number
+}
+
+/** GET workers/:id/seasons — 시즌 + 공제 + 요약 */
+export interface WorkerSeason extends SeasonBrief {
+  isCurrent: boolean
+  deductions: Deduction[]
+  summary: {
+    workDays: number
+    totalHours: number
+    grossPay: number
+    netPay: number
+    confirmedGrossPay: number
+    confirmedNetPay: number
+    unsettledCount: number
+    periodCount: number
+  }
+}
+
+export interface CreateSeasonPayload {
+  startDate: string
+  endDate?: string | null
+  salaryType?: SalaryType
+  hourlyWage: number
+  fixedMonthlySalary?: number
+  dailyHours: number
+  settlementCycleType?: SettlementCycleType
+  note?: string
+  copyDeductionsFromSeasonId?: string
+  deductions?: Deduction[]
+}
+
+export type UpdateSeasonPayload = Partial<Omit<CreateSeasonPayload, 'copyDeductionsFromSeasonId'>>
+
+/** 마감 실패(409 SEASON_UNSETTLED) 시 남은 정산기간 */
+export interface UnsettledPeriod {
+  periodStart: string
+  periodEnd: string
+  settleDate: string
+  status: 'open' | 'pending' | 'requested'
+}
+
+export interface AnnualReport {
+  year: number
+  totals: {
+    grossPay: number
+    deductionTotal: number
+    advanceTotal: number
+    netPay: number
+    cashOut: number
+    workDays: number
+    totalHours: number
+    headcount: number
+    extraCostTotal: number
+    totalCost: number
+  }
+  monthly: { month: number; grossPay: number; deductionTotal: number; advanceTotal: number; netPay: number }[]
+  byWorker: {
+    workerId: string
+    workerName: string
+    seasonId: string | null
+    seasonYear: number
+    seasonStart: string | null
+    seasonEnd: string | null
+    workDays: number
+    totalHours: number
+    grossPay: number
+    deductionTotal: number
+    advanceTotal: number
+    netPay: number
+    share: number
+  }[]
+  deductionsByLabel: { label: string; amount: number }[]
+  unsettled: {
+    count: number
+    estimatedNetPay: number
+    items: {
+      workerId: string
+      workerName: string
+      periodStart: string
+      settleDate: string
+      status: 'open' | 'pending' | 'requested'
+      estimatedNetPay: number
+    }[]
+  }
+  previousYear: { year: number; grossPay: number; netPay: number; headcount: number } | null
 }
 
 /** 신규 등록 시 username/password 포함, 수정 시 근무조건만 */
 export interface SaveWorkerPayload {
   id?: string
+  /** 수정 시 근무조건·공제를 저장할 시즌 (없으면 기본 시즌) */
+  seasonId?: string
   name: string
   username?: string
   password?: string
@@ -77,7 +187,8 @@ export interface PeriodMeta {
   periodStart: string
   periodEnd: string
   settleDate: string
-  nextPeriodStart: string
+  /** 시즌의 마지막 기간이면 null */
+  nextPeriodStart: string | null
   prevPeriodStart: string | null
 }
 
@@ -102,6 +213,7 @@ export interface CalendarResponse extends PeriodMeta {
     grossPay: number
   }
   days: CalendarDay[]
+  season?: SeasonBrief
 }
 
 export type SettlementStatus = 'open' | 'pending' | 'requested' | 'confirmed'
@@ -128,6 +240,9 @@ export interface SettlementResponse extends PeriodMeta {
   canRequest: boolean
   canApprove: boolean
   variableDeductions: VariableDeductionDef[]
+  season?: SeasonBrief
+  seasonId?: string
+  seasonYear?: number
 }
 
 export interface SettlementHistoryItem {
@@ -142,4 +257,5 @@ export interface SettlementHistoryItem {
   requestedAt: string | null
   confirmedAt: string | null
   snapshot: SettlementResponse
+  seasonYear?: number
 }
