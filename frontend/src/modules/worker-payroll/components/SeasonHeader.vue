@@ -10,9 +10,12 @@
           </span>
         </div>
       </div>
+      <span class="sh-right">
       <span v-if="selected?.closed" class="sh-badge closed">🔒 {{ selected.seasonYear }} 시즌 마감 완료 · 기록 잠금</span>
       <span v-else-if="selected?.endDate" class="sh-badge ended">귀국 {{ md(selected.endDate) }}</span>
       <span v-else-if="selected" class="sh-badge active">근무 중</span>
+      <button class="btn-del" title="일꾼 삭제" @click="$emit('delete')">일꾼 삭제</button>
+      </span>
     </div>
 
     <!-- 시즌 칩 -->
@@ -103,6 +106,7 @@ const emit = defineEmits<{
   (e: 'select', seasonId: string): void
   (e: 'rehire'): void
   (e: 'changed'): void
+  (e: 'delete'): void
 }>()
 
 const notify = useNotificationStore()
@@ -186,6 +190,12 @@ async function reopen() {
   gap: 12px;
 }
 .sh-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sh-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn-del {
+  border: 1px solid var(--border-input); background: var(--bg-card); color: var(--text-muted);
+  border-radius: 8px; padding: 4px 10px; font-size: var(--font-size-caption); font-weight: 600; cursor: pointer;
+}
+.btn-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
 .sh-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .sh-avatar {
   width: 40px; height: 40px; border-radius: 50%;

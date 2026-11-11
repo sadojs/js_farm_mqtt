@@ -116,6 +116,7 @@
               @select="selectSeason"
               @rehire="openRehire(selectedWorker.id, (selectedWorker.lastSeasonYear ?? thisYear) + 1)"
               @changed="refreshSelected"
+              @delete="onDelete"
             />
 
             <div class="tabs">
@@ -154,6 +155,14 @@
         </section>
       </div>
 
+      <DeleteWorkerModal
+        v-if="deleting"
+        :worker-id="deleting.id"
+        :worker-name="deleting.name"
+        @close="deleting = null"
+        @deleted="onDeleted"
+      />
+
       <RehireModal
         v-if="rehire"
         :worker="rehire.worker"
@@ -182,6 +191,7 @@ import SettlementHistory from './components/SettlementHistory.vue'
 import SeasonHeader from './components/SeasonHeader.vue'
 import RehireModal from './components/RehireModal.vue'
 import AnnualReport from './components/AnnualReport.vue'
+import DeleteWorkerModal from './components/DeleteWorkerModal.vue'
 
 const authStore = useAuthStore()
 const notify = useNotificationStore()
@@ -201,6 +211,7 @@ const lang = ref<PayrollLang>('ko')
 const year = ref<number>(readYear())
 const seasonDetails = ref<WorkerSeason[]>([])
 const selectedSeasonId = ref<string | null>(null)
+const deleting = ref<{ id: string; name: string } | null>(null)
 const rehire = ref<{ worker: Worker; lastSeason: WorkerSeason | null; targetYear: number } | null>(null)
 
 function readYear(): number {
@@ -344,20 +355,21 @@ async function onSaved(worker: Worker) {
   await loadSeasons(!isNew)
 }
 
-async function onDelete() {
-  if (!selectedId.value) return
-  if (!confirm('이 일꾼을 삭제할까요? (근무·정산 기록은 보존됩니다)')) return
-  try {
-    await workerPayrollApi.removeWorker(selectedId.value)
-    notify.info('일꾼 관리', '일꾼을 삭제했습니다.')
-    selectedId.value = null
-    creating.value = false
-    seasonDetails.value = []
-    selectedSeasonId.value = null
-    await loadWorkers()
-  } catch {
-    notify.error('일꾼 관리', '삭제에 실패했습니다.')
-  }
+/** 삭제 — 목록에서만(기록 유지) / 기록까지 완전 삭제 중 선택하는 팝업 */
+function onDelete() {
+  const w = selectedWorker.value
+  if (w) deleting.value = { id: w.id, name: w.name }
+}
+
+async function onDeleted() {
+  deleting.value = null
+  selectedId.value = null
+  creating.value = false
+  seasonDetails.value = []
+  selectedSeasonId.value = null
+  await loadWorkers()
+  const first = yearWorkers.value[0] ?? workers.value[0]
+  if (first) await select(first.id)
 }
 
 onMounted(async () => {

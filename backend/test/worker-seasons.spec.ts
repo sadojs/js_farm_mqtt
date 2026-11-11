@@ -233,4 +233,85 @@ describe('일꾼 시즌 (재고용 · 마감)', () => {
     const [ded] = await t.ds.query('select season_id from payroll_deductions where worker_id = $1', [res.body.id]);
     expect(ded.season_id).toBe(season.id);
   });
+
+  describe('일꾼 삭제 — 목록에서만 숨김 / 기록까지 완전 삭제', () => {
+    const ACC = 'aaaaaaaa-0000-4000-8000-0000000000d1';
+    const mk = async (wid: string, name: string, withAccount = false) => {
+      if (withAccount) {
+        await t.ds.query(
+          `insert into users (id, username, password_hash, name, role, parent_user_id, status, created_at, updated_at)
+           values ($1,'f1purgeacct','x','삭제계정','farm_user',$2,'active',now(),now())`,
+          [ACC, USERS.f1.id],
+        );
+      }
+      if (withAccount) {
+        await t.ds.query(
+          `insert into refresh_tokens (id, "userId", "tokenHash", "expiresAt", "createdAt") values (gen_random_uuid(), $1, 'h-purge', now() + interval '7 days', now())`,
+          [ACC],
+        );
+      }
+      await t.ds.query(
+        `insert into payroll_workers (id, user_id, account_user_id, name, start_date, end_date, hourly_wage, daily_hours, created_at, updated_at)
+         values ($1,$2,$3,$4,'2025-03-01','2025-04-30',10000,8,now(),now())`,
+        [wid, USERS.f1.id, withAccount ? ACC : null, name],
+      );
+      await t.ds.query(
+        `insert into payroll_advances (id, user_id, worker_id, date, amount, created_at, updated_at) values (gen_random_uuid(),$1,$2,'2025-03-10',30000,now(),now())`,
+        [USERS.f1.id, wid],
+      );
+      const r = await http().post(`/api/worker-payroll/workers/${wid}/settlement/approve`).set('Authorization', as('f1')).send({ periodStart: '2025-03-01' });
+      expect(r.status).toBe(201);
+    };
+    const count = async (table: string, wid: string) =>
+      (await t.ds.query(`select count(*)::int n from ${table} where worker_id = $1`, [wid]))[0].n;
+
+    it('기록 건수 안내 → 목록에서만 삭제: 목록에서 빠지고 기록·연간 결산은 유지, 로그인 계정 비활성', async () => {
+      const H = id(1, 120);
+      await mk(H, 'F1-숨김일꾼', true);
+      const sum = await http().get(`/api/worker-payroll/workers/${H}/records-summary`).set('Authorization', as('f1'));
+      expect(sum.body).toMatchObject({ name: 'F1-숨김일꾼', seasons: 1, settlements: 1, confirmedSettlements: 1, advances: 1, hasAccount: true });
+
+      const res = await http().delete(`/api/worker-payroll/workers/${H}`).set('Authorization', as('f1'));
+      expect(res.body).toMatchObject({ ok: true, purged: false, account: 'deactivated' });
+      const list = await http().get('/api/worker-payroll/workers').set('Authorization', as('f1'));
+      expect(list.body.find((w: any) => w.id === H)).toBeUndefined();
+      expect(await count('payroll_settlements', H)).toBe(1);
+      expect(await count('payroll_advances', H)).toBe(1);
+      const annual = await http().get('/api/worker-payroll/annual?year=2025').set('Authorization', as('f1'));
+      expect(annual.body.byWorker.some((w: any) => w.workerId === H)).toBe(true);
+      const [acct] = await t.ds.query('select status from users where id = $1', [ACC]);
+      expect(acct.status).toBe('inactive');
+      // 비활성화 시 로그인 유지 토큰도 폐기 (이전엔 컬럼명 오류로 조용히 실패했음)
+      expect(await t.ds.query('select id from refresh_tokens where "userId"::text = $1', [ACC])).toHaveLength(0);
+    });
+
+    it('기록까지 완전 삭제(purge=true): 시즌·정산·가불·근무조정·기타비용·일꾼·계정 모두 삭제, 연간 결산에서도 빠짐', async () => {
+      const P = id(1, 121);
+      await mk(P, 'F1-완전삭제');
+      await http().post(`/api/worker-payroll/workers/${P}/day`).set('Authorization', as('f1')).send({ date: '2025-03-05', status: 'off' });
+      await http().post('/api/worker-payroll/extra-costs').set('Authorization', as('f1')).send({ year: 2025, workerId: P, label: '항공권', amount: 500000 });
+      // 다른 일꾼의 기록은 그대로여야 함
+      const otherBefore = await count('payroll_settlements', W);
+
+      const res = await http().delete(`/api/worker-payroll/workers/${P}?purge=true`).set('Authorization', as('f1'));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ purged: true, deleted: { settlements: 1, advances: 1, dayOverrides: 1, extraCosts: 1, seasons: 1 } });
+      for (const tb of ['payroll_settlements', 'payroll_advances', 'payroll_day_overrides', 'payroll_deductions', 'payroll_extra_costs', 'payroll_worker_seasons']) {
+        expect(await count(tb, P)).toBe(0);
+      }
+      expect(await t.ds.query('select id from payroll_workers where id = $1', [P])).toHaveLength(0);
+      expect(await count('payroll_settlements', W)).toBe(otherBefore);
+      const annual = await http().get('/api/worker-payroll/annual?year=2025').set('Authorization', as('f1'));
+      expect(annual.body.byWorker.some((w: any) => w.workerId === P)).toBe(false);
+      const [log] = await t.ds.query(`select action from activity_logs where target_id::text = $1`, [P]);
+      expect(log.action).toBe('payroll.worker.purge');
+    });
+
+    it('권한: 다른 농장·농장 사용자는 삭제·건수 조회 불가', async () => {
+      expect((await http().delete(`/api/worker-payroll/workers/${W}?purge=true`).set('Authorization', as('f2'))).status).toBe(403);
+      expect((await http().get(`/api/worker-payroll/workers/${W}/records-summary`).set('Authorization', as('f2'))).status).toBe(403);
+      expect((await http().delete(`/api/worker-payroll/workers/${W}`).set('Authorization', as('u1'))).status).toBe(403);
+      expect(await t.ds.query('select id from payroll_workers where id = $1', [W])).toHaveLength(1);
+    });
+  });
 });

@@ -637,10 +637,74 @@ export class WorkerPayrollService {
     }
   }
 
-  async removeWorker(ownerId: string, id: string) {
+  /** 삭제 전 안내용 — 이 일꾼에 남아 있는 기록 건수 */
+  async workerRecordSummary(ownerId: string, id: string) {
     const worker = await this.findOwnedWorker(ownerId, id);
-    worker.isActive = false;
-    await this.workerRepo.save(worker);
+    const [row] = await this.dataSource.query(
+      `SELECT
+         (SELECT COUNT(*) FROM payroll_worker_seasons WHERE worker_id = $1)::int AS seasons,
+         (SELECT COUNT(*) FROM payroll_settlements WHERE worker_id = $1)::int AS settlements,
+         (SELECT COUNT(*) FROM payroll_settlements WHERE worker_id = $1 AND status = 'confirmed')::int AS "confirmedSettlements",
+         (SELECT COUNT(*) FROM payroll_advances WHERE worker_id = $1)::int AS advances,
+         (SELECT COUNT(*) FROM payroll_day_overrides WHERE worker_id = $1)::int AS "dayOverrides",
+         (SELECT COUNT(*) FROM payroll_extra_costs WHERE worker_id = $1)::int AS "extraCosts"`,
+      [worker.id],
+    );
+    return { workerId: worker.id, name: worker.name, hasAccount: !!worker.accountUserId, ...row };
+  }
+
+  /**
+   * 일꾼 삭제.
+   * - 기본(purge=false): 목록에서만 숨김 — 근무·가불·정산 기록은 그대로(연간 결산에도 계속 포함), 재고용 시 복구.
+   * - purge=true: 이 일꾼의 기록을 DB 에서 영구 삭제(시즌·공제·근무조정·가불·정산·일꾼 지정 기타비용).
+   * 두 경우 모두 일꾼 로그인 계정은 더 쓸 수 없게 한다(완전 삭제 시 계정도 삭제, 동작 이력이 있으면 비활성화).
+   */
+  async removeWorker(ownerId: string, id: string, purge = false) {
+    const worker = await this.findOwnedWorker(ownerId, id);
+    if (!purge) {
+      worker.isActive = false;
+      await this.workerRepo.save(worker);
+      const account = await this.deactivateAccount(worker.accountUserId);
+      return { purged: false, account };
+    }
+
+    const deleted = await this.dataSource.transaction(async (m) => {
+      const del = async (table: string) =>
+        (await m.query(`DELETE FROM ${table} WHERE worker_id = $1`, [worker.id]))[1] ?? 0;
+      const counts = {
+        settlements: await del('payroll_settlements'),
+        advances: await del('payroll_advances'),
+        dayOverrides: await del('payroll_day_overrides'),
+        deductions: await del('payroll_deductions'),
+        extraCosts: await del('payroll_extra_costs'),
+        seasons: await del('payroll_worker_seasons'),
+      };
+      await m.delete(Worker, { id: worker.id });
+      return counts;
+    });
+
+    let account: 'none' | 'removed' | 'deactivated' = 'none';
+    if (worker.accountUserId) {
+      try {
+        await this.usersService.remove(worker.accountUserId);
+        account = 'removed';
+      } catch {
+        // 동작 이력이 있는 계정은 삭제할 수 없음(이력 보존) → 비활성화
+        account = (await this.deactivateAccount(worker.accountUserId)) === 'none' ? 'none' : 'deactivated';
+      }
+    }
+    return { purged: true, deleted, account };
+  }
+
+  /** 일꾼 로그인 계정 비활성화 (재고용 시 reactivateAccount 로 복구) */
+  private async deactivateAccount(accountUserId: string | null): Promise<'none' | 'deactivated'> {
+    if (!accountUserId) return 'none';
+    const [row] = await this.dataSource.query('SELECT status FROM users WHERE id = $1', [accountUserId]);
+    if (!row) return 'none';
+    if (row.status !== 'inactive') {
+      await this.usersService.update(accountUserId, { status: 'inactive' } as any);
+    }
+    return 'deactivated';
   }
 
   // ──── 가불 ────

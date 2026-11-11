@@ -14,6 +14,7 @@ import type {
   AnnualReport,
   ExtraCost,
   SaveExtraCostPayload,
+  WorkerRecordSummary,
 } from '../types/worker-payroll.types'
 
 export const workerPayrollApi = {
@@ -31,8 +32,12 @@ export const workerPayrollApi = {
   saveWorker(payload: SaveWorkerPayload): Promise<Worker> {
     return apiClient.post('/worker-payroll/workers', payload).then((r) => r.data)
   },
-  removeWorker(id: string): Promise<void> {
-    return apiClient.delete(`/worker-payroll/workers/${id}`).then(() => undefined)
+  /** purge=false: 목록에서만 삭제(기록 유지) / true: 기록까지 DB 에서 영구 삭제 */
+  removeWorker(id: string, purge = false): Promise<void> {
+    return apiClient.delete(`/worker-payroll/workers/${id}`, { params: purge ? { purge: true } : undefined }).then(() => undefined)
+  },
+  getRecordSummary(id: string): Promise<WorkerRecordSummary> {
+    return apiClient.get(`/worker-payroll/workers/${id}/records-summary`).then((r) => r.data)
   },
 
   // ── 가불 ──

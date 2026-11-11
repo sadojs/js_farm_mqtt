@@ -84,11 +84,33 @@ export class WorkerPayrollController {
     return this.service.saveWorker(this.ownerId(user), dto);
   }
 
-  @Delete('workers/:id')
-  async removeWorker(@CurrentUser() user: any, @Param('id') id: string) {
+  /** 삭제 전 안내 — 남아 있는 기록 건수 */
+  @Get('workers/:id/records-summary')
+  workerRecordSummary(@CurrentUser() user: any, @Param('id') id: string) {
     this.assertManager(user);
-    await this.service.removeWorker(this.ownerId(user), id);
-    return { ok: true };
+    return this.service.workerRecordSummary(this.ownerId(user), id);
+  }
+
+  /** 일꾼 삭제 — 기본은 목록에서만 숨김(기록 유지), ?purge=true 면 기록까지 영구 삭제 */
+  @Delete('workers/:id')
+  async removeWorker(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Query('purge') purge?: string,
+  ) {
+    this.assertManager(user);
+    const summary = await this.service.workerRecordSummary(this.ownerId(user), id);
+    const result = await this.service.removeWorker(this.ownerId(user), id, purge === 'true');
+    this.activityLog.log({
+      userId: user.id,
+      userName: user.name || user.username,
+      action: result.purged ? 'payroll.worker.purge' : 'payroll.worker.delete',
+      targetType: 'payroll_worker',
+      targetId: id,
+      targetName: summary.name,
+      details: { menu: '일꾼 관리', ...result },
+    });
+    return { ok: true, ...result };
   }
 
   // ──── 가불 ────

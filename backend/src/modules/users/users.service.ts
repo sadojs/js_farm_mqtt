@@ -151,7 +151,7 @@ export class UsersService {
    * (이전: 로그인·토큰 갱신 때만 상태를 봐서 비활성화 후에도 열린 접속과 최대 15분짜리 토큰이 계속 유효)
    */
   private async revokeSessions(userId: string) {
-    await this.dataSource.query('DELETE FROM refresh_tokens WHERE user_id::text = $1', [userId]).catch(() => undefined);
+    await this.dataSource.query('DELETE FROM refresh_tokens WHERE "userId"::text = $1', [userId]).catch(() => undefined);
     this.eventEmitter.emit('user.sessions.revoked', { userId });
   }
 

@@ -260,6 +260,19 @@ export interface SettlementHistoryItem {
   seasonYear?: number
 }
 
+/** 삭제 안내용 기록 건수 */
+export interface WorkerRecordSummary {
+  workerId: string
+  name: string
+  hasAccount: boolean
+  seasons: number
+  settlements: number
+  confirmedSettlements: number
+  advances: number
+  dayOverrides: number
+  extraCosts: number
+}
+
 /** 기타 고용비용 (항공권·비자 등) — 연간 결산 총 고용비용에 합산 */
 export interface ExtraCost {
   id: string
