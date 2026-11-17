@@ -110,7 +110,9 @@ describe('농장 이름 · 계정 보호', () => {
 
   describe('자동화 날씨 조건 — 구역을 소유한 농장의 날씨만', () => {
     it('농장1 구역의 weather 매핑은 농장2 의 더 최신 날씨가 아니라 농장1 날씨를 읽는다', async () => {
-      // 시드: 농장1 날씨 11℃(00:00:01), 농장2 날씨 12℃(00:00:02, 더 최신)
+      // 자동 제어는 최근(3시간 이내) 날씨만 쓴다 → 현재 시각 기준으로 넣는다: 농장1 11℃, 농장2 12℃(더 최신)
+      await t.ds.query(`insert into weather_data (time, user_id, temperature, humidity) values (now() - interval '2 minutes', $1, 11, 60)`, [USERS.f1.id]);
+      await t.ds.query(`insert into weather_data (time, user_id, temperature, humidity) values (now() - interval '1 minute', $1, 12, 60)`, [USERS.f2.id]);
       await t.ds.query(
         `insert into env_mappings (id, group_id, role_key, source_type, weather_field, created_at, updated_at)
          values ($1,$2,'outdoor_temp','weather','temperature',now(),now())`,

@@ -15,6 +15,9 @@ import { RainOverrideService } from '../rain-override/rain-override.service';
  * - 우선순위: 비(우적) > 고온. 비 감지 중이면 항상 false.
  * - 기본 OFF: highTempOverrideEnabled=false 면 즉시 false → 기존 개폐기 동작 그대로.
  */
+/** 오래된 온도값으로 고온 판정하지 않는다 (자동화 실행기와 같은 기준) */
+const SENSOR_MAX_AGE_MIN = Number(process.env.AUTOMATION_SENSOR_MAX_AGE_MIN) || 20;
+
 @Injectable()
 export class HighTempOverrideService {
   private readonly logger = new Logger(HighTempOverrideService.name);
@@ -105,6 +108,7 @@ export class HighTempOverrideService {
     const roleRows = await this.dataSource.query(`
       SELECT (SELECT sd.value FROM sensor_data sd
               WHERE sd.device_id = em.device_id AND sd.sensor_type = em.sensor_type
+                AND sd.time > now() - make_interval(mins => ${SENSOR_MAX_AGE_MIN})
               ORDER BY sd.time DESC LIMIT 1) AS value
       FROM env_mappings em
       WHERE em.group_id = CAST($1 AS uuid) AND em.role_key = 'internal_temp'
@@ -118,6 +122,7 @@ export class HighTempOverrideService {
       JOIN devices d ON d.id = sd.device_id
       LEFT JOIN gateways g ON g.id::text = d.gateway_id
       WHERE sd.sensor_type = 'temperature'
+        AND sd.time > now() - make_interval(mins => ${SENSOR_MAX_AGE_MIN})
         AND (d.id IN (SELECT gd.device_id FROM group_devices gd WHERE gd.group_id = CAST($1 AS uuid))
              OR g.group_id = CAST($1 AS uuid))
       ORDER BY sd.time DESC LIMIT 1

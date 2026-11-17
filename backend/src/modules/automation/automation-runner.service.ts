@@ -14,6 +14,14 @@ import { isGatewayLatched } from '../../common/emergency/emergency-latch';
 
 type LogicOp = 'AND' | 'OR';
 
+/**
+ * 자동 제어가 믿는 센서값의 최대 나이. 이보다 오래된 값은 '없음'으로 본다
+ * (센서가 죽은 뒤 마지막 값으로 며칠씩 제어하던 문제). Pi 폴백의 센서 타임아웃(1200초)과 같은 기준.
+ */
+const SENSOR_MAX_AGE_MIN = Number(process.env.AUTOMATION_SENSOR_MAX_AGE_MIN) || 20;
+/** 기상청 날씨값(1시간 주기 수집)의 최대 나이 */
+const WEATHER_MAX_AGE_MIN = Number(process.env.AUTOMATION_WEATHER_MAX_AGE_MIN) || 180;
+
 /** 수동 우회 또는 아직 유효한 타이머·방재가 걸린 장비 — 룰이 건드리지 않는다 */
 export function isManuallyHeld(settings: any): boolean {
   if (!settings) return false;
@@ -26,7 +34,9 @@ export class AutomationRunnerService {
   private readonly logger = new Logger(AutomationRunnerService.name);
 
   // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase, hysteresisAction }
-  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold'; cycleAnchorMs?: number; directionStartMs?: number }>();
+  private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold'; cycleAnchorMs?: number; directionStartMs?: number; targetIds?: string[] }>();
+  /** 센서 끊김으로 멈춘 룰 — 같은 알림을 반복하지 않기 위한 표시 */
+  private readonly staleNotified = new Set<string>();
 
   constructor(
     @InjectRepository(AutomationRule)
@@ -147,6 +157,14 @@ export class AutomationRunnerService {
       if (settings.userOverride && !timerActive) { settings.userOverride = false; changed = true; }
       if (settings.ruleIntendedState != null) { settings.ruleIntendedState = null; changed = true; }
       // 룰 disable 시: 이 룰이 켜 둔 장비는 실제 OFF 발행 후 sticky 정리 + switchState=false → UI 즉시 반영
+      const heldByOther = !rule.enabled ? this.otherActiveRuleFor(dev.id, rule.id) : null;
+      if (heldByOther && settings.switchState) {
+        // 다른 룰이 켜 두고 있는 장비 — 끄지 않고 소유만 넘긴다
+        settings.relayActiveRuleId = heldByOther;
+        dev.deviceSettings = settings;
+        await this.devicesRepo.save(dev).catch(() => undefined);
+        continue;
+      }
       if (!rule.enabled && !timerActive) {
         await this.turnOffIfRuleOwned(dev, rule, settings);
       }
@@ -250,22 +268,38 @@ export class AutomationRunnerService {
     }
 
     const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
+    const isOpener = await this.isOpenerRule(rule);
 
-    if (!conditionResult.matched) {
+    // 히스테리시스 '유지' 구간(켜는 기준과 끄는 기준 사이): 켜져 있던 장비는 그대로 둔다.
+    // (이전: 유지 구간을 '조건 불충족'으로 처리해 켜는 기준 바로 아래에서 꺼졌다 — 히스테리시스 무력화.)
+    // 개폐기는 유지 구간에서 멈추는 것이 맞으므로 제외.
+    let holdAsOn = false;
+    if (!conditionResult.matched && !isOpener && this.isHysteresisHold(conditionResult.details)) {
+      const wasOn = this.lastState.get(rule.id)?.matched || (await this.ruleOwnsRunningDevice(rule));
+      if (!wasOn) {
+        return { executed: false, reason: 'hysteresis_hold_idle', details: conditionResult.details };
+      }
+      holdAsOn = true;
+    }
+
+    if (!conditionResult.matched && !holdAsOn) {
       // 룰 active → inactive 전환: 대상 device의 relayActivePhase 해제 + switchState=false
       const prev = this.lastState.get(rule.id);
       if (prev?.matched) {
         await this.clearRelayActivePhase(rule).catch(err =>
           this.logger.warn(`relayActivePhase 해제 실패: ${err.message}`)
         );
+        await this.notifyIfSensorStale(rule).catch(() => undefined);
       }
       this.lastState.delete(rule.id);
       return { executed: false, reason: 'conditions_not_met', details: conditionResult.details };
     }
+    this.staleNotified.delete(rule.id);
 
     // 릴레이 모드 체크: 조건이 매칭된 시간 범위 내에서 ON/OFF 사이클 실행
     // 히스테리시스(방향: on=열기, off=닫기)를 먼저 산출 — 사이클 anchor/10분 캡의 세션 경계 판정용.
-    const hysteresisAction = this.extractHysteresisAction(conditionResult.details);
+    const hysteresisAction = holdAsOn ? 'on' : this.extractHysteresisAction(conditionResult.details);
+    const targetIds = this.extractTargetDeviceIds(rule);
     const prevRelay = this.lastState.get(rule.id);
     const nowMs = evaluatedAt.getTime();
     // 새 세션 = 최초 매칭이거나 방향이 바뀐 경우 → 사이클 anchor / 10분 타이머 리셋.
@@ -279,7 +313,7 @@ export class AutomationRunnerService {
       // 활성이면, 동작/대기 듀티의 대기(off) phase 를 생략하고 연속 '열림'을 유지한다.
       // (10분 캡은 아래에서 그대로 적용 — 완전 개방 후 정지.)
       if (hysteresisAction === 'on'
-        && await this.isOpenerRule(rule)
+        && isOpener
         && await this.highTempOverride.isActive(rule.groupId)) {
         relayResult.isOnPhase = true;
       }
@@ -291,8 +325,7 @@ export class AutomationRunnerService {
       // 비-페어 device(예: 유동팬)에서 hysteresisAction='off'는 룰 종료로 간주.
       // (페어 device는 'off' 시 반대 방향으로 라우팅하지만 단일 device는 그냥 stop)
       if (hysteresisAction === 'off') {
-        const isOpenerRule = await this.isOpenerRule(rule);
-        if (!isOpenerRule) {
+        if (!isOpener) {
           const wasActive = this.lastState.get(rule.id)?.matched === true;
           // 항상 clearRelayActivePhase 호출 — backend 재시작으로 lastState 캐시가 비어있어도
           // device.deviceSettings.relayActivePhase가 남아있으면 정리 (내부에서 idempotent)
@@ -336,8 +369,37 @@ export class AutomationRunnerService {
       // 펄스 방향이 바뀌었을 때(예: 열기 → 닫기)만 logsRepo.save 호출.
       // 같은 활성 사이클 내의 30s ON ↔ 60s OFF 펄스 토글은 발행은 하되 로그는 생략.
       const isNewActivation = !prev?.matched || directionChanged;
-      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction, cycleAnchorMs, directionStartMs });
+      this.lastState.set(rule.id, { matched: true, relayOnPhase: relayResult.isOnPhase, hysteresisAction, cycleAnchorMs, directionStartMs, targetIds });
       return this.executeRelayAction(rule, relayResult, hysteresisAction, isNewActivation);
+    }
+
+    // 주기 없는 히스테리시스 룰: 끄는 기준 이하로 내려가면 이 룰이 켠 장비를 끈다.
+    // (이전: 방향을 보지 않고 액션을 그대로 실행 → 낮은 값에서 ON 을 다시 보내고, 꺼지는 경로가 없었다.)
+    const actionCommand = (Array.isArray(rule.actions) ? rule.actions[0] : rule.actions)?.command;
+    if (hysteresisAction === 'off' && !isOpener && actionCommand !== 'off') {
+      const wasActive = this.lastState.get(rule.id)?.matched === true || (await this.ruleOwnsRunningDevice(rule));
+      await this.clearRelayActivePhase(rule).catch(err =>
+        this.logger.warn(`룰 종료 처리 실패: ${err.message}`)
+      );
+      this.lastState.delete(rule.id);
+      if (wasActive) {
+        await this.logsRepo.save(
+          this.logsRepo.create({
+            ruleId: rule.id,
+            userId: rule.userId,
+            success: true,
+            conditionsMet: {
+              ...conditionResult.details,
+              ruleName: rule.name,
+              hysteresisAction: 'off',
+              equipmentType: (rule.actions as any)?.equipmentType || null,
+              deactivated: true,
+            },
+            actionsExecuted: { deviceNames: [], command: 'off' },
+          }),
+        ).catch(err => this.logger.warn(`룰 종료 로그 저장 실패: ${err?.message ?? err}`));
+      }
+      return { executed: false, reason: 'hysteresis_off' };
     }
 
     // 일반 자동화: 이미 조건 충족 중이면 중복 실행 방지
@@ -345,7 +407,7 @@ export class AutomationRunnerService {
     if (prev?.matched) {
       return { executed: false, reason: 'already_active' };
     }
-    this.lastState.set(rule.id, { matched: true });
+    this.lastState.set(rule.id, { matched: true, hysteresisAction, targetIds });
 
     const actionResults: any[] = [];
     let success = true;
@@ -356,6 +418,10 @@ export class AutomationRunnerService {
       for (const action of actions) {
         const executed = await this.executeAction(rule, action);
         actionResults.push(executed);
+      }
+      // 히스테리시스 룰이 켠 장비에 '이 룰이 켰다'는 표시를 남긴다 → 끄는 기준에서 이 룰이 끌 수 있다.
+      if (hysteresisAction === 'on' && actionCommand !== 'off') {
+        await this.markRuleOwnership(rule, actionResults).catch(() => undefined);
       }
 
       // 대상 장비가 전부 수동/타이머/방재로 건너뛰어졌으면 '한 번 실행' 조건을 소진하지 않고,
@@ -697,6 +763,7 @@ export class AutomationRunnerService {
       JOIN devices d ON d.id = sd.device_id
       LEFT JOIN gateways g ON g.id::text = d.gateway_id
       WHERE sd.user_id = $1::uuid
+        AND sd.time > now() - make_interval(mins => ${SENSOR_MAX_AGE_MIN})
       ${groupFilter}
       ${houseFilter}
       ORDER BY sd.sensor_type, sd.time DESC
@@ -734,6 +801,7 @@ export class AutomationRunnerService {
         value
       FROM sensor_data
       WHERE device_id = ANY($1)
+        AND time > now() - make_interval(mins => ${SENSOR_MAX_AGE_MIN})
       ORDER BY device_id, sensor_type, time DESC
       `,
       [deviceIds],
@@ -762,6 +830,7 @@ export class AutomationRunnerService {
       SELECT em.role_key,
         (SELECT sd.value FROM sensor_data sd
          WHERE sd.device_id = em.device_id AND sd.sensor_type = em.sensor_type
+           AND sd.time > now() - make_interval(mins => ${SENSOR_MAX_AGE_MIN})
          ORDER BY sd.time DESC LIMIT 1) as value
       FROM env_mappings em
       WHERE em.group_id = $1 AND em.source_type = 'sensor'
@@ -792,6 +861,7 @@ export class AutomationRunnerService {
         `SELECT temperature, humidity, precipitation, wind_speed
          FROM weather_data
          WHERE user_id::text = (SELECT user_id::text FROM house_groups WHERE id::text = $1)
+           AND time > now() - make_interval(mins => ${WEATHER_MAX_AGE_MIN})
          ORDER BY time DESC LIMIT 1`,
         [groupId],
       );
@@ -1034,6 +1104,85 @@ export class AutomationRunnerService {
     return dev?.equipmentType === 'opener_open' || dev?.equipmentType === 'opener_close';
   }
 
+  /**
+   * 히스테리시스 '유지' 구간인가 — 유지(hold) 조건을 충족으로 치면 룰 전체가 성립하고,
+   * 실제로 유지 조건이 하나 이상 있을 때.
+   */
+  private isHysteresisHold(details: any): boolean {
+    if (!Array.isArray(details?.groups)) return false;
+    let anyHold = false;
+    const groupResults = details.groups.map((g: any) => {
+      const results = (g.conditions || []).map((c: any) => {
+        if (c.hysteresisAction === 'hold') { anyHold = true; return true; }
+        return !!c.matched;
+      });
+      return g.logic === 'OR' ? results.some(Boolean) : results.every(Boolean);
+    });
+    if (!anyHold) return false;
+    return details.logic === 'OR' ? groupResults.some(Boolean) : groupResults.every(Boolean);
+  }
+
+  /** 이 룰이 켜 둔 장비가 아직 켜져 있는가 (서버 재시작으로 메모리 상태가 비어도 유지 구간을 이어가기 위해) */
+  private async ruleOwnsRunningDevice(rule: AutomationRule): Promise<boolean> {
+    for (const id of this.extractTargetDeviceIds(rule)) {
+      const dev = await this.devicesRepo.findOne({ where: { id } });
+      const s: any = dev?.deviceSettings;
+      if (s?.switchState === true && s.relayActiveRuleId === rule.id) return true;
+    }
+    return false;
+  }
+
+  /** 주기 없는 히스테리시스 룰이 켠 장비에 소유 표시(relayActiveRuleId) — 다른 필드는 건드리지 않는다 */
+  private async markRuleOwnership(rule: AutomationRule, actionResults: any[]): Promise<void> {
+    const ids = actionResults
+      .flatMap((r: any) => r?.devices || [])
+      .filter((d: any) => d?.success && !d.skipped && d.deviceId)
+      .map((d: any) => d.deviceId as string);
+    for (const id of new Set<string>(ids)) {
+      await this.devicesRepo.query(
+        `UPDATE devices SET device_settings = jsonb_set(COALESCE(device_settings, '{}'::jsonb), '{relayActiveRuleId}', to_jsonb($2::text)) WHERE id::text = $1`,
+        [id, rule.id],
+      );
+    }
+  }
+
+  /** 같은 장비를 지금 켜 두고 있는 다른 룰 (있으면 이 룰이 끝나도 끄지 않고 소유만 넘긴다) */
+  private otherActiveRuleFor(deviceId: string, exceptRuleId: string): string | null {
+    for (const [ruleId, st] of this.lastState) {
+      if (ruleId === exceptRuleId || !st.matched || st.hysteresisAction === 'off') continue;
+      if (st.targetIds?.includes(deviceId)) return ruleId;
+    }
+    return null;
+  }
+
+  /** 룰이 멈춘 이유가 센서 끊김이면 한 번 알린다 */
+  private async notifyIfSensorStale(rule: AutomationRule): Promise<void> {
+    if (this.staleNotified.has(rule.id)) return;
+    const sensorIds = [...new Set<string>(
+      ((rule.conditions as any)?.groups || [])
+        .flatMap((g: any) => g.conditions || [])
+        .map((c: any) => c.sensor_device_id)
+        .filter(Boolean),
+    )];
+    if (sensorIds.length === 0) return;
+    const rows: Array<{ id: string; name: string }> = await this.dataSource.query(
+      `SELECT d.id::text AS id, d.name FROM devices d
+       WHERE d.id::text = ANY($1)
+         AND NOT EXISTS (SELECT 1 FROM sensor_data sd WHERE sd.device_id = d.id
+                         AND sd.time > now() - make_interval(mins => $2))`,
+      [sensorIds, SENSOR_MAX_AGE_MIN],
+    );
+    if (rows.length === 0) return;
+    this.staleNotified.add(rule.id);
+    const names = rows.map((r) => r.name).join(', ');
+    this.logger.warn(`[stale-sensor] ${rule.name}: ${names} 값이 ${SENSOR_MAX_AGE_MIN}분 넘게 없음 → 자동 제어 중지`);
+    this.eventsGateway.sendNotification(rule.userId, {
+      type: 'warning',
+      title: '⚠️ 자동 제어 중지',
+      message: `측정기(${names}) 값이 ${SENSOR_MAX_AGE_MIN}분 넘게 들어오지 않아 "${rule.name}" 자동 제어를 멈추고 장비를 껐습니다. 측정기를 확인해 주세요.`,
+    });
+  }
+
   private extractHysteresisAction(details: any): 'on' | 'off' | 'hold' | undefined {
     if (!details?.groups) return undefined;
     for (const g of details.groups) {
@@ -1134,6 +1283,18 @@ export class AutomationRunnerService {
         // 타이머는 사용자가 시간제로 건 독립 의도(만료/취소로만 해제) — 여기서 userOverride 를
         // 지우면 다음 틱에 러너가 장치를 다시 잡아 '타이머 중 자동화룰 동작' 버그가 발생한다.
         if (settings.overrideUntil && new Date(settings.overrideUntil).getTime() > Date.now()) {
+          continue;
+        }
+        // 같은 장비를 다른 룰이 지금 켜 두고 있으면 끄지 않고 소유만 넘긴다
+        // (이전: 룰 하나가 끝나면 장비를 꺼 버리고, 아직 유효한 다른 룰은 다시 켜지 않았다.)
+        const other = this.otherActiveRuleFor(t.id, rule.id);
+        if (other && settings.switchState) {
+          if (settings.relayActiveRuleId !== other) {
+            settings.relayActiveRuleId = other;
+            t.deviceSettings = settings;
+            await this.devicesRepo.save(t);
+          }
+          this.logger.log(`[rule-end] ${rule.name} 종료 — ${t.name} 은 다른 룰이 가동 중이라 유지`);
           continue;
         }
         if (settings.relayActivePhase || settings.switchState
