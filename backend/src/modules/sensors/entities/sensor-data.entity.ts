@@ -5,13 +5,13 @@ export class SensorData {
   @PrimaryColumn({ type: 'timestamptz' })
   time: Date;
 
-  @Column({ name: 'device_id', type: 'uuid' })
+  @PrimaryColumn({ name: 'device_id', type: 'uuid' })
   deviceId: string;
 
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'sensor_type' })
+  @PrimaryColumn({ name: 'sensor_type' })
   sensorType: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 4 })
