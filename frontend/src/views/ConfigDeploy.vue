@@ -798,7 +798,7 @@ onMounted(() => {
   gap: 0.75rem; margin-top: 1rem;
 }
 .component-card {
-  background: var(--card-bg, #fff);
+  background: var(--bg-card);
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 6px;
@@ -840,7 +840,7 @@ onMounted(() => {
 
 .workflow-box {
   display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;
-  background: var(--card-bg, #fff);
+  background: var(--bg-card);
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px; padding: 1rem;
 }

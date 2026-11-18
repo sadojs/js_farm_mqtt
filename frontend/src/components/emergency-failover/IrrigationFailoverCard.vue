@@ -36,7 +36,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .card {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
@@ -46,11 +46,11 @@ const emit = defineEmits<{
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: calc(14px * var(--content-scale, 1)); font-weight: 500; }
 .form-group input {
-  padding: 8px; border: 1px solid var(--border-color, #ccc);
+  padding: 8px; border: 1px solid var(--border-input); background: var(--bg-input); color: var(--text-primary);
   border-radius: 6px; font-size: calc(14px * var(--content-scale, 1));
 }
 .hint {
-  background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
+  background: var(--bg-hover); padding: 8px 12px; border-radius: 6px;
   font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); margin: 8px 0 0 0;
 }
 </style>

@@ -26,7 +26,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .card {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
@@ -34,7 +34,7 @@ const emit = defineEmits<{
 .toggle-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
 .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .hint {
-  background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
+  background: var(--bg-hover); padding: 8px 12px; border-radius: 6px;
   font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); margin: 8px 0 0 0;
 }
 </style>

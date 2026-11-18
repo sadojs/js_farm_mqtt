@@ -89,7 +89,7 @@ function fmt(d: string | null | undefined) {
   font-weight: 600; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
 }
 .status-card {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
@@ -102,13 +102,13 @@ function fmt(d: string | null | undefined) {
 .badge-fallback { background: #ffebee; color: #c62828; }
 .badge-unknown { background: #eceff1; color: #546e7a; }
 .warn { color: var(--warning, #f57c00); }
-.synced { color: var(--success, #2e7d32); }
+.synced { color: var(--success-text); }
 .btn-secondary, .btn-danger {
   padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
   border: 1px solid transparent;
 }
 .btn-secondary {
-  background: var(--card-bg, #fff); color: var(--text, #333);
+  background: var(--bg-card); color: var(--text-primary);
   border-color: var(--border-color, #ccc);
 }
 .btn-danger { background: var(--danger, #d32f2f); color: #fff; }

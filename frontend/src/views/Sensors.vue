@@ -674,7 +674,7 @@ onUnmounted(() => {
   height: 60px;
   flex-shrink: 0;
 }
-.score-ring .ring-center {
+.score-ring :deep(.ring-center) {
   position: absolute;
   inset: 0;
   display: flex;
@@ -684,11 +684,12 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
-.score-ring .ring-center.good { color: #2e7d32; }
-.score-ring .ring-center.warn { color: #b45309; }
-.score-ring .ring-center.danger { color: #b71c1c; }
-.score-ring .ring-center.unset { color: var(--text-muted); }
-.score-ring .ring-number {
+/* ScoreRing 은 render 함수로 만든 하위 요소라 scoped 속성이 붙지 않는다 → :deep 필수 (없으면 숫자가 링 밖 왼쪽 아래로 밀림) */
+.score-ring :deep(.ring-center.good) { color: var(--success-text); }
+.score-ring :deep(.ring-center.warn) { color: var(--warning-text); }
+.score-ring :deep(.ring-center.danger) { color: var(--danger-badge-text); }
+.score-ring :deep(.ring-center.unset) { color: var(--text-muted); }
+.score-ring :deep(.ring-number) {
   font-size: calc(20px * var(--content-scale, 1));
   line-height: 1;
 }

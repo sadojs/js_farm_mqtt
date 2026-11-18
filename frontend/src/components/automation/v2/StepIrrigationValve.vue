@@ -165,7 +165,7 @@ const fertWarnings = computed<string[]>(() => {
 .step-sub { color: var(--text-secondary, #666); margin: 0; font-size: calc(13px * var(--content-scale, 1)); }
 
 .section-block {
-  background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e5e5e5);
+  background: var(--bg-card); border: 1px solid var(--border-color, #e5e5e5);
   border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
 }
 .section-label { font-weight: 600; font-size: calc(14px * var(--content-scale, 1)); color: var(--text, #1f2937); }
@@ -184,7 +184,7 @@ const fertWarnings = computed<string[]>(() => {
   padding: 10px 12px;
   transition: background 0.15s;
 }
-.valve-row.active { background: var(--card-bg, #fff); border-color: #4caf50; }
+.valve-row.active { background: var(--bg-card); border-color: #4caf50; }
 /* 명시적 색상 — 다크 배경/테마에서도 가독성 보장 */
 .zone-label {
   font-weight: 700; font-size: calc(14px * var(--content-scale, 1));
@@ -206,7 +206,7 @@ const fertWarnings = computed<string[]>(() => {
 .toggle-btn {
   padding: 6px 16px; border-radius: 16px;
   border: 1px solid var(--border-color, #ccc);
-  background: var(--card-bg, #fff); color: var(--text-secondary, #666);
+  background: var(--bg-card); color: var(--text-secondary, #666);
   font-weight: 600; cursor: pointer; min-width: 60px;
   transition: all 0.15s;
 }

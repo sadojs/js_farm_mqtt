@@ -322,7 +322,7 @@ function fmt(d: string | null) {
 .gw-select { display: flex; flex-direction: column; gap: 4px; }
 .gw-select select {
   padding: 8px; border-radius: 6px;
-  border: 1px solid var(--border-color, #ccc); min-width: 240px;
+  border: 1px solid var(--border-input); background: var(--bg-input); color: var(--text-primary); min-width: 240px;
 }
 
 .loading, .error { padding: 32px; text-align: center; color: var(--text-secondary, #666); }
@@ -341,7 +341,7 @@ function fmt(d: string | null) {
 }
 
 .card {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
@@ -354,16 +354,16 @@ function fmt(d: string | null) {
 .events-table code { font-size: calc(11px * var(--content-scale, 1)); }
 .badge-event {
   padding: 2px 8px; border-radius: 8px; font-size: calc(11px * var(--content-scale, 1));
-  background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555);
+  background: var(--bg-hover); color: var(--text-secondary, #555);
 }
 .badge-event.badge-danger { background: #ffebee; color: #c62828; }
 .badge-event.badge-warning { background: #fff3e0; color: #ef6c00; }
 .badge-event.badge-info { background: #e3f2fd; color: #1565c0; }
 .badge-event.badge-success { background: #e8f5e9; color: #2e7d32; }
-.badge-event.badge-neutral { background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555); }
+.badge-event.badge-neutral { background: var(--bg-hover); color: var(--text-secondary, #555); }
 
-.info-card { background: #f0f4f8; border-color: #b0bec5; }
-.info-card p { margin: 0 0 8px 0; line-height: 1.6; font-size: calc(14px * var(--content-scale, 1)); color: #37474f; }
+.info-card { background: var(--bg-hover); border-color: var(--border-color); }
+.info-card p { margin: 0 0 8px 0; line-height: 1.6; font-size: calc(14px * var(--content-scale, 1)); color: var(--text-secondary); }
 .info-card ul { margin: 8px 0 0 20px; padding: 0; font-size: calc(13px * var(--content-scale, 1)); color: #455a64; line-height: 1.7; }
 .info-card code { background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 4px; font-size: calc(12px * var(--content-scale, 1)); }
 
@@ -371,7 +371,7 @@ function fmt(d: string | null) {
 .btn-primary {
   padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
   border: 1px solid transparent;
-  background: var(--primary, #4caf50); color: #fff;
+  background: var(--accent); color: #fff;
 }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 

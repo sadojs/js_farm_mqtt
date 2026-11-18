@@ -75,7 +75,7 @@ const scheduleByMonth = computed(() => {
 
 <style scoped>
 .card {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   padding: 16px 20px; margin-bottom: 16px;
   border: 1px solid var(--border-color, #e5e5e5);
 }
@@ -86,7 +86,7 @@ const scheduleByMonth = computed(() => {
   border-radius: 6px; padding: 2px 8px;
 }
 .hint {
-  background: var(--info-bg, #f0f4f8); padding: 8px 12px; border-radius: 6px;
+  background: var(--bg-hover); padding: 8px 12px; border-radius: 6px;
   font-size: calc(13px * var(--content-scale, 1)); color: var(--text-secondary, #555); line-height: 1.5;
 }
 .toggle-row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -95,7 +95,7 @@ const scheduleByMonth = computed(() => {
 .month-card {
   border: 1px solid var(--border-color, #ddd); border-radius: 8px;
   padding: 12px 8px; cursor: pointer; text-align: center;
-  background: var(--card-bg, #fff); color: var(--text, #333);
+  background: var(--bg-card); color: var(--text-primary);
   transition: transform 0.1s, box-shadow 0.1s;
 }
 .month-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.06); }

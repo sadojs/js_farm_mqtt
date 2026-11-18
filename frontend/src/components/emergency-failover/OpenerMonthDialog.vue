@@ -102,7 +102,7 @@ function save() {
   display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
 .modal {
-  background: var(--card-bg, #fff); border-radius: 12px;
+  background: var(--bg-card); border-radius: 12px;
   width: 90%; max-width: 420px; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0,0,0,0.15);
 }
@@ -123,11 +123,11 @@ function save() {
 .radio-row label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
 .time-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 input[type="time"] {
-  padding: 8px; border: 1px solid var(--border-color, #ccc);
+  padding: 8px; border: 1px solid var(--border-input); background: var(--bg-input); color: var(--text-primary);
   border-radius: 6px; font-size: calc(14px * var(--content-scale, 1));
 }
 .hint {
-  background: var(--info-bg, #f0f4f8); color: var(--text-secondary, #555);
+  background: var(--bg-hover); color: var(--text-secondary, #555);
   padding: 8px 12px; border-radius: 6px; font-size: calc(13px * var(--content-scale, 1)); margin: 0;
 }
 .modal-footer {
@@ -138,9 +138,9 @@ input[type="time"] {
   padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: calc(14px * var(--content-scale, 1));
   border: 1px solid transparent;
 }
-.btn-primary { background: var(--primary, #4caf50); color: #fff; }
+.btn-primary { background: var(--accent); color: #fff; }
 .btn-secondary {
-  background: var(--card-bg, #fff); color: var(--text, #333);
+  background: var(--bg-card); color: var(--text-primary);
   border-color: var(--border-color, #ccc);
 }
 </style>
