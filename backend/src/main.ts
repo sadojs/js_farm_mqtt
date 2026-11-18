@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import * as helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
@@ -9,7 +10,11 @@ import { acquireInstanceLock } from './common/instance-lock';
 async function bootstrap() {
   // 자동제어·스케줄러 중복 실행 방지 — 다른 인스턴스가 돌고 있으면 기다렸다가, 끝내 안 되면 기동 중단
   await acquireInstanceLock();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // nginx(frontend/admin-console)가 앞에 있어 모든 요청이 프록시 IP 로 보였다 → 요청 제한(/auth/login 10회/분 등)이
+  // 모든 사용자에게 공유되어 한 명의 실패가 다른 사용자를 잠갔다. 사설망·루프백 프록시가 보낸 X-Forwarded-For 만 믿는다
+  // (인터넷에서 직접 들어온 요청이 헤더를 위조해도 무시됨).
+  app.set('trust proxy', process.env.TRUST_PROXY || 'loopback, linklocal, uniquelocal');
   const logger = new Logger('Bootstrap');
 
   app.use((helmet as any).default ? (helmet as any).default() : (helmet as any)());
