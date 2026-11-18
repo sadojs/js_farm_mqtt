@@ -21,12 +21,25 @@ import { DevicesService } from '../devices/devices.service';
  *
  * 비 종료 동작: Option B — 자동제어 룰 자연 재평가 (FR-07)
  */
+/** 우적센서 신호가 이 시간(분) 넘게 없으면 센서 이상으로 보고 '비 감지'를 해제한다 (센서는 최대 ~60초마다 재발행) */
+const RAIN_STALE_MIN = Number(process.env.RAIN_SIGNAL_MAX_AGE_MIN) || 30;
+/** 비가 와도 구역 내부온도가 이 값(°C) 이상이면 닫지 않고 환기를 우선한다. 0 이면 사용 안 함 */
+const CRITICAL_HEAT_C = process.env.RAIN_CRITICAL_TEMP_C !== undefined ? Number(process.env.RAIN_CRITICAL_TEMP_C) : 40;
+/** 치명 고온 해제 여유(°C) — 경계에서 열림/닫힘이 반복되지 않도록 */
+const CRITICAL_HEAT_CLEAR_MARGIN_C = 2;
+/** 온도값 유효 시간(분) — automation-runner 와 같은 기준 */
+const TEMP_MAX_AGE_MIN = Number(process.env.AUTOMATION_SENSOR_MAX_AGE_MIN) || 20;
+
 @Injectable()
 export class RainOverrideService {
   private readonly logger = new Logger(RainOverrideService.name);
 
   /** groupId → rain detected */
   private rainState = new Map<string, boolean>();
+  /** groupId → 우적센서 신호(true/false 무관)를 마지막으로 받은 시각(ms) — 센서 끊김 판정 */
+  private rainSeenAt = new Map<string, number>();
+  /** groupId → 치명 고온으로 비 닫힘을 양보 중 */
+  private criticalHeat = new Map<string, boolean>();
   /**
    * deviceId → 최근 원신호(rain true/false). 토글(비감지자동제어) 상태와 무관하게 항상 갱신.
    * 재활성화(ON) 시 다음 센서 재발행(최대 60s)을 기다리지 않고 현재 비 여부를 즉시 판단하는 용도.
@@ -80,7 +93,9 @@ export class RainOverrideService {
   private async handleZoneRainChange(groupId: string, rainDetected: boolean) {
     const prevRain = this.rainState.get(groupId) ?? false;
     this.rainState.set(groupId, rainDetected);
+    this.rainSeenAt.set(groupId, Date.now());
     if (prevRain === rainDetected) return;
+    if (!rainDetected) this.criticalHeat.set(groupId, false);
 
     if (rainDetected) {
       this.userOverride.set(groupId, false); // 새 비 이벤트는 처음부터
@@ -110,7 +125,8 @@ export class RainOverrideService {
     if (!groupId) return false;
     const rain = this.rainState.get(groupId) ?? false;
     const userOverridden = this.userOverride.get(groupId) ?? false;
-    return rain && !userOverridden;
+    const heatYield = this.criticalHeat.get(groupId) ?? false;
+    return rain && !userOverridden && !heatYield;
   }
 
   /** controlDevice: 사용자(자동제어 아닌) 호출 시 — suppress 활성화 */
@@ -218,6 +234,91 @@ export class RainOverrideService {
   }
 
   /**
+   * 1분마다: ① 우적센서 신호가 끊겼으면 '비 감지'를 해제(계속 닫힌 채 방치 방지)
+   *          ② 비 감지 중 구역 내부온도가 치명 고온이면 닫힘을 양보(작물 보호), 내려가면 복귀.
+   */
+  @Cron('*/30 * * * * *')
+  async tickSafety() {
+    const now = Date.now();
+    for (const [groupId, raining] of [...this.rainState]) {
+      if (!raining) continue;
+      const seen = this.rainSeenAt.get(groupId) ?? 0;
+      if (now - seen > RAIN_STALE_MIN * 60_000) {
+        await this.expireStaleRain(groupId).catch((e) => this.logger.warn(`rain stale 처리 실패: ${e?.message}`));
+        continue;
+      }
+      if (CRITICAL_HEAT_C > 0) {
+        await this.evaluateCriticalHeat(groupId).catch((e) => this.logger.warn(`critical heat 판정 실패: ${e?.message}`));
+      }
+    }
+  }
+
+  private async expireStaleRain(groupId: string) {
+    this.rainState.set(groupId, false);
+    this.userOverride.set(groupId, false);
+    this.criticalHeat.set(groupId, false);
+    this.closeCycles.delete(groupId);
+    this.logger.warn(`🛰 구역 ${groupId} 우적센서 신호 ${RAIN_STALE_MIN}분 넘게 없음 → 비 감지 해제(센서 이상)`);
+    this.eventsGateway.broadcastRainOverride?.({ groupId, rainDetected: false, userOverride: false });
+    const ownerId = await this.getZoneOwnerUserId(groupId);
+    if (!ownerId) return;
+    await this.activityLog.log({
+      userId: ownerId, userName: 'system', action: 'device.rain_override.sensor_lost',
+      targetType: 'group', targetId: groupId,
+      details: { menu: '비 감지 우회', reason: `우적센서 신호 ${RAIN_STALE_MIN}분 이상 없음`, },
+    }).catch(() => undefined);
+    this.eventsGateway.sendNotification(ownerId, {
+      type: 'warning',
+      title: '⚠️ 우적센서 신호 끊김',
+      message: `우적센서 신호가 ${RAIN_STALE_MIN}분 넘게 들어오지 않아 '비 감지' 상태를 해제하고 개폐기를 자동 제어로 돌렸습니다. 센서를 확인해 주세요.`,
+    });
+  }
+
+  private async evaluateCriticalHeat(groupId: string) {
+    const temp = await this.getZoneTemperature(groupId);
+    const yielding = this.criticalHeat.get(groupId) ?? false;
+    if (!yielding && temp != null && temp >= CRITICAL_HEAT_C) {
+      this.criticalHeat.set(groupId, true);
+      this.closeCycles.delete(groupId);
+      this.logger.warn(`🔥 구역 ${groupId} 비 감지 중이지만 내부온도 ${temp}°C ≥ ${CRITICAL_HEAT_C}°C → 닫힘 양보(환기 우선)`);
+      this.eventsGateway.broadcastRainOverride?.({ groupId, rainDetected: true, userOverride: this.userOverride.get(groupId) ?? false });
+      const ownerId = await this.getZoneOwnerUserId(groupId);
+      if (ownerId) {
+        await this.activityLog.log({
+          userId: ownerId, userName: 'system', action: 'device.rain_override.heat_yield',
+          targetType: 'group', targetId: groupId,
+          details: { menu: '비 감지 우회', temperature: temp, limit: CRITICAL_HEAT_C },
+        }).catch(() => undefined);
+        this.eventsGateway.sendNotification(ownerId, {
+          type: 'warning',
+          title: '🔥 치명 고온 — 환기 우선',
+          message: `비가 오고 있지만 내부온도가 ${temp}°C(기준 ${CRITICAL_HEAT_C}°C)라 개폐기 닫힘을 멈추고 자동 제어(환기)로 돌렸습니다.`,
+        });
+      }
+    } else if (yielding && (temp == null || temp < CRITICAL_HEAT_C - CRITICAL_HEAT_CLEAR_MARGIN_C)) {
+      this.criticalHeat.set(groupId, false);
+      this.logger.log(`🌧 구역 ${groupId} 온도 ${temp ?? '값없음'} → 비 감지 닫힘 복귀`);
+      this.eventsGateway.broadcastRainOverride?.({ groupId, rainDetected: true, userOverride: this.userOverride.get(groupId) ?? false });
+      if (this.rainState.get(groupId)) await this.startCloseCycle(groupId, 'heat-cleared');
+    }
+  }
+
+  /** 구역 대표 내부온도 — 최근 TEMP_MAX_AGE_MIN 분 값만 */
+  private async getZoneTemperature(groupId: string): Promise<number | null> {
+    const rows = await this.dataSource.query(`
+      SELECT (SELECT sd.value FROM sensor_data sd
+              WHERE sd.device_id = em.device_id AND sd.sensor_type = em.sensor_type
+                AND sd.time > now() - make_interval(mins => ${TEMP_MAX_AGE_MIN})
+              ORDER BY sd.time DESC LIMIT 1) AS value
+      FROM env_mappings em
+      WHERE em.group_id = CAST($1 AS uuid) AND em.role_key = 'internal_temp'
+        AND em.source_type = 'sensor' AND em.device_id IS NOT NULL AND em.sensor_type IS NOT NULL
+      LIMIT 1
+    `, [groupId]);
+    return rows[0]?.value != null ? Number(rows[0].value) : null;
+  }
+
+  /**
    * 우적센서 device 의 rain-override 를 즉시 해제 — '비감지자동제어' OFF 토글 시 호출.
    * 진행 중이던 닫힘 듀티사이클(closeCycles)을 종료하고 rainState 를 클리어해 자동제어로
    * 즉시 복귀시킨다. (handleRainSignal 의 disabled-return 은 '새 이벤트 차단'만 하므로
@@ -231,6 +332,7 @@ export class RainOverrideService {
       const hadCycle = this.closeCycles.delete(m.groupId);
       this.rainState.set(m.groupId, false);
       this.userOverride.set(m.groupId, false);
+      this.criticalHeat.set(m.groupId, false);
       if (hadCycle) {
         this.logger.log(`🛑 구역 ${m.groupId} 비감지자동제어 OFF → 닫힘 사이클 즉시 종료(자동제어 복귀)`);
       }
