@@ -127,4 +127,66 @@ describe('자동 제어 — 히스테리시스 · 룰 충돌 · 센서 신선도
     await run(r); // (run 이 mock 기록을 비운다) 다음 평가에서는 같은 알림을 다시 보내지 않음
     expect(notify.mock.calls.filter((c) => String((c[1] as any)?.title).includes('자동 제어 중지'))).toHaveLength(0);
   });
+
+  describe('R5 개폐기 — 온습도계 끊김 시 월별 시간표(백업)', () => {
+    const OPEN = id(1, 42);
+    const GW = 'f1-gw';
+    const mkOpenerRule = async (rid: string) => {
+      await t.ds.query(
+        `insert into automation_rules (id,user_id,group_id,name,rule_type,enabled,conditions,actions,priority,created_at,updated_at)
+         values ($1,$2,$3,'개폐기룰','weather',true,$4,$5,1,now(),now())`,
+        [rid, USERS.f1.id, id(1, 10),
+          JSON.stringify({ logic: 'AND', groups: [{ logic: 'AND', conditions: [
+            { type: 'sensor', field: 'temperature', operator: 'gte', value: 30, deviation: 2, ...relay, sensor_device_id: SENSOR }] }], target: {} }),
+          JSON.stringify({ targetDeviceId: OPEN, targetDeviceIds: [OPEN], equipmentType: 'opener_open', sensorDeviceIds: [SENSOR] })],
+      );
+      return t.ds.getRepository(AutomationRule).findOneByOrFail({ id: rid });
+    };
+    const setSchedule = async (mode: string, openTime: string | null, closeTime: string | null, enabled = true) => {
+      const month = new Date().getMonth() + 1;
+      await t.ds.query(`insert into fallback_configs (gateway_id) values ($1) on conflict do nothing`, [GW]);
+      await t.ds.query(`delete from fallback_opener_schedule where gateway_id=$1`, [GW]);
+      await t.ds.query(
+        `insert into fallback_opener_schedule (gateway_id, month, enabled, mode, open_time, close_time) values ($1,$2,$3,$4,$5,$6)`,
+        [GW, month, enabled, mode, openTime, closeTime],
+      );
+    };
+    const pubTo = () => ((t.mqtt.controlDevice as jest.Mock)?.mock?.calls ?? []).map((c: any[]) => `${c[1]}:${JSON.stringify(c[2])}`);
+
+    it('센서 끊김 + 열림 시간대 → 열림, 알림 1회', async () => {
+      await setSchedule('always-open', null, null);
+      await setVal('temperature', 20, 3 * 3_600_000); // 3시간 전 값만 있음 = 끊김
+      const r = await mkOpenerRule(id(1, 210));
+      const notify = jest.spyOn(t.app.get(EventsGateway), 'sendNotification');
+      await run(r);
+      // 개폐기 인터록: 반대(닫힘) OFF → 열림 ON
+      expect(pubTo()).toEqual(['F1-개폐기닫힘:{"state":"OFF"}', 'F1-개폐기열림:{"state":"ON"}']);
+      expect(notify.mock.calls.filter((c) => String((c[1] as any)?.title).includes('시간표'))).toHaveLength(1);
+    });
+
+    it('센서 끊김 + 시간표 꺼짐 → 아무것도 하지 않는다', async () => {
+      await setSchedule('always-open', null, null, false);
+      await setVal('temperature', 20, 3 * 3_600_000);
+      const r = await mkOpenerRule(id(1, 211));
+      expect((await run(r)).published).toEqual([]);
+    });
+
+    it('센서 정상이면 시간표를 쓰지 않는다 (온도 20 ≤ 28 → 시간표가 열림이어도 닫힘)', async () => {
+      await setSchedule('always-open', null, null);
+      await setVal('temperature', 20);
+      const r = await mkOpenerRule(id(1, 212));
+      await run(r);
+      expect(pubTo()).toEqual(['F1-개폐기열림:{"state":"OFF"}', 'F1-개폐기닫힘:{"state":"ON"}']);
+    });
+
+    it('센서 끊김 + 닫힘 시간대 → 닫힘 방향(페어)으로 발행', async () => {
+      const now = new Date();
+      const hh = (d: number) => String((now.getHours() + d + 24) % 24).padStart(2, '0') + ':00';
+      await setSchedule('time', hh(3), hh(5)); // 지금은 열림 시간대가 아님
+      await setVal('temperature', 20, 3 * 3_600_000);
+      const r = await mkOpenerRule(id(1, 213));
+      await run(r);
+      expect(pubTo()).toEqual(['F1-개폐기열림:{"state":"OFF"}', 'F1-개폐기닫힘:{"state":"ON"}']);
+    });
+  });
 });

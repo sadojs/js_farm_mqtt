@@ -37,6 +37,8 @@ export class AutomationRunnerService {
   private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold'; cycleAnchorMs?: number; directionStartMs?: number; targetIds?: string[] }>();
   /** 센서 끊김으로 멈춘 룰 — 같은 알림을 반복하지 않기 위한 표시 */
   private readonly staleNotified = new Set<string>();
+  /** 센서 끊김으로 월별 시간표(백업)로 운전 중인 개폐기 룰 — 전환 시점에만 알리기 위함 */
+  private readonly backupActive = new Set<string>();
 
   constructor(
     @InjectRepository(AutomationRule)
@@ -267,8 +269,33 @@ export class AutomationRunnerService {
       return { executed: false, reason: 'rain_override_active' };
     }
 
-    const conditionResult = await this.evaluateRuleConditions(rule, evaluatedAt);
+    let conditionResult: { matched: boolean; details: any; onceConditionHits: string[] } =
+      await this.evaluateRuleConditions(rule, evaluatedAt);
     const isOpener = await this.isOpenerRule(rule);
+
+    // 개폐기 룰의 온습도계 값이 오래됐으면(이머전시와 같은 규칙) 월별 시간표(백업)로 운전한다.
+    // 비(우적) 닫힘은 위에서 이미 처리됐고, 고온 강제열림은 백업 방향보다 우선한다.
+    let usingBackup = false;
+    if (!conditionResult.matched && isOpener && this.checkRelayCycle(rule, evaluatedAt)) {
+      const backup = await this.openerBackupAction(rule, evaluatedAt).catch((err) => {
+        this.logger.warn(`[opener-backup] 판정 실패 ${rule.name}: ${err?.message ?? err}`);
+        return null;
+      });
+      if (backup) {
+        usingBackup = true;
+        conditionResult = {
+          matched: true,
+          details: {
+            type: 'opener_backup',
+            reason: backup.reason,
+            groups: [{ logic: 'AND', conditions: [{ matched: true, hysteresisAction: backup.action, backup: true }] }],
+          },
+          onceConditionHits: [] as string[],
+        };
+        await this.notifyBackupStart(rule, backup).catch(() => undefined);
+      }
+    }
+    if (!usingBackup) this.backupActive.delete(rule.id);
 
     // 히스테리시스 '유지' 구간(켜는 기준과 끄는 기준 사이): 켜져 있던 장비는 그대로 둔다.
     // (이전: 유지 구간을 '조건 불충족'으로 처리해 켜는 기준 바로 아래에서 꺼졌다 — 히스테리시스 무력화.)
@@ -1155,23 +1182,28 @@ export class AutomationRunnerService {
     return null;
   }
 
-  /** 룰이 멈춘 이유가 센서 끊김이면 한 번 알린다 */
-  private async notifyIfSensorStale(rule: AutomationRule): Promise<void> {
-    if (this.staleNotified.has(rule.id)) return;
+  /** 룰 조건이 참조하는 센서 중 최근 SENSOR_MAX_AGE_MIN 분 안에 값이 없는 것 */
+  private async findStaleSensors(rule: AutomationRule): Promise<Array<{ id: string; name: string }>> {
     const sensorIds = [...new Set<string>(
       ((rule.conditions as any)?.groups || [])
         .flatMap((g: any) => g.conditions || [])
         .map((c: any) => c.sensor_device_id)
         .filter(Boolean),
     )];
-    if (sensorIds.length === 0) return;
-    const rows: Array<{ id: string; name: string }> = await this.dataSource.query(
+    if (sensorIds.length === 0) return [];
+    return this.dataSource.query(
       `SELECT d.id::text AS id, d.name FROM devices d
        WHERE d.id::text = ANY($1)
          AND NOT EXISTS (SELECT 1 FROM sensor_data sd WHERE sd.device_id = d.id
                          AND sd.time > now() - make_interval(mins => $2))`,
       [sensorIds, SENSOR_MAX_AGE_MIN],
     );
+  }
+
+  /** 룰이 멈춘 이유가 센서 끊김이면 한 번 알린다 */
+  private async notifyIfSensorStale(rule: AutomationRule): Promise<void> {
+    if (this.staleNotified.has(rule.id)) return;
+    const rows = await this.findStaleSensors(rule);
     if (rows.length === 0) return;
     this.staleNotified.add(rule.id);
     const names = rows.map((r) => r.name).join(', ');
@@ -1180,6 +1212,70 @@ export class AutomationRunnerService {
       type: 'warning',
       title: '⚠️ 자동 제어 중지',
       message: `측정기(${names}) 값이 ${SENSOR_MAX_AGE_MIN}분 넘게 들어오지 않아 "${rule.name}" 자동 제어를 멈추고 장비를 껐습니다. 측정기를 확인해 주세요.`,
+    });
+  }
+
+  /**
+   * 개폐기 백업 판정 — 이머전시(Pi 폴백)와 같은 규칙.
+   * 룰이 참조하는 온습도계 값이 SENSOR_MAX_AGE_MIN 분 넘게 없으면, 그 게이트웨이의 월별 시간표로 열림/닫힘을 정한다.
+   *  - 시간표 없음/꺼짐, 개폐기 폴백 꺼짐: null (기존처럼 룰 중지)
+   *  - mode 'always-open': 열림, 'time': openTime~closeTime 사이 열림(자정 넘김 지원), 그 밖 닫힘
+   *  - 고온 강제열림이 활성이면(고온 센서 정상) 시간표가 닫힘이어도 열림
+   */
+  private async openerBackupAction(
+    rule: AutomationRule,
+    now: Date,
+  ): Promise<{ action: 'on' | 'off'; reason: string; sensors: string } | null> {
+    const stale = await this.findStaleSensors(rule);
+    if (stale.length === 0) return null;
+    const targetId = this.extractTargetDeviceIds(rule)[0];
+    if (!targetId) return null;
+    const month = now.getMonth() + 1;
+    const rows: any[] = await this.dataSource.query(
+      `SELECT fc.opener_enabled AS "openerEnabled", s.enabled, s.mode,
+              to_char(s.open_time, 'HH24:MI') AS "openTime", to_char(s.close_time, 'HH24:MI') AS "closeTime"
+       FROM devices d
+       JOIN gateways g ON g.id::text = d.gateway_id OR g.gateway_id = d.gateway_id
+       JOIN fallback_configs fc ON fc.gateway_id = g.gateway_id
+       JOIN fallback_opener_schedule s ON s.gateway_id = g.gateway_id AND s.month = $2
+       WHERE d.id = $1::uuid
+       LIMIT 1`,
+      [targetId, month],
+    );
+    const sch = rows[0];
+    if (!sch || sch.openerEnabled === false || !sch.enabled) return null;
+
+    const sensors = stale.map((r) => r.name).join(', ');
+    let open: boolean;
+    let reason: string;
+    if (sch.mode === 'always-open') {
+      open = true;
+      reason = `${month}월 시간표: 항상 열림`;
+    } else if (sch.mode === 'time' && sch.openTime && sch.closeTime) {
+      const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+      const cur = now.getHours() * 60 + now.getMinutes();
+      const o = toMin(sch.openTime);
+      const c = toMin(sch.closeTime);
+      open = o <= c ? (cur >= o && cur < c) : (cur >= o || cur < c);
+      reason = `${month}월 시간표 ${sch.openTime}~${sch.closeTime}: ${open ? '열림' : '닫힘'} 시간대`;
+    } else {
+      return null;
+    }
+    if (!open && await this.highTempOverride.isActive(rule.groupId)) {
+      open = true;
+      reason += ' → 고온 강제열림 우선';
+    }
+    return { action: open ? 'on' : 'off', reason, sensors };
+  }
+
+  private async notifyBackupStart(rule: AutomationRule, b: { reason: string; sensors: string }): Promise<void> {
+    if (this.backupActive.has(rule.id)) return;
+    this.backupActive.add(rule.id);
+    this.logger.warn(`[opener-backup] ${rule.name}: ${b.sensors} 값이 ${SENSOR_MAX_AGE_MIN}분 넘게 없음 → 월별 시간표로 운전 (${b.reason})`);
+    this.eventsGateway.sendNotification(rule.userId, {
+      type: 'warning',
+      title: '⚠️ 측정기 이상 — 시간표로 개폐기 운전',
+      message: `측정기(${b.sensors}) 값이 ${SENSOR_MAX_AGE_MIN}분 넘게 들어오지 않아 "${rule.name}"을(를) 이머전시와 같은 월별 시간표로 운전합니다. (${b.reason}) 측정기를 확인해 주세요.`,
     });
   }
 
