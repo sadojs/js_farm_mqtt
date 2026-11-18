@@ -182,12 +182,24 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * 브로커에 연결되어 있지 않으면 ON 명령을 거부한다.
+   * (mqtt.js 는 끊긴 동안 발행을 대기열에 쌓았다가 재연결 때 한꺼번에 보내 — 몇 시간 전 ON 이 뒤늦게 실행될 수 있다.
+   *  OFF 는 안전하므로 대기열에 두어 재연결 때 전달되게 한다.)
+   */
+  private assertBrokerForOn(isOn: boolean): void {
+    if (isOn && this.client && this.client.connected === false) {
+      throw new Error('MQTT 브로커에 연결되어 있지 않아 켜기 명령을 보내지 않았습니다.');
+    }
+  }
+
   /** 장비 제어 (MQTT publish) */
   async controlDevice(gatewayId: string, friendlyName: string, command: object): Promise<void> {
     // 비상 정지 유지 중엔 ON 계열 명령 차단 (OFF 는 허용) — 수동·자동·스케줄·방재 전 경로의 최종 관문
     if (isGatewayLatched(gatewayId) && Object.values(command || {}).some(isOnValue)) {
       throw new EmergencyLatchedError(gatewayId);
     }
+    this.assertBrokerForOn(Object.values(command || {}).some(isOnValue));
     const topic = `farm/${gatewayId}/z2m/${friendlyName}/set`;
     return new Promise((resolve, reject) => {
       this.client.publish(topic, JSON.stringify(command), { qos: 1 }, (err) => {
@@ -211,6 +223,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     if (isGatewayLatched(gatewayId) && cmd.state) {
       throw new EmergencyLatchedError(gatewayId);
     }
+    this.assertBrokerForOn(!!cmd.state);
     const topic = `farm/${gatewayId}/gpio/relay`;
     const payload = JSON.stringify({ ...cmd, requestId: Date.now() });
     return new Promise((resolve, reject) => {

@@ -56,6 +56,9 @@ const ZONE_FUNCTION_KEY: Record<number, string> = {
 export class IrrigationSchedulerService implements OnApplicationBootstrap {
   private readonly logger = new Logger(IrrigationSchedulerService.name);
   private activeIrrigations = new Map<string, ActiveIrrigation>();
+  /** 이 프로세스가 시작된 시각 — 이보다 앞선 예정 시각의 관수는 서버가 꺼져 있어 놓친 것 */
+  private readonly bootedAt = Date.now();
+  private readonly missedNotified = new Set<string>();
 
   constructor(
     @InjectRepository(AutomationRule)
@@ -85,8 +88,64 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
       if (this.shouldStartNow(conditions, now)) {
         this.logger.log(`관수 스케줄 시작: ${rule.name} (${rule.id})`);
         await this.startIrrigation(rule, conditions);
+      } else {
+        this.notifyIfMissed(rule, conditions, now);
       }
     }
+  }
+
+  /** 예정 시각에 서버가 꺼져 있어(재시작·장애) 실행되지 못한 관수를 한 번 알린다 (최근 15분 이내) */
+  private notifyIfMissed(rule: AutomationRule, conditions: any, now: Date) {
+    const scheduleList = (conditions.schedules && conditions.schedules.length > 0)
+      ? conditions.schedules
+      : [{ startTime: conditions.startTime, days: conditions.schedule?.days ?? [] }];
+    for (const sched of scheduleList) {
+      if (!sched.startTime || !sched.days?.includes(now.getDay())) continue;
+      const [h, m] = sched.startTime.split(':').map(Number);
+      const at = new Date(now); at.setHours(h, m, 0, 0);
+      const t = at.getTime();
+      if (t >= this.bootedAt || now.getTime() - t > 15 * 60_000 || now.getTime() <= t) continue;
+      const key = `${rule.id}@${sched.startTime}@${at.toDateString()}`;
+      if (this.missedNotified.has(key)) continue;
+      this.missedNotified.add(key);
+      this.logger.warn(`관수 누락: ${rule.name} ${sched.startTime} 예정 — 서버가 꺼져 있었음`);
+      this.eventsGateway.sendNotification(rule.userId, {
+        type: 'warning',
+        title: '⚠️ 관수 누락',
+        message: `"${rule.name}" ${sched.startTime} 관수가 서버가 꺼져 있던 시간이라 실행되지 못했습니다. 필요하면 지금 직접 관수해 주세요.`,
+      });
+    }
+  }
+
+  /**
+   * 관수 명령 발행 — 실패하면 다시 시도한다.
+   * OFF 는 밸브가 열린 채 남지 않도록 끝까지(6회, 10초 간격), ON 은 관수가 아직 진행 중일 때만 2회.
+   * 끝내 실패하면 알린다.
+   */
+  private async publishWithRetry(active: ActiveIrrigation, action: ScheduledAction): Promise<void> {
+    const attempts = action.value ? 3 : 7;
+    let lastErr: any;
+    for (let i = 0; i < attempts; i++) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, 10_000));
+        if (action.value && this.activeIrrigations.get(active.ruleId) !== active) return; // 중지됨 — ON 재시도 금지
+      }
+      try {
+        await this.devicesService.publishDeviceSwitch(active.device, active.gateway, action.switchCode, action.value);
+        if (i > 0) this.logger.log(`관수 명령 재시도 성공(${i + 1}회째): ${action.label}`);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        this.logger.warn(`관수 명령 실패(${i + 1}/${attempts}): ${action.label} - ${err?.message}`);
+      }
+    }
+    this.eventsGateway.sendNotification(active.userId, {
+      type: 'error',
+      title: action.value ? '⚠️ 관수 켜기 실패' : '🚨 관수 끄기 실패',
+      message: action.value
+        ? `"${active.ruleName}" ${action.label} 명령이 전달되지 않았습니다. 관수가 빠졌을 수 있으니 확인해 주세요. (${lastErr?.message ?? '오류'})`
+        : `"${active.ruleName}" ${action.label} 끄기 명령이 전달되지 않았습니다. 밸브가 열려 있을 수 있으니 지금 직접 확인해 주세요. (${lastErr?.message ?? '오류'})`,
+    });
   }
 
   /** 즉시 1회 관수 (음성·즉시실행) — 룰 조건(시각)은 바꾸지 않는다 */
@@ -246,7 +305,7 @@ export class IrrigationSchedulerService implements OnApplicationBootstrap {
           }
           this.logger.log(`관수 실행: ${action.label} (${action.switchCode}=${action.value})`);
           // device.source에 따라 onboard(gpio-agent) / zigbee(z2m) 자동 라우팅
-          await this.devicesService.publishDeviceSwitch(active.device, active.gateway, action.switchCode, action.value);
+          await this.publishWithRetry(active, action);
         } catch (err: any) {
           this.logger.error(`관수 명령 실패: ${action.label} - ${err.message}`);
         }
