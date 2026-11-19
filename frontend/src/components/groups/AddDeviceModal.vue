@@ -45,6 +45,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, watch } from 'vue'
 import { useGroupStore } from '../../stores/group.store'
 import { useDeviceStore } from '../../stores/device.store'
@@ -110,7 +111,7 @@ const confirmAdd = async () => {
     emit('close')
   } catch (err) {
     console.error('장치 추가 실패:', err)
-    alert('장치 추가에 실패했습니다.')
+    notify('장치 추가에 실패했습니다.')
   } finally {
     adding.value = false
   }

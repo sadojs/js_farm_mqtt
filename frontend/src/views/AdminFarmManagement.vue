@@ -112,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../utils/dialogs'
 import { ref, computed, onMounted } from 'vue'
 import { groupApi } from '@/api/group.api'
 import { gatewayApi } from '@/api/gateway.api'
@@ -208,7 +209,7 @@ async function submitAddZone() {
 }
 
 async function removeZone(zone: HouseGroupWithOwner) {
-  if (!confirm(`"${zone.name}" 구역을 삭제하시겠습니까?`)) return
+  if (!await askConfirm(`"${zone.name}" 구역을 삭제하시겠습니까?`)) return
   try {
     await groupApi.removeGroup(zone.id)
     allZones.value = allZones.value.filter(z => z.id !== zone.id)
@@ -240,7 +241,7 @@ async function onGatewayAssign(zone: HouseGroupWithOwner, gatewayId: string) {
 }
 
 async function onGatewayDetach(gw: GatewayItem) {
-  if (!confirm(`"${gw.name}" 게이트웨이를 구역에서 해제할까요?`)) return
+  if (!await askConfirm(`"${gw.name}" 게이트웨이를 구역에서 해제할까요?`)) return
   try {
     await gatewayApi.assignZone(gw.id, null)
     const gwRes = await gatewayApi.getAll()

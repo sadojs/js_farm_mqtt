@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify, askConfirm } from '../../utils/dialogs'
 import { ref, reactive, watch } from 'vue'
 import { zoneNotesApi } from '../../api/zone-notes.api'
 import { ZONE_NOTE_TAGS, zoneNoteTagMeta } from '../../types/zone-note.types'
@@ -185,7 +186,7 @@ async function onSave() {
     emit('changed')
     backToList()
   } catch (e: any) {
-    alert(e?.response?.data?.message || '저장에 실패했습니다.')
+    notify(e?.response?.data?.message || '저장에 실패했습니다.')
   } finally {
     busy.value = false
   }
@@ -193,7 +194,7 @@ async function onSave() {
 
 async function onDelete() {
   if (!editing.value) return
-  if (!confirm('이 메모를 삭제하시겠습니까?')) return
+  if (!await askConfirm('이 메모를 삭제하시겠습니까?')) return
   busy.value = true
   try {
     await zoneNotesApi.remove(editing.value.id)
@@ -201,7 +202,7 @@ async function onDelete() {
     emit('changed')
     backToList()
   } catch {
-    alert('삭제에 실패했습니다.')
+    notify('삭제에 실패했습니다.')
   } finally {
     busy.value = false
   }

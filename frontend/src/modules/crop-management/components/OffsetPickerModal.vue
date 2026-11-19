@@ -75,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../../utils/dialogs'
 import { ref, onMounted } from 'vue'
 import { cropManagementApi } from '../api/crop-management.api'
 import type { OffsetSuggestion, OffsetStrategy } from '../types/crop-management.types'
@@ -132,7 +133,7 @@ async function apply(offset: number, source: string, borrowedGroupId?: string) {
     emit('applied', { offset, source, borrowedGroupId })
     emit('close')
   } catch {
-    alert('저장 실패. 다시 시도해주세요.')
+    notify('저장 실패. 다시 시도해주세요.')
   }
 }
 </script>

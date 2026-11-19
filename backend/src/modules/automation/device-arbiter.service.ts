@@ -20,8 +20,8 @@ export type ArbiterSource =
 export const SOURCE_RANK: Record<ArbiterSource, number> = {
   emergency: 1,
   protection: 2,
-  rain: 3,
-  high_temp: 4,
+  high_temp: 3, // 비 닫힘보다 위 — 비가 와도 고온이면 열어 둔다(이슬비에 닫혀 고온 피해 방지)
+  rain: 4,
   manual: 5,
   irrigation_timer: 6,
   rule: 7,

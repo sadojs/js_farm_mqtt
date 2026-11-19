@@ -1,6 +1,7 @@
 import { createTestApp, TestApp } from './utils/test-app';
 import { seed, USERS, id } from './utils/seed';
 import { RainOverrideService } from '../src/modules/rain-override/rain-override.service';
+import { HighTempOverrideService } from '../src/modules/automation/high-temp-override.service';
 import { EventsGateway } from '../src/modules/gateway/events.gateway';
 
 /** 검토 C1·C9 — 우적센서 끊김 만료, 치명 고온이면 비 닫힘 양보 */
@@ -75,5 +76,88 @@ describe('비 감지 우회 — 센서 끊김 · 치명 고온', () => {
     await svc.handleRainSignal(RAIN, true);
     await svc.tickSafety();
     expect(svc.isOpenerRainOverridden(GROUP)).toBe(true);
+  });
+});
+
+/** 우선순위: 고온 강제열림 > 비 닫힘 — 이슬비에 닫혀 고온 피해가 나지 않게 */
+describe('고온 > 비 닫힘', () => {
+  let t: TestApp;
+  const GROUP = id(1, 10);
+  const RAIN = id(1, 60);
+  const TEMP = id(1, 40);
+  let rain: RainOverrideService;
+  let hot: HighTempOverrideService;
+  const rp = () => rain as any;
+
+  beforeAll(async () => {
+    t = await createTestApp();
+    await seed(t.ds);
+    rain = t.app.get(RainOverrideService);
+    hot = t.app.get(HighTempOverrideService);
+    await t.ds.query(
+      `insert into devices (id,user_id,house_id,gateway_id,friendly_name,name,category,device_type,online,created_at,updated_at)
+       select $1,$2,house_id,gateway_id,'F1-우적','F1-우적','sensor','sensor',true,now(),now() from devices where id=$3`,
+      [RAIN, USERS.f1.id, TEMP],
+    );
+    await t.ds.query(
+      `insert into env_mappings (id,group_id,role_key,source_type,device_id,sensor_type) values
+       (gen_random_uuid(),$1,'rain_detection','sensor',$2,'rain_detection'),
+       (gen_random_uuid(),$1,'internal_temp','sensor',$3,'temperature')`,
+      [GROUP, RAIN, TEMP],
+    );
+    await t.ds.query(
+      `insert into fallback_configs (gateway_id, high_temp_override_enabled, high_temp_open_threshold)
+       values ('f1-gw', true, 30) on conflict (gateway_id) do update set high_temp_override_enabled=true, high_temp_open_threshold=30`);
+  });
+  afterAll(async () => { await t?.app.close(); });
+  beforeEach(async () => {
+    await t.ds.query(`delete from sensor_data where device_id=$1`, [TEMP]);
+    rp().rainState.clear(); rp().rainSeenAt.clear(); rp().criticalHeat.clear();
+    rp().closeCycles.clear(); rp().highTempYield.clear();
+    (hot as any).activeZones.clear();
+  });
+  const setTemp = async (v: number) => {
+    await t.ds.query(`delete from sensor_data where device_id=$1`, [TEMP]);
+    await t.ds.query(
+      `insert into sensor_data (time, device_id, user_id, sensor_type, value, unit) values (now(),$1,$2,'temperature',$3,'')`,
+      [TEMP, USERS.f1.id, v]);
+  };
+
+  it('비가 와도 임계값 이상이면 닫지 않는다(고온 강제열림 유지)', async () => {
+    await setTemp(32);
+    await rain.handleRainSignal(RAIN, true);
+    expect(rp().closeCycles.has(GROUP)).toBe(false);
+    expect(rain.isOpenerRainOverridden(GROUP)).toBe(false);
+    expect(await hot.isActive(GROUP)).toBe(true);
+  });
+
+  it('비 중 고온이 풀리면 비 닫힘이 시작되고, 다시 고온이면 양보한다', async () => {
+    await setTemp(32);
+    await rain.handleRainSignal(RAIN, true);
+    await setTemp(27);
+    await rain.tickSafety();
+    expect(rain.isOpenerRainOverridden(GROUP)).toBe(true);
+    await setTemp(31);
+    await rain.tickSafety();
+    expect(rain.isOpenerRainOverridden(GROUP)).toBe(false);
+    expect(rp().closeCycles.has(GROUP)).toBe(false);
+  });
+
+  it('임계값 바로 아래(1℃ 이내)에서는 열림 유지 — 닫힘/열림 떨림 방지', async () => {
+    await setTemp(31);
+    await rain.handleRainSignal(RAIN, true);
+    await setTemp(29.5);
+    await rain.tickSafety();
+    expect(rain.isOpenerRainOverridden(GROUP)).toBe(false);
+  });
+
+  it('고온 설정이 꺼져 있으면 비는 예전처럼 닫는다', async () => {
+    await t.ds.query(`update fallback_configs set high_temp_override_enabled=false where gateway_id='f1-gw'`);
+    (hot as any).cfgCache.clear();
+    await setTemp(35);
+    await rain.handleRainSignal(RAIN, true);
+    expect(rain.isOpenerRainOverridden(GROUP)).toBe(true);
+    await t.ds.query(`update fallback_configs set high_temp_override_enabled=true where gateway_id='f1-gw'`);
+    (hot as any).cfgCache.clear();
   });
 });

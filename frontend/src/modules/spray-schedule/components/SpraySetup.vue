@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../../../utils/dialogs'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../../../stores/auth.store'
 import { useNotificationStore } from '../../../stores/notification.store'
@@ -216,10 +217,10 @@ function addZone() {
   })
 }
 
-function removeZone(index: number) {
+async function removeZone(index: number) {
   const zone = zones.value[index]
   if (zone.id) {
-    if (!confirm('이 구역과 관련 방재 일정을 모두 삭제할까요?')) return
+    if (!await askConfirm('이 구역과 관련 방재 일정을 모두 삭제할까요?')) return
     sprayScheduleApi
       .deleteZone(zone.id)
       .then(() => {

@@ -150,6 +150,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, reactive } from 'vue'
 import { cropManagementApi } from './api/crop-management.api'
 import type { CreateCropBatchPayload, OffsetSuggestion } from './types/crop-management.types'
@@ -230,7 +231,7 @@ async function handleSubmit() {
     emit('created', created)
     emit('close')
   } catch (e: any) {
-    alert(e?.response?.data?.message ?? '저장 실패. 다시 시도해주세요.')
+    notify(e?.response?.data?.message ?? '저장 실패. 다시 시도해주세요.')
   } finally {
     submitting.value = false
   }

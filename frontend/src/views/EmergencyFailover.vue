@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { notify, askConfirm } from '../utils/dialogs'
 import { ref, onMounted, computed, watch } from 'vue'
 import { gatewayApi } from '../api/gateway.api'
 import { useEmergencyFailover } from '../composables/useEmergencyFailover'
@@ -115,49 +116,49 @@ async function onSaveSchedule(dto: UpsertScheduleDto) {
 
 async function saveAll() {
   if (!fanValid.value) {
-    alert('환기팬 ON 임계값은 OFF 임계값보다 커야 합니다')
+    notify('환기팬 ON 임계값은 OFF 임계값보다 커야 합니다')
     return
   }
   if (!openerValid.value) {
-    alert('개폐기 개방 임계값은 닫힘 임계값보다 커야 합니다')
+    notify('개폐기 개방 임계값은 닫힘 임계값보다 커야 합니다')
     return
   }
   if (allCriticalDisabled.value) {
-    if (!confirm('개폐기·관수·액비 폴백이 모두 비활성화되어 있습니다. 통신 단절 시 안전망이 없어 작물 피해가 발생할 수 있습니다. 그래도 저장할까요?')) {
+    if (!await askConfirm('개폐기·관수·액비 폴백이 모두 비활성화되어 있습니다. 통신 단절 시 안전망이 없어 작물 피해가 발생할 수 있습니다. 그래도 저장할까요?')) {
       return
     }
   }
   await fail.saveConfig(editable.value)
   const ok = await fail.waitForSync()
   if (ok) {
-    alert(`저장 및 게이트웨이 동기화 완료 (v${fail.config.value?.version}).`)
+    notify(`저장 및 게이트웨이 동기화 완료 (v${fail.config.value?.version}).`)
   } else {
-    alert('저장되었습니다. 다만 게이트웨이 동기화 확인이 지연됩니다(응답 없음) — 게이트웨이 온라인 상태와 상태 카드의 동기화 배지를 확인하세요.')
+    notify('저장되었습니다. 다만 게이트웨이 동기화 확인이 지연됩니다(응답 없음) — 게이트웨이 온라인 상태와 상태 카드의 동기화 배지를 확인하세요.')
   }
 }
 
 async function resync() {
   await fail.resync()
-  alert('재동기화 메시지를 발행했습니다.')
+  notify('재동기화 메시지를 발행했습니다.')
 }
 
 async function emergencyStop() {
-  if (!confirm('정말 모든 릴레이를 비상 정지하시겠습니까?\n\n해제 버튼을 누르기 전까지 자동제어·수동 조작으로 켜지지 않습니다. 폴백 모드에서도 즉시 실행됩니다.')) return
+  if (!await askConfirm('정말 모든 릴레이를 비상 정지하시겠습니까?\n\n해제 버튼을 누르기 전까지 자동제어·수동 조작으로 켜지지 않습니다. 폴백 모드에서도 즉시 실행됩니다.')) return
   try {
     await fail.emergencyStop('manual-from-ui', 'admin')
-    alert('비상 정지했습니다. 해제 전까지 이 게이트웨이의 릴레이는 켜지지 않습니다.')
+    notify('비상 정지했습니다. 해제 전까지 이 게이트웨이의 릴레이는 켜지지 않습니다.')
   } catch (e: any) {
-    alert(e?.response?.data?.message || '비상 정지 요청에 실패했습니다.')
+    notify(e?.response?.data?.message || '비상 정지 요청에 실패했습니다.')
   }
 }
 
 async function emergencyRelease() {
-  if (!confirm('비상 정지를 해제할까요?\n\n장비는 꺼진 상태 그대로이며, 자동제어가 다음 평가부터 다시 동작합니다.')) return
+  if (!await askConfirm('비상 정지를 해제할까요?\n\n장비는 꺼진 상태 그대로이며, 자동제어가 다음 평가부터 다시 동작합니다.')) return
   try {
     await fail.emergencyRelease()
-    alert('비상 정지를 해제했습니다.')
+    notify('비상 정지를 해제했습니다.')
   } catch (e: any) {
-    alert(e?.response?.data?.message || '해제 요청에 실패했습니다.')
+    notify(e?.response?.data?.message || '해제 요청에 실패했습니다.')
   }
 }
 

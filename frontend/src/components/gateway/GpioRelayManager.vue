@@ -248,6 +248,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../../utils/dialogs'
 import { ref, computed } from 'vue'
 import { gatewayEnvApi, type OnboardDevice } from '@/api/gateway-env.api'
 import { gpioApi } from '@/api/gpio.api'
@@ -500,7 +501,7 @@ async function toggleRain() {
   if (!rs) return
   const newVal = !rs.enabled
   // 비활성화 경고: 우적센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중
-  if (!newVal && !window.confirm(
+  if (!newVal && !await askConfirm(
     '우적센서를 비활성화하시겠습니까?\n\n이 센서는 구역에 매핑되어 비 감지 자동 닫힘에 사용 중입니다. ' +
     '비활성화하면 비가 와도 개폐기가 자동으로 닫히지 않으며, 구역관리·대시보드에서도 숨겨집니다.',
   )) return

@@ -394,6 +394,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify, askConfirm } from '../utils/dialogs'
 import { ref, computed, onMounted, watch } from 'vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import { userApi } from '../api/user.api'
@@ -598,17 +599,17 @@ async function saveGateway() {
     gwForm.value = { gatewayId: '', name: '', userId: '', location: '' }
     await refreshAll()
   } catch (err: any) {
-    alert(err.response?.data?.message || '게이트웨이 저장에 실패했습니다.')
+    notify(err.response?.data?.message || '게이트웨이 저장에 실패했습니다.')
   }
 }
 
 async function deleteGateway(gw: any) {
-  if (!confirm(`게이트웨이 "${gw.name}" (${gw.gatewayId})를 삭제하시겠습니까?`)) return
+  if (!await askConfirm(`게이트웨이 "${gw.name}" (${gw.gatewayId})를 삭제하시겠습니까?`)) return
   try {
     await gatewayApi.remove(gw.id)
     await refreshAll()
   } catch {
-    alert('게이트웨이 삭제에 실패했습니다.')
+    notify('게이트웨이 삭제에 실패했습니다.')
   }
 }
 
@@ -644,13 +645,13 @@ function openNewUserUnder(_parent: User) {
 }
 
 const deleteUser = async (user: User) => {
-  if (!confirm(`${user.name} 사용자를 삭제하시겠습니까?`)) return
+  if (!await askConfirm(`${user.name} 사용자를 삭제하시겠습니까?`)) return
   try {
     await userApi.remove(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
   } catch (err: any) {
     console.error('삭제 실패:', err)
-    alert(err?.response?.data?.message || '삭제에 실패했습니다.')
+    notify(err?.response?.data?.message || '삭제에 실패했습니다.')
   }
 }
 
@@ -695,7 +696,7 @@ const saveUser = async (userData: any) => {
     closeUserModal()
   } catch (err: any) {
     console.error('저장 실패:', err)
-    alert(err.response?.data?.message || '저장에 실패했습니다.')
+    notify(err.response?.data?.message || '저장에 실패했습니다.')
   }
 }
 

@@ -83,6 +83,7 @@ const { state, handleConfirm, handleCancel } = useConfirm()
   font-size: calc(15px * var(--content-scale, 1));
   color: var(--text-secondary);
   line-height: 1.5;
+  white-space: pre-line;
   margin-bottom: 24px;
 }
 

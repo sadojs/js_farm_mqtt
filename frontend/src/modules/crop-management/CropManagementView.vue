@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../../utils/dialogs'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { cropManagementApi } from './api/crop-management.api'
 import { groupApi } from '@/api/group.api'
@@ -200,7 +201,7 @@ function openModal(groupId?: string) {
 }
 
 async function removeBatch(id: string) {
-  if (!confirm('이 파종 정보를 삭제할까요?')) return
+  if (!await askConfirm('이 파종 정보를 삭제할까요?')) return
   await cropManagementApi.deleteBatch(id)
   batches.value = batches.value.filter((b) => b.id !== id)
 }

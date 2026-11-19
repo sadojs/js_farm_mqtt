@@ -59,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify, askConfirm } from '../../../utils/dialogs'
 import { ref, computed } from 'vue'
 import { workLogApi } from '../api/work-log.api'
 import type { WorkLog, WorkTaskType } from '../types/work-log.types'
@@ -100,20 +101,20 @@ async function onSave() {
     })
     emit('saved')
   } catch (err: any) {
-    alert(err.response?.data?.message || '저장에 실패했습니다.')
+    notify(err.response?.data?.message || '저장에 실패했습니다.')
   } finally {
     busy.value = false
   }
 }
 
 async function onDelete() {
-  if (!confirm('이 기록을 삭제하시겠습니까?')) return
+  if (!await askConfirm('이 기록을 삭제하시겠습니까?')) return
   busy.value = true
   try {
     await workLogApi.deleteLog(props.log.id)
     emit('deleted')
   } catch (err: any) {
-    alert(err.response?.data?.message || '삭제에 실패했습니다.')
+    notify(err.response?.data?.message || '삭제에 실패했습니다.')
   } finally {
     busy.value = false
   }

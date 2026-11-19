@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, computed, watch, shallowRef, onBeforeUnmount } from 'vue'
 import type {
   AutomationRule, ConditionGroup, IrrigationConditions,
@@ -204,7 +205,7 @@ async function handleSave() {
     emit('close')
   } catch (err) {
     console.error('설정 수정 실패:', err)
-    alert('저장에 실패했습니다.')
+    notify('저장에 실패했습니다.')
   } finally {
     saving.value = false
   }

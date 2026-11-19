@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, computed, watch, onBeforeUnmount, shallowRef } from 'vue'
 import type { AutomationRule, WizardFormData, CreateRuleRequest, IrrigationConditions } from '../../types/automation.types'
 import { createEmptyWizardForm, createDefaultIrrigationConditions } from '../../utils/automation-helpers'
@@ -273,7 +274,7 @@ async function handleSave() {
     emit('close')
   } catch (err) {
     console.error('룰 저장 실패:', err)
-    alert('저장에 실패했습니다. 다시 시도해주세요.')
+    notify('저장에 실패했습니다. 다시 시도해주세요.')
   } finally {
     saving.value = false
   }

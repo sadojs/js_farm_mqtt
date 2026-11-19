@@ -643,6 +643,19 @@ body {
   --accent-hover: #1b5e20;
   --accent-bg: #e8f5e9;
   --accent-text: #2e7d32;
+  /* 별칭 — 화면마다 제각각 쓰던 이름(--primary, --success …)을 한 곳으로 모은다. 테마 전환은 아래 원본 값이 따라간다. */
+  --primary: var(--accent);
+  --primary-color: var(--accent);
+  --primary-dark: var(--accent-hover);
+  --success: var(--accent);
+  --success-color: var(--accent);
+  --danger-color: var(--danger);
+  --text: var(--text-primary);
+  --color-text: var(--text-primary);
+  --text-tertiary: var(--text-muted);
+  --text-disabled: var(--text-muted);
+  --bg-subtle: var(--bg-hover);
+  --radius-pill: 999px;
   /* 위험색 */
   --danger: #e53935;
   --danger-hover: #c62828;

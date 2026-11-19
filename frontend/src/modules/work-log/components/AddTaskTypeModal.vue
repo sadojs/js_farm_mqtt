@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../../utils/dialogs'
 import { computed, ref } from 'vue'
 import { workLogApi } from '../api/work-log.api'
 import type { Palette, WorkTaskType } from '../types/work-log.types'
@@ -99,7 +100,7 @@ async function save() {
     }
     emit('saved')
   } catch (err: any) {
-    alert(err.response?.data?.message || '저장 실패')
+    notify(err.response?.data?.message || '저장 실패')
   } finally {
     saving.value = false
   }

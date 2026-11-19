@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, computed, watch } from 'vue'
 import { useGroupStore } from '../../stores/group.store'
 import { gatewayApi } from '@/api/gateway.api'
@@ -156,7 +157,7 @@ const handleCreate = async () => {
         }
       }
       if (failedGateways.length > 0) {
-        alert(`구역은 생성되었으나 일부 게이트웨이 할당에 실패했습니다:\n\n${failedGateways.join('\n')}`)
+        notify(`구역은 생성되었으나 일부 게이트웨이 할당에 실패했습니다:\n\n${failedGateways.join('\n')}`)
       }
     }
     emit('created')
@@ -166,11 +167,11 @@ const handleCreate = async () => {
     const status = err?.response?.status
     const serverMsg = err?.response?.data?.message
     if (status === 409) {
-      alert(`게이트웨이 할당 실패\n\n${serverMsg || '이 게이트웨이는 이미 다른 구역에 할당되어 있습니다.'}`)
+      notify(`게이트웨이 할당 실패\n\n${serverMsg || '이 게이트웨이는 이미 다른 구역에 할당되어 있습니다.'}`)
     } else if (status === 403) {
-      alert('접근 권한이 없습니다.')
+      notify('접근 권한이 없습니다.')
     } else {
-      alert('구역 생성에 실패했습니다.')
+      notify('구역 생성에 실패했습니다.')
     }
   } finally {
     creating.value = false

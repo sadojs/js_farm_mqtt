@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, computed, watch } from 'vue'
 import { useGroupStore } from '../../stores/group.store'
 import { groupApi } from '../../api/group.api'
@@ -214,7 +215,7 @@ const confirmRemove = async () => {
     emit('close')
   } catch (err) {
     console.error('구역 장치 제거 실패:', err)
-    alert('장치 제거에 실패했습니다.')
+    notify('장치 제거에 실패했습니다.')
   } finally {
     removing.value = false
   }

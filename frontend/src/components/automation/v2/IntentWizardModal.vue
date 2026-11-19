@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../../../utils/dialogs'
 import { computed, ref, onMounted } from 'vue'
 import { useRuleWizardV2 } from '@/composables/useRuleWizardV2'
 import { useAutomationStore } from '@/stores/automation.store'
@@ -259,9 +260,9 @@ async function handleSave() {
 }
 
 // 닫기 처리 — WizardFrame이 Esc/overlay click도 emit('close')로 전달
-function handleClose() {
+async function handleClose() {
   if (wizard.currentStep.value === 'review') {
-    if (!confirm('입력 내용이 사라집니다. 닫을까요?')) return
+    if (!await askConfirm('입력 내용이 사라집니다. 닫을까요?')) return
   }
   emit('close')
 }

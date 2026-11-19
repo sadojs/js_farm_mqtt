@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { computed, ref, watch } from 'vue'
 import { userApi } from '../../api/user.api'
 import addressRegions from '../../data/address-regions.json'
@@ -301,11 +302,11 @@ function syncAddress() {
 
 const handleSubmit = () => {
   if (selectedLevel1.value && !selectedLevel2.value) {
-    alert('시/군/구를 선택해 주세요.')
+    notify('시/군/구를 선택해 주세요.')
     return
   }
   if (formData.value.role === 'farm_admin' && !formData.value.farmName?.trim()) {
-    alert('농장 이름을 입력해 주세요.')
+    notify('농장 이름을 입력해 주세요.')
     return
   }
   syncAddress()

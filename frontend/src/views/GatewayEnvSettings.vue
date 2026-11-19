@@ -580,6 +580,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../utils/dialogs'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { groupApi } from '@/api/group.api'
@@ -1246,7 +1247,7 @@ async function saveZigbeeName(dev: ZigbeeDevice) {
 }
 
 async function removeZigbee(dev: ZigbeeDevice) {
-  if (!confirm(`"${dev.name}"을 삭제할까요?`)) return
+  if (!await askConfirm(`"${dev.name}"을 삭제할까요?`)) return
   try {
     await gatewayEnvApi.removeZigbee(gatewayId, dev.id)
     zigbeeDevices.value = zigbeeDevices.value.filter(d => d.id !== dev.id)

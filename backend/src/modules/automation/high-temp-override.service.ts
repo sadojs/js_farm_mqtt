@@ -12,10 +12,13 @@ import { RainOverrideService } from '../rain-override/rain-override.service';
  * 이 판정을 사용한다. (닫힘의 rain-override 와 대칭.)
  *
  * - 임계값/토글: 구역 환경설정(fallback_configs.high_temp_*), 구역 단위.
- * - 우선순위: 비(우적) > 고온. 비 감지 중이면 항상 false.
+ * - 우선순위: 고온 > 비(우적). 비가 와도 온도가 임계값 이상이면 열림을 유지하고, 비 닫힘은 양보한다.
+ *   (비가 오면 온도가 내려 고온이 풀리고, 그때서야 비 닫힘이 동작한다.)
  * - 기본 OFF: highTempOverrideEnabled=false 면 즉시 false → 기존 개폐기 동작 그대로.
  */
 /** 오래된 온도값으로 고온 판정하지 않는다 (자동화 실행기와 같은 기준) */
+/** 고온 해제 여유(°C) */
+const HIGH_TEMP_CLEAR_MARGIN_C = 1;
 const SENSOR_MAX_AGE_MIN = Number(process.env.AUTOMATION_SENSOR_MAX_AGE_MIN) || 20;
 
 @Injectable()
@@ -33,11 +36,14 @@ export class HighTempOverrideService {
     private readonly rainOverride: RainOverrideService,
     private readonly eventsGateway: EventsGateway,
     private readonly activityLog: ActivityLogService,
-  ) {}
+  ) {
+    // 비 감지 서비스가 닫힘 전에 고온 여부를 새로 확인할 수 있게 연결
+    this.rainOverride.registerHeatYieldChecker((groupId) => this.isActive(groupId));
+  }
 
   /**
    * 구역의 고온 무대기 강제열림 활성 여부.
-   * 조건: ①highTempOverrideEnabled ②비 아님(rain=false) ③구역 내부온도 ≥ 임계값.
+   * 조건: ①highTempOverrideEnabled ②구역 내부온도 ≥ 임계값(이미 활성이면 임계값-1℃ 까지 유지).
    * 전환 시 activity_log + broadcast. enabled=false 면 즉시 false(기존 경로 무변화).
    */
   async isActive(groupId: string | null | undefined): Promise<boolean> {
@@ -47,13 +53,11 @@ export class HighTempOverrideService {
       await this.setState(groupId, false, null, cfg?.threshold ?? null);
       return false;
     }
-    // 비(우적) 우선 — 비 감지 중이면 고온 오버라이드 안 함(닫힘 유지)
-    if (this.rainOverride.getZoneState(groupId).rainDetected) {
-      await this.setState(groupId, false, null, cfg.threshold);
-      return false;
-    }
     const temp = await this.getZoneTemperature(groupId);
-    const active = temp != null && temp >= cfg.threshold;
+    // 이미 활성이면 임계값 아래로 1℃ 내려가야 해제 — 비로 식었다 닫힘→재상승→열림 하는 떨림 방지
+    const wasActive = this.activeZones.get(groupId) ?? false;
+    const limit = wasActive ? cfg.threshold - HIGH_TEMP_CLEAR_MARGIN_C : cfg.threshold;
+    const active = temp != null && temp >= limit;
     await this.setState(groupId, active, temp, cfg.threshold);
     return active;
   }
@@ -67,6 +71,8 @@ export class HighTempOverrideService {
     const prev = this.activeZones.get(groupId) ?? false;
     if (prev === active) return;
     this.activeZones.set(groupId, active);
+    // 비 닫힘이 고온 강제열림에 양보/복귀하도록 알린다
+    await this.rainOverride.setHighTempYield(groupId, active);
     this.eventsGateway.broadcastHighTempOverride?.({ groupId, active, temperature: temp, threshold });
     const ownerId = await this.getZoneOwnerUserId(groupId);
     if (ownerId) {

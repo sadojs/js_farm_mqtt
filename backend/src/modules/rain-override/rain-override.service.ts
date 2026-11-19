@@ -45,6 +45,10 @@ export class RainOverrideService {
    * 재활성화(ON) 시 다음 센서 재발행(최대 60s)을 기다리지 않고 현재 비 여부를 즉시 판단하는 용도.
    */
   private lastRawRain = new Map<string, boolean>();
+  /** groupId → 고온 강제열림 활성 중(비 닫힘이 양보) */
+  private highTempYield = new Map<string, boolean>();
+  /** 닫기 전에 고온 여부를 새로 판정하는 함수(HighTempOverrideService 가 등록) */
+  private heatYieldChecker: ((groupId: string) => Promise<boolean>) | null = null;
   /** groupId → 비 도중 사용자 직접 제어 발생 여부 (suppress) */
   private userOverride = new Map<string, boolean>();
   /**
@@ -120,13 +124,37 @@ export class RainOverrideService {
     });
   }
 
+  registerHeatYieldChecker(fn: (groupId: string) => Promise<boolean>) {
+    this.heatYieldChecker = fn;
+  }
+
+  /**
+   * 고온 강제열림이 시작/종료됐다 — 우선순위는 고온 > 비 이므로
+   * 시작되면 닫힘 사이클을 멈추고, 끝났는데 아직 비가 오면 닫힘을 다시 시작한다.
+   */
+  async setHighTempYield(groupId: string, active: boolean) {
+    this.highTempYield.set(groupId, active);
+    if (active) {
+      if (this.closeCycles.delete(groupId)) {
+        this.logger.warn(`🔥 구역 ${groupId} 고온 강제열림 — 비 감지 중이지만 닫힘 양보`);
+      }
+      return;
+    }
+    if ((this.rainState.get(groupId) ?? false) && !(this.userOverride.get(groupId) ?? false)
+      && !(this.criticalHeat.get(groupId) ?? false) && !this.closeCycles.has(groupId)) {
+      this.logger.log(`🌧 구역 ${groupId} 고온 해제 + 비 감지 중 → 비 닫힘 시작`);
+      await this.startCloseCycle(groupId, 'high-temp-cleared');
+    }
+  }
+
   /** automation-runner: opener 룰 실행 전 호출 — true면 룰 skip */
   isOpenerRainOverridden(groupId: string | null | undefined): boolean {
     if (!groupId) return false;
     const rain = this.rainState.get(groupId) ?? false;
     const userOverridden = this.userOverride.get(groupId) ?? false;
     const heatYield = this.criticalHeat.get(groupId) ?? false;
-    return rain && !userOverridden && !heatYield;
+    const highTemp = this.highTempYield.get(groupId) ?? false;
+    return rain && !userOverridden && !heatYield && !highTemp;
   }
 
   /** controlDevice: 사용자(자동제어 아닌) 호출 시 — suppress 활성화 */
@@ -152,6 +180,12 @@ export class RainOverrideService {
    * 사이클 상태를 등록하고 즉시 첫 동작 펄스를 발행한다. 이후 tickCloseCycles cron이 반복.
    */
   private async startCloseCycle(groupId: string, reason: string) {
+    // 고온 강제열림이 우선 — 지금 고온이면 닫지 않는다(고온이 풀리면 setHighTempYield 가 다시 시작)
+    if (this.heatYieldChecker && await this.heatYieldChecker(groupId).catch(() => false)) {
+      this.logger.warn(`🔥 구역 ${groupId} 비 감지됐지만 고온 강제열림 중 → 닫지 않음`);
+      return;
+    }
+    if (this.closeCycles.has(groupId)) return; // 판정 중 다른 경로가 이미 시작함
     const ownerUserId = await this.getZoneOwnerUserId(groupId);
     if (!ownerUserId) return;
 
@@ -247,6 +281,8 @@ export class RainOverrideService {
         await this.expireStaleRain(groupId).catch((e) => this.logger.warn(`rain stale 처리 실패: ${e?.message}`));
         continue;
       }
+      // 고온 여부를 새로 판정(시작/해제 전환이 setHighTempYield 로 반영된다)
+      if (this.heatYieldChecker) await this.heatYieldChecker(groupId).catch(() => undefined);
       if (CRITICAL_HEAT_C > 0) {
         await this.evaluateCriticalHeat(groupId).catch((e) => this.logger.warn(`critical heat 판정 실패: ${e?.message}`));
       }

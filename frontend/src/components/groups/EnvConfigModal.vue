@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { ref, watch } from 'vue'
 import { envConfigApi } from '../../api/env-config.api'
 import { groupApi } from '../../api/group.api'
@@ -188,7 +189,7 @@ async function loadEnvConfig(group: HouseGroup) {
     envMappings.value = map
   } catch (err) {
     console.error('환경설정 로드 실패:', err)
-    alert('환경설정을 불러오는데 실패했습니다.')
+    notify('환경설정을 불러오는데 실패했습니다.')
     emit('close')
   } finally {
     envLoading.value = false
@@ -230,7 +231,7 @@ async function saveEnvConfig() {
     }
     emit('close')
   } catch {
-    alert('환경설정 저장에 실패했습니다.')
+    notify('환경설정 저장에 실패했습니다.')
   } finally {
     envSaving.value = false
   }

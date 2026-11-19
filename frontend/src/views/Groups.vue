@@ -635,6 +635,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify as showNotice } from '../utils/dialogs'
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGroupStore } from '../stores/group.store'
@@ -1818,7 +1819,7 @@ const deleteGroup = async (group: HouseGroup) => {
     await groupStore.removeGroup(group.id)
   } catch (err) {
     console.error('구역 삭제 실패:', err)
-    alert('구역 삭제에 실패했습니다.')
+    showNotice('구역 삭제에 실패했습니다.')
   }
 }
 

@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../../utils/dialogs'
 import { ref, computed, onMounted } from 'vue'
 import { useGroupStore } from '@/stores/group.store'
 import { useNotificationStore } from '@/stores/notification.store'
@@ -194,9 +195,9 @@ async function commitSave() {
   }
 }
 
-function onCloseAttempt() {
+async function onCloseAttempt() {
   if (hasChanges.value) {
-    if (!window.confirm('저장하지 않은 변경이 있습니다. 닫으시겠습니까?')) return
+    if (!await askConfirm('저장하지 않은 변경이 있습니다. 닫으시겠습니까?')) return
   }
   emit('close')
 }

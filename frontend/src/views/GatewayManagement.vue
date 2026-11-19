@@ -376,6 +376,7 @@
 </template>
 
 <script setup lang="ts">
+import { askConfirm } from '../utils/dialogs'
 import { ref, computed, onMounted, onBeforeUnmount, type Directive } from 'vue'
 import { useRouter } from 'vue-router'
 import { gatewayApi } from '@/api/gateway.api'
@@ -552,7 +553,7 @@ async function onZoneChange(gw: GatewayWithTunnel, groupId: string) {
   if (newGroupId === gw.groupId) return
 
   if (newGroupId && gw.groupId && newGroupId !== gw.groupId) {
-    if (!confirm(`이 게이트웨이를 "${groupsForGateway(gw).find(g => g.id === newGroupId)?.name}" 구역으로 재할당할까요?`)) return
+    if (!await askConfirm(`이 게이트웨이를 "${groupsForGateway(gw).find(g => g.id === newGroupId)?.name}" 구역으로 재할당할까요?`)) return
   }
 
   zoneAssigning.value = gw.id
@@ -576,7 +577,7 @@ function openTerminal(gw: GatewayWithTunnel) {
 }
 
 async function removeGateway(gw: GatewayWithTunnel) {
-  if (!confirm(`"${gw.name}" 게이트웨이를 삭제할까요?`)) return
+  if (!await askConfirm(`"${gw.name}" 게이트웨이를 삭제할까요?`)) return
   try {
     await gatewayApi.remove(gw.id)
     gateways.value = gateways.value.filter(g => g.id !== gw.id)

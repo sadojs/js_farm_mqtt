@@ -95,6 +95,7 @@
 </template>
 
 <script setup lang="ts">
+import { notify } from '../../utils/dialogs'
 import { computed, onMounted, ref } from 'vue'
 import { workLogApi } from './api/work-log.api'
 import type { BoardCell, Palette, WorkLog, WorkTaskType } from './types/work-log.types'
@@ -234,7 +235,7 @@ async function onChipMove(logId: string, date: string) {
     await workLogApi.updateLog(logId, { doneAt })
     await refreshAfterLog()
   } catch (err: any) {
-    alert(err.response?.data?.message || '날짜 이동에 실패했습니다.')
+    notify(err.response?.data?.message || '날짜 이동에 실패했습니다.')
   }
 }
 

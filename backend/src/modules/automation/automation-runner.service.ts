@@ -321,6 +321,10 @@ export class AutomationRunnerService {
   async executeRule(rule: AutomationRule) {
     const evaluatedAt = new Date();
 
+    // 고온 > 비: 비가 오는 중이면 고온 여부를 먼저 새로 판정해 닫힘 양보 상태를 맞춘다
+    if (rule.groupId && this.rainOverride.getZoneState(rule.groupId).rainDetected) {
+      await this.highTempOverride.isActive(rule.groupId).catch(() => false);
+    }
     // 비 감지 우회: 개폐기 룰이고 해당 구역에 비 감지 우회 활성 시 즉시 skip
     if (this.rainOverride.isOpenerRainOverridden(rule.groupId) && await this.isOpenerRule(rule)) {
       this.dropState(rule.id);
