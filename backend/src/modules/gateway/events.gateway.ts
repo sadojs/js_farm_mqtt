@@ -383,6 +383,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     void this.ownerOfGroup(payload.groupId).then((owner) => this.emitToFarm(owner, 'rain:override', payload));
   }
 
+  /** 룰끼리 같은 장치를 반대로 제어 — 사용자에게 한쪽을 비활성화할지 묻는 팝업 */
+  broadcastAutomationConflict(ownerId: string, payload: object) {
+    this.emitToFarm(ownerId, 'automation:conflict', payload);
+  }
+
   // 고온 무대기 강제열림 상태 브로드캐스트 (구역 단위)
   broadcastHighTempOverride(payload: { groupId: string; active: boolean; temperature?: number | null; threshold?: number | null }) {
     void this.ownerOfGroup(payload.groupId).then((owner) => this.emitToFarm(owner, 'high-temp:override', payload));

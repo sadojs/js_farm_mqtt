@@ -8,6 +8,7 @@ import { AutomationRunnerService } from './automation-runner.service';
 import { IrrigationSchedulerService } from './irrigation-scheduler.service';
 import { DevicesService } from '../devices/devices.service';
 import { Device } from '../devices/entities/device.entity';
+import { DeviceArbiterService } from './device-arbiter.service';
 
 @Injectable()
 export class AutomationService {
@@ -20,6 +21,7 @@ export class AutomationService {
     private readonly runnerService: AutomationRunnerService,
     private readonly irrigationScheduler: IrrigationSchedulerService,
     private readonly devicesService: DevicesService,
+    private readonly arbiter: DeviceArbiterService,
   ) {}
 
   async findAll(userId: string | null) {
@@ -103,6 +105,38 @@ export class AutomationService {
     }
 
     return this.withTarget(saved);
+  }
+
+  /** 룰끼리 같은 장치를 반대로 제어 중인 충돌 목록 — 팝업이 새로고침/재접속 뒤에도 뜨도록 */
+  getConflicts(userId: string | null) {
+    return this.arbiter.listConflicts(userId);
+  }
+
+  /**
+   * 충돌 해소 — 'disable_loser': 우선순위에서 밀린 룰을 비활성화(사용자가 "설정"을 고른 경우),
+   * 'dismiss': 그대로 두기(하루 동안 다시 묻지 않음).
+   */
+  async resolveConflict(userId: string | null, id: string, action: 'disable_loser' | 'dismiss') {
+    const conflict = this.arbiter.getConflict(id);
+    if (!conflict) return { resolved: false, reason: 'not_found' };
+    if (userId && conflict.userId !== userId) throw new NotFoundException();
+    if (action === 'dismiss') {
+      this.arbiter.dismissConflict(id);
+      return { resolved: true, action };
+    }
+    const rule = await this.rulesRepo.findOne({ where: { id: conflict.loser.ruleId } });
+    if (rule?.enabled) {
+      rule.enabled = false;
+      rule.disabledReason = 'conflict';
+      rule.disabledAt = new Date();
+      const saved = await this.rulesRepo.save(rule);
+      try { await this.runnerService.onRuleToggled(saved); } catch (err: any) {
+        this.logger.warn(`onRuleToggled(충돌 해소) 실패: ${err?.message ?? err}`);
+      }
+      this.logger.log(`[conflict] 사용자 결정 — "${rule.name}" 비활성화 (우선 룰: "${conflict.winner.name}")`);
+    }
+    this.arbiter.resolveConflict(id);
+    return { resolved: true, action, disabledRule: rule ? { id: rule.id, name: rule.name } : null };
   }
 
   async toggle(id: string, userId: string | null, options?: { autoEnableRemote?: boolean }) {

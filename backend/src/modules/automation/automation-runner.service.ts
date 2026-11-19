@@ -10,6 +10,7 @@ import { EventsGateway } from '../gateway/events.gateway';
 import { DevicesService } from '../devices/devices.service';
 import { RainOverrideService } from '../rain-override/rain-override.service';
 import { HighTempOverrideService } from './high-temp-override.service';
+import { DeviceArbiterService, Want, ArbiterSource } from './device-arbiter.service';
 import { isGatewayLatched } from '../../common/emergency/emergency-latch';
 
 type LogicOp = 'AND' | 'OR';
@@ -35,6 +36,8 @@ export class AutomationRunnerService {
 
   // 이전 실행 상태 캐시: ruleId → { matched, relayOnPhase, hysteresisAction }
   private readonly lastState = new Map<string, { matched: boolean; relayOnPhase?: boolean; hysteresisAction?: 'on' | 'off' | 'hold'; cycleAnchorMs?: number; directionStartMs?: number; targetIds?: string[] }>();
+  /** 중재기에서 밀려 이번 평가에서 건너뛸 장치 — ruleId → deviceIds (executeAction 이 읽는다) */
+  private readonly arbiterBlocked = new Map<string, Set<string>>();
   /** 센서 끊김으로 멈춘 룰 — 같은 알림을 반복하지 않기 위한 표시 */
   private readonly staleNotified = new Set<string>();
   /** 센서 끊김으로 월별 시간표(백업)로 운전 중인 개폐기 룰 — 전환 시점에만 알리기 위함 */
@@ -52,6 +55,7 @@ export class AutomationRunnerService {
     private readonly rainOverride: RainOverrideService,
     private readonly highTempOverride: HighTempOverrideService,
     private readonly dataSource: DataSource,
+    private readonly arbiter: DeviceArbiterService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -146,7 +150,7 @@ export class AutomationRunnerService {
    *  - 룰 disable 시 device의 sticky 상태도 정리하여 UI 토글이 즉시 반영
    */
   async onRuleToggled(rule: AutomationRule): Promise<void> {
-    this.lastState.delete(rule.id);
+    this.dropState(rule.id);
     const ids = this.extractTargetDeviceIds(rule);
     for (const id of ids) {
       const dev = await this.devicesRepo.findOne({ where: { id } });
@@ -199,7 +203,7 @@ export class AutomationRunnerService {
    *  꺼지던 문제.)
    */
   async onRuleStoppedForDevice(rule: AutomationRule, deviceId: string): Promise<void> {
-    this.lastState.delete(rule.id);
+    this.dropState(rule.id);
     const ids = new Set<string>([deviceId]);
     const dev = await this.devicesRepo.findOne({ where: { id: deviceId } });
     if (dev?.pairedDeviceId) ids.add(dev.pairedDeviceId);
@@ -260,12 +264,66 @@ export class AutomationRunnerService {
     return [...ids];
   }
 
+  /** 룰 상태 캐시를 지우고 중재기 요청도 철회한다 (룰이 멈추거나 바뀐 경우) */
+  private dropState(ruleId: string) {
+    this.lastState.delete(ruleId);
+    this.arbiterBlocked.delete(ruleId);
+    this.arbiter.releaseAll('rule', ruleId);
+    this.arbiter.releaseAll('backup_schedule', ruleId);
+  }
+
+  /** 개폐기 열림/닫힘 쌍을 하나로 묶는 키 — 둘 중 어느 쪽 id 로 와도 같다 */
+  private async arbiterDeviceKey(device: Device): Promise<string> {
+    const isOpener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+    if (isOpener && device.pairedDeviceId) return [device.id, device.pairedDeviceId].sort()[0];
+    return device.id;
+  }
+
+  /**
+   * 이 룰이 지금 원하는 상태를 중재기에 등록하고, 더 우선하는 다른 룰에 밀리는 장치 id 를 돌려준다.
+   * (이전: 우선순위 높은 룰이 먼저 실행된 뒤 낮은 룰이 같은 장치에 반대 명령을 덮어썼다.)
+   */
+  private async claimForRule(
+    rule: AutomationRule,
+    isOpener: boolean,
+    hysteresisAction: 'on' | 'off' | 'hold' | undefined,
+    source: ArbiterSource,
+  ): Promise<{ blocked: Set<string>; total: number }> {
+    const action: any = Array.isArray(rule.actions) ? rule.actions[0] : rule.actions;
+    const targets = await this.resolveOpenerTargets(action, hysteresisAction)
+      .then((t) => t ?? this.extractTargetDeviceIds(rule));
+    const blocked = new Set<string>();
+    for (const id of new Set(targets)) {
+      const device = await this.devicesRepo.findOne({ where: { id } });
+      if (!device) continue;
+      const opener = device.equipmentType === 'opener_open' || device.equipmentType === 'opener_close';
+      const want: Want = opener
+        ? (device.equipmentType === 'opener_open' ? 'open' : 'close')
+        : (action?.command === 'off' ? 'off' : 'on');
+      const decision = this.arbiter.claim({
+        deviceKey: await this.arbiterDeviceKey(device),
+        source,
+        key: rule.id,
+        want,
+        rulePriority: rule.priority ?? 0,
+        label: rule.name,
+        userId: rule.userId,
+        deviceName: device.name,
+      });
+      if (!decision.allowed) {
+        blocked.add(id);
+        this.logger.log(`[arbiter] ${rule.name} → ${device.name} 보류: ${this.arbiter.explain(await this.arbiterDeviceKey(device))}`);
+      }
+    }
+    return { blocked, total: new Set(targets).size };
+  }
+
   async executeRule(rule: AutomationRule) {
     const evaluatedAt = new Date();
 
     // 비 감지 우회: 개폐기 룰이고 해당 구역에 비 감지 우회 활성 시 즉시 skip
     if (this.rainOverride.isOpenerRainOverridden(rule.groupId) && await this.isOpenerRule(rule)) {
-      this.lastState.delete(rule.id);
+      this.dropState(rule.id);
       return { executed: false, reason: 'rain_override_active' };
     }
 
@@ -318,10 +376,32 @@ export class AutomationRunnerService {
         );
         await this.notifyIfSensorStale(rule).catch(() => undefined);
       }
-      this.lastState.delete(rule.id);
+      this.dropState(rule.id);
       return { executed: false, reason: 'conditions_not_met', details: conditionResult.details };
     }
     this.staleNotified.delete(rule.id);
+
+    // 장치 목표 상태 중재 — 룰이 끝나는 중(비-개폐기의 히스테리시스 '끄기')이 아니면 요청을 등록하고,
+    // 같은 장치를 반대로 원하는 더 우선하는 룰이 있으면 이 룰은 이번 평가에서 그 장치를 건드리지 않는다.
+    {
+      const endingNonOpener = !isOpener && !holdAsOn
+        && this.extractHysteresisAction(conditionResult.details) === 'off'
+        && (Array.isArray(rule.actions) ? rule.actions[0] : rule.actions)?.command !== 'off';
+      if (endingNonOpener) {
+        this.arbiter.releaseAll('rule', rule.id);
+        this.arbiterBlocked.delete(rule.id);
+      } else {
+        const claimAction = holdAsOn ? 'on' : this.extractHysteresisAction(conditionResult.details);
+        const { blocked, total } = await this.claimForRule(rule, isOpener, claimAction, usingBackup ? 'backup_schedule' : 'rule');
+        if (blocked.size > 0 && blocked.size >= total) {
+          this.lastState.delete(rule.id); // 요청은 유지(충돌 추적), 실행 상태만 비운다
+          this.arbiterBlocked.delete(rule.id);
+          return { executed: false, reason: 'arbiter_blocked', blocked: [...blocked] };
+        }
+        if (blocked.size > 0) this.arbiterBlocked.set(rule.id, blocked);
+        else this.arbiterBlocked.delete(rule.id);
+      }
+    }
 
     // 릴레이 모드 체크: 조건이 매칭된 시간 범위 내에서 ON/OFF 사이클 실행
     // 히스테리시스(방향: on=열기, off=닫기)를 먼저 산출 — 사이클 anchor/10분 캡의 세션 경계 판정용.
@@ -359,7 +439,7 @@ export class AutomationRunnerService {
           await this.clearRelayActivePhase(rule).catch(err =>
             this.logger.warn(`relayActivePhase 해제 실패: ${err.message}`)
           );
-          this.lastState.delete(rule.id);
+          this.dropState(rule.id);
           // 활성 → 비활성 전환은 "변화 시점" — 로그 1건만 남긴다.
           // (사용자가 환풍기 등이 언제 꺼졌는지 추적 가능)
           if (wasActive) {
@@ -408,7 +488,7 @@ export class AutomationRunnerService {
       await this.clearRelayActivePhase(rule).catch(err =>
         this.logger.warn(`룰 종료 처리 실패: ${err.message}`)
       );
-      this.lastState.delete(rule.id);
+      this.dropState(rule.id);
       if (wasActive) {
         await this.logsRepo.save(
           this.logsRepo.create({
@@ -938,7 +1018,12 @@ export class AutomationRunnerService {
     }
 
     const results: any[] = [];
+    const arbiterSkip = this.arbiterBlocked.get(rule.id);
     for (const device of candidateDevices) {
+      if (arbiterSkip?.has(device.id)) {
+        results.push({ deviceId: device.id, deviceName: device.name, success: true, skipped: true });
+        continue;
+      }
       // 수동/타이머 우회 활성 device 는 룰 실행 대상에서 제외(relay 경로와 동일). 만료 시 자동 복귀.
       if (isGatewayLatched(device.gatewayId)) {
         this.logger.log(`[emergency] ${device.name} 비상 정지 유지 중 — 룰 실행 skip (rule=${rule.name})`);

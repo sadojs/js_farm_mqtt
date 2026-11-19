@@ -415,6 +415,7 @@
     </main>
 
     <ConfirmDialog />
+    <RuleConflictModal v-if="isAuthenticated && (isAdmin || isFarmAdmin)" />
     <ToastContainer />
     <VoiceAssistant v-if="showShell" />
     <UserSettingsModal
@@ -444,6 +445,7 @@ import { useWebSocket } from './composables/useWebSocket'
 import { initNativePush } from './composables/useNativePush'
 import ConfirmDialog from './components/common/ConfirmDialog.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
+import RuleConflictModal from './components/common/RuleConflictModal.vue'
 import NotificationCenter from './components/common/NotificationCenter.vue'
 import VoiceAssistant from './modules/voice-assistant/VoiceAssistant.vue'
 import UserSettingsModal from './components/common/UserSettingsModal.vue'

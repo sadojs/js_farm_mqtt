@@ -3,6 +3,7 @@ import { seed, USERS, id } from './utils/seed';
 import { AutomationRunnerService } from '../src/modules/automation/automation-runner.service';
 import { AutomationRule } from '../src/modules/automation/entities/automation-rule.entity';
 import { EventsGateway } from '../src/modules/gateway/events.gateway';
+import { DeviceArbiterService } from '../src/modules/automation/device-arbiter.service';
 
 /**
  * 자동 제어 회귀 — docs/03-analysis/service-review-2026-11-17.md R1~R4.
@@ -47,6 +48,7 @@ describe('자동 제어 — 히스테리시스 · 룰 충돌 · 센서 신선도
     await t.ds.query(`delete from sensor_data where device_id=$1`, [SENSOR]);
     await t.ds.query(`update devices set device_settings='{}'::jsonb where id=$1`, [FAN]);
     (t.app.get(AutomationRunnerService) as any).lastState.clear();
+    t.app.get(DeviceArbiterService).reset(); // 테스트가 룰 행을 직접 지우므로 중재기 요청도 비운다
   };
   const relay = { relay: true, relayOnSeconds: 3000, relayOffSeconds: 600 }; // 테스트 동안은 항상 '동작' 구간
 

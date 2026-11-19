@@ -56,6 +56,14 @@ export const automationApi = {
 
   restoreBulkStoppedRules: (ruleIds?: string[]) =>
     apiClient.post<{ restored: { id: string; name: string }[] }>(`/automation/rules/restore`, ruleIds ? { ruleIds } : {}),
+
+  // 룰 충돌(같은 장치를 반대로 제어) — 목록 / 해소(밀린 룰 비활성화 · 그대로 두기)
+  getConflicts: () =>
+    apiClient.get<import('../composables/useWebSocket').RuleConflictPayload[]>('/automation/conflicts'),
+
+  resolveConflict: (id: string, action: 'disable_loser' | 'dismiss') =>
+    apiClient.post<{ resolved: boolean; disabledRule?: { id: string; name: string } | null }>(
+      '/automation/conflicts/resolve', { id, action }),
 }
 
 export interface IrrigationRuleSummary {

@@ -70,6 +70,22 @@ export function onHighTempOverride(fn: HighTempOverrideHandler) {
   return () => highTempOverrideHandlers.delete(fn)
 }
 
+// 룰 충돌(같은 장치를 반대로 제어하는 두 룰) — 사용자에게 한쪽을 비활성화할지 묻는 팝업
+export interface RuleConflictPayload {
+  id: string
+  deviceKey: string
+  deviceName: string
+  winner: { ruleId: string; name: string; want: string; priority: number }
+  loser: { ruleId: string; name: string; want: string; priority: number }
+  createdAt: string
+}
+type AutomationConflictHandler = (data: RuleConflictPayload) => void
+const automationConflictHandlers = new Set<AutomationConflictHandler>()
+export function onAutomationConflict(fn: AutomationConflictHandler) {
+  automationConflictHandlers.add(fn)
+  return () => automationConflictHandlers.delete(fn)
+}
+
 export const socketStatus = readonly({
   connected: _connected,
   reconnecting: _reconnecting,
@@ -255,6 +271,11 @@ export function useWebSocket() {
     // 고온 무대기 강제열림 상태 (구역 단위)
     socket.on('high-temp:override', (data: Parameters<HighTempOverrideHandler>[0]) => {
       highTempOverrideHandlers.forEach(fn => fn(data))
+    })
+
+    // 룰 충돌 팝업
+    socket.on('automation:conflict', (data: RuleConflictPayload) => {
+      automationConflictHandlers.forEach(fn => fn(data))
     })
 
     // 일반 알림

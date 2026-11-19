@@ -163,6 +163,20 @@ export class AutomationController {
     return this.automationService.restoreBulkStoppedRules(this.getEffectiveUserId(user), dto?.ruleIds);
   }
 
+  /** 룰 충돌(같은 장치를 반대로 제어) 목록 */
+  @Get('conflicts')
+  getConflicts(@CurrentUser() user: any) {
+    return this.automationService.getConflicts(this.getEffectiveUserId(user));
+  }
+
+  /** 룰 충돌 해소 — disable_loser: 밀린 룰 비활성화 / dismiss: 그대로 두기 */
+  @Post('conflicts/resolve')
+  @Roles('admin', 'farm_admin')
+  resolveConflict(@CurrentUser() user: any, @Body() dto: { id: string; action: 'disable_loser' | 'dismiss' }) {
+    return this.automationService.resolveConflict(
+      this.getEffectiveUserId(user), dto.id, dto.action === 'disable_loser' ? 'disable_loser' : 'dismiss');
+  }
+
   @Get('logs/stats')
   getLogStats(@CurrentUser() user: any) {
     return this.automationService.getLogStats(this.getEffectiveUserId(user));
