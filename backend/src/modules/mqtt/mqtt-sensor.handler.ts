@@ -58,6 +58,11 @@ export class MqttSensorHandler {
     });
     if (!device) return;
 
+    // 단일 스위치 장치의 상태 보고 → 명령 반영 확인(CommandAckService)
+    if (typeof data.state === 'string' && (data.state.toUpperCase() === 'ON' || data.state.toUpperCase() === 'OFF')) {
+      this.eventEmitter.emit('device.state_reported', { deviceId: device.id, on: data.state.toUpperCase() === 'ON' });
+    }
+
     for (const [key, mapping] of Object.entries(SENSOR_MAP)) {
       if (data[key] == null) continue;
       // boolean 채널은 true/false를 1/0으로 변환

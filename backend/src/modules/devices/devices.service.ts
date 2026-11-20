@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { RainOverrideService } from '../rain-override/rain-override.service';
 import { Device } from './entities/device.entity';
+import { CommandAckService } from './command-ack.service';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { GatewayOnboardDevice } from '../gateway-env/entities/gateway-onboard-device.entity';
@@ -49,6 +50,7 @@ export class DevicesService {
     private activityLog: ActivityLogService,
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
+    private commandAck: CommandAckService,
   ) {}
 
   /**
@@ -280,6 +282,8 @@ export class DevicesService {
       rainOverrideDisabled: !!settings.rainOverrideDisabled,
       // 수동 우회 정책 — frontend가 배지 표시용으로 사용
       userOverride: !!settings.userOverride,
+      // 명령 미반영(재전송 3회 후에도 상태 보고 없음) — 카드의 빨간 표시·다시 보내기
+      commandUnconfirmed: settings.commandUnconfirmed ?? null,
       ruleIntendedState: settings.ruleIntendedState ?? null,
       // 임시 타이머(override-until) — frontend 카운트다운/배지용
       overrideUntil: settings.overrideUntil ?? null,
@@ -1073,6 +1077,8 @@ export class DevicesService {
           //    듀티사이클 마커) 때문에 '대기 phase OFF skip'으로 무시돼(sticky ON), 실제로는
           //    꺼졌는데 UI엔 계속 ON으로 남아 열림·닫힘이 둘 다 켜진 것처럼 보인다.
           //    (relayActivePhase 를 미리 지워두면 그 피드백이 정상적으로 OFF 로 반영됨.)
+          // 반대편에 아직 확인 중인 ON 명령이 있으면 그만둔다 — 재전송이 인터록을 깨지 않도록
+          this.commandAck.cancel(paired.id);
           const ps: any = paired.deviceSettings || {};
           ps.switchState = false;
           ps.switchStates = { ...(ps.switchStates || {}), state: false, switch_1: false };
@@ -1125,7 +1131,7 @@ export class DevicesService {
         throw new BadRequestException(`onboard 장치는 state 명령만 지원합니다.`);
       }
       const isOn = stateCmd.value === true || stateCmd.value === 'ON' || stateCmd.value === 1;
-      await this.mqttService.publishGpioRelay(gateway.gatewayId, {
+      const gpioPayload = {
         slot: slot.slotKey,
         pin: slot.gpioPin,
         state: isOn,
@@ -1133,7 +1139,15 @@ export class DevicesService {
         ...(isOn && interlockPartnerPin != null ? { interlockPin: interlockPartnerPin } : {}),
         // 동작 펄스: state=ON + durationMs 면 gpio-agent가 durationMs 뒤 자동 OFF (모터 연속통전 방지)
         ...(durationMs && durationMs > 0 && isOn ? { durationMs } : {}),
-      });
+      };
+      await this.mqttService.publishGpioRelay(gateway.gatewayId, gpioPayload);
+      // 명령 반영 확인 — gpio/status 가 안 오면 다시 보내고, 끝내 안 되면 "명령 미반영" 알림
+      if (device.equipmentType !== 'irrigation' && device.equipmentType !== 'controller') {
+        this.commandAck.expect(device, isOn, async () => {
+          if (isOn && isGatewayLatched(device.gatewayId)) { this.commandAck.cancel(device.id); return; }
+          await this.mqttService.publishGpioRelay(gateway.gatewayId, gpioPayload);
+        });
+      }
       // 상태 기록 (verify 응답용)
       const settings = (device.deviceSettings || {}) as any;
       settings.switchStates = { ...(settings.switchStates || {}), state: isOn, switch_1: isOn };
@@ -1164,6 +1178,14 @@ export class DevicesService {
     // TS0601 multi-channel은 switch_N → state_lN 으로 키 변환 + "ON"/"OFF" 문자열 강제
     const mqttCommandForZ2m = this.normalizeForZ2m(mqttCommand, device.zigbeeModel);
     await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommandForZ2m);
+    // 명령 반영 확인 (단일 스위치 Zigbee 장치) — z2m 상태 보고가 안 오면 재전송·미반영 알림
+    if (!isMultiChannel && (mqttCommand as any).state !== undefined) {
+      const wantOn = (mqttCommand as any).state === 'ON';
+      this.commandAck.expect(device, wantOn, async () => {
+        if (wantOn && isGatewayLatched(device.gatewayId)) { this.commandAck.cancel(device.id); return; }
+        await this.mqttService.controlDevice(gateway.gatewayId, device.friendlyName, mqttCommandForZ2m);
+      });
+    }
 
     // Zigbee 장치 상태 낙관적(optimistic) 기록 — verify가 통과되도록
     // (z2m 응답이 ms 단위로 약간 늦어 verify(1초 후)가 false negative 발생하던 문제 해결)

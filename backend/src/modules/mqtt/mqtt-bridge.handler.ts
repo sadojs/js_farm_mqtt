@@ -1,6 +1,7 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GatewayManagerService } from '../gateway-manager/gateway-manager.service';
 import { EventsGateway } from '../gateway/events.gateway';
 import { ZigbeeDevice } from './mqtt.types';
@@ -21,6 +22,7 @@ export class MqttBridgeHandler {
     private eventsGateway: EventsGateway,
     @InjectRepository(Device) private deviceRepo: Repository<Device>,
     @InjectRepository(GatewayOnboardDevice) private onboardRepo: Repository<GatewayOnboardDevice>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async handleBridgeState(gatewayId: string, payload: Buffer) {
@@ -114,6 +116,12 @@ export class MqttBridgeHandler {
             }
           }
           if (device) {
+            // 명령 반영 확인(CommandAckService) — 아래 '대기 phase skip' return 보다 먼저
+            if (device.equipmentType !== 'irrigation') {
+              this.eventEmitter.emit('device.state_reported', {
+                deviceId: device.id, on: !!data.state, rejected: (data as any).rejected,
+              });
+            }
             const settings: any = device.deviceSettings || {};
             if (device.equipmentType === 'irrigation') {
               // 관수: switchStates 다중 키 갱신 (channelMapping의 mapping value = relay_<slotKey>)

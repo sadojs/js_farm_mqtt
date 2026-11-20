@@ -297,6 +297,8 @@
                   <span v-if="highTempActiveZones.has(group.id)" class="hightemp-badge" title="고온 무대기 강제열림 동작 중 — 개폐기를 대기 없이 연속 개방 중입니다">
                     🔥 고온 강제열림
                   </span>
+                  <button v-if="unconfirmedOpener(og)" type="button" class="unconfirmed-badge" @click.stop="resendOpener(og)"
+                    title="명령을 여러 번 보냈지만 장치가 응답하지 않았습니다. 눌러서 다시 보내기">⚠ 미반영</button>
                   <span v-if="openerTimerOf(og)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(og.openDevice)" title="타이머 해제 → 자동제어 복귀">
                     <span class="timer-dot"></span>{{ openerTimerOf(og)!.direction === 'open' ? '열기' : '닫기' }} {{ formatCountdown(openerTimerOf(og)!.until) }}<span class="timer-x">✕</span>
                   </span>
@@ -423,6 +425,8 @@
                       title="이름 변경"
                     >✎</button>
                   </template>
+                  <button v-if="unconfirmedOf(device.id)" type="button" class="unconfirmed-badge" @click.stop="resendDevice(device.id)"
+                    title="명령을 여러 번 보냈지만 장치가 응답하지 않았습니다. 눌러서 다시 보내기">⚠ 미반영</button>
                   <span v-if="isActive(device.overrideUntil)" class="timer-badge" @click.stop="cancelDeviceTimerFromCard(device)" title="타이머 해제 → 자동제어 복귀">
                     <span class="timer-dot"></span>{{ formatCountdown(device.overrideUntil) }}<span class="timer-x">✕</span>
                   </span>
@@ -1509,6 +1513,27 @@ async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: strin
   }
 }
 
+// ── 명령 미반영 표시 (서버가 3번 다시 보냈는데도 장치 응답 없음) ──
+function unconfirmedOf(id: string) {
+  return deviceStore.devices.find(d => d.id === id)?.commandUnconfirmed ?? null
+}
+function unconfirmedOpener(og: OpenerGroupInfo) {
+  return unconfirmedOf(og.openDevice.id) || unconfirmedOf(og.closeDevice.id)
+}
+function resendDevice(id: string) {
+  const f = unconfirmedOf(id)
+  if (f) handleControl(id, f.on)
+}
+function resendOpener(og: OpenerGroupInfo) {
+  const fo = unconfirmedOf(og.openDevice.id)
+  const fc = unconfirmedOf(og.closeDevice.id)
+  if (fo?.on) return handleOpenerInterlock(og, 'open')
+  if (fc?.on) return handleOpenerInterlock(og, 'close')
+  // 끄기 명령이 반영되지 않은 경우 — 같은 쪽 끄기를 다시 보낸다
+  const id = fo ? og.openDevice.id : og.closeDevice.id
+  handleControl(id, false)
+}
+
 const handleControl = async (deviceId: string, turnOn: boolean) => {
   if (controllingId.value) return
   const device = deviceStore.devices.find(d => d.id === deviceId)
@@ -2420,6 +2445,13 @@ onBeforeUnmount(() => {
 }
 
 /* 수동 우회 배지 — 자동제어 룰 의도와 다르게 수동 조작된 상태 표시 */
+.unconfirmed-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: calc(11px * var(--content-scale, 1)); font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; border: 1px solid var(--danger);
+  background: var(--danger-bg); color: var(--danger);
+  white-space: nowrap; cursor: pointer;
+}
 .manual-override-badge {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: calc(11px * var(--content-scale, 1));

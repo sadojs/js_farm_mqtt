@@ -135,6 +135,8 @@ export interface Device {
   rainOverrideDisabled?: boolean
   /** 수동 우회 활성 — 사용자가 룰 의도와 다르게 토글하여 룰이 일시 정지된 상태 */
   userOverride?: boolean
+  /** 명령을 여러 번 보냈지만 장치가 상태를 보고하지 않음 (명령 미반영) */
+  commandUnconfirmed?: { at: string; on: boolean } | null
   /** 룰이 마지막으로 의도한 상태 (true=ON 유지, null=룰 inactive) — 다음 사용자 토글 판정용 */
   ruleIntendedState?: boolean | null
   /** 임시 타이머 만료 시각 ISO (팬·개폐기 장치 단위). 만료 시 자동제어 복귀. */

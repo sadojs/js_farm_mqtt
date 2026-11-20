@@ -181,10 +181,13 @@ export function useWebSocket() {
       switchState: boolean | null;
       switchStates?: Record<string, boolean> | null;
       online?: boolean;
+      commandUnconfirmed?: { at: string; on: boolean } | null;
     }) => {
       const deviceStore = useDeviceStore()
       const dev = deviceStore.devices.find(d => d.id === data.deviceId)
       if (dev) {
+        // 명령 미반영 표시 (명령 확인 결과가 담긴 갱신에만 들어 있다)
+        if ('commandUnconfirmed' in data) (dev as any).commandUnconfirmed = data.commandUnconfirmed ?? null
         if (data.switchState !== null && data.switchState !== undefined) {
           (dev as any).switchState = data.switchState
         }

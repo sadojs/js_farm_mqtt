@@ -11,6 +11,8 @@ import { GatewayModule } from '../gateway/gateway.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { RainOverrideModule } from '../rain-override/rain-override.module';
 import { AutomationModule } from '../automation/automation.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { CommandAckService } from './command-ack.service';
 
 @Module({
   imports: [
@@ -20,9 +22,10 @@ import { AutomationModule } from '../automation/automation.module';
     ActivityLogModule,
     forwardRef(() => RainOverrideModule),
     forwardRef(() => AutomationModule),
+    NotificationsModule,
   ],
   controllers: [DevicesController],
-  providers: [DevicesService],
-  exports: [DevicesService],
+  providers: [DevicesService, CommandAckService],
+  exports: [DevicesService, CommandAckService],
 })
 export class DevicesModule {}
