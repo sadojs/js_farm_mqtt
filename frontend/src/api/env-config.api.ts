@@ -104,3 +104,25 @@ export const envConfigApi = {
   getResolved: (groupId: string) =>
     apiClient.get<Record<string, ResolvedValue>>(`/env-config/groups/${groupId}/resolved`),
 }
+
+// ── 환경 경보 (내부 온도·습도 높음, 토양 수분 낮음 — 지속 시간 기본 5분) ──
+export interface EnvAlertItem {
+  key: 'temp_high' | 'humidity_high' | 'soil_low'
+  enabled: boolean
+  threshold: number
+  minutes: number
+  label?: string
+  unit?: string
+  dir?: 'high' | 'low'
+}
+export interface EnvAlertSettings {
+  groupId: string
+  saved: boolean
+  channel: 'push' | 'center'
+  items: EnvAlertItem[]
+}
+export const envAlertsApi = {
+  get: (groupId: string) => apiClient.get<EnvAlertSettings>(`/env-alerts/groups/${groupId}`),
+  save: (groupId: string, body: { items: EnvAlertItem[]; channel: 'push' | 'center' }) =>
+    apiClient.put<EnvAlertSettings>(`/env-alerts/groups/${groupId}`, body),
+}

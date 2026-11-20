@@ -112,6 +112,38 @@
               <input type="number" min="-10" max="100" step="0.5" v-model.number="deviceForm.highTempOpenThreshold" class="env-source-select" placeholder="예: 35" />
             </div>
           </template>
+
+          <!-- 환경 경보 — 숫자가 오래 넘으면 알림 (순간적인 튀는 값은 무시) -->
+          <template v-if="alertForm">
+            <div class="env-section-label" style="margin-top: 16px;">
+              환경 경보
+              <span class="env-unit">· {{ alertForm.saved ? '사용 중' : '아직 저장 전 — 저장하면 감시를 시작합니다' }}</span>
+            </div>
+            <p class="device-hint">순간적으로 튀는 값은 무시하고, 지속 시간을 넘길 때만 한 번 알립니다. 정상으로 돌아오면 한 번 더 알립니다.</p>
+            <div v-for="item in alertForm.items" :key="item.key" class="alert-row" :class="{ off: !item.enabled }">
+              <label class="alert-toggle">
+                <input type="checkbox" v-model="item.enabled" @change="alertTouched = true" />
+                <span class="alert-pill" :class="{ on: item.enabled }">{{ item.enabled ? '켜짐' : '꺼짐' }}</span>
+              </label>
+              <span class="alert-text">
+                {{ item.label }}가
+                <input type="number" class="alert-num" step="0.5" v-model.number="item.threshold" :aria-label="`${item.label} 기준`" @input="alertTouched = true" />{{ item.unit }}
+                {{ item.dir === 'low' ? '이하' : '이상' }}인 상태가
+                <input type="number" class="alert-num" min="1" max="180" v-model.number="item.minutes" aria-label="지속 시간(분)" @input="alertTouched = true" />분
+                이어지면 알림
+              </span>
+            </div>
+            <div class="alert-channel">
+              <label class="env-role-label" for="alert-channel">알림 받는 곳</label>
+              <select id="alert-channel" v-model="alertForm.channel" class="env-source-select" @change="alertTouched = true">
+                <option value="push">앱 푸시 + 알림 센터</option>
+                <option value="center">알림 센터만</option>
+              </select>
+            </div>
+            <p v-if="!hasInternalTemp" class="device-hint" style="margin-top: 8px;">
+              내부 온도·습도 경보는 위 "내부 환경"에서 센서를 지정해야 동작합니다. 토양 수분은 이 구역 센서의 평균값을 씁니다.
+            </p>
+          </template>
         </template>
       </div>
       <div class="env-modal-footer">
@@ -126,11 +158,12 @@
 
 <script setup lang="ts">
 import { notify } from '../../utils/dialogs'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { envConfigApi } from '../../api/env-config.api'
 import { groupApi } from '../../api/group.api'
 import { useGroupStore } from '../../stores/group.store'
-import type { EnvRole, SourcesResponse, SaveMappingItem, ZoneDeviceSettings } from '../../api/env-config.api'
+import type { EnvRole, SourcesResponse, SaveMappingItem, ZoneDeviceSettings, EnvAlertSettings } from '../../api/env-config.api'
+import { envAlertsApi } from '../../api/env-config.api'
 import type { HouseGroup } from '../../types/group.types'
 
 type DeviceForm = NonNullable<ZoneDeviceSettings['settings']>
@@ -155,6 +188,10 @@ const deviceGateways = ref<ZoneDeviceSettings['gateways']>([])
 const groupName = ref('')
 const groupDesc = ref('')
 const groupStore = useGroupStore()
+// 환경 경보 — 저장 전 구역은 손대지 않으면 저장하지 않는다(의도치 않게 감시 시작 방지)
+const alertForm = ref<EnvAlertSettings | null>(null)
+const alertTouched = ref(false)
+const hasInternalTemp = computed(() => !!envMappings.value['internal_temp'] || !!envMappings.value['internal_humidity'])
 
 watch(() => props.show, async (val) => {
   if (val && props.group) {
@@ -187,6 +224,8 @@ async function loadEnvConfig(group: HouseGroup) {
       }
     }
     envMappings.value = map
+    alertTouched.value = false
+    alertForm.value = await envAlertsApi.get(group.id).then(r => r.data).catch(() => null)
   } catch (err) {
     console.error('환경설정 로드 실패:', err)
     notify('환경설정을 불러오는데 실패했습니다.')
@@ -198,6 +237,11 @@ async function loadEnvConfig(group: HouseGroup) {
 
 async function saveEnvConfig() {
   if (!props.group) return
+  // 경보 지속 시간은 저장 전에 먼저 확인 (다른 항목만 저장되고 멈추지 않도록)
+  if (alertForm.value?.items.some(i => !(i.minutes >= 1 && i.minutes <= 180))) {
+    notify('경보 지속 시간은 1~180분 사이로 입력해 주세요.', 'warning')
+    return
+  }
   envSaving.value = true
   try {
     const mappings: SaveMappingItem[] = Object.entries(envMappings.value)
@@ -229,8 +273,17 @@ async function saveEnvConfig() {
         highTempOpenThreshold: d.highTempOpenThreshold ?? null,
       })
     }
+    // 환경 경보 — 이미 쓰는 중이거나 이번에 손댄 경우에만 저장
+    if (alertForm.value && (alertForm.value.saved || alertTouched.value)) {
+      await envAlertsApi.save(props.group.id, {
+        items: alertForm.value.items.map(({ key, enabled, threshold, minutes }) => ({ key, enabled, threshold, minutes })),
+        channel: alertForm.value.channel,
+      })
+    }
     emit('close')
-  } catch {
+  } catch (e: any) {
+    const msg = e?.response?.data?.message
+    if (msg && typeof msg === 'string') { notify(msg, 'error'); return }
     notify('환경설정 저장에 실패했습니다.')
   } finally {
     envSaving.value = false
@@ -328,6 +381,28 @@ function getSelectedValue(roleKey: string): string {
 }
 .device-rain-row input { width: 18px; height: 18px; flex-shrink: 0; }
 .loading-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+.alert-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 8px;
+  background: var(--bg-secondary); border-radius: 8px;
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary);
+}
+.alert-row.off .alert-text { color: var(--text-muted); }
+.alert-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.alert-toggle input { width: 18px; height: 18px; }
+.alert-pill {
+  padding: 2px 8px; border-radius: 999px; font-size: calc(12px * var(--content-scale, 1)); font-weight: 700;
+  background: var(--bg-hover); color: var(--text-muted);
+}
+.alert-pill.on { background: var(--accent-bg); color: var(--accent); }
+.alert-text { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; line-height: 1.9; }
+.alert-num {
+  width: 64px; padding: 4px 6px; text-align: center;
+  background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border-input); border-radius: 6px;
+  font-size: calc(14px * var(--content-scale, 1));
+}
+.alert-channel { margin-top: 4px; }
 .close-btn {
   background: none; border: none; font-size: calc(20px * var(--content-scale, 1)); color: var(--text-muted);
   cursor: pointer; width: 32px; height: 32px;

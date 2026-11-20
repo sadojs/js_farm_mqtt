@@ -18,6 +18,7 @@ import { GatewayManagerModule } from './modules/gateway-manager/gateway-manager.
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { SensorAlertsModule } from './modules/sensor-alerts/sensor-alerts.module';
+import { EnvAlertsModule } from './modules/env-alerts/env-alerts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { EnvConfigModule } from './modules/env-config/env-config.module';
 import { ConfigDeployModule } from './modules/config-deploy/config-deploy.module';
@@ -70,6 +71,7 @@ import { FarmContextModule } from './common/farm-context/farm-context.module';
     DashboardModule,
     WeatherModule,
     SensorAlertsModule,
+    EnvAlertsModule,
     NotificationsModule,
     EnvConfigModule,
     ConfigDeployModule,
