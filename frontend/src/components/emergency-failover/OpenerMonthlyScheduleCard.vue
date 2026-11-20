@@ -36,7 +36,7 @@ const scheduleByMonth = computed(() => {
           :checked="openerEnabled"
           @change="emit('update:openerEnabled', ($event.target as HTMLInputElement).checked)"
         />
-        폴백 활성
+        단독 운전 사용
       </label>
       <label>
         <input

@@ -69,7 +69,7 @@
         <ul class="confirm-list">
           <li v-for="h in confirmCounts.perHouse.filter(x => x.device + x.rule + x.gateway > 0)" :key="h.id">
             <strong>{{ h.name }}</strong>
-            <span class="meta">장치 {{ h.device }} · 룰 {{ h.rule }} · 게이트웨이 {{ h.gateway }}</span>
+            <span class="meta">장치 {{ h.device }} · 규칙 {{ h.rule }} · 게이트웨이 {{ h.gateway }}</span>
           </li>
         </ul>
         <p class="note">IoT 화면에서만 숨겨지며, 실제 자동제어 / 알림 동작은 그대로 유지됩니다.</p>
@@ -160,7 +160,7 @@ function formatMeta(g: HouseGroupWithOwner): string {
   if (c) {
     if (c.device > 0) parts.push(`장치 ${c.device}`)
     if (c.gateway > 0) parts.push(`게이트웨이 ${c.gateway}`)
-    if (c.rule > 0) parts.push(`자동화 룰 ${c.rule}`)
+    if (c.rule > 0) parts.push(`자동제어 규칙 ${c.rule}`)
   }
   if (!parts.length) parts.push('등록된 IoT 장치 없음')
   if (g.description) parts.push(g.description)

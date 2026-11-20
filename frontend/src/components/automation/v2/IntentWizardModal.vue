@@ -179,7 +179,7 @@ const canProceedHint = computed(() => {
   if (step === 'irrigation-valve') return '활성화된 밸브의 관주 시간을 1분 이상으로 설정해주세요 (액비 활성 시 투여+종료전대기 ≤ 관주 시간)'
   if (step === 'device-by-intent') return '장치를 하나 이상 선택해주세요'
   if (step === 'timing') return '시간/온도 조건을 설정해주세요'
-  if (step === 'review') return '룰 이름을 입력해주세요'
+  if (step === 'review') return '규칙 이름을 입력해주세요'
   return ''
 })
 
@@ -256,12 +256,12 @@ async function handleSave() {
     if (!wizard.state.value.activateNow && result?.id) {
       await automationStore.toggleRule(result.id)
     }
-    notify.success('룰 생성 완료', `"${wizard.state.value.ruleName}" 룰이 추가되었습니다.`)
+    notify.success('규칙 생성 완료', `"${wizard.state.value.ruleName}" 규칙이 추가되었습니다.`)
     emit('saved', wizard.state.value.ruleName)
     emit('close')
   } catch (err) {
     console.error('[V2 Wizard] 룰 생성 실패:', err)
-    notify.error('저장 실패', '룰 생성에 실패했습니다. 다시 시도해주세요.')
+    notify.error('저장 실패', '규칙 생성에 실패했습니다. 다시 시도해주세요.')
   } finally {
     saving.value = false
   }

@@ -213,7 +213,7 @@ export function useWebSocket() {
       const notificationStore = useNotificationStore()
       notificationStore.info(
         '장치 교체 완료',
-        `자동제어룰 ${data.preservedRules}개가 보존되었습니다.`,
+        `자동제어 규칙 ${data.preservedRules}개가 보존되었습니다.`,
       )
     })
 

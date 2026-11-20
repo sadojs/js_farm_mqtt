@@ -44,8 +44,9 @@
       :action-fn="() => openWizard()"
     />
 
-    <!-- 구역별 그룹 + 컴팩트 행 리스트 -->
-    <div v-else class="rule-groups">
+    <!-- 구역별 그룹 + 컴팩트 행 리스트 (넓은 화면: 목록 | 선택한 규칙 나란히) -->
+    <div v-else class="rules-split" :class="{ wide: isWide }">
+    <div class="rule-groups">
       <section v-for="grp in rulesGroupedByZone" :key="grp.key" class="zone-section">
         <header class="zone-header">
           <span class="zone-icon" aria-hidden="true">
@@ -62,12 +63,12 @@
             v-for="rule in grp.rules"
             :key="rule.id"
             class="rule-row"
-            :class="{ 'is-off': !rule.enabled, reorderable: true, dragging: reorderDraggingId === rule.id }"
+            :class="{ 'is-off': !rule.enabled, reorderable: true, dragging: reorderDraggingId === rule.id, selected: isWide && selectedRuleId === rule.id }"
             :style="reorderDragStyle(rule.id)"
             :data-reorder-id="rule.id"
             :data-reorder-group="'rules:' + grp.key"
             :title="targetLabel(rule)"
-            @click="openWizard(rule)"
+            @click="onRowClick(rule)"
           >
             <span
               class="drag-grip"
@@ -120,6 +121,16 @@
         </div>
       </section>
     </div>
+    <RuleDetailPane
+      v-if="isWide"
+      :rule="selectedRule"
+      :target-text="selectedRule ? `${targetLabel(selectedRule)} · ${getRuleDeviceNames(selectedRule).join(', ') || '장치 없음'}` : ''"
+      :condition-text="selectedRule ? conditionText(selectedRule) : ''"
+      :action-text="selectedRule ? actionText(selectedRule) : ''"
+      @edit="openWizard"
+      @copy="openCopy"
+    />
+    </div>
 
     </template>
     <!-- //규칙 목록 탭 -->
@@ -148,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useAutomationStore } from '../stores/automation.store'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
@@ -163,6 +174,7 @@ import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
 import IntentWizardModal from '../components/automation/v2/IntentWizardModal.vue'
 import EmptyState from '../components/common/EmptyState.vue'
 import EquipmentIcon from '../components/common/EquipmentIcon.vue'
+import RuleDetailPane from '../components/automation/RuleDetailPane.vue'
 // AutomationLogTimeline → 작업 내역 페이지로 이전됨
 
 const automationStore = useAutomationStore()
@@ -282,6 +294,23 @@ function targetLabel(rule: AutomationRule) {
   if (!rule.houseId) return `${group.name} (구역 전체)`
   const house = (group.houses || []).find(h => h.id === rule.houseId)
   return house ? `${group.name} > ${house.name}` : `${group.name} (하우스 미지정)`
+}
+
+// ── 넓은 화면(1200px 이상): 목록을 누르면 오른쪽에 자세히, 휴대폰·태블릿 세로는 지금처럼 바로 수정 ──
+const wideQuery = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1200px)') : null
+const isWide = ref(!!wideQuery?.matches)
+const onWideChange = (e: MediaQueryListEvent) => { isWide.value = e.matches }
+const selectedRuleId = ref<string | null>(null)
+const selectedRule = computed(() => rules.value.find(r => r.id === selectedRuleId.value) ?? null)
+// 넓은 화면에서 아무것도 고르지 않았으면 첫 규칙을 보여 준다
+watch([isWide, () => rulesGroupedByZone.value], () => {
+  if (!isWide.value) return
+  if (selectedRuleId.value && rules.value.some(r => r.id === selectedRuleId.value)) return
+  selectedRuleId.value = rulesGroupedByZone.value[0]?.rules[0]?.id ?? null
+})
+function onRowClick(rule: AutomationRule) {
+  if (isWide.value) selectedRuleId.value = rule.id
+  else openWizard(rule)
 }
 
 function openWizard(rule?: AutomationRule) {
@@ -437,8 +466,14 @@ const rulesGroupedByZone = computed<ZoneGroup[]>(() => {
   return arr
 })
 
-onMounted(() => document.addEventListener('click', closeMenu))
-onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
+onMounted(() => {
+  document.addEventListener('click', closeMenu)
+  wideQuery?.addEventListener('change', onWideChange)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMenu)
+  wideQuery?.removeEventListener('change', onWideChange)
+})
 
 onMounted(async () => {
   await Promise.all([
@@ -455,6 +490,17 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 0 auto;
 }
+/* 넓은 화면: 목록 | 선택한 규칙 */
+@media (min-width: 1200px) {
+  .page-container { max-width: 1480px; }
+}
+.rules-split.wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  gap: 20px;
+  align-items: start;
+}
+.rule-row.selected { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
 
 .page-header {
   display: flex;

@@ -1,7 +1,7 @@
 <template>
   <div class="step-farm-admin">
     <div class="step-head">
-      <h3 class="step-title">어느 농장의 룰을 만들까요?</h3>
+      <h3 class="step-title">어느 농장의 규칙을 만들까요?</h3>
       <p class="step-desc">대상 농장을 선택하세요 (플랫폼 관리자 전용)</p>
     </div>
 

@@ -50,7 +50,7 @@ function save() {
   <div v-if="open" class="modal-backdrop" @click.self="emit('close')">
     <div class="modal">
       <header class="modal-header">
-        <h3>{{ month }}월 폴백 스케줄</h3>
+        <h3>{{ month }}월 단독 운전 시간표</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </header>
       <div class="modal-body">
@@ -85,7 +85,7 @@ function save() {
         </div>
 
         <p class="hint">
-          ⓘ 통신 단절 <strong>+ 온습도계 이상</strong> 시 백업으로 이 스케줄이 동작합니다. 정상 통신 중에는 서버 자동화 룰을 따릅니다.
+          ⓘ 통신 단절 <strong>+ 온습도계 이상</strong> 시 백업으로 이 스케줄이 동작합니다. 정상 통신 중에는 서버 자동제어 규칙을 따릅니다.
         </p>
       </div>
       <footer class="modal-footer">

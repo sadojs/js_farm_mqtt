@@ -33,7 +33,7 @@
       <div class="brb-main">
         <div class="brb-text">
           <svg class="brb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
-          <span>정지된 자동제어 룰 <b>{{ bulkStoppedRules.length }}개</b></span>
+          <span>정지된 자동제어 규칙 <b>{{ bulkStoppedRules.length }}개</b></span>
         </div>
         <button class="brb-restore" :disabled="restoringBulk || !!restoringOne" @click="restoreBulk">
           <template v-if="restoringBulk">원복 중…</template>
@@ -47,7 +47,7 @@
         <span v-for="r in bulkStoppedRules" :key="r.id" class="brb-rule-chip">
           <span class="brb-rule-name">{{ r.name }}</span>
           <button class="brb-rule-restore" :disabled="restoringBulk || restoringOne === r.id"
-                  title="이 룰만 원복" @click="restoreOne(r.id)">
+                  title="이 규칙만 원복" @click="restoreOne(r.id)">
             <svg class="ic-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
           </button>
         </span>
@@ -431,7 +431,7 @@
                     <span class="timer-dot"></span>{{ formatCountdown(device.overrideUntil) }}<span class="timer-x">✕</span>
                   </span>
                   <span v-else-if="device.userOverride" class="manual-override-badge"
-                    title="자동제어 룰의 의도와 다르게 수동으로 변경됨. 다시 룰 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
+                    title="자동제어 규칙의 의도와 다르게 수동으로 변경됨. 다시 규칙 의도와 같은 상태로 토글하면 자동제어로 복귀합니다.">
                     🖐 수동
                   </span>
                 </div>
@@ -879,7 +879,7 @@ async function restoreBulk() {
     const { restored } = (await automationApi.restoreBulkStoppedRules()).data
     bulkStoppedRules.value = []
     await automationStore.fetchRules().catch(() => undefined)
-    notify.success('자동제어 원복', `룰 ${restored.length}개를 다시 켰습니다.`)
+    notify.success('자동제어 원복', `규칙 ${restored.length}개를 다시 켰습니다.`)
   } catch {
     notify.error('오류', '자동제어 원복에 실패했습니다.')
   } finally {
@@ -894,7 +894,7 @@ async function restoreOne(ruleId: string) {
   try {
     const { restored } = (await automationApi.restoreBulkStoppedRules([ruleId])).data
     await onBulkRulesChanged()
-    notify.success('자동제어 원복', `${restored[0]?.name ?? '룰'}을(를) 다시 켰습니다.`)
+    notify.success('자동제어 원복', `${restored[0]?.name ?? '규칙'}을(를) 다시 켰습니다.`)
   } catch {
     notify.error('오류', '자동제어 원복에 실패했습니다.')
   } finally {
@@ -1490,11 +1490,11 @@ async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: strin
     if (!active || active.length === 0) return true
     const names = active.map(r => `• ${r.name}`).join('\n')
     const go = await confirm({
-      title: '자동제어 룰이 동작 중입니다',
+      title: '자동제어 규칙이 동작 중입니다',
       message:
-        `${deviceLabel}을(를) 제어 중인 자동제어 룰 ${active.length}개가 있습니다.\n${names}\n\n` +
-        `수동으로 조작하려면 이 룰들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
-        `(정지된 룰은 상단 '자동제어 원복'에서 되돌릴 수 있습니다.)`,
+        `${deviceLabel}을(를) 제어 중인 자동제어 규칙 ${active.length}개가 있습니다.\n${names}\n\n` +
+        `수동으로 조작하려면 이 규칙들을 정지해야 합니다. 정지하고 수동 제어할까요?\n` +
+        `(정지된 규칙은 상단 '자동제어 원복'에서 되돌릴 수 있습니다.)`,
       confirmText: '정지하고 수동 제어',
       cancelText: '취소',
       variant: 'warning',
@@ -1504,7 +1504,7 @@ async function guardActiveRulesBeforeManual(deviceId: string, deviceLabel: strin
     if (stopped.length > 0) {
       // 정지된 룰이 상단 '자동제어 원복' 배너에 즉시 누적되도록 갱신 (일괄제어와 동일)
       await onBulkRulesChanged()
-      notify.info('자동제어 정지', `룰 ${stopped.length}개를 정지했습니다. 상단 '자동제어 원복'에서 되돌릴 수 있습니다.`)
+      notify.info('자동제어 정지', `규칙 ${stopped.length}개를 정지했습니다. 상단 '자동제어 원복'에서 되돌릴 수 있습니다.`)
     }
     return true
   } catch (e) {
@@ -2856,7 +2856,7 @@ input:checked + .toggle-slider-sm:before { transform: translateX(16px); }
   }
   .page-header .header-actions .badge-hidden .hz-text { display: none; }
   /* 모바일 2열 — minmax(0, 1fr) 필수(1fr 만으로는 자식 min-content 가 viewport 폭을 넘겨 가로 잘림).
-     측정기·장치 카드만 2열, 자동제어룰 리스트는 아래에서 1열 유지. */
+     측정기·장치 카드만 2열, 자동제어 규칙 리스트는 아래에서 1열 유지. */
   .device-sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* 모바일: 제목 + 옵션 버튼을 한 줄에(수량 배지 제거로 공간 확보). 제목은 한 줄 말줄임,
      버튼 묶음은 유지. 버튼은 한 줄에 들어가도록 살짝 축소. */

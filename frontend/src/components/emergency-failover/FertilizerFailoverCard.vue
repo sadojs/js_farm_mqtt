@@ -17,7 +17,7 @@ const emit = defineEmits<{
           :checked="fertilizerEnabled"
           @change="emit('update:fertilizerEnabled', ($event.target as HTMLInputElement).checked)"
         />
-        폴백 활성
+        단독 운전 사용
       </label>
     </div>
     <p class="hint">ⓘ 통신 단절 즉시 OFF (지연 없음)</p>

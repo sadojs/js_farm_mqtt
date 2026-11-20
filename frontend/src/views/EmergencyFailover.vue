@@ -124,7 +124,7 @@ async function saveAll() {
     return
   }
   if (allCriticalDisabled.value) {
-    if (!await askConfirm('개폐기·관수·액비 폴백이 모두 비활성화되어 있습니다. 통신 단절 시 안전망이 없어 작물 피해가 발생할 수 있습니다. 그래도 저장할까요?')) {
+    if (!await askConfirm('개폐기·관수·액비 단독 운전이 모두 비활성화되어 있습니다. 통신 단절 시 안전망이 없어 작물 피해가 발생할 수 있습니다. 그래도 저장할까요?')) {
       return
     }
   }
@@ -143,7 +143,7 @@ async function resync() {
 }
 
 async function emergencyStop() {
-  if (!await askConfirm('정말 모든 릴레이를 비상 정지하시겠습니까?\n\n해제 버튼을 누르기 전까지 자동제어·수동 조작으로 켜지지 않습니다. 폴백 모드에서도 즉시 실행됩니다.')) return
+  if (!await askConfirm('정말 모든 릴레이를 비상 정지하시겠습니까?\n\n해제 버튼을 누르기 전까지 자동제어·수동 조작으로 켜지지 않습니다. 단독 운전에서도 즉시 실행됩니다.')) return
   try {
     await fail.emergencyStop('manual-from-ui', 'admin')
     notify('비상 정지했습니다. 해제 전까지 이 게이트웨이의 릴레이는 켜지지 않습니다.')
@@ -172,8 +172,8 @@ function fmt(d: string | null) {
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h2>이머전시 페일오버</h2>
-        <p class="page-description">서버와 통신 단절 시 라즈베리파이가 로컬 룰로 작물 안전 동작을 수행합니다.</p>
+        <h2>단독 운전 설정</h2>
+        <p class="page-description">서버와 통신 단절 시 라즈베리파이가 로컬 규칙으로 작물 안전 동작을 수행합니다.</p>
       </div>
       <div class="gw-select">
         <label>게이트웨이</label>
@@ -188,7 +188,7 @@ function fmt(d: string | null) {
     <div v-if="!selectedGatewayId" class="loading">게이트웨이를 먼저 선택하세요.</div>
     <div v-else-if="fail.loading.value" class="loading">로딩 중...</div>
     <div v-else-if="fail.error.value" class="error">
-      <strong>⚠ 폴백 설정을 불러올 수 없습니다.</strong>
+      <strong>⚠ 단독 운전 설정을 불러올 수 없습니다.</strong>
       <p>{{ fail.error.value }}</p>
       <p class="error-hint">
         백엔드 마이그레이션 020이 적용되었는지, 게이트웨이가 올바르게 등록되었는지 확인하세요.
@@ -196,7 +196,7 @@ function fmt(d: string | null) {
       </p>
     </div>
     <div v-else-if="!fail.config.value" class="error">
-      <strong>⚠ 폴백 설정 데이터가 없습니다.</strong>
+      <strong>⚠ 단독 운전 설정 데이터가 없습니다.</strong>
       <p>이 게이트웨이는 마이그레이션 020 이전에 등록된 것으로 보입니다.
         페이지를 새로고침하면 백엔드가 자동으로 시드 생성합니다.</p>
     </div>
@@ -214,9 +214,9 @@ function fmt(d: string | null) {
 
       <!-- M-3: 최소 안전 룰 비활성화 경고 -->
       <div v-if="allCriticalDisabled" class="warning-banner">
-        ⚠️ <strong>경고:</strong> 개폐기·관수·액비 폴백이 모두 비활성화되어 있습니다.
+        ⚠️ <strong>경고:</strong> 개폐기·관수·액비 단독 운전이 모두 비활성화되어 있습니다.
         통신 단절 시 안전망이 없어 작물 피해가 발생할 수 있습니다.
-        최소 한 가지 이상의 폴백을 활성화하는 것을 강력히 권장합니다.
+        최소 한 가지 이상의 단독 운전을 활성화하는 것을 강력히 권장합니다.
       </div>
 
       <HeartbeatSettingsCard
@@ -256,9 +256,9 @@ function fmt(d: string | null) {
 
       <!-- 폴백 측정값 소스 안내 -->
       <section class="card info-card">
-        <h3>ℹ️ 폴백 모드 측정값 소스</h3>
+        <h3>ℹ️ 단독 운전 측정값 소스</h3>
         <p>
-          폴백 모드(서버 단절) 동안 라즈베리파이는 이 게이트웨이에 연결된
+          단독 운전(서버 단절) 동안 라즈베리파이는 이 게이트웨이에 연결된
           <strong>모든 온/습도 측정기</strong> 의 가장 최근 수신 값을 <strong>유동팬·개폐기</strong> 제어에 사용합니다.
           (<code>구역 관리 → 센서 환경 설정</code> 의 내부 온/습도 매핑과는 <strong>별개</strong> —
           오프라인 상태에서 매핑 정보 조회가 불가능하기 때문)
@@ -266,13 +266,13 @@ function fmt(d: string | null) {
         <ul>
           <li>특정 측정기의 값으로 동작시키려면 해당 게이트웨이에 그 측정기만 연결하세요.</li>
           <li>여러 측정기가 있으면 마지막에 게시된 값이 사용됩니다 (각 측정기가 평균으로 합산되지 않음).</li>
-          <li>온라인 복귀 시 자동제어 룰이 다시 메인 컨트롤러를 잡으며, 폴백 사용 임계값은 안전망입니다.</li>
+          <li>온라인 복귀 시 자동제어 규칙이 다시 메인 컨트롤러를 잡으며, 단독 운전 기준값은 안전망입니다.</li>
         </ul>
       </section>
 
       <!-- 최근 이벤트 (한글화) -->
       <section class="card" v-if="fail.events.value.length">
-        <h3>최근 폴백 이벤트 ({{ fail.events.value.length }}건)</h3>
+        <h3>최근 단독 운전 기록 ({{ fail.events.value.length }}건)</h3>
         <table class="events-table">
           <thead>
             <tr>

@@ -2,9 +2,9 @@
   <div v-if="current" class="conflict-overlay">
     <div class="conflict-dialog" role="alertdialog" aria-modal="true" aria-labelledby="conflict-title">
       <div class="conflict-icon" aria-hidden="true">⚠️</div>
-      <h3 id="conflict-title" class="conflict-title">자동제어 룰이 서로 충돌합니다</h3>
+      <h3 id="conflict-title" class="conflict-title">자동제어 규칙이 서로 충돌합니다</h3>
       <p class="conflict-lead">
-        <strong>{{ current.deviceName }}</strong> 을(를) 두 룰이 반대로 제어하고 있습니다.
+        <strong>{{ current.deviceName }}</strong> 을(를) 두 규칙이 반대로 제어하고 있습니다.
       </p>
 
       <div class="conflict-rules">
@@ -21,14 +21,14 @@
       </div>
 
       <p class="conflict-help">
-        우선순위가 높은 룰이 먼저 적용되고, 낮은 룰은 동작하지 않습니다.
-        <strong>"{{ current.loser.name }}"</strong> 룰을 비활성화하면 이 충돌이 사라집니다. 룰은 삭제되지 않고 자동제어 화면에서 다시 켤 수 있습니다.
+        우선순위가 높은 규칙이 먼저 적용되고, 낮은 규칙은 동작하지 않습니다.
+        <strong>"{{ current.loser.name }}"</strong> 규칙을 비활성화하면 이 충돌이 사라집니다. 규칙은 삭제되지 않고 자동제어 화면에서 다시 켤 수 있습니다.
       </p>
 
       <div class="conflict-actions">
         <button class="btn keep" :disabled="busy" @click="decide('dismiss')">그대로 두기</button>
         <button class="btn apply" :disabled="busy" @click="decide('disable_loser')">
-          밀린 룰 비활성화
+          밀린 규칙 비활성화
         </button>
       </div>
       <p v-if="queue.length > 1" class="conflict-more">다른 충돌 {{ queue.length - 1 }}건이 더 있습니다.</p>
@@ -64,7 +64,7 @@ async function decide(action: 'disable_loser' | 'dismiss') {
   try {
     const { data } = await automationApi.resolveConflict(c.id, action)
     if (action === 'disable_loser' && data.disabledRule) {
-      notificationStore.info('룰 비활성화', `"${data.disabledRule.name}" 룰을 비활성화했습니다.`)
+      notificationStore.info('규칙 비활성화', `"${data.disabledRule.name}" 규칙을 비활성화했습니다.`)
     }
     queue.value = queue.value.filter((q) => q.id !== c.id)
   } catch (e: any) {

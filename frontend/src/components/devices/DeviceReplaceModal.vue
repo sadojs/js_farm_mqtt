@@ -148,7 +148,7 @@ async function executeReplace() {
     })
     notif.success(
       '교체 완료',
-      `${preview.value.device.name} — 자동제어룰 ${res.data.preserved.rules}개, 채널 매핑 ${res.data.preserved.mappingKeys}개 보존`,
+      `${preview.value.device.name} — 자동제어 규칙 ${res.data.preserved.rules}개, 채널 매핑 ${res.data.preserved.mappingKeys}개 보존`,
     )
     emit('replaced', { deviceId: res.data.deviceId, oldIeee: res.data.oldIeee, newIeee: res.data.newIeee })
     handleClose()
@@ -204,7 +204,7 @@ onMounted(() => { if (props.visible) loadPreview() })
           <div class="impact-title">📋 교체 후 자동 보존됩니다</div>
           <div class="impact-grid">
             <div class="impact-item">
-              <span class="impact-label">자동제어룰</span>
+              <span class="impact-label">자동제어 규칙</span>
               <span class="impact-value">{{ preview.impact.rulesCount }}개</span>
               <div v-if="preview.impact.ruleNames.length" class="impact-detail">
                 {{ preview.impact.ruleNames.slice(0, 3).join(', ') }}{{ preview.impact.ruleNames.length > 3 ? ' 외' : '' }}

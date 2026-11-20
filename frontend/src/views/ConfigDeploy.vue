@@ -209,7 +209,7 @@
       <h3>라즈베리파이 설치 컴포넌트 및 배포 워크플로우</h3>
       <p class="section-hint">
         <code>setup.sh</code> 실행 시 자동 설치되는 컴포넌트와 출하 절차입니다.
-        배포 절차 자체는 기존 그대로이며, <strong>2026-05 업데이트</strong>로 이머전시 페일오버 엔진이 추가되었습니다.
+        배포 절차 자체는 기존 그대로이며, <strong>2026-05 업데이트</strong>로 단독 운전 엔진이 추가되었습니다.
       </p>
 
       <div class="component-grid">
@@ -242,7 +242,7 @@
             <span class="badge-new">NEW</span> Fallback Engine
           </div>
           <div class="component-detail">
-            서버 단절 시 자동 안전 동작 (이머전시 페일오버).<br>
+            서버 단절 시 자동 안전 동작 (단독 운전).<br>
             • 관수 ON 시점부터 30분 후 OFF<br>
             • 액비 즉시 OFF<br>
             • 환기팬/유동팬 35°C ON / 28°C OFF (기본 비활성)<br>
@@ -255,7 +255,7 @@
           </div>
           <div class="component-actions">
             <router-link to="/emergency-failover" class="btn-link">
-              이머전시 페일오버 설정 페이지 →
+              단독 운전 설정 페이지 →
             </router-link>
           </div>
         </div>
@@ -287,7 +287,7 @@
             <li><code>bash clone-sd.sh golden-lgw.img.xz diskN</code></li>
             <li>SD 장착 → Pi 전원 ON</li>
             <li>자동: 본부 Wi-Fi 연결 → register → 개발서버 웹UI 자동 출현</li>
-            <li>검증: 디바이스 1~2개 페어링 + 룰 1개 (통신 확인)</li>
+            <li>검증: 디바이스 1~2개 페어링 + 규칙 1개 (통신 확인)</li>
             <li>
               설정 배포 → 4. 시스템 설정:
               <ul>
@@ -298,7 +298,7 @@
           </ol>
           <div class="workflow-stage"><strong>본부 / 프로덕션 서버 웹UI</strong></div>
           <ol class="workflow-list" start="6">
-            <li>같은 Pi (<code>lgw-farm01</code>) 자동 출현 확인 (디바이스/룰 비어있음 = 정상)</li>
+            <li>같은 Pi (<code>lgw-farm01</code>) 자동 출현 확인 (디바이스/규칙 비어있음 = 정상)</li>
             <li>설정 배포 → 4. 시스템 설정:
               <ul>
                 <li>7-A. Wi-Fi → 농장 SSID/PW [적용] (본부 통신 끊김 = 정상)</li>
@@ -309,7 +309,7 @@
           <div class="workflow-stage"><strong>농장 현장</strong></div>
           <ol class="workflow-list" start="9">
             <li>Pi 전원 ON → 농장 Wi-Fi 자동 연결 → 프로덕션 reverse tunnel 자동 복구 → 🟢 online</li>
-            <li>농장 디바이스 페어링 + 자동제어 룰 설정 (현장)</li>
+            <li>농장 디바이스 페어링 + 자동제어 규칙 설정 (현장)</li>
           </ol>
         </div>
       </div>
@@ -318,7 +318,7 @@
         <strong>💡 2026-05 업데이트 안내</strong>
         <ul>
           <li><strong>골든 이미지 재빌드 필요</strong> — Fallback Engine 추가, GPIO Agent payload 호환 (<code>{slot, pin, state, requestId}</code>) 반영</li>
-          <li>현장 출하 후 → <a href="/emergency-failover">이머전시 페일오버 설정 페이지</a>에서 농장별 폴백 룰 편집 (월별 스케줄 / 임계값)</li>
+          <li>현장 출하 후 → <a href="/emergency-failover">단독 운전 설정 페이지</a>에서 농장별 단독 운전 규칙 편집 (월별 스케줄 / 임계값)</li>
           <li>온보드 장치 추가/삭제/핀 변경 시 → <strong>RPi에 자동 동기화됨</strong> (별도 설정 배포 불필요)</li>
           <li>장치 매핑은 서버 <code>gateway_onboard_devices</code> 테이블이 권위. RPi는 MQTT retained 메시지로 자동 수신.</li>
         </ul>

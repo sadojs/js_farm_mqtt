@@ -102,7 +102,7 @@
             </template>
             <!-- device-replacement: 🔄 교체 버튼 (FR-13: 환경설정 Zigbee 탭의 device row에만 노출) -->
             <button v-if="authStore.isAdmin && canReplace(dev)" class="btn-replace btn-sm"
-              @click.stop="openReplaceModal(dev)" title="동일 기종 새 장치로 교체 (기존 룰/매핑 보존)">
+              @click.stop="openReplaceModal(dev)" title="동일 기종 새 장치로 교체 (기존 규칙/매핑 보존)">
               🔄 교체
             </button>
             <label class="toggle">
@@ -376,7 +376,7 @@
         <h3>채널 매핑 — {{ mappingModalDev.name }}</h3>
         <p class="modal-desc">
           Zigbee 스위치 코드와 관수 기능을 연결합니다. ({{ mappingChannelCount }}채널)<br>
-          <small class="modal-hint">⊘ 비활성화로 설정하면 자동제어룰/구역관리에서 해당 채널이 숨겨집니다.</small>
+          <small class="modal-hint">⊘ 비활성화로 설정하면 자동제어 규칙/구역관리에서 해당 채널이 숨겨집니다.</small>
         </p>
         <div class="mapping-grid">
           <div v-for="(label, key) in activeMappingSlots" :key="key" class="mapping-row">
@@ -399,8 +399,8 @@
       <div class="modal modal-sm-fixed">
         <h3>타이머 설정 — {{ timerModalDev.name }}</h3>
         <p class="modal-desc">
-          <template v-if="timerModalType === 'opener' || timerModalType === 'opener-onboard'">개폐기 동작·대기 시간을 설정합니다. (자동제어 룰에서만 적용)</template>
-          <template v-else>유동팬 동작·대기 시간을 설정합니다. (자동제어 룰에서만 적용)</template>
+          <template v-if="timerModalType === 'opener' || timerModalType === 'opener-onboard'">개폐기 동작·대기 시간을 설정합니다. (자동제어 규칙에서만 적용)</template>
+          <template v-else>유동팬 동작·대기 시간을 설정합니다. (자동제어 규칙에서만 적용)</template>
         </p>
         <div class="timer-form">
           <div class="timer-row">
@@ -1259,10 +1259,10 @@ async function removeZigbee(dev: ZigbeeDevice) {
     if (e?.response?.status === 409 && Array.isArray(rules) && rules.length > 0) {
       const names = rules.map((r: any) => `• ${r.name}${r.enabled === false ? ' (비활성)' : ''}`).join('\n')
       window.alert(
-        `"${dev.name}"은(는) 아래 자동제어 룰에서 사용 중이라 삭제할 수 없습니다.\n` +
-        `먼저 자동 제어 설정에서 아래 룰을 삭제한 뒤 장치를 삭제하세요.\n\n${names}`,
+        `"${dev.name}"은(는) 아래 자동제어 규칙에서 사용 중이라 삭제할 수 없습니다.\n` +
+        `먼저 자동 제어 설정에서 아래 규칙을 삭제한 뒤 장치를 삭제하세요.\n\n${names}`,
       )
-      notif.error('삭제 불가', '자동제어 룰에서 사용 중입니다. 먼저 해당 룰을 삭제하세요.')
+      notif.error('삭제 불가', '자동제어 규칙에서 사용 중입니다. 먼저 해당 규칙을 삭제하세요.')
     } else {
       notif.error('오류', data?.message || '삭제에 실패했습니다.')
     }

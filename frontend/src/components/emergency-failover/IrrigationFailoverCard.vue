@@ -19,7 +19,7 @@ const emit = defineEmits<{
           :checked="irrigationEnabled"
           @change="emit('update:irrigationEnabled', ($event.target as HTMLInputElement).checked)"
         />
-        폴백 활성
+        단독 운전 사용
       </label>
     </div>
     <div class="form-group">
@@ -30,7 +30,7 @@ const emit = defineEmits<{
         @input="emit('update:irrigationMaxRuntimeMinutes', Number(($event.target as HTMLInputElement).value))"
       />
     </div>
-    <p class="hint">ⓘ 통신 단절 시 관수 ON 시각부터 N분이 지나면 자동 OFF. 폴백 중 신규 시작은 금지됩니다.</p>
+    <p class="hint">ⓘ 통신 단절 시 관수 ON 시각부터 N분이 지나면 자동 OFF. 단독 운전 중 신규 시작은 금지됩니다.</p>
   </section>
 </template>
 

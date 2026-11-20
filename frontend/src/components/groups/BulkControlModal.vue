@@ -103,9 +103,9 @@
         </div>
 
         <!-- 관련 자동제어 룰 — 정지 후 실행 안내 + 전체 리스트 -->
-        <div v-if="confirm.rulesLoading" class="confirm-rules loading">관련 자동제어 룰 확인 중…</div>
+        <div v-if="confirm.rulesLoading" class="confirm-rules loading">관련 자동제어 규칙 확인 중…</div>
         <div v-else-if="confirm.relatedRules.length > 0" class="confirm-rules">
-          <div class="confirm-rules-head">⚠ 이 장치를 제어 중인 자동제어 룰 {{ confirm.relatedRules.length }}개 — <b>정지 후</b> 실행됩니다</div>
+          <div class="confirm-rules-head">⚠ 이 장치를 제어 중인 자동제어 규칙 {{ confirm.relatedRules.length }}개 — <b>정지 후</b> 실행됩니다</div>
           <div class="confirm-rules-list">
             <span v-for="r in confirm.relatedRules" :key="r.id" class="confirm-rule-chip">{{ r.name }}</span>
           </div>
@@ -119,7 +119,7 @@
             {{ executing
               ? `실행 중… (${execDone}/${confirm.count})`
               : (confirm.relatedRules.length > 0
-                  ? `룰 ${confirm.relatedRules.length}개 정지하고 ${confirm.verb}`
+                  ? `규칙 ${confirm.relatedRules.length}개 정지하고 ${confirm.verb}`
                   : `${confirm.count}대 ${confirm.verb}`) }}
           </button>
         </div>

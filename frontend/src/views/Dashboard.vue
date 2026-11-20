@@ -91,6 +91,9 @@
       </div>
     </div>
 
+    <!-- 넓은 화면(1200px 이상): 구역 목록 | 선택한 구역 현황 — 휴대폰·태블릿은 지금 그대로 -->
+    <ZoneOverviewSplit v-if="isWide && !isEditMode" />
+
     <!-- 나머지 위젯 동적 렌더링 (weather + summary 제외) -->
     <template v-for="widget in nonHeroVisibleWidgets" :key="widget.id">
       <!-- 장치 상태 정보 위젯 -->
@@ -106,9 +109,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { dashboardApi } from '../api/dashboard.api'
 import SummaryCards from '../components/dashboard/SummaryCards.vue'
+import ZoneOverviewSplit from '../components/dashboard/ZoneOverviewSplit.vue'
 import DeviceStatusCards from '../components/dashboard/DeviceStatusCards.vue'
 import IrrigationHistoryWidget from '../components/dashboard/IrrigationHistoryWidget.vue'
 import GddDashboardWidget from '../modules/crop-management/GddDashboardWidget.vue'
@@ -134,6 +138,13 @@ const nonHeroVisibleWidgets = computed(() =>
 
 const loading = ref(false)
 const errorMessage = ref('')
+
+// 넓은 화면 여부 (구역 현황 분할 위젯)
+const wideQuery = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1200px)') : null
+const isWide = ref(!!wideQuery?.matches)
+const onWideChange = (e: MediaQueryListEvent) => { isWide.value = e.matches }
+onMounted(() => wideQuery?.addEventListener('change', onWideChange))
+onBeforeUnmount(() => wideQuery?.removeEventListener('change', onWideChange))
 
 const locationLabel = ref('-')
 const weather = ref({

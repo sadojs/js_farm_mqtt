@@ -57,7 +57,7 @@ function changeTriggerType(next: OpenerTriggerType) {
   <section class="card">
     <h3>개폐기 온습도 조건 <span class="primary-badge">주 제어</span></h3>
     <p class="hint" style="margin-bottom: 12px;">
-      ※ 폴백 모드(서버 단절) 동안 개폐기를 <strong>온도/습도</strong> 로 자동 제어합니다(유동팬과 동일 방식).
+      ※ 단독 운전(서버 단절) 동안 개폐기를 <strong>온도/습도</strong> 로 자동 제어합니다(유동팬과 동일 방식).
       측정값이 높으면 <strong>개방</strong>, 낮으면 <strong>닫힘</strong>.
       <br>
       ※ <strong>온습도계가 동작하지 않으면</strong>(측정값 없음/오래됨) 아래 「백업 스케줄」의

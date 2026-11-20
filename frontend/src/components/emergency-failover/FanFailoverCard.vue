@@ -54,7 +54,7 @@ function changeTriggerType(next: FanTriggerType) {
     <p class="hint" style="margin-bottom: 12px;">
       ※ 환기팬과 유동팬은 동일 장치를 가리킵니다. 기본 비활성.
       <br>
-      ※ 폴백 모드(서버 단절) 동안 게이트웨이가 수신한 모든 온/습도 측정기의
+      ※ 단독 운전(서버 단절) 동안 게이트웨이가 수신한 모든 온/습도 측정기의
       <strong>가장 최근 값</strong> 으로 동작합니다. 측정기를 1대로 좁히려면
       해당 게이트웨이에 측정기를 한 종류만 연결하세요.
     </p>
@@ -66,7 +66,7 @@ function changeTriggerType(next: FanTriggerType) {
           :checked="fanEnabled"
           @change="emit('update:fanEnabled', ($event.target as HTMLInputElement).checked)"
         />
-        폴백 활성
+        단독 운전 사용
       </label>
     </div>
 

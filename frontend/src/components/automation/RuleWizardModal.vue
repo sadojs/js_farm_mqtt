@@ -252,7 +252,7 @@ const canProceedHint = computed(() => {
   if (currentStep.value === 3) return isIrrigation.value
     ? '관수 일정·구역을 설정해주세요 (액비 활성 시 관주시간 ≥ 투여+종료전대기)'
     : '조건을 모두 입력해주세요'
-  if (currentStep.value === 4) return '룰 이름을 입력해주세요'
+  if (currentStep.value === 4) return '규칙 이름을 입력해주세요'
   return ''
 })
 

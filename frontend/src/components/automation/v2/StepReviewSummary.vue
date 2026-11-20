@@ -43,13 +43,13 @@
 
     <!-- 룰 이름 -->
     <div class="name-section">
-      <label class="field-label" for="rule-name-input">룰 이름</label>
+      <label class="field-label" for="rule-name-input">규칙 이름</label>
       <input
         id="rule-name-input"
         type="text"
         class="name-input"
         :value="ruleName"
-        placeholder="룰 이름을 입력하세요"
+        placeholder="규칙 이름을 입력하세요"
         @input="emit('update:ruleName', ($event.target as HTMLInputElement).value)"
       />
     </div>
@@ -58,7 +58,7 @@
     <label class="activate-toggle">
       <input type="checkbox" :checked="activateNow"
         @change="emit('update:activateNow', ($event.target as HTMLInputElement).checked)" />
-      <span>룰을 바로 활성화하기</span>
+      <span>규칙을 바로 활성화하기</span>
     </label>
   </div>
 </template>

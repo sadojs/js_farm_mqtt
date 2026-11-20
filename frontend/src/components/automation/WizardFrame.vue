@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
         <div class="wf-header">
           <div class="wf-title-row">
             <h2 class="wf-title">{{ title }}</h2>
-            <span v-if="editMode" class="wf-edit-badge" title="기존 룰을 수정합니다">수정 모드</span>
+            <span v-if="editMode" class="wf-edit-badge" title="기존 규칙을 수정합니다">수정 모드</span>
           </div>
           <button class="wf-close" aria-label="닫기" @click="emit('close')">✕</button>
         </div>

@@ -9,7 +9,7 @@ import type { FallbackEvent } from '../types/emergency-failover.types'
 export function eventTypeLabel(eventType: FallbackEvent['eventType']): string {
   switch (eventType) {
     case 'mode_change': return '모드 전환'
-    case 'rule_fired': return '룰 발화'
+    case 'rule_fired': return '규칙 실행'
     case 'safety_off': return '안전 정지'
     case 'sync_ack': return '동기화 확인'
     default: return String(eventType)
@@ -37,7 +37,7 @@ export function eventPayloadSummary(event: FallbackEvent): string {
   if (event.eventType === 'mode_change') {
     const to = String(p.to ?? '')
     if (to === 'online') return '온라인 모드 복귀 — 서버 통신 정상 회복'
-    if (to === 'fallback' || to === 'offline') return '폴백 모드 진입 — 서버 통신 단절 감지'
+    if (to === 'fallback' || to === 'offline') return '단독 운전 시작 — 서버 통신 단절 감지'
     return `모드 → ${to || '(미지정)'}`
   }
 
@@ -48,7 +48,7 @@ export function eventPayloadSummary(event: FallbackEvent): string {
     const reasonText =
       reason === 'emergency-stop-all' ? '전체 비상 정지 명령'
       : reason === 'emergency-stop-no-mapping' ? '비상 정지 — 채널 매핑 미동기화 안전망'
-      : reason === 'fallback-mode-drop' ? '폴백 모드 종료 — 활성 채널 강제 OFF'
+      : reason === 'fallback-mode-drop' ? '단독 운전 종료 — 활성 채널 강제 OFF'
       : reason === 'rain-override-active' ? '강우 감지 — 개폐기 강제 닫힘'
       : reason || '(사유 미기재)'
     if (cmd && typeof cmd === 'object') {
