@@ -15,8 +15,12 @@ export const automationApi = {
   reorderRules: (orders: { id: string; displayOrder: number }[]) =>
     apiClient.patch<{ updated: number }>('/automation/rules/reorder', { orders }),
 
-  toggleRule: (id: string, params?: string) =>
-    apiClient.patch(`/automation/rules/${id}/toggle${params || ''}`),
+  toggleRule: (id: string, params?: string, body?: { disableRuleIds?: string[] }) =>
+    apiClient.patch(`/automation/rules/${id}/toggle${params || ''}`, body ?? {}),
+
+  /** 저장·켜기 전 충돌 확인 */
+  checkConflicts: (data: { ruleId?: string; groupId?: string; conditions: any; actions: any }) =>
+    apiClient.post<{ conflicts: import('../utils/ruleConflicts').SaveConflict[] }>('/automation/rules/check-conflicts', data),
 
   removeRule: (id: string) =>
     apiClient.delete(`/automation/rules/${id}`),

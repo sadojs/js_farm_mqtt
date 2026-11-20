@@ -123,6 +123,7 @@ import { useDeviceStore } from '@/stores/device.store'
 import { useNotificationStore } from '@/stores/notification.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { transformV2ToLegacy } from './transformV2ToLegacy'
+import { confirmRuleConflicts } from '../../../utils/ruleConflicts'
 import { generateRuleName } from '@/utils/ruleNameGenerator'
 import type { WizardStep } from './types'
 import StepFarmAdminSelect from './StepFarmAdminSelect.vue'
@@ -243,6 +244,13 @@ async function handleSave() {
     const dto: any = transformV2ToLegacy(wizard.state.value)
     if (authStore.isAdmin && wizard.state.value.farmUserId) {
       dto.targetUserId = wizard.state.value.farmUserId
+    }
+    // 바로 켜는 규칙이면 저장 전에 같은 장치를 움직이는 규칙이 있는지 확인
+    if (wizard.state.value.activateNow) {
+      const disableRuleIds = await confirmRuleConflicts(
+        { groupId: dto.groupId, conditions: dto.conditions, actions: dto.actions }, 'create')
+      if (disableRuleIds === null) return
+      if (disableRuleIds.length) dto.disableRuleIds = disableRuleIds
     }
     const result = await automationStore.createRule(dto)
     if (!wizard.state.value.activateNow && result?.id) {

@@ -1,11 +1,11 @@
 <template>
   <WizardFrame
     v-if="visible"
-    :title="editRule ? '자동 제어 수정' : '새 자동 제어 설정'"
+    :title="editRule ? '자동 제어 수정' : copyRule ? '자동 제어 복사' : '새 자동 제어 설정'"
     :edit-mode="!!editRule"
-    :step-index="currentStep - 1"
-    :total-steps="stepList.length"
-    :show-prev="currentStep > 1"
+    :step-index="currentStep - minStep"
+    :total-steps="stepList.length - minStep + 1"
+    :show-prev="currentStep > minStep"
     :show-next="true"
     :can-proceed="currentStep < 4 ? canNext : (canSave && !saving)"
     :can-proceed-hint="canProceedHint"
@@ -15,6 +15,14 @@
     @prev="currentStep--"
     @next="currentStep < 4 ? currentStep++ : handleSave()"
   >
+    <!-- 수정: 구역·장치는 고정 (다른 장치로 만들려면 복사) -->
+    <div v-if="editRule && currentStep >= 3" class="locked-target">
+      <span class="locked-icon" aria-hidden="true">📌</span>
+      <div class="locked-body">
+        <b>{{ lockedTargetLabel }}</b>
+        <span>수정에서는 구역과 장치를 바꾸지 않습니다. 다른 장치로 만들려면 목록의 ⋮ 메뉴에서 "복사"를 쓰세요.</span>
+      </div>
+    </div>
     <StepTargetSelect
       v-if="currentStep === 1"
       v-model="formData.groupId"
@@ -51,6 +59,7 @@
 
 <script setup lang="ts">
 import { notify } from '../../utils/dialogs'
+import { confirmRuleConflicts } from '../../utils/ruleConflicts'
 import { ref, computed, watch, onBeforeUnmount, shallowRef } from 'vue'
 import type { AutomationRule, WizardFormData, CreateRuleRequest, IrrigationConditions } from '../../types/automation.types'
 import { createEmptyWizardForm, createDefaultIrrigationConditions } from '../../utils/automation-helpers'
@@ -66,7 +75,7 @@ import StepIrrigationCondition from './StepIrrigationCondition.vue'
 import StepReview from './StepReview.vue'
 import WizardFrame from './WizardFrame.vue'
 
-const props = defineProps<{ visible: boolean; editRule?: AutomationRule | null }>()
+const props = defineProps<{ visible: boolean; editRule?: AutomationRule | null; copyRule?: AutomationRule | null }>()
 const emit = defineEmits<{ close: []; saved: [rule: any] }>()
 
 const automationStore = useAutomationStore()
@@ -89,9 +98,10 @@ watch(() => props.visible, (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
   if (!open) return
   groupStore.fetchGroups().catch(() => undefined)
-  currentStep.value = 1
-  if (props.editRule) {
-    const rule = props.editRule
+  currentStep.value = minStep.value
+  const sourceRule = props.editRule ?? props.copyRule
+  if (sourceRule) {
+    const rule = sourceRule
     const actions = rule.actions || {} as any
     const sensorIds = actions.sensorDeviceIds || []
     const deviceIds = actions.targetDeviceIds?.length
@@ -116,7 +126,7 @@ watch(() => props.visible, (open) => {
       conditions: rule.conditions && 'groups' in rule.conditions && Array.isArray(rule.conditions.groups)
         ? rule.conditions
         : createEmptyWizardForm().conditions,
-      name: rule.name,
+      name: props.editRule ? rule.name : `${rule.name} (복사)`,
       description: isJsonMeta ? '' : rawDesc,
       priority: rule.priority,
     }
@@ -130,6 +140,17 @@ watch(() => props.visible, (open) => {
     formData.value = createEmptyWizardForm()
     irrigationForm.value = createDefaultIrrigationConditions()
   }
+})
+
+// 수정은 조건 단계부터 (구역·장치 고정), 새로 만들기·복사는 처음부터
+const minStep = computed(() => (props.editRule ? 3 : 1))
+
+const lockedTargetLabel = computed(() => {
+  const group = groupStore.groups.find(g => g.id === formData.value.groupId)
+  const names = formData.value.actuatorDeviceIds
+    .map(id => group?.devices?.find((d: any) => d.id === id)?.name ?? deviceStore.devices.find(d => d.id === id)?.name)
+    .filter(Boolean)
+  return `${group?.name ?? '구역'} · ${names.length ? names.join(', ') : '장치'}`
 })
 
 // 선택된 장치의 equipmentType (첫 번째 선택 장치 기준)
@@ -214,7 +235,8 @@ const canNext = computed(() => {
     return formData.value.conditions.groups.length > 0 &&
       formData.value.conditions.groups.every(g => g.conditions.length > 0) &&
       formData.value.conditions.groups.every(g =>
-        g.conditions.every(cond => cond.value !== null && cond.value !== undefined)
+        g.conditions.every(cond => cond.value !== null && cond.value !== undefined
+          && !(Number((cond as any).deviation) < 0)) // 켜기 기준이 끄기 기준보다 낮으면 막음
       )
   }
   return true
@@ -264,6 +286,19 @@ async function handleSave() {
       priority: formData.value.priority,
     }
 
+    // 켜진 채로 저장되는 규칙이면, 같은 장치를 움직이는 다른 규칙이 있는지 먼저 확인
+    const willBeOn = props.editRule ? props.editRule.enabled : true
+    if (willBeOn) {
+      const disableRuleIds = await confirmRuleConflicts({
+        ruleId: props.editRule?.id,
+        groupId: payload.groupId,
+        conditions: payload.conditions,
+        actions: payload.actions,
+      }, props.editRule ? 'update' : 'create')
+      if (disableRuleIds === null) return
+      if (disableRuleIds.length) payload.disableRuleIds = disableRuleIds
+    }
+
     let result
     if (props.editRule) {
       result = await automationStore.updateRule(props.editRule.id, payload)
@@ -282,5 +317,14 @@ async function handleSave() {
 </script>
 
 <style scoped>
-/* RuleWizardModal — 컨테이너/푸터 스타일은 WizardFrame이 담당. 별도 스타일 불필요. */
+/* RuleWizardModal — 컨테이너/푸터 스타일은 WizardFrame이 담당. */
+.locked-target {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px; margin-bottom: 14px;
+  background: var(--bg-hover); border: 1px solid var(--border-light); border-radius: 10px;
+}
+.locked-icon { font-size: calc(16px * var(--content-scale, 1)); line-height: 1.3; }
+.locked-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.locked-body b { font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); }
+.locked-body span { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); line-height: 1.5; }
 </style>

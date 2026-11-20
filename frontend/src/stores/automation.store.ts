@@ -36,9 +36,14 @@ export const useAutomationStore = defineStore('automation', () => {
     return data
   }
 
-  async function toggleRule(id: string, options?: { autoEnableRemote?: boolean }) {
+  async function toggleRule(id: string, options?: { autoEnableRemote?: boolean; disableRuleIds?: string[] }) {
     const params = options?.autoEnableRemote ? '?autoEnableRemote=true' : ''
-    await automationApi.toggleRule(id, params)
+    const disable = options?.disableRuleIds?.length ? { disableRuleIds: options.disableRuleIds } : undefined
+    await automationApi.toggleRule(id, params, disable)
+    if (disable) {
+      await fetchRules() // 함께 꺼진 규칙까지 반영
+      return
+    }
     const rule = rules.value.find(r => r.id === id)
     if (rule) {
       rule.enabled = !rule.enabled

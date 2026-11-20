@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AutomationService } from './automation.service';
-import { CreateRuleDto, UpdateRuleDto } from './dto/create-rule.dto';
+import { CreateRuleDto, UpdateRuleDto, CheckConflictsDto } from './dto/create-rule.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -65,6 +65,13 @@ export class AutomationController {
     return this.automationService.reorder(uid, body?.orders ?? []);
   }
 
+  /** 저장·켜기 전 충돌 확인 — 같은 장치를 반대로 움직일 수 있는 켜진 규칙 */
+  @Post('rules/check-conflicts')
+  @Roles('admin', 'farm_admin')
+  checkConflicts(@CurrentUser() user: any, @Body() dto: CheckConflictsDto) {
+    return this.automationService.checkSaveConflicts(this.getEffectiveUserId(user), dto);
+  }
+
   @Put('rules/:id')
   @Roles('admin', 'farm_admin')
   async update(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: UpdateRuleDto) {
@@ -84,9 +91,13 @@ export class AutomationController {
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Query('autoEnableRemote') autoEnableRemote?: string,
+    @Body() body?: { disableRuleIds?: string[] },
   ) {
+    const disableRuleIds = Array.isArray(body?.disableRuleIds)
+      ? body!.disableRuleIds.filter((x) => typeof x === 'string') : undefined;
     const result = await this.automationService.toggle(id, this.getEffectiveUserId(user), {
       autoEnableRemote: autoEnableRemote === 'true',
+      disableRuleIds,
     });
     this.activityLog.log({
       userId: user.id, userName: user.name || user.username,

@@ -9,6 +9,7 @@ import { IrrigationSchedulerService } from './irrigation-scheduler.service';
 import { DevicesService } from '../devices/devices.service';
 import { Device } from '../devices/entities/device.entity';
 import { DeviceArbiterService } from './device-arbiter.service';
+import { findSaveConflicts, targetIds, SaveConflict } from './rules/save-conflict';
 
 @Injectable()
 export class AutomationService {
@@ -72,7 +73,54 @@ export class AutomationService {
       priority: dto.priority ?? 0,
     });
     const saved = await this.rulesRepo.save(rule);
+    await this.disableForConflict(userId, dto.disableRuleIds, saved.id);
     return this.withTarget(saved);
+  }
+
+  /**
+   * 저장(또는 켜기) 전 충돌 확인 — 같은 장치를 반대로 움직일 수 있는 켜진 규칙 목록.
+   * userId=null(관리자)이면 규칙 주인(수정 중인 규칙 또는 구역 주인)의 규칙만 본다.
+   */
+  async checkSaveConflicts(
+    userId: string | null,
+    body: { ruleId?: string; groupId?: string; conditions: any; actions: any },
+  ): Promise<{ conflicts: SaveConflict[] }> {
+    let owner = userId;
+    if (!owner && body.ruleId) {
+      owner = (await this.rulesRepo.findOne({ where: { id: body.ruleId } }))?.userId ?? null;
+    }
+    if (!owner && body.groupId) owner = await this.resolveGroupOwner(body.groupId);
+    const rules = await this.rulesRepo.find({ where: owner ? { userId: owner, enabled: true } : { enabled: true } });
+    const ids = new Set<string>(targetIds(body.actions));
+    for (const r of rules) targetIds(r.actions).forEach((x) => ids.add(x));
+    const devices = ids.size
+      ? await this.devicesRepo.find({ where: { id: In([...ids]) } })
+      : [];
+    const map = new Map(devices.map((d) => [d.id, d]));
+    const conflicts = findSaveConflicts(
+      { id: body.ruleId, conditions: body.conditions, actions: body.actions },
+      rules,
+      map as any,
+    );
+    return { conflicts };
+  }
+
+  /** 사용자가 저장 전 충돌 확인에서 동의한 기존 규칙을 끈다 (disabled_reason='conflict') */
+  private async disableForConflict(userId: string | null, ruleIds: string[] | undefined, keepId: string) {
+    if (!Array.isArray(ruleIds) || ruleIds.length === 0) return;
+    for (const rid of new Set(ruleIds)) {
+      if (!rid || rid === keepId) continue;
+      const other = await this.rulesRepo.findOne({ where: userId ? { id: rid, userId } : { id: rid } });
+      if (!other?.enabled) continue;
+      other.enabled = false;
+      other.disabledReason = 'conflict';
+      other.disabledAt = new Date();
+      const saved = await this.rulesRepo.save(other);
+      try { await this.runnerService.onRuleToggled(saved); } catch (err: any) {
+        this.logger.warn(`onRuleToggled(저장 전 충돌) 실패: ${err?.message ?? err}`);
+      }
+      this.logger.log(`[save-conflict] "${other.name}" 비활성화 (사용자 선택)`);
+    }
   }
 
   async update(id: string, userId: string | null, dto: UpdateRuleDto) {
@@ -94,6 +142,7 @@ export class AutomationService {
     if (dto.priority !== undefined) rule.priority = dto.priority;
 
     const saved = await this.rulesRepo.save(rule);
+    await this.disableForConflict(userId ?? rule.userId, dto.disableRuleIds, saved.id);
 
     // 룰 update 시 runner의 in-memory lastState 강제 무효화 + 대상 device의 manual override / rule intent 리셋
     // 이유: conditions 변경(특히 relay: true→false 같은 모드 전환) 시 stale lastState가 'already_active'로 publish를 막아
@@ -139,13 +188,14 @@ export class AutomationService {
     return { resolved: true, action, disabledRule: rule ? { id: rule.id, name: rule.name } : null };
   }
 
-  async toggle(id: string, userId: string | null, options?: { autoEnableRemote?: boolean }) {
+  async toggle(id: string, userId: string | null, options?: { autoEnableRemote?: boolean; disableRuleIds?: string[] }) {
     const rule = await this.rulesRepo.findOne({ where: userId ? { id, userId } : { id } });
     if (!rule) throw new NotFoundException();
     rule.enabled = !rule.enabled;
     // 수동으로 다시 켜면 일괄제어 정지 표기 클리어 (원복 배너에서 사라짐)
     if (rule.enabled) { rule.disabledReason = null; rule.disabledAt = null; }
     const saved = await this.rulesRepo.save(rule);
+    if (saved.enabled) await this.disableForConflict(userId ?? saved.userId, options?.disableRuleIds, saved.id);
 
     // 룰 toggle 시 runner의 in-memory lastState 강제 무효화 + 대상 device의 manual override / rule intent 리셋
     // → 룰 disable→enable 시 즉시 재평가되고 ON/OFF가 새로 적용되도록 보장.

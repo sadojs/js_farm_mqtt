@@ -102,6 +102,8 @@ export interface CreateRuleRequest {
   conditions: ConditionGroup | IrrigationConditions
   actions: RuleAction
   priority?: number
+  /** 저장하면서 끌 기존 규칙(저장 전 충돌 확인에서 동의한 것) */
+  disableRuleIds?: string[]
 }
 
 export interface AutomationLog {

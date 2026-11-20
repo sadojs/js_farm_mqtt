@@ -216,4 +216,26 @@ describe('중재기 — 룰 실행기 연동 (같은 팬을 반대로 제어하�
     await run(id(1, 309));
     expect((await run(id(1, 310))).published).toEqual(['{"state":"OFF"}']);
   });
+
+  it('저장 전 충돌 확인: 같은 팬을 반대로 움직이는 켜진 규칙을 알려 주고, 동의하면 저장하면서 그 규칙을 끈다', async () => {
+    await mkRule(id(1, 309), '기존-끄기', 1, 'off', 'humidity');
+    const svc = t.app.get(AutomationService);
+    const body = {
+      groupId: id(1, 10),
+      conditions: { logic: 'AND', groups: [{ logic: 'AND', conditions: [
+        { type: 'sensor', field: 'temperature', operator: 'gte', value: 28, deviation: 2, sensor_device_id: SENSOR }] }] },
+      actions: { targetDeviceId: FAN, targetDeviceIds: [FAN], sensorDeviceIds: [SENSOR] },
+    };
+    const { conflicts } = await svc.checkSaveConflicts(USERS.f1.id, body);
+    expect(conflicts.map((c) => c.ruleName)).toEqual(['기존-끄기']);
+    // 관리자(userId=null)도 구역 주인 기준으로 같은 결과
+    expect((await svc.checkSaveConflicts(null, body)).conflicts).toHaveLength(1);
+
+    const created: any = await svc.create(USERS.f1.id, { name: '새-켜기', ...body, disableRuleIds: [id(1, 309)] } as any);
+    const old = (await t.ds.query(`select enabled, disabled_reason from automation_rules where id=$1`, [id(1, 309)]))[0];
+    expect(old.enabled).toBe(false);
+    expect(old.disabled_reason).toBe('conflict');
+    // 새 규칙을 기준으로 다시 확인하면 충돌 없음(기존 규칙은 꺼졌다)
+    expect((await svc.checkSaveConflicts(USERS.f1.id, { ...body, ruleId: created.id })).conflicts).toEqual([]);
+  });
 });

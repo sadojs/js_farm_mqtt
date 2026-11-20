@@ -71,27 +71,34 @@
               <!-- 히스테리시스 UI (FR-02): fan + temperature/humidity 관련 역할 -->
               <template v-if="isFanHysteresis(cond)">
                 <div class="hysteresis-row">
-                  <label>기준값</label>
+                  <label>🟢</label>
                   <input
                     type="number"
-                    :value="cond.value"
-                    @input="changeValue(gi, ci, Number(($event.target as HTMLInputElement).value))"
+                    step="0.5"
+                    :value="thresholdOn(cond)"
+                    :aria-label="`${onWord} 기준`"
+                    @change="changeThreshold(gi, ci, 'on', Number(($event.target as HTMLInputElement).value))"
                     class="value-input small"
                   />
-                  <span class="unit">{{ getUnit(cond.field) }}</span>
-                  <label>허용 범위</label>
-                  <input
-                    type="number"
-                    :value="cond.deviation || 0"
-                    min="0"
-                    @input="changeDeviation(gi, ci, Number(($event.target as HTMLInputElement).value))"
-                    class="value-input small"
-                  />
-                  <span class="unit">{{ getUnit(cond.field) }}</span>
+                  <span class="unit">{{ getUnit(cond.field) }} 이상이면 {{ onWord }}</span>
                 </div>
-                <div v-if="cond.deviation" class="hysteresis-preview">
-                  ON: {{ Number(cond.value) + Number(cond.deviation) }}{{ getUnit(cond.field) }} 이상 /
-                  OFF: {{ Number(cond.value) - Number(cond.deviation) }}{{ getUnit(cond.field) }} 이하
+                <div class="hysteresis-row">
+                  <label>🔴</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    :value="thresholdOff(cond)"
+                    :aria-label="`${offWord} 기준`"
+                    @change="changeThreshold(gi, ci, 'off', Number(($event.target as HTMLInputElement).value))"
+                    class="value-input small"
+                  />
+                  <span class="unit">{{ getUnit(cond.field) }} 이하면 {{ offWord }}</span>
+                </div>
+                <div v-if="Number(cond.deviation) < 0" class="hysteresis-preview error">
+                  {{ onWord }} 기준이 {{ offWord }} 기준보다 낮습니다. 다시 입력해 주세요.
+                </div>
+                <div v-else-if="Number(cond.deviation) > 0" class="hysteresis-preview">
+                  ⚪ {{ thresholdOff(cond) }}~{{ thresholdOn(cond) }}{{ getUnit(cond.field) }} 사이에서는 지금 상태를 그대로 둡니다.
                 </div>
               </template>
 
@@ -710,9 +717,21 @@ function changeValue(gi: number, ci: number, value: any) {
   emit('update:modelValue', next)
 }
 
-function changeDeviation(gi: number, ci: number, value: number) {
+// 열기(켜기)·닫기(끄기) 기준을 직접 받는다 — 저장 형식은 기준값(가운데)±편차(절반) 그대로
+const r1 = (v: number) => Math.round(v * 10) / 10
+const onWord = computed(() => (props.equipmentType === 'opener_open' ? '열기' : '켜기'))
+const offWord = computed(() => (props.equipmentType === 'opener_open' ? '닫기' : '끄기'))
+function thresholdOn(cond: Condition) { return r1(Number(cond.value) + Number(cond.deviation || 0)) }
+function thresholdOff(cond: Condition) { return r1(Number(cond.value) - Number(cond.deviation || 0)) }
+
+function changeThreshold(gi: number, ci: number, which: 'on' | 'off', v: number) {
+  if (isNaN(v)) return
   const next = clone()
-  next.groups[gi].conditions[ci].deviation = value
+  const cond = next.groups[gi].conditions[ci]
+  const on = which === 'on' ? v : thresholdOn(cond)
+  const off = which === 'off' ? v : thresholdOff(cond)
+  cond.value = r1((on + off) / 2)
+  cond.deviation = r1((on - off) / 2)
   emit('update:modelValue', next)
 }
 
@@ -880,6 +899,7 @@ function addGroup() {
 .hysteresis-row label {
   font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary);
 }
+.hysteresis-preview.error { color: var(--danger); }
 .hysteresis-preview {
   width: 100%; font-size: calc(12px * var(--content-scale, 1)); color: var(--accent); background: var(--accent-bg);
   padding: 6px 10px; border-radius: 6px; margin-top: 4px;

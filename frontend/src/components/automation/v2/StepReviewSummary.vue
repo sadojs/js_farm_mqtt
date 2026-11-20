@@ -164,11 +164,15 @@ const timingText = computed(() => {
   }
   if (trigger.triggerType === 'temperature' && trigger.temperature) {
     const { base, hysteresis } = trigger.temperature
-    const onAt = base + hysteresis
-    const offAt = base - hysteresis
+    const r1 = (v: number) => Math.round(v * 10) / 10
+    const onAt = r1(base + hysteresis)
+    const offAt = r1(base - hysteresis)
+    const isHum = trigger.sensorField === 'humidity'
+    const word = isHum ? '습도가' : '온도가'
+    const unit = isHum ? '%' : '°C'
     const onAction = state.intent === 'opener' ? '열고' : '켜고'
     const offAction = state.intent === 'opener' ? '닫습니다' : '끕니다'
-    return `온도가 ${onAt}°C 이상이면 ${onAction},\n${offAt}°C 이하로 떨어지면 ${offAction}.\n(기준 ${base}°C, 편차 ${hysteresis}°C)`
+    return `${word} ${onAt}${unit} 이상이면 ${onAction},\n${offAt}${unit} 이하로 떨어지면 ${offAction}.\n(그 사이에서는 지금 상태를 그대로 둡니다)`
   }
   return '(미설정)'
 })

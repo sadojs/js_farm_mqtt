@@ -99,16 +99,23 @@
 
             <!-- 우측: 토글 + 케밥 -->
             <label class="toggle-switch" @click.stop>
-              <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
+              <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id, $event)" />
               <span class="toggle-slider"></span>
             </label>
-            <button class="btn-kebab" @click.stop="handleDelete(rule)" :aria-label="`${rule.name} 삭제`" title="삭제">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                <circle cx="12" cy="5" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="12" cy="19" r="1.6" />
-              </svg>
-            </button>
+            <div class="kebab-wrap" @click.stop>
+              <button class="btn-kebab" :aria-label="`${rule.name} 메뉴`" title="메뉴"
+                :aria-expanded="menuRuleId === rule.id" @click="toggleMenu(rule.id)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="5" r="1.6" />
+                  <circle cx="12" cy="12" r="1.6" />
+                  <circle cx="12" cy="19" r="1.6" />
+                </svg>
+              </button>
+              <div v-if="menuRuleId === rule.id" class="kebab-menu" role="menu">
+                <button role="menuitem" @click="openCopy(rule)">복사해서 새로 만들기</button>
+                <button role="menuitem" class="danger" @click="menuRuleId = null; handleDelete(rule)">삭제</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -121,7 +128,8 @@
     <RuleWizardModal
       :visible="wizardOpen"
       :editRule="editingRule"
-      @close="wizardOpen = false"
+      :copyRule="copyingRule"
+      @close="wizardOpen = false; copyingRule = null"
       @saved="onRuleSaved"
     />
     <IntentWizardModal
@@ -140,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useAutomationStore } from '../stores/automation.store'
 import { useGroupStore } from '../stores/group.store'
 import { useDeviceStore } from '../stores/device.store'
@@ -149,6 +157,7 @@ import { useConfirm } from '../composables/useConfirm'
 import { useReorder } from '../composables/useReorder'
 import { automationApi } from '../api/automation.api'
 import { useNotificationStore } from '../stores/notification.store'
+import { confirmRuleConflicts } from '../utils/ruleConflicts'
 import type { AutomationRule } from '../types/automation.types'
 import RuleWizardModal from '../components/automation/RuleWizardModal.vue'
 import IntentWizardModal from '../components/automation/v2/IntentWizardModal.vue'
@@ -174,6 +183,22 @@ const mainTab = ref<'rules' | 'logs'>('rules')
 const wizardOpen = ref(false)
 const showIntentWizard = ref(false)
 const editingRule = ref<AutomationRule | null>(null)
+const copyingRule = ref<AutomationRule | null>(null)
+
+// 행 오른쪽 ⋮ 메뉴 (복사 / 삭제)
+const menuRuleId = ref<string | null>(null)
+function toggleMenu(id: string) {
+  menuRuleId.value = menuRuleId.value === id ? null : id
+}
+function closeMenu() { menuRuleId.value = null }
+
+/** 복사: 같은 조건으로 새 규칙을 만든다 — 장치와 조건을 바꿔 저장 */
+function openCopy(rule: AutomationRule) {
+  menuRuleId.value = null
+  editingRule.value = null
+  copyingRule.value = rule
+  wizardOpen.value = true
+}
 
 const rules = computed(() => automationStore.rules)
 const loading = computed(() => automationStore.loading)
@@ -260,6 +285,7 @@ function targetLabel(rule: AutomationRule) {
 }
 
 function openWizard(rule?: AutomationRule) {
+  copyingRule.value = null
   editingRule.value = rule || null
   if (!rule) {
     showIntentWizard.value = true
@@ -274,13 +300,29 @@ function handleSwitchToLegacy() {
   wizardOpen.value = true
 }
 
-async function handleToggle(id: string) {
+async function handleToggle(id: string, ev?: Event) {
   const rule = rules.value.find(r => r.id === id)
   const newState = rule ? !rule.enabled : true
+  // 켜기 전에 같은 장치를 움직이는 켜진 규칙이 있는지 확인 — 켜면 그 규칙은 꺼진다
+  let disableRuleIds: string[] = []
+  if (newState && rule) {
+    const picked = await confirmRuleConflicts(
+      { ruleId: rule.id, groupId: rule.groupId, conditions: rule.conditions, actions: rule.actions }, 'enable')
+    if (picked === null) {
+      // 취소 — 스위치를 원래(꺼짐)대로 되돌린다
+      const el = ev?.target as HTMLInputElement | undefined
+      if (el) el.checked = false
+      return
+    }
+    disableRuleIds = picked
+  }
   try {
     // FR-03: 관주 설정 활성화 시 autoEnableRemote 전달
     const isIrrigationEnable = newState && (rule?.conditions as any)?.type === 'irrigation'
-    await automationStore.toggleRule(id, isIrrigationEnable ? { autoEnableRemote: true } : undefined)
+    await automationStore.toggleRule(id, {
+      ...(isIrrigationEnable ? { autoEnableRemote: true } : {}),
+      ...(disableRuleIds.length ? { disableRuleIds } : {}),
+    })
     notify.success('적용 완료', `${rule?.name || '설정'}이(가) ${newState ? '활성화' : '비활성화'}되었습니다`)
   } catch {
     notify.error('적용 실패', '설정 상태 변경에 실패했습니다')
@@ -394,6 +436,9 @@ const rulesGroupedByZone = computed<ZoneGroup[]>(() => {
   if (unassigned.rules.length > 0) arr.push(unassigned)
   return arr
 })
+
+onMounted(() => document.addEventListener('click', closeMenu))
+onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
 
 onMounted(async () => {
   await Promise.all([
@@ -703,7 +748,21 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0;
 }
-.btn-kebab:hover { background: var(--danger-bg, rgba(239,68,68,.1)); color: var(--danger, #dc2626); }
+.btn-kebab:hover { background: var(--bg-hover); color: var(--text-primary); }
+.kebab-wrap { position: relative; flex-shrink: 0; }
+.kebab-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+  min-width: 180px; padding: 6px;
+  background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  display: flex; flex-direction: column;
+}
+.kebab-menu button {
+  text-align: left; padding: 10px 12px; border: none; background: none; border-radius: 6px;
+  font-size: calc(14px * var(--content-scale, 1)); color: var(--text-primary); cursor: pointer;
+}
+.kebab-menu button:hover { background: var(--bg-hover); }
+.kebab-menu button.danger { color: var(--danger); }
 
 /* ── 모바일 (≤768px) — 동일 패턴, 행 세로 풀기 ── */
 @media (max-width: 768px) {

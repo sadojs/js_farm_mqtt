@@ -140,34 +140,30 @@
           <p v-else-if="loadingChannels" class="field-hint">측정값 목록을 불러오는 중…</p>
         </div>
 
-        <div class="field-row">
-          <label class="field-label">{{ baseLabel }}</label>
-          <div class="input-unit-row">
-            <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
-              :placeholder="basePlaceholder"
-              :value="localTemp.base ?? ''"
-              @input="updateTemp('base', +($event.target as HTMLInputElement).value)" />
-            <span class="unit-label">{{ unitSymbol }}</span>
-          </div>
+        <!-- 열기·닫기 기준을 직접 입력 (저장은 기준값±편차 형식 그대로) -->
+        <div class="threshold-row">
+          <span class="threshold-dot green" aria-hidden="true">🟢</span>
+          <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
+            :aria-label="`${onWord} ${fieldWord}`"
+            :placeholder="onPlaceholder"
+            :value="openAt ?? ''"
+            @input="setThreshold('open', ($event.target as HTMLInputElement).value)" />
+          <span class="unit-label">{{ unitSymbol }} 이상이면 {{ onWord }}</span>
         </div>
-
-        <div class="field-row">
-          <label class="field-label">↕️ 편차 (허용 범위)</label>
-          <div class="input-unit-row">
-            <input type="number" class="num-input" min="0.5" max="20" step="0.5"
-              :value="localTemp.hysteresis"
-              @input="updateTemp('hysteresis', +($event.target as HTMLInputElement).value)" />
-            <span class="unit-label">{{ unitSymbol }}</span>
-          </div>
+        <div class="threshold-row">
+          <span class="threshold-dot red" aria-hidden="true">🔴</span>
+          <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
+            :aria-label="`${offWord} ${fieldWord}`"
+            :placeholder="offPlaceholder"
+            :value="closeAt ?? ''"
+            @input="setThreshold('close', ($event.target as HTMLInputElement).value)" />
+          <span class="unit-label">{{ unitSymbol }} 이하면 {{ offWord }}</span>
         </div>
-        <p class="field-hint">잦은 ON/OFF 방지를 위한 여유값이에요</p>
-
-        <div v-if="tempPreview" class="preview-box">
-          <span class="preview-label">✨ 미리보기</span>
-          <p class="preview-line green">🟢 {{ onAt.toFixed(1) }}{{ unitSymbol }} 이상이면 → {{ intent === 'opener' ? '열림' : '켜짐' }}</p>
-          <p class="preview-line red">🔴 {{ offAt.toFixed(1) }}{{ unitSymbol }} 이하면 → {{ intent === 'opener' ? '닫힘' : '꺼짐' }}</p>
-          <p class="preview-line gray">⚪ {{ offAt.toFixed(1) }}~{{ onAt.toFixed(1) }}{{ unitSymbol }} 사이 → 현재 상태 유지</p>
-        </div>
+        <p v-if="thresholdError" class="error-msg threshold-error">{{ thresholdError }}</p>
+        <p v-else-if="tempPreview" class="field-hint threshold-hint">
+          ⚪ {{ closeAt }}~{{ openAt }}{{ unitSymbol }} 사이에서는 지금 상태를 그대로 둡니다.
+        </p>
+        <p v-else class="field-hint threshold-hint">{{ onWord }} 기준은 {{ offWord }} 기준보다 1{{ unitSymbol }} 이상 높아야 합니다.</p>
 
         <!-- 추가 조건 (습도/CO2 등) -->
         <button class="btn-add-cond" @click="showExtraCond = !showExtraCond">
@@ -353,13 +349,8 @@ const unitSymbol = computed(() => {
   if (opt) return opt.unit
   return props.sensorField === 'humidity' ? '%' : '°C'
 })
-const baseLabel = computed(() => {
-  if (props.sensorField === 'humidity') return '💧 기준 습도'
-  return '🌡️ 기준 온도'
-})
 const baseMin = computed(() => (props.sensorField === 'humidity' ? 0 : -20))
 const baseMax = computed(() => (props.sensorField === 'humidity' ? 100 : 60))
-const basePlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 70' : '예: 28'))
 
 // 탭 상태 (v-show 사용 → DOM 항상 존재해 사라짐 방지)
 const tab = ref<'time' | 'temperature'>(props.triggerType)
@@ -469,14 +460,45 @@ function emitTimeRanges() {
 }
 
 // ── 온도 헬퍼 ────────────────────────────────────
-function updateTemp(key: keyof TemperatureTrigger, val: number) {
-  (localTemp as any)[key] = val
+
+// 화면에는 "열기 기준 / 닫기 기준"을 그대로 보여 주고, 저장 형식(기준값 = 가운데, 편차 = 절반)으로 바꿔 넘긴다.
+const round1 = (v: number) => Math.round(v * 10) / 10
+const hasBase = localTemp.base != null && String(localTemp.base) !== '' && !isNaN(Number(localTemp.base))
+const openAt = ref<number | null>(hasBase ? round1(Number(localTemp.base) + Number(localTemp.hysteresis ?? 2)) : null)
+const closeAt = ref<number | null>(hasBase ? round1(Number(localTemp.base) - Number(localTemp.hysteresis ?? 2)) : null)
+
+const thresholdError = computed(() => {
+  if (openAt.value == null || closeAt.value == null) return ''
+  if (openAt.value - closeAt.value < 1) {
+    return `${onWord.value} 기준(${openAt.value}${unitSymbol.value})은 ${offWord.value} 기준(${closeAt.value}${unitSymbol.value})보다 1${unitSymbol.value} 이상 높아야 합니다.`
+  }
+  return ''
+})
+const tempPreview = computed(() => openAt.value != null && closeAt.value != null && !thresholdError.value)
+
+function setThreshold(which: 'open' | 'close', raw: string) {
+  const v = raw === '' ? null : Number(raw)
+  const val = v == null || isNaN(v) ? null : v
+  if (which === 'open') openAt.value = val
+  else closeAt.value = val
+  if (openAt.value == null || closeAt.value == null) {
+    // 하나라도 비면 다음 단계로 못 가게 기준값을 비운다
+    localTemp.base = '' as any
+    emit('update:temperature', { ...localTemp })
+    return
+  }
+  localTemp.base = round1((openAt.value + closeAt.value) / 2)
+  // 차이가 1 미만이면 편차가 0.5 미만이 되어 다음 단계가 막힌다(오류 문구로 안내)
+  localTemp.hysteresis = round1((openAt.value - closeAt.value) / 2)
   emit('update:temperature', { ...localTemp })
 }
 
-const onAt = computed(() => (localTemp.base ?? 0) + (localTemp.hysteresis ?? 2))
-const offAt = computed(() => (localTemp.base ?? 0) - (localTemp.hysteresis ?? 2))
-const tempPreview = computed(() => localTemp.base != null && !isNaN(Number(localTemp.base)) && String(localTemp.base) !== '')
+const isOpenerIntent = computed(() => props.intent === 'opener')
+const onWord = computed(() => (isOpenerIntent.value ? '열기' : '켜기'))
+const offWord = computed(() => (isOpenerIntent.value ? '닫기' : '끄기'))
+const fieldWord = computed(() => (props.sensorField === 'humidity' ? '습도' : '온도'))
+const onPlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 80' : '예: 27'))
+const offPlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 70' : '예: 23'))
 
 // ── 시간 미리보기 ─────────────────────────────────
 const timePreview = computed(() => {
@@ -578,6 +600,10 @@ if (props.intent !== 'irrigation') {
 }
 
 .unit-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
+.threshold-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.threshold-row .unit-label { color: var(--text-primary); font-size: calc(14px * var(--content-scale, 1)); }
+.threshold-dot { font-size: calc(14px * var(--content-scale, 1)); }
+.threshold-error, .threshold-hint { margin: -6px 0 0; }
 
 .preview-box {
   padding: 12px 14px; background: var(--bg-secondary);
