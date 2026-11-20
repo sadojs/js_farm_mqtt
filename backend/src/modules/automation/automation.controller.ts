@@ -6,6 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ControlStatusService } from './control-status.service';
 
 @Controller('automation')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,6 +15,7 @@ export class AutomationController {
   constructor(
     private automationService: AutomationService,
     private activityLog: ActivityLogService,
+    private controlStatus: ControlStatusService,
   ) {}
 
   private getEffectiveUserId(user: any): string | null {
@@ -172,6 +174,12 @@ export class AutomationController {
   @Post('rules/restore')
   restoreBulkStoppedRules(@CurrentUser() user: any, @Body() dto: { ruleIds?: string[] }) {
     return this.automationService.restoreBulkStoppedRules(this.getEffectiveUserId(user), dto?.ruleIds);
+  }
+
+  /** 장치 제어 현황 — 지금 누가 이 장치를 움직이는지(우선순위 사다리) */
+  @Get('control-status/:deviceId')
+  getControlStatus(@CurrentUser() user: any, @Param('deviceId') deviceId: string) {
+    return this.controlStatus.getStatus(deviceId, this.getEffectiveUserId(user));
   }
 
   /** 룰 충돌(같은 장치를 반대로 제어) 목록 */

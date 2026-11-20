@@ -281,9 +281,12 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitOpenerGroupRename(og)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startOpenerGroupRename(og)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ og.groupName }}</span>
+                    <span class="irrig-name-tap" :class="{ tappable: !isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) ? startOpenerGroupRename(og) : openControlStatus(og.openDevice.id, og.groupName)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : '눌러서 제어 현황 보기'">
+                      <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }">{{ og.groupName }}</span>
+                      <span v-if="!isGroupEditing(group.id)" class="name-chevron" aria-hidden="true">›</span>
+                    </span>
                     <button
                       v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
@@ -407,9 +410,12 @@
                     <button class="btn-rename-ok" @mousedown.prevent="submitDeviceRename(device.id)">✓</button>
                   </template>
                   <template v-else>
-                    <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }"
-                      @click.stop="isGroupEditing(group.id) && startDeviceRename(device.id, device.name)"
-                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : undefined">{{ device.name }}</span>
+                    <span class="irrig-name-tap" :class="{ tappable: !isGroupEditing(group.id) }"
+                      @click.stop="isGroupEditing(group.id) ? startDeviceRename(device.id, device.name) : openControlStatus(device.id, device.name)"
+                      :title="isGroupEditing(group.id) ? '눌러서 이름 변경' : '눌러서 제어 현황 보기'">
+                      <span class="sub-card-name" :class="{ editable: isGroupEditing(group.id) }">{{ device.name }}</span>
+                      <span v-if="!isGroupEditing(group.id)" class="name-chevron" aria-hidden="true">›</span>
+                    </span>
                     <button
                       v-if="!isFarmUser && isGroupEditing(group.id)"
                       class="btn-rename-mini"
@@ -533,6 +539,12 @@
     />
 
     <!-- 관수 상태 모달 -->
+    <ControlStatusModal
+      :device-id="controlStatusDeviceId"
+      :device-name="controlStatusDeviceName"
+      @close="controlStatusDeviceId = null"
+      @released="groupStore.fetchGroups()"
+    />
     <IrrigationStatusModal
       :visible="showIrrigationStatusModal"
       :device="irrigationStatusDevice"
@@ -645,6 +657,7 @@ import { useAuthStore } from '../stores/auth.store'
 import GroupCreation from '@/components/groups/GroupCreation.vue'
 import AddDeviceModal from '@/components/groups/AddDeviceModal.vue'
 import IrrigationStatusModal from '@/components/devices/IrrigationStatusModal.vue'
+import ControlStatusModal from '@/components/devices/ControlStatusModal.vue'
 import IrrigationTimerModal from '@/components/devices/IrrigationTimerModal.vue'
 import DeviceTimerSheet from '@/components/devices/DeviceTimerSheet.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -1152,6 +1165,13 @@ const irrigationControlling = ref<string | null>(null)
 
 // 관수 상태 모달
 const showIrrigationStatusModal = ref(false)
+// 장치 제어 현황 (누가 지금 움직이는지 — 우선순위 사다리)
+const controlStatusDeviceId = ref<string | null>(null)
+const controlStatusDeviceName = ref('')
+function openControlStatus(id: string, name: string) {
+  controlStatusDeviceName.value = name
+  controlStatusDeviceId.value = id
+}
 const irrigationStatusDevice = ref<Device | null>(null)
 
 function getMapping(device: Device): ChannelMapping {

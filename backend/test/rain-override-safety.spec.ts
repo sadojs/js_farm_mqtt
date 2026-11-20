@@ -3,6 +3,7 @@ import { seed, USERS, id } from './utils/seed';
 import { RainOverrideService } from '../src/modules/rain-override/rain-override.service';
 import { HighTempOverrideService } from '../src/modules/automation/high-temp-override.service';
 import { EventsGateway } from '../src/modules/gateway/events.gateway';
+import { ControlStatusService } from '../src/modules/automation/control-status.service';
 
 /** 검토 C1·C9 — 우적센서 끊김 만료, 치명 고온이면 비 닫힘 양보 */
 describe('비 감지 우회 — 센서 끊김 · 치명 고온', () => {
@@ -122,6 +123,38 @@ describe('고온 > 비 닫힘', () => {
       `insert into sensor_data (time, device_id, user_id, sensor_type, value, unit) values (now(),$1,$2,'temperature',$3,'')`,
       [TEMP, USERS.f1.id, v]);
   };
+
+  it('제어 현황: 비+고온이면 고온이 이기고, 수동 조작은 그보다 위, 고온이 풀리면 비가 이긴다', async () => {
+    const cs = t.app.get(ControlStatusService);
+    const OPEN = id(1, 42);
+    const CLOSE = id(1, 43);
+    const winnerOf = async () => (await cs.getStatus(OPEN, USERS.f1.id));
+    await setTemp(32);
+    await rain.handleRainSignal(RAIN, true);
+    let st = await winnerOf();
+    expect(st.deviceClass).toBe('opener');
+    expect(st.winner?.source).toBe('high_temp');
+    expect(st.ladder.find((r) => r.source === 'rain')?.state).toBe('lose');
+    expect(st.lock).toBeNull();
+
+    // 닫힘 쪽에 수동 타이머 → 수동이 맨 위
+    const until = new Date(Date.now() + 30 * 60000).toISOString();
+    await t.ds.query(`update devices set device_settings = $2::jsonb where id=$1`,
+      [CLOSE, JSON.stringify({ userOverride: true, overrideUntil: until, overrideDirection: 'close' })]);
+    st = await winnerOf();
+    expect(st.winner?.source).toBe('manual');
+    expect(st.manual.releasable).toBe(true);
+    expect(st.ladder.find((r) => r.source === 'high_temp')?.state).toBe('lose');
+
+    // 수동 해제 + 고온 해제 → 비 감지 자동 닫힘이 이긴다
+    await t.ds.query(`update devices set device_settings='{}'::jsonb where id=$1`, [CLOSE]);
+    await setTemp(27);
+    await rain.tickSafety();
+    st = await winnerOf();
+    expect(st.winner?.source).toBe('rain');
+    // 다른 농장 사용자는 볼 수 없다
+    await expect(cs.getStatus(OPEN, USERS.f2.id)).rejects.toThrow();
+  });
 
   it('비가 와도 임계값 이상이면 닫지 않는다(고온 강제열림 유지)', async () => {
     await setTemp(32);

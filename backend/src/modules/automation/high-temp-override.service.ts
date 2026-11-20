@@ -27,6 +27,8 @@ export class HighTempOverrideService {
 
   /** groupId → 현재 고온 오버라이드 활성 여부 (전환 감지/로그/브로드캐스트용) */
   private activeZones = new Map<string, boolean>();
+  /** 마지막 판정 때 읽은 온도·기준 (제어 현황 화면용) */
+  private lastReading = new Map<string, { temp: number | null; threshold: number | null; enabled: boolean }>();
   /** groupId → 구역 설정 캐시(TTL) — disabled 구역이 매 tick DB 조회하지 않도록 */
   private cfgCache = new Map<string, { cfg: { enabled: boolean; threshold: number | null } | null; exp: number }>();
   private readonly CFG_TTL_MS = 60 * 1000;
@@ -50,6 +52,7 @@ export class HighTempOverrideService {
     if (!groupId) return false;
     const cfg = await this.getZoneConfig(groupId);
     if (!cfg || !cfg.enabled || cfg.threshold == null) {
+      this.lastReading.set(groupId, { temp: null, threshold: cfg?.threshold ?? null, enabled: false });
       await this.setState(groupId, false, null, cfg?.threshold ?? null);
       return false;
     }
@@ -58,8 +61,16 @@ export class HighTempOverrideService {
     const wasActive = this.activeZones.get(groupId) ?? false;
     const limit = wasActive ? cfg.threshold - HIGH_TEMP_CLEAR_MARGIN_C : cfg.threshold;
     const active = temp != null && temp >= limit;
+    this.lastReading.set(groupId, { temp, threshold: cfg.threshold, enabled: true });
     await this.setState(groupId, active, temp, cfg.threshold);
     return active;
+  }
+
+  /** 판정을 새로 한 뒤 온도·기준까지 돌려준다 (제어 현황 화면용) */
+  async describe(groupId: string): Promise<{ active: boolean; enabled: boolean; temp: number | null; threshold: number | null }> {
+    const active = await this.isActive(groupId).catch(() => false);
+    const r = this.lastReading.get(groupId) ?? { temp: null, threshold: null, enabled: false };
+    return { active, ...r };
   }
 
   /** 구역의 현재 고온 오버라이드 상태 (UI 초기 배지용) */

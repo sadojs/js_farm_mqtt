@@ -8,6 +8,7 @@ import { AutomationRunnerService } from './automation-runner.service';
 import { IrrigationSchedulerService } from './irrigation-scheduler.service';
 import { HighTempOverrideService } from './high-temp-override.service';
 import { DeviceArbiterService } from './device-arbiter.service';
+import { ControlStatusService } from './control-status.service';
 import { Device } from '../devices/entities/device.entity';
 import { Gateway } from '../gateway-manager/entities/gateway.entity';
 import { MqttModule } from '../mqtt/mqtt.module';
@@ -26,7 +27,7 @@ import { RainOverrideModule } from '../rain-override/rain-override.module';
     RainOverrideModule,
   ],
   controllers: [AutomationController],
-  providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService, HighTempOverrideService, DeviceArbiterService],
-  exports: [AutomationService, IrrigationSchedulerService, HighTempOverrideService, DeviceArbiterService],
+  providers: [AutomationService, AutomationRunnerService, IrrigationSchedulerService, HighTempOverrideService, DeviceArbiterService, ControlStatusService],
+  exports: [AutomationService, IrrigationSchedulerService, HighTempOverrideService, DeviceArbiterService, ControlStatusService],
 })
 export class AutomationModule {}

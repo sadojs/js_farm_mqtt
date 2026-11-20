@@ -12,30 +12,34 @@ import { EventsGateway } from '../gateway/events.gateway';
  * 룰보다 먼저 처리되며(= 표의 위쪽), 이후 단계에서 요청 등록 방식으로 옮긴다.
  */
 
-/** 요청 주체. 숫자가 작을수록 우선한다. */
+/**
+ * 요청 주체. 숫자가 작을수록 우선한다.
+ * 수동 조작은 무조건 최우선(사용자 결정 2026-11-20). 비상 정지는 순위가 아니라 잠금 —
+ * 걸려 있으면 해제 전까지 수동을 포함해 켜는 명령이 모두 막힌다(0 으로 표시).
+ */
 export type ArbiterSource =
   | 'emergency' | 'protection' | 'rain' | 'high_temp'
   | 'manual' | 'irrigation_timer' | 'rule' | 'backup_schedule';
 
 export const SOURCE_RANK: Record<ArbiterSource, number> = {
-  emergency: 1,
+  emergency: 0, // 잠금
+  manual: 1,
   protection: 2,
   high_temp: 3, // 비 닫힘보다 위 — 비가 와도 고온이면 열어 둔다(이슬비에 닫혀 고온 피해 방지)
   rain: 4,
-  manual: 5,
-  irrigation_timer: 6,
-  rule: 7,
-  backup_schedule: 8,
+  irrigation_timer: 5,
+  rule: 6,
+  backup_schedule: 7,
 };
 
 export const SOURCE_LABEL: Record<ArbiterSource, string> = {
   emergency: '비상 정지',
   protection: '방재 모드',
-  rain: '비 감지 닫힘',
+  rain: '비 감지 자동 닫힘',
   high_temp: '고온 강제열림',
   manual: '수동 조작',
   irrigation_timer: '관수 타이머',
-  rule: '자동화 룰',
+  rule: '자동제어 규칙',
   backup_schedule: '센서 끊김 시간표',
 };
 
@@ -199,6 +203,12 @@ export class DeviceArbiterService {
     this.purge();
     const list = [...this.claims.values()].filter((c) => c.deviceKey === deviceKey);
     return list.sort(DeviceArbiterService.compare)[0] ?? null;
+  }
+
+  /** 장치에 걸린 살아 있는 요청 전부 (제어 현황 화면용) */
+  claimsFor(deviceKey: string): Claim[] {
+    this.purge();
+    return [...this.claims.values()].filter((c) => c.deviceKey === deviceKey).sort(DeviceArbiterService.compare);
   }
 
   /** 화면·로그용 한 줄 설명 */

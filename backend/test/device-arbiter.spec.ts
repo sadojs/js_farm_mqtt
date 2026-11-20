@@ -17,9 +17,9 @@ describe('중재기 — 우선순위 표와 요청 규칙 (단위)', () => {
   });
   beforeEach(() => { jest.restoreAllMocks(); gw.broadcastAutomationConflict.mockClear(); arb = new DeviceArbiterService(gw as any); });
 
-  it('우선순위 표: 비상 > 방재 > 고온 > 비 > 수동 > 관수 타이머 > 룰 > 센서 끊김 시간표', () => {
+  it('우선순위 표: (비상 정지 잠금) > 수동 > 방재 > 고온 > 비 > 관수 타이머 > 룰 > 센서 끊김 시간표', () => {
     const order = Object.entries(SOURCE_RANK).sort((a, b) => a[1] - b[1]).map(([k]) => k);
-    expect(order).toEqual(['emergency', 'protection', 'high_temp', 'rain', 'manual', 'irrigation_timer', 'rule', 'backup_schedule']);
+    expect(order).toEqual(['emergency', 'manual', 'protection', 'high_temp', 'rain', 'irrigation_timer', 'rule', 'backup_schedule']);
   });
 
   it('같은 상태를 원하면 서로 막지 않는다 (R3 — 두 룰 모두 켜기)', () => {

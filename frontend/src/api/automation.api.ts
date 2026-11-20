@@ -1,7 +1,29 @@
 import apiClient from './client'
 import type { AutomationRule, CreateRuleRequest, AutomationLog, AutomationLogStats } from '../types/automation.types'
 
+export interface ControlStatusRow {
+  source: string
+  label: string
+  state: 'win' | 'lose' | 'idle' | 'na'
+  detail: string
+  want?: string
+}
+export interface ControlStatus {
+  deviceId: string
+  deviceName: string
+  deviceClass: 'opener' | 'fan' | 'irrigation' | 'other'
+  lock: { active: boolean; label: string } | null
+  winner: { source: string; label: string; detail: string } | null
+  manual: { active: boolean; until: string | null; releasable: boolean }
+  ladder: ControlStatusRow[]
+  checkedAt: string
+}
+
 export const automationApi = {
+  /** 장치 제어 현황 — 지금 누가 이 장치를 움직이는지 */
+  getControlStatus: (deviceId: string) =>
+    apiClient.get<ControlStatus>(`/automation/control-status/${deviceId}`),
+
   getRules: () =>
     apiClient.get<AutomationRule[]>('/automation/rules'),
 

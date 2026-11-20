@@ -666,6 +666,9 @@ body {
   --warning-bg: #fef3c7;
   --warning-text: #92400e;
   --warning-border: #fde68a;
+  /* 안내(파랑) — 수동 조작 중·정보 표시 (검토 §7-10) */
+  --info: #1e6fd9;
+  --info-bg: #e7f0fd;
   --success-bg: #dcfce7;
   --success-text: #166534;
   --danger-badge-bg: #fee2e2;
@@ -726,6 +729,8 @@ body {
   --warning-bg: #3a2a0a;
   --warning-text: #fbbf24;
   --warning-border: #78510a;
+  --info: #64a8ff;
+  --info-bg: #13263f;
   --success-bg: #0a2a1a;
   --success-text: #4ade80;
   --danger-badge-bg: #3a1a1a;
