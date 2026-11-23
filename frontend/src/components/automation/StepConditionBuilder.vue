@@ -46,9 +46,9 @@
                 :value="cond.sensor_device_id || ''"
                 @change="changeSensorDevice(gi, ci, ($event.target as HTMLSelectElement).value)"
                 class="device-select"
-                title="특정 센서 장치 선택 (선택 안하면 그룹 평균 사용)"
+                aria-label="센서"
               >
-                <option value="">그룹 평균</option>
+                <option value="" disabled>센서를 고르세요</option>
                 <option v-for="d in sensorDevices" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
 
@@ -71,34 +71,33 @@
               <!-- 히스테리시스 UI (FR-02): fan + temperature/humidity 관련 역할 -->
               <template v-if="isFanHysteresis(cond)">
                 <div class="hysteresis-row">
-                  <label>🟢</label>
+                  <label>{{ isHumidityField(cond.field) ? '기준 습도' : '기준 온도' }}</label>
                   <input
                     type="number"
                     step="0.5"
-                    :value="thresholdOn(cond)"
-                    :aria-label="`${onWord} 기준`"
-                    @change="changeThreshold(gi, ci, 'on', Number(($event.target as HTMLInputElement).value))"
+                    :value="cond.value"
+                    @input="changeValue(gi, ci, Number(($event.target as HTMLInputElement).value))"
                     class="value-input small"
                   />
-                  <span class="unit">{{ getUnit(cond.field) }} 이상이면 {{ onWord }}</span>
-                </div>
-                <div class="hysteresis-row">
-                  <label>🔴</label>
+                  <span class="unit">{{ condUnit(cond) }}</span>
+                  <label>편차</label>
                   <input
                     type="number"
                     step="0.5"
-                    :value="thresholdOff(cond)"
-                    :aria-label="`${offWord} 기준`"
-                    @change="changeThreshold(gi, ci, 'off', Number(($event.target as HTMLInputElement).value))"
+                    min="0"
+                    :value="cond.deviation || 0"
+                    @input="changeDeviation(gi, ci, Number(($event.target as HTMLInputElement).value))"
                     class="value-input small"
                   />
-                  <span class="unit">{{ getUnit(cond.field) }} 이하면 {{ offWord }}</span>
+                  <span class="unit">{{ condUnit(cond) }}</span>
                 </div>
                 <div v-if="Number(cond.deviation) < 0" class="hysteresis-preview error">
-                  {{ onWord }} 기준이 {{ offWord }} 기준보다 낮습니다. 다시 입력해 주세요.
+                  편차는 0 이상으로 입력해 주세요.
                 </div>
-                <div v-else-if="Number(cond.deviation) > 0" class="hysteresis-preview">
-                  ⚪ {{ thresholdOff(cond) }}~{{ thresholdOn(cond) }}{{ getUnit(cond.field) }} 사이에서는 지금 상태를 그대로 둡니다.
+                <div v-else class="hysteresis-preview">
+                  <b>{{ thresholdOn(cond) }}{{ condUnit(cond) }} 이상이면 {{ onWord }} / {{ thresholdOff(cond) }}{{ condUnit(cond) }} 이하면 {{ offWord }}</b>
+                  <span v-if="Number(cond.deviation) > 0" class="hysteresis-sub">그 사이에서는 지금 상태를 그대로 둡니다.</span>
+                  <span v-else class="hysteresis-sub">편차를 1~2 정도 넣으면 기준 근처에서 자주 {{ onWord }}·{{ offWord }}를 반복하지 않습니다.</span>
                 </div>
               </template>
 
@@ -272,6 +271,7 @@ import {
 import { envConfigApi } from '../../api/env-config.api'
 import type { EnvRole, ResolvedValue } from '../../api/env-config.api'
 import { deviceApi } from '../../api/device.api'
+import { useGroupStore } from '../../stores/group.store'
 import type { Device } from '../../types/device.types'
 
 const DAYS = [
@@ -313,6 +313,7 @@ const envRoles = ref<EnvRole[]>([])
 const resolvedValues = ref<Record<string, ResolvedValue>>({})
 
 const sensorDevices = ref<Device[]>([])
+const groupStore = useGroupStore()
 
 async function loadEnvData() {
   if (!props.groupId) return
@@ -330,8 +331,22 @@ async function loadEnvData() {
 
 async function loadSensorDevices() {
   try {
+    if (props.groupId && groupStore.groups.length === 0) await groupStore.fetchGroups().catch(() => undefined)
     const res = await deviceApi.getAll()
-    sensorDevices.value = (res.data as Device[]).filter(d => d.deviceType === 'sensor')
+    const all = (res.data as Device[]).filter(d => d.deviceType === 'sensor')
+    // 이 구역의 센서만 보여 준다 (구역 정보를 못 찾으면 전체)
+    const group = props.groupId ? groupStore.groups.find(g => g.id === props.groupId) : null
+    const inZone = new Set(((group as any)?.devices || []).map((d: any) => d.id))
+    const zoneSensors = inZone.size > 0 ? all.filter(d => inZone.has(d.id)) : []
+    // 이미 조건에 쓰인 센서는 구역 밖이어도 남겨 둔다 (기존 규칙 표시용)
+    const used = new Set<string>()
+    for (const g of (props.modelValue?.groups || [])) {
+      for (const c of (g.conditions || [])) if ((c as any).sensor_device_id) used.add((c as any).sensor_device_id)
+    }
+    sensorDevices.value = zoneSensors.length > 0
+      ? all.filter(d => inZone.has(d.id) || used.has(d.id))
+      : all
+    for (const d of sensorDevices.value) loadChannelsForDevice(d.id)
   } catch {
     // ignore
   }
@@ -422,11 +437,27 @@ function hydrateTimeSchedulerFromModel() {
   }
 }
 
-function changeSensorDevice(gi: number, ci: number, deviceId: string) {
+async function changeSensorDevice(gi: number, ci: number, deviceId: string) {
+  if (!deviceId) return
+  await loadChannelsForDevice(deviceId)
   const next = clone()
-  next.groups[gi].conditions[ci].sensor_device_id = deviceId || null
+  const cond = next.groups[gi].conditions[ci]
+  cond.sensor_device_id = deviceId
+  // 고른 센서에 지금 데이터 종류가 없으면 같은 계열(온도/습도) → 첫 번째 데이터로 바꾼다. 기준값·편차는 유지.
+  const fields = sensorFieldsOf(deviceId).map(f => f.value)
+  if (fields.length > 0 && !fields.includes(cond.field)) {
+    const want = isHumidityField(cond.field) ? 'humidity' : cond.field.includes('temp') ? 'temperature' : ''
+    const pick = fields.includes(want) ? want : fields[0]
+    const sameKind = (want === 'humidity' && pick === 'humidity') || (want === 'temperature' && pick === 'temperature')
+    cond.field = pick
+    cond.type = 'sensor'
+    cond.unit = sensorFieldsOf(deviceId).find(f => f.value === pick)?.unit || ''
+    if (!sameKind) {
+      cond.operator = 'gte'
+      delete (cond as any).deviation
+    }
+  }
   emit('update:modelValue', next)
-  if (deviceId) loadChannelsForDevice(deviceId)
 }
 
 // 채널 필드 한국어 라벨 폴백 (env-roles에 등록되지 않은 경우)
@@ -446,17 +477,28 @@ const FIELD_KR_LABEL: Record<string, string> = {
   rainfall: '강우',
 }
 
-// 특정 condition의 sensor_device_id에 맞춘 field 옵션 목록 (없으면 envRoleFields)
+// 조건에 쓸 수 없는 상태값(배터리·신호 등)은 데이터 목록에서 뺀다
+const NOISE_FIELDS = new Set(['battery', 'linkquality', 'voltage', 'battery_low', 'update', 'update_available'])
+
+// 특정 condition의 sensor_device_id에 맞춘 field 옵션 목록 (센서를 아직 안 골랐으면 기존 구역 환경 항목)
 function fieldsForCondition(cond: any): any[] {
   const did = cond?.sensor_device_id
   if (!did) return availableFields.value
-  const channels = channelCache.value.get(did)
-  if (!channels || channels.length === 0) return availableFields.value
+  const opts = sensorFieldsOf(did)
+  // 최근 기록이 없는 센서: 지금 조건의 데이터만 남겨 값이 사라지지 않게
+  if (opts.length === 0) {
+    return [{ value: cond.field, label: FIELD_KR_LABEL[cond.field] ?? cond.field, displayLabel: `${FIELD_KR_LABEL[cond.field] ?? cond.field} (최근 기록 없음)`, type: 'sensor', operators: getOperators(cond.field), unit: cond.unit || '', defaultValue: 0, icon: '📊' }]
+  }
+  return opts
+}
+
+function sensorFieldsOf(did: string): any[] {
+  const channels = (channelCache.value.get(did) || []).filter(ch => !NOISE_FIELDS.has(ch.field))
   // 디바이스가 실제 발행하는 채널만 노출, 라벨에 최근 값 부착
   return channels.map(ch => {
     const role = envRoleFields.value.find(r => r.value === ch.field)
     const baseLabel = role?.label ?? FIELD_KR_LABEL[ch.field] ?? ch.field
-    const valStr = ch.lastValue == null ? '값 없음' : `${ch.lastValue}${ch.unit}`
+    const valStr = ch.lastValue == null ? '값 없음' : `${Math.round(Number(ch.lastValue) * 10) / 10}${ch.unit}`
     return {
       value: ch.field,
       label: baseLabel,
@@ -717,21 +759,20 @@ function changeValue(gi: number, ci: number, value: any) {
   emit('update:modelValue', next)
 }
 
-// 열기(켜기)·닫기(끄기) 기준을 직접 받는다 — 저장 형식은 기준값(가운데)±편차(절반) 그대로
+// 기준값 + 편차를 입력받고 "27℃ 이상이면 열기 / 23℃ 이하면 닫기"로 풀어서 보여 준다
 const r1 = (v: number) => Math.round(v * 10) / 10
 const onWord = computed(() => (props.equipmentType === 'opener_open' ? '열기' : '켜기'))
 const offWord = computed(() => (props.equipmentType === 'opener_open' ? '닫기' : '끄기'))
 function thresholdOn(cond: Condition) { return r1(Number(cond.value) + Number(cond.deviation || 0)) }
 function thresholdOff(cond: Condition) { return r1(Number(cond.value) - Number(cond.deviation || 0)) }
+function isHumidityField(field: string) { return field.includes('humidity') }
+function condUnit(cond: Condition) {
+  return getUnit(cond.field) || cond.unit || (isHumidityField(cond.field) ? '%' : '°C')
+}
 
-function changeThreshold(gi: number, ci: number, which: 'on' | 'off', v: number) {
-  if (isNaN(v)) return
+function changeDeviation(gi: number, ci: number, value: number) {
   const next = clone()
-  const cond = next.groups[gi].conditions[ci]
-  const on = which === 'on' ? v : thresholdOn(cond)
-  const off = which === 'off' ? v : thresholdOff(cond)
-  cond.value = r1((on + off) / 2)
-  cond.deviation = r1((on - off) / 2)
+  next.groups[gi].conditions[ci].deviation = value
   emit('update:modelValue', next)
 }
 
@@ -899,11 +940,13 @@ function addGroup() {
 .hysteresis-row label {
   font-size: calc(13px * var(--content-scale, 1)); font-weight: 600; color: var(--text-secondary);
 }
-.hysteresis-preview.error { color: var(--danger); }
 .hysteresis-preview {
-  width: 100%; font-size: calc(12px * var(--content-scale, 1)); color: var(--accent); background: var(--accent-bg);
-  padding: 6px 10px; border-radius: 6px; margin-top: 4px;
+  width: 100%; font-size: calc(13px * var(--content-scale, 1)); color: var(--accent); background: var(--accent-bg);
+  padding: 8px 10px; border-radius: 6px; margin-top: 4px;
+  display: flex; flex-direction: column; gap: 2px;
 }
+.hysteresis-preview.error { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.hysteresis-sub { font-size: calc(12px * var(--content-scale, 1)); color: var(--text-muted); }
 
 /* 릴레이 옵션 */
 .relay-option {

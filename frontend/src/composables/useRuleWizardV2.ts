@@ -157,7 +157,8 @@ export function useRuleWizardV2(isAdmin = false) {
           return ranges.length > 0 && ranges.every(r => r.days.length > 0 && r.start && r.end && r.start < r.end)
         }
         const temp = trigger.temperature
-        const tempValid = !!(temp && temp.base != null && !isNaN(temp.base) && temp.hysteresis >= 0.5)
+        const tempValid = !!(temp && temp.base != null && String(temp.base) !== '' && !isNaN(Number(temp.base))
+          && Number(temp.hysteresis) >= 0.5)
         // 온습도 트리거에는 (센서, 측정 채널) 모두 필수
         return tempValid && !!trigger.sensorDeviceId && !!trigger.sensorField
       }

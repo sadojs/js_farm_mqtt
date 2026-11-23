@@ -121,49 +121,61 @@
 
       <!-- 온습도 탭 -->
       <div v-show="tab === 'temperature'" class="tab-panel">
-        <!-- 측정 채널 선택: (device, field) 평탄화 리스트 -->
+        <!-- 센서 → 그 센서의 데이터(온도·습도) 순서로 고른다 -->
         <div class="field-section">
-          <label class="field-label">📡 측정값</label>
-          <select
-            class="form-select"
-            :value="channelKey"
-            @change="onChannelChange(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" disabled>측정값을 선택하세요</option>
-            <option v-for="opt in channelOptions" :key="opt.key" :value="opt.key">
-              {{ opt.label }}
-            </option>
-          </select>
-          <p v-if="channelOptions.length === 0 && !loadingChannels" class="field-hint">
-            이 구역에 등록된 센서가 없거나 24시간 내 측정 기록이 없습니다.
+          <label class="field-label">📡 측정 센서</label>
+          <div class="sensor-pick">
+            <select
+              class="form-select"
+              aria-label="센서"
+              :value="sensorDeviceId ?? ''"
+              @change="onSensorChange(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="" disabled>센서를 고르세요</option>
+              <option v-for="s in availableSensors" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <select
+              class="form-select"
+              aria-label="데이터"
+              :value="sensorField ?? ''"
+              :disabled="!sensorDeviceId || fieldOptions.length === 0"
+              @change="onFieldChange(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="" disabled>{{ sensorDeviceId ? '데이터를 고르세요' : '센서를 먼저 고르세요' }}</option>
+              <option v-for="f in fieldOptions" :key="f.field" :value="f.field">{{ f.label }}</option>
+            </select>
+          </div>
+          <p v-if="availableSensors.length === 0" class="field-hint">이 구역에 등록된 센서가 없습니다.</p>
+          <p v-else-if="loadingChannels" class="field-hint">센서 데이터를 불러오는 중…</p>
+          <p v-else-if="sensorDeviceId && fieldOptions.length === 0" class="field-hint">
+            이 센서는 최근 24시간 동안 온도·습도 기록이 없습니다.
           </p>
-          <p v-else-if="loadingChannels" class="field-hint">측정값 목록을 불러오는 중…</p>
         </div>
 
-        <!-- 열기·닫기 기준을 직접 입력 (저장은 기준값±편차 형식 그대로) -->
-        <div class="threshold-row">
-          <span class="threshold-dot green" aria-hidden="true">🟢</span>
-          <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
-            :aria-label="`${onWord} ${fieldWord}`"
-            :placeholder="onPlaceholder"
-            :value="openAt ?? ''"
-            @input="setThreshold('open', ($event.target as HTMLInputElement).value)" />
-          <span class="unit-label">{{ unitSymbol }} 이상이면 {{ onWord }}</span>
+        <div class="field-row">
+          <label class="field-label">{{ baseLabel }}</label>
+          <div class="input-unit-row">
+            <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
+              :placeholder="basePlaceholder"
+              :value="localTemp.base ?? ''"
+              @input="updateTemp('base', ($event.target as HTMLInputElement).value)" />
+            <span class="unit-label">{{ unitSymbol }}</span>
+          </div>
         </div>
-        <div class="threshold-row">
-          <span class="threshold-dot red" aria-hidden="true">🔴</span>
-          <input type="number" class="num-input" :min="baseMin" :max="baseMax" step="0.5"
-            :aria-label="`${offWord} ${fieldWord}`"
-            :placeholder="offPlaceholder"
-            :value="closeAt ?? ''"
-            @input="setThreshold('close', ($event.target as HTMLInputElement).value)" />
-          <span class="unit-label">{{ unitSymbol }} 이하면 {{ offWord }}</span>
+        <div class="field-row">
+          <label class="field-label">↕️ 편차</label>
+          <div class="input-unit-row">
+            <input type="number" class="num-input" min="0.5" max="20" step="0.5"
+              :value="localTemp.hysteresis"
+              @input="updateTemp('hysteresis', ($event.target as HTMLInputElement).value)" />
+            <span class="unit-label">{{ unitSymbol }}</span>
+          </div>
         </div>
-        <p v-if="thresholdError" class="error-msg threshold-error">{{ thresholdError }}</p>
-        <p v-else-if="tempPreview" class="field-hint threshold-hint">
-          ⚪ {{ closeAt }}~{{ openAt }}{{ unitSymbol }} 사이에서는 지금 상태를 그대로 둡니다.
-        </p>
-        <p v-else class="field-hint threshold-hint">{{ onWord }} 기준은 {{ offWord }} 기준보다 1{{ unitSymbol }} 이상 높아야 합니다.</p>
+        <p v-if="hysteresisError" class="error-msg threshold-error">{{ hysteresisError }}</p>
+        <div v-else-if="tempPreview" class="preview-box">
+          <p class="preview-text"><b>{{ fmt1(onAt) }}{{ unitSymbol }} 이상이면 {{ onWord }} / {{ fmt1(offAt) }}{{ unitSymbol }} 이하면 {{ offWord }}</b></p>
+          <p class="preview-line gray">그 사이에서는 지금 상태를 그대로 둡니다.</p>
+        </div>
 
         <!-- 추가 조건 (습도/CO2 등) -->
         <button class="btn-add-cond" @click="showExtraCond = !showExtraCond">
@@ -254,14 +266,11 @@ const emit = defineEmits<{
 
 const groupStore = useGroupStore()
 
-// ── 측정 채널 평탄화 ────────────────────────────────────────────
-interface ChannelOption {
-  key: string   // `${deviceId}::${field}`
-  deviceId: string
+// ── 센서 → 데이터 선택 ────────────────────────────────────────────
+interface FieldOption {
   field: SensorReadingField
-  label: string // "온습도센서1 — 온도 (24.2°C)"
+  label: string // "온도 (24.2°C)"
   unit: string
-  lastValue: number | null
 }
 
 const FIELD_LABEL: Record<SensorReadingField, string> = {
@@ -279,39 +288,31 @@ const availableSensors = computed(() => {
   return (group.devices || []).filter((d: any) => d.deviceType === 'sensor') as any[]
 })
 
-const channelOptions = computed<ChannelOption[]>(() => {
-  const opts: ChannelOption[] = []
-  for (const dev of availableSensors.value) {
-    const channels = channelCache.value.get(dev.id) || []
-    for (const ch of channels) {
-      if (ch.field !== 'temperature' && ch.field !== 'humidity') continue
-      const f = ch.field as SensorReadingField
-      const valStr = ch.lastValue == null ? '값 없음' : `${ch.lastValue.toFixed(1)}${ch.unit}`
-      opts.push({
-        key: `${dev.id}::${f}`,
-        deviceId: dev.id,
-        field: f,
-        unit: ch.unit,
-        lastValue: ch.lastValue,
-        label: `${dev.name} — ${FIELD_LABEL[f]} (${valStr})`,
-      })
-    }
+function fieldsOf(deviceId: string | undefined): FieldOption[] {
+  if (!deviceId) return []
+  const out: FieldOption[] = []
+  for (const ch of channelCache.value.get(deviceId) || []) {
+    if (ch.field !== 'temperature' && ch.field !== 'humidity') continue
+    const f = ch.field as SensorReadingField
+    const valStr = ch.lastValue == null ? '값 없음' : `${Number(ch.lastValue).toFixed(1)}${ch.unit}`
+    out.push({ field: f, unit: ch.unit, label: `${FIELD_LABEL[f]} (${valStr})` })
   }
-  return opts
-})
+  return out
+}
+const fieldOptions = computed(() => fieldsOf(props.sensorDeviceId))
 
-const channelKey = computed(() => {
-  if (props.sensorDeviceId && props.sensorField) {
-    return `${props.sensorDeviceId}::${props.sensorField}`
-  }
-  return ''
-})
+function onSensorChange(deviceId: string) {
+  if (!deviceId) return
+  emit('update:sensorDeviceId', deviceId)
+  // 같은 데이터가 그 센서에도 있으면 그대로, 없으면 첫 번째(보통 온도)로
+  const opts = fieldsOf(deviceId)
+  const keep = opts.find(o => o.field === props.sensorField)
+  emit('update:sensorField', keep?.field ?? opts[0]?.field)
+}
 
-function onChannelChange(key: string) {
-  const opt = channelOptions.value.find(o => o.key === key)
-  if (!opt) return
-  emit('update:sensorDeviceId', opt.deviceId)
-  emit('update:sensorField', opt.field)
+function onFieldChange(field: string) {
+  const opt = fieldOptions.value.find(o => o.field === field)
+  if (opt) emit('update:sensorField', opt.field)
 }
 
 async function loadChannelsForSensors() {
@@ -345,10 +346,12 @@ watch(() => availableSensors.value.length, loadChannelsForSensors)
 
 // 현재 채널에 따른 단위 표기 + 라벨
 const unitSymbol = computed(() => {
-  const opt = channelOptions.value.find(o => o.key === channelKey.value)
-  if (opt) return opt.unit
+  const opt = fieldOptions.value.find(o => o.field === props.sensorField)
+  if (opt?.unit) return opt.unit
   return props.sensorField === 'humidity' ? '%' : '°C'
 })
+const baseLabel = computed(() => (props.sensorField === 'humidity' ? '💧 기준 습도' : '🌡️ 기준 온도'))
+const basePlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 75' : '예: 25'))
 const baseMin = computed(() => (props.sensorField === 'humidity' ? 0 : -20))
 const baseMax = computed(() => (props.sensorField === 'humidity' ? 100 : 60))
 
@@ -461,44 +464,25 @@ function emitTimeRanges() {
 
 // ── 온도 헬퍼 ────────────────────────────────────
 
-// 화면에는 "열기 기준 / 닫기 기준"을 그대로 보여 주고, 저장 형식(기준값 = 가운데, 편차 = 절반)으로 바꿔 넘긴다.
-const round1 = (v: number) => Math.round(v * 10) / 10
-const hasBase = localTemp.base != null && String(localTemp.base) !== '' && !isNaN(Number(localTemp.base))
-const openAt = ref<number | null>(hasBase ? round1(Number(localTemp.base) + Number(localTemp.hysteresis ?? 2)) : null)
-const closeAt = ref<number | null>(hasBase ? round1(Number(localTemp.base) - Number(localTemp.hysteresis ?? 2)) : null)
-
-const thresholdError = computed(() => {
-  if (openAt.value == null || closeAt.value == null) return ''
-  if (openAt.value - closeAt.value < 1) {
-    return `${onWord.value} 기준(${openAt.value}${unitSymbol.value})은 ${offWord.value} 기준(${closeAt.value}${unitSymbol.value})보다 1${unitSymbol.value} 이상 높아야 합니다.`
-  }
-  return ''
-})
-const tempPreview = computed(() => openAt.value != null && closeAt.value != null && !thresholdError.value)
-
-function setThreshold(which: 'open' | 'close', raw: string) {
-  const v = raw === '' ? null : Number(raw)
-  const val = v == null || isNaN(v) ? null : v
-  if (which === 'open') openAt.value = val
-  else closeAt.value = val
-  if (openAt.value == null || closeAt.value == null) {
-    // 하나라도 비면 다음 단계로 못 가게 기준값을 비운다
-    localTemp.base = '' as any
-    emit('update:temperature', { ...localTemp })
-    return
-  }
-  localTemp.base = round1((openAt.value + closeAt.value) / 2)
-  // 차이가 1 미만이면 편차가 0.5 미만이 되어 다음 단계가 막힌다(오류 문구로 안내)
-  localTemp.hysteresis = round1((openAt.value - closeAt.value) / 2)
+// 기준값 + 편차를 입력받고, 아래에 "27℃ 이상이면 열기 / 23℃ 이하면 닫기"로 풀어서 보여 준다
+function updateTemp(key: keyof TemperatureTrigger, raw: string) {
+  ;(localTemp as any)[key] = raw === '' ? '' : Number(raw)
   emit('update:temperature', { ...localTemp })
 }
+const fmt1 = (v: number) => String(Math.round(v * 10) / 10)
+const hasBase = computed(() => localTemp.base != null && String(localTemp.base) !== '' && !isNaN(Number(localTemp.base)))
+const onAt = computed(() => Number(localTemp.base) + Number(localTemp.hysteresis || 0))
+const offAt = computed(() => Number(localTemp.base) - Number(localTemp.hysteresis || 0))
+const hysteresisError = computed(() => {
+  const h = localTemp.hysteresis as any
+  if (h === '' || h == null || isNaN(Number(h)) || Number(h) < 0.5) return '편차는 0.5 이상으로 입력해 주세요.'
+  return ''
+})
+const tempPreview = computed(() => hasBase.value && !hysteresisError.value)
 
 const isOpenerIntent = computed(() => props.intent === 'opener')
 const onWord = computed(() => (isOpenerIntent.value ? '열기' : '켜기'))
 const offWord = computed(() => (isOpenerIntent.value ? '닫기' : '끄기'))
-const fieldWord = computed(() => (props.sensorField === 'humidity' ? '습도' : '온도'))
-const onPlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 80' : '예: 27'))
-const offPlaceholder = computed(() => (props.sensorField === 'humidity' ? '예: 70' : '예: 23'))
 
 // ── 시간 미리보기 ─────────────────────────────────
 const timePreview = computed(() => {
@@ -600,10 +584,10 @@ if (props.intent !== 'irrigation') {
 }
 
 .unit-label { font-size: calc(13px * var(--content-scale, 1)); color: var(--text-muted); }
-.threshold-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.threshold-row .unit-label { color: var(--text-primary); font-size: calc(14px * var(--content-scale, 1)); }
-.threshold-dot { font-size: calc(14px * var(--content-scale, 1)); }
-.threshold-error, .threshold-hint { margin: -6px 0 0; }
+.threshold-error { margin: -6px 0 0; }
+.sensor-pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.sensor-pick .form-select:disabled { opacity: 0.6; cursor: not-allowed; }
+@media (max-width: 420px) { .sensor-pick { grid-template-columns: 1fr; } }
 
 .preview-box {
   padding: 12px 14px; background: var(--bg-secondary);

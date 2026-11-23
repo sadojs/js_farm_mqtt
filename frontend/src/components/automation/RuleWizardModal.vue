@@ -236,7 +236,7 @@ const canNext = computed(() => {
       formData.value.conditions.groups.every(g => g.conditions.length > 0) &&
       formData.value.conditions.groups.every(g =>
         g.conditions.every(cond => cond.value !== null && cond.value !== undefined
-          && !(Number((cond as any).deviation) < 0)) // 켜기 기준이 끄기 기준보다 낮으면 막음
+          && !(Number((cond as any).deviation) < 0)) // 편차가 음수면 막음
       )
   }
   return true
