@@ -23,7 +23,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
+# 80 은 https://$host:8443 으로 301 리다이렉트만 하므로(컨테이너 안엔 8443 없음) 443 을 직접 확인한다
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:80/ || exit 1
+  CMD wget -q --spider --no-check-certificate https://127.0.0.1/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

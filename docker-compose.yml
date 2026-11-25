@@ -55,7 +55,8 @@ services:
       - sfm-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/uptime' -C 1 -W 3 || exit 1"]
+      # allow_anonymous false 라 인증 없는 mosquitto_sub 는 항상 거부됨 → 1883 수신 여부만 확인(비밀번호를 compose 에 넣지 않기 위해)
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -121,6 +122,12 @@ services:
     container_name: sfm-frontend
     ports:
       - "81:80"
+    healthcheck:
+      # 이미지 HEALTHCHECK 와 같음 — 이미지 재빌드 없이도 적용되게 compose 에도 둠
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
       - backend
     networks:
