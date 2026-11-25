@@ -140,5 +140,6 @@ curl -X POST http://172.30.1.42:3100/api/config-deploy/register-tunnel-key \
 | eth0 static IP | `192.168.0.100/24` |
 | Gateway / DNS | `192.168.0.1` / `8.8.8.8` |
 | Bootstrap token | `/etc/smartfarm/bootstrap.token` (Pi) + `BOOTSTRAP_TOKEN` (서버 env) |
+| 자격증명 교체 | 서버 MQTT 비밀번호·BOOTSTRAP_TOKEN 이 바뀌면 Pi 에서 `scripts/apply-credentials.sh` 실행 (2026-11-25 교체분은 운영자 맥 `~/secrets/` 참고) |
 
 > ⚠️ 보안: 골든 이미지에 기본 비밀번호가 평문으로 들어가 있습니다. **농장에 배포 후 반드시** `passwd` 명령으로 비밀번호 변경, 또는 ConfigDeploy 페이지에서 무선/hostname 변경 시 함께 절차로 진행하세요. (향후 사이클에서 LUKS / TPM 검토 예정)
